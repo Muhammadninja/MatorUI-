@@ -112,13 +112,12 @@ function RootNavigation() {
       <NavigationThemeProvider value={navigationTheme}>
         <Stack screenOptions={{ contentStyle: { backgroundColor: tokens.background } }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="(profile)" options={{ headerShown: false }} />
+          <Stack.Screen name="(settings)" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="order-history" options={{ headerShown: false }} />
-          <Stack.Screen name="shipping-addresses" options={{ headerShown: false }} />
-          <Stack.Screen name="settings-security" options={{ headerShown: false }} />
-          <Stack.Screen name="notification-settings" options={{ headerShown: false }} />
-          <Stack.Screen name="edit-profile" options={{ headerShown: false }} />
-          <Stack.Screen name="payment-methods" options={{ headerShown: false }} />
+          <Stack.Screen name="notifications" options={{ headerShown: false }} />
+          <Stack.Screen name="top-featured" options={{ headerShown: false }} />
+          <Stack.Screen name="item-detail" options={{ headerShown: false }} />
         </Stack>
       </NavigationThemeProvider>
     </AppView>

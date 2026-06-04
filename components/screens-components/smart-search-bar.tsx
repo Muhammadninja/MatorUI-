@@ -1,4 +1,4 @@
-import { Bell, Camera, Mic, Sparkles } from 'lucide-react-native';
+import { Bell, Mic, Sparkles } from 'lucide-react-native';
 import { StyleSheet } from 'react-native';
 import { Controller } from 'react-hook-form';
 
@@ -56,16 +56,6 @@ export function SmartSearchBar({
           }
           rightAdornment={
             <AppView row align="center" gap={8}>
-              <AppPressableView
-                center
-                rounded={36}
-                onPress={onImageSearchPress}
-                androidRipple
-                accessibilityLabel="Search with photo"
-                style={styles.adornmentIcon}
-              >
-                <Camera size={18} strokeWidth={2.4} color={tokens.text} />
-              </AppPressableView>
               <AppPressableView
                 center
                 rounded={36}

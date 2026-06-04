@@ -21,6 +21,7 @@ export type SearchPartCardProps = {
   actionLabel?: string;
   compact?: boolean;
   style?: StyleProp<ViewStyle>;
+  onPress?: () => void;
 };
 
 export default function SearchPartCard({
@@ -34,6 +35,7 @@ export default function SearchPartCard({
   actionLabel = 'Add to cart',
   compact = false,
   style,
+  onPress,
 }: SearchPartCardProps) {
   const { scheme, tokens } = useThemeContext();
   const { addItem } = useCartContext();
@@ -91,6 +93,7 @@ export default function SearchPartCard({
       rounded={24}
       shadowLevel={8}
       style={[cardShadowStyle, style]}
+      onPress={onPress}
       media={
         <AppView style={{ position: 'relative' }}>
           <Image

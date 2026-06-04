@@ -21,7 +21,7 @@ export function SearchQuickFilters() {
   const { scheme, tokens } = useThemeContext();
 
   return (
-      <AppView gap={12} mt={8} px={8}>
+      <AppView gap={12} px={8}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
