@@ -1,0 +1,201 @@
+================================================================================
+  MATORUI — AI CHATBOT SCREEN  |  BACKEND API SPECIFICATION
+  Prepared for: Backend Developer
+  Date: 2026-06-04
+  Frontend stack: Expo (React Native), TypeScript
+  Frontend context files:
+    - components/screens-components/ai-chatbot.tsx
+    - services/ai-chat-service.ts
+================================================================================
+
+Base path:
+  /api/v1/chatbot
+
+Authentication:
+  Bearer token in Authorization header for all endpoints.
+
+Primary frontend behaviors to support:
+  - Start or continue a chatbot conversation.
+  - Send a user message and receive an assistant reply.
+  - Restore recent chat history.
+  - Use selected vehicle context to improve fitment and catalog answers.
+  - Support future action categories: fitment, order tracking, deals, returns.
+
+--------------------------------------------------------------------------------
+1.  LIST CONVERSATIONS  —  GET /api/v1/chatbot/conversations
+--------------------------------------------------------------------------------
+Purpose:
+  Populates "View chat history" and the history button in the top bar.
+
+Response 200 OK:
+  {
+    "conversations": [
+      {
+        "id": "string",
+        "title": "BMW F30 brake fitment",
+        "preview": "Confirmed rotor options for your F30 build.",
+        "updatedAt": "2026-06-03T20:12:00Z",
+        "vehicleContext": {
+          "makeId": "bmw",
+          "modelId": "3-series",
+          "trimId": "f30-340i",
+          "selectedCarName": "BMW 340i F30"
+        }
+      }
+    ]
+  }
+
+--------------------------------------------------------------------------------
+2.  GET CONVERSATION DETAIL  —  GET /api/v1/chatbot/conversations/:conversationId
+--------------------------------------------------------------------------------
+Purpose:
+  Restores a prior thread when a conversation is opened from history.
+
+Response 200 OK:
+  {
+    "id": "string",
+    "title": "string",
+    "preview": "string",
+    "updatedAt": "2026-06-03T20:12:00Z",
+    "vehicleContext": {
+      "makeId": "string",
+      "modelId": "string",
+      "trimId": "string",
+      "selectedCarName": "string"
+    },
+    "messages": [
+      {
+        "id": "string",
+        "role": "user",
+        "body": "Will this brake kit fit my BMW 340i F30?",
+        "title": null,
+        "caption": "Yesterday",
+        "createdAt": "2026-06-03T20:10:00Z"
+      },
+      {
+        "id": "string",
+        "role": "assistant",
+        "body": "For your BMW 340i F30 ...",
+        "title": "Matorui Assistant",
+        "caption": "Yesterday",
+        "createdAt": "2026-06-03T20:10:06Z"
+      }
+    ]
+  }
+
+Error responses:
+  404 { "error": "conversation_not_found" }
+
+--------------------------------------------------------------------------------
+3.  SEND MESSAGE  —  POST /api/v1/chatbot/messages
+--------------------------------------------------------------------------------
+Purpose:
+  Main chat request from the composer and quick suggestion chips.
+
+Request body:
+  {
+    "conversationId": "string|null",
+    "message": "Which upgrade fits my build?",
+    "vehicleContext": {
+      "makeId": "string",
+      "modelId": "string",
+      "trimId": "string",
+      "selectedCarName": "string"
+    }
+  }
+
+Notes:
+  - conversationId may be null on the first message.
+  - vehicleContext may be null if the user has not selected a vehicle yet.
+  - The backend should persist the user message and assistant reply in one flow.
+
+Response 200 OK:
+  {
+    "conversationId": "string",
+    "reply": {
+      "id": "string",
+      "role": "assistant",
+      "body": "For your BMW 340i F30, ...",
+      "title": "Matorui Assistant",
+      "caption": "Now",
+      "createdAt": "2026-06-04T10:49:00Z"
+    },
+    "suggestions": [
+      "Check part fitment",
+      "Track orders",
+      "What upgrades fit my build?"
+    ]
+  }
+
+Error responses:
+  422 { "error": "validation_error", "message": "message is required" }
+  503 { "error": "chat_service_unavailable", "message": "temporary upstream failure" }
+
+--------------------------------------------------------------------------------
+4.  OPTIONAL STREAMING RESPONSE  —  POST /api/v1/chatbot/messages/stream
+--------------------------------------------------------------------------------
+Purpose:
+  Optional future improvement for token streaming instead of waiting for a full
+  response. Not required for the current frontend implementation.
+
+Recommendation:
+  If implemented, keep the same request body as §3 and stream assistant chunks
+  plus a final message envelope containing conversationId and message metadata.
+
+--------------------------------------------------------------------------------
+5.  CLEAR CONVERSATION  —  DELETE /api/v1/chatbot/conversations/:conversationId
+--------------------------------------------------------------------------------
+Purpose:
+  Supports the top-right menu action when the frontend is upgraded from local
+  clear-chat state to backend-managed deletion.
+
+Response 204 No Content
+
+--------------------------------------------------------------------------------
+6.  DOMAIN EXPECTATIONS FOR RESPONSES
+--------------------------------------------------------------------------------
+The assistant should prefer structured, automotive-aware answers. Examples:
+  - Fitment: confirm compatibility, required inputs, edge cases, alternatives.
+  - Orders: shipment state, payment state, tracking URL, support escalation.
+  - Deals: promos relevant to the saved vehicle or cart.
+  - Returns/Warranty: policy summary and actionable next step.
+
+If vehicleContext is present, responses should explicitly account for it.
+
+--------------------------------------------------------------------------------
+7.  FRONTEND TYPES CURRENTLY EXPECTED
+--------------------------------------------------------------------------------
+Conversation summary:
+  {
+    "id": "string",
+    "title": "string",
+    "preview": "string",
+    "updatedAt": "ISO-8601",
+    "vehicleContext": {
+      "makeId": "string",
+      "modelId": "string",
+      "trimId": "string",
+      "selectedCarName": "string"
+    }
+  }
+
+Message shape:
+  {
+    "id": "string",
+    "role": "assistant|user",
+    "body": "string",
+    "title": "string|null",
+    "caption": "string|null",
+    "createdAt": "ISO-8601"
+  }
+
+--------------------------------------------------------------------------------
+8.  IMPLEMENTATION NOTES
+--------------------------------------------------------------------------------
+  - Keep message IDs stable strings; UUID is preferred.
+  - createdAt should always be ISO-8601.
+  - selectedCarName is display-ready text for the mobile UI.
+  - makeId/modelId/trimId should stay opaque backend identifiers.
+  - The frontend already has a vehicle picker modal and will pass those IDs.
+  - The frontend is currently using mock history and mock send logic via
+    services/ai-chat-service.ts until these endpoints are ready.

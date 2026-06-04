@@ -1,0 +1,556 @@
+================================================================================
+  MATORUI — PROFILE SECTION  |  BACKEND API SPECIFICATION
+  Prepared for: Backend Developer
+  Date: 2026-06-04
+  Frontend stack: Expo (React Native), TypeScript
+  Frontend context file: contexts/user.context.tsx
+================================================================================
+
+This document covers every API endpoint needed to power the Profile tab and all
+screens reachable from it. Base path: /api/v1
+Authentication: Bearer token in Authorization header for all endpoints.
+
+Screens covered:
+  - Profile (tab)
+  - Edit Profile
+  - Order History
+  - Shipping Addresses
+  - Settings & Security
+  - Notification Settings
+  - Payment Methods
+  - Recently Viewed (also on Search tab)
+  - Privacy & Security (bottom sheet)
+
+--------------------------------------------------------------------------------
+1.  USER PROFILE  —  GET /api/v1/me
+--------------------------------------------------------------------------------
+Purpose:
+  Fetches the authenticated user's profile. Called on app mount and on
+  pull-to-refresh on the Profile tab.
+  Frontend hook: useUserContext().refreshProfile()
+
+Response  200 OK:
+  {
+    "id": "string",             // UUID
+    "firstName": "string",
+    "lastName": "string",
+    "username": "string",       // e.g. "m.abdullaev"  (no leading @)
+    "email": "string",
+    "bio": "string|null",
+    "avatarUrl": "string|null", // fully-qualified URL or null
+    "isPremium": true,
+    "memberSince": "2024-03-15T00:00:00Z"  // ISO 8601
+  }
+
+Frontend usage:
+  - Hero card: displays firstName + lastName as full name, first initials as
+    avatar fallback, isPremium drives the gold star vs. grey shield badge.
+  - Settings & Security: email shown next to "Change Email" row.
+  - Edit Profile: pre-fills all form fields.
+
+--------------------------------------------------------------------------------
+2.  UPDATE PROFILE  —  PATCH /api/v1/me
+--------------------------------------------------------------------------------
+Purpose:
+  Partial update from the Edit Profile screen.
+  Frontend calls this when the user taps the ✓ header button or "Save Changes".
+  Frontend hook: useUserContext().updateProfile(patch)
+  The frontend does an optimistic local update and rolls back on error.
+
+Request body (JSON, all fields optional):
+  {
+    "firstName": "string",
+    "lastName": "string",
+    "username": "string",       // without leading @
+    "bio": "string|null",
+    "avatarUrl": "string|null"  // URL after a separate upload (see §3)
+  }
+
+Response  200 OK:
+  Full UserProfile object (same shape as §1)
+
+Error responses:
+  409 { "error": "username_taken", "message": "..." }
+  422 { "error": "validation_error", "fields": { "username": "too short" } }
+
+--------------------------------------------------------------------------------
+3.  AVATAR UPLOAD  —  POST /api/v1/me/avatar
+--------------------------------------------------------------------------------
+Purpose:
+  Uploads a new profile picture from the Edit Profile screen (camera badge).
+  The frontend sends the image as multipart/form-data, then stores the returned
+  URL and calls PATCH /api/v1/me with { avatarUrl }.
+
+Request:
+  Content-Type: multipart/form-data
+  Field name: "avatar"
+  Accepted MIME types: image/jpeg, image/png, image/webp
+  Max size: 5 MB
+
+Response  200 OK:
+  {
+    "avatarUrl": "string"   // fully-qualified URL to the stored image
+  }
+
+Error responses:
+  413 { "error": "file_too_large" }
+  415 { "error": "unsupported_media_type" }
+
+--------------------------------------------------------------------------------
+4.  ORDER HISTORY  —  GET /api/v1/me/orders
+--------------------------------------------------------------------------------
+Purpose:
+  List of past orders shown on the Order History screen.
+
+Request query params:
+  page    number  default 1
+  limit   number  default 20
+  status  string  optional — filter by: "Delivered" | "In Transit" |
+                             "Processing" | "Cancelled"
+
+Response  200 OK:
+  {
+    "orders": [
+      {
+        "id": "string",         // e.g. "ORD-8821"
+        "date": "string",       // formatted display date, e.g. "May 28, 2026"
+                                // OR return ISO 8601 and let frontend format
+        "status": "string",     // "Delivered" | "In Transit" | "Processing" | "Cancelled"
+        "itemCount": 3,
+        "total": "string",      // formatted, e.g. "$486.00"
+        "summary": "string"     // short text, e.g. "Garrett GTX3582R + 2 items"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "total": 12,
+      "hasNext": false
+    }
+  }
+
+Status color mapping (frontend already handles this):
+  Delivered  → green   #0f9d58
+  In Transit → yellow  #f4b400
+  Processing → blue    #4285f4
+  Cancelled  → red     #db4437
+
+--------------------------------------------------------------------------------
+5.  ORDER DETAIL  —  GET /api/v1/me/orders/:orderId
+--------------------------------------------------------------------------------
+Purpose:
+  Tapping a row on Order History navigates to the detail view (future screen).
+  Include this endpoint so the frontend can be built out when needed.
+
+Response  200 OK:
+  {
+    "id": "string",
+    "date": "string",
+    "status": "string",
+    "items": [
+      {
+        "id": "string",
+        "title": "string",
+        "price": "string",
+        "quantity": 1,
+        "imageUrl": "string|null"
+      }
+    ],
+    "subtotal": "string",
+    "shipping": "string",
+    "total": "string",
+    "shippingAddress": { /* same shape as §6 address object */ },
+    "trackingNumber": "string|null"
+  }
+
+Error responses:
+  404 { "error": "order_not_found" }
+
+--------------------------------------------------------------------------------
+6.  SHIPPING ADDRESSES  —  GET /api/v1/me/addresses
+--------------------------------------------------------------------------------
+Purpose:
+  List saved shipping addresses. Displayed on the Shipping Addresses screen.
+
+Response  200 OK:
+  {
+    "addresses": [
+      {
+        "id": "string",
+        "label": "string",      // e.g. "Home", "Work", "Garage"
+        "name": "string",       // recipient name
+        "line1": "string",      // street address
+        "line2": "string",      // city, state, zip, country
+        "isDefault": true
+      }
+    ]
+  }
+
+--------------------------------------------------------------------------------
+7.  ADD ADDRESS  —  POST /api/v1/me/addresses
+--------------------------------------------------------------------------------
+Request body:
+  {
+    "label": "string",
+    "name": "string",
+    "line1": "string",
+    "line2": "string",
+    "setAsDefault": false
+  }
+
+Response  201 Created:
+  Full address object (same shape as item in §6)
+
+Error responses:
+  422 { "error": "validation_error", "fields": { ... } }
+
+--------------------------------------------------------------------------------
+8.  UPDATE ADDRESS  —  PATCH /api/v1/me/addresses/:addressId
+--------------------------------------------------------------------------------
+Request body: any subset of the address fields from §7
+Response  200 OK: full address object
+
+--------------------------------------------------------------------------------
+9.  DELETE ADDRESS  —  DELETE /api/v1/me/addresses/:addressId
+--------------------------------------------------------------------------------
+Response  204 No Content
+
+Error responses:
+  404 { "error": "address_not_found" }
+  409 { "error": "cannot_delete_default", "message": "Set another address as default first." }
+
+--------------------------------------------------------------------------------
+10. SET DEFAULT ADDRESS  —  POST /api/v1/me/addresses/:addressId/set-default
+--------------------------------------------------------------------------------
+Response  200 OK:
+  {
+    "defaultAddressId": "string"
+  }
+
+--------------------------------------------------------------------------------
+11. PAYMENT CARDS  —  GET /api/v1/me/payment-methods
+--------------------------------------------------------------------------------
+Purpose:
+  List saved payment cards shown on the Payment Methods screen.
+  The frontend never receives raw card numbers — only masked last4.
+
+Response  200 OK:
+  {
+    "cards": [
+      {
+        "id": "string",
+        "brand": "string",      // "VISA" | "MC" | "AMEX" | "DISCOVER"
+        "last4": "string",      // e.g. "4289"
+        "holder": "string",
+        "expiry": "string",     // "MM/YY"
+        "isDefault": true,
+        "cardColor": "string|null",    // optional hex for card background
+        "accentColor": "string|null"   // optional hex for decorative circles
+      }
+    ]
+  }
+
+--------------------------------------------------------------------------------
+12. ADD PAYMENT CARD  —  POST /api/v1/me/payment-methods
+--------------------------------------------------------------------------------
+Purpose:
+  Triggered from the "+ Add Card" button. The frontend should open a
+  Stripe / payment-processor SDK sheet rather than collecting raw numbers.
+  This endpoint receives a processor token, not raw card data.
+
+Request body:
+  {
+    "processorToken": "string",  // token from Stripe/Adyen/etc.
+    "setAsDefault": false
+  }
+
+Response  201 Created:
+  Full card object (same shape as item in §11)
+
+Error responses:
+  402 { "error": "card_declined", "message": "..." }
+  422 { "error": "invalid_token" }
+
+--------------------------------------------------------------------------------
+13. DELETE PAYMENT CARD  —  DELETE /api/v1/me/payment-methods/:cardId
+--------------------------------------------------------------------------------
+Response  204 No Content
+
+Error responses:
+  404 { "error": "card_not_found" }
+  409 { "error": "cannot_delete_default", "message": "Set another card as default first." }
+
+--------------------------------------------------------------------------------
+14. SET DEFAULT CARD  —  POST /api/v1/me/payment-methods/:cardId/set-default
+--------------------------------------------------------------------------------
+Response  200 OK:
+  {
+    "defaultCardId": "string"
+  }
+
+--------------------------------------------------------------------------------
+15. SUBSCRIPTION  —  GET /api/v1/me/subscription
+--------------------------------------------------------------------------------
+Purpose:
+  Shown in the Subscription section of the Payment Methods screen.
+
+Response  200 OK:
+  {
+    "plan": "string",           // "Premium" | "Standard" | "Trial"
+    "status": "string",         // "active" | "cancelled" | "past_due" | "trialing"
+    "billingCycle": "string",   // "monthly" | "annual"
+    "priceDisplay": "string",   // "$14.99 / mo"
+    "nextRenewal": "string",    // ISO 8601 or display date
+    "cancelledAt": "string|null"
+  }
+
+  Returns null subscription data if the user has no paid plan.
+
+--------------------------------------------------------------------------------
+16. CANCEL SUBSCRIPTION  —  POST /api/v1/me/subscription/cancel
+--------------------------------------------------------------------------------
+Purpose:
+  "Cancel Subscription" danger button on the Payment Methods screen.
+
+Response  200 OK:
+  {
+    "cancelledAt": "string",    // ISO 8601
+    "accessUntil": "string"     // user retains access until end of billing period
+  }
+
+Error responses:
+  409 { "error": "already_cancelled" }
+
+--------------------------------------------------------------------------------
+17. NOTIFICATION PREFERENCES  —  GET /api/v1/me/notifications
+--------------------------------------------------------------------------------
+Purpose:
+  Initial state for the Notification Settings screen toggles.
+
+Response  200 OK:
+  {
+    "masterEnabled": true,
+    "categories": {
+      "orderUpdates": true,
+      "promotions": false,
+      "priceAlerts": true,
+      "newArrivals": true
+    }
+  }
+
+--------------------------------------------------------------------------------
+18. UPDATE NOTIFICATION PREFERENCES  —  PATCH /api/v1/me/notifications
+--------------------------------------------------------------------------------
+Request body (all fields optional):
+  {
+    "masterEnabled": true,
+    "categories": {
+      "orderUpdates": true,
+      "promotions": false,
+      "priceAlerts": true,
+      "newArrivals": true
+    }
+  }
+
+Response  200 OK: same shape as §17
+
+--------------------------------------------------------------------------------
+19. CHANGE EMAIL  —  POST /api/v1/me/change-email
+--------------------------------------------------------------------------------
+Purpose:
+  Triggered from Settings & Security → Change Email.
+
+Request body:
+  {
+    "newEmail": "string",
+    "currentPassword": "string"
+  }
+
+Response  200 OK:
+  {
+    "message": "Verification email sent to new address."
+  }
+
+Error responses:
+  400 { "error": "invalid_email" }
+  401 { "error": "wrong_password" }
+  409 { "error": "email_already_used" }
+
+--------------------------------------------------------------------------------
+20. CHANGE PASSWORD  —  POST /api/v1/me/change-password
+--------------------------------------------------------------------------------
+Request body:
+  {
+    "currentPassword": "string",
+    "newPassword": "string"
+  }
+
+Response  200 OK:
+  {
+    "message": "Password updated successfully."
+  }
+
+Error responses:
+  401 { "error": "wrong_password" }
+  422 { "error": "password_too_weak", "message": "..." }
+
+--------------------------------------------------------------------------------
+21. BIOMETRICS / 2FA  —  GET & PATCH /api/v1/me/security
+--------------------------------------------------------------------------------
+GET — current security settings:
+  Response  200 OK:
+  {
+    "biometricsEnabled": false,
+    "twoFactorEnabled": false,
+    "twoFactorMethod": "totp|sms|null"
+  }
+
+PATCH — update:
+  Request body (all optional):
+  {
+    "biometricsEnabled": true,
+    "twoFactorEnabled": true,
+    "twoFactorMethod": "totp"
+  }
+  Response  200 OK: same shape as GET
+
+--------------------------------------------------------------------------------
+22. CHANGE LANGUAGE  —  PATCH /api/v1/me/language
+--------------------------------------------------------------------------------
+Request body:
+  {
+    "locale": "string"   // BCP 47, e.g. "en-US", "uz-UZ", "ru-RU"
+  }
+
+Response  200 OK:
+  {
+    "locale": "string"
+  }
+
+--------------------------------------------------------------------------------
+23. RECENTLY VIEWED  —  see search-api-spec.txt §7
+--------------------------------------------------------------------------------
+  GET  /api/v1/me/recently-viewed   — list
+  POST /api/v1/me/recently-viewed   — record a view
+
+  Also powers the Recently Viewed strip on the Profile tab and the full
+  /recently-viewed screen.
+
+--------------------------------------------------------------------------------
+24. PRIVACY — DATA & PERSONALIZATION  —  GET /api/v1/me/privacy
+--------------------------------------------------------------------------------
+Purpose:
+  Shown in the Privacy & Security bottom sheet → "Data & Personalization" row.
+
+Response  200 OK:
+  {
+    "personalisedAds": true,
+    "analyticsEnabled": true,
+    "dataRetentionDays": 365
+  }
+
+--------------------------------------------------------------------------------
+25. PRIVACY — CONNECTED APPS  —  GET & DELETE /api/v1/me/connected-apps
+--------------------------------------------------------------------------------
+GET — list connected third-party apps:
+  Response  200 OK:
+  {
+    "apps": [
+      {
+        "id": "string",
+        "name": "string",
+        "iconUrl": "string|null",
+        "connectedAt": "string",
+        "scopes": ["string"]
+      }
+    ]
+  }
+
+DELETE /api/v1/me/connected-apps/:appId — revoke access:
+  Response  204 No Content
+
+--------------------------------------------------------------------------------
+26. DELETE ACCOUNT  —  DELETE /api/v1/me
+--------------------------------------------------------------------------------
+Purpose:
+  "Delete Account" danger row inside the Privacy & Security bottom sheet.
+  Should require the user to re-authenticate (confirmation password/OTP)
+  before the account is deleted.
+
+Request body:
+  {
+    "confirmPassword": "string"
+  }
+
+Response  200 OK:
+  {
+    "message": "Account scheduled for deletion.",
+    "deletedAt": "string"   // ISO 8601 — actual deletion after grace period
+  }
+
+Error responses:
+  401 { "error": "wrong_password" }
+
+--------------------------------------------------------------------------------
+27. SIGN OUT  —  POST /api/v1/auth/logout
+--------------------------------------------------------------------------------
+Purpose:
+  "Sign Out" row at the bottom of Settings & Security.
+  Invalidates the current refresh token server-side.
+
+Request body:
+  {
+    "refreshToken": "string"
+  }
+
+Response  200 OK:
+  {
+    "message": "Logged out successfully."
+  }
+
+================================================================================
+  COMMON ERROR SHAPE
+================================================================================
+
+All errors:
+  {
+    "error": "snake_case_code",
+    "message": "Human-readable description",
+    "fields": { ... }   // optional, for validation errors
+  }
+
+HTTP status codes used:
+  200 OK, 201 Created, 204 No Content
+  400 Bad Request, 401 Unauthorized, 402 Payment Required
+  403 Forbidden, 404 Not Found, 409 Conflict
+  413 Payload Too Large, 415 Unsupported Media Type
+  422 Unprocessable Entity, 500 Internal Server Error
+
+================================================================================
+  INTEGRATION NOTES FOR FRONTEND
+================================================================================
+
+1. All TODO stubs are in contexts/user.context.tsx. Each function has a comment
+   showing the exact endpoint to call:
+     refreshProfile()  → GET  /api/v1/me
+     updateProfile()   → PATCH /api/v1/me
+
+2. The frontend uses optimistic updates for profile edits. If the API returns
+   an error, the state rolls back automatically — no extra work needed on the
+   frontend side.
+
+3. Notification toggle state is currently local (useState). Once §17/§18 are
+   ready, replace the useState initial values with a useEffect that calls
+   GET /api/v1/me/notifications, and fire PATCH on every toggle change.
+
+4. Payment card colours (cardColor, accentColor in §11) are optional. The
+   frontend has fallback colours (#0d0d0d, #0f0c29) if the API omits them.
+
+5. The Privacy sheet (§24–§26) is currently a static UI. Wire it up once the
+   endpoints are available — no frontend structural changes needed.
+
+6. For security operations (change email, change password, delete account)
+   the frontend will need a password confirmation modal — not yet built.
+   Coordinate with the frontend team before implementing.
+
+================================================================================

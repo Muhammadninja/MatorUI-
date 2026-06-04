@@ -1,0 +1,163 @@
+SEARCH PAGE BACKEND HANDOFF
+
+Screen purpose:
+- Search/discovery landing page.
+- Current UI contains 5 data-driven areas:
+  1. Smart search header
+  2. Quick filter chips
+  3. Catalogue horizontal carousel
+  4. Promo banner / sponsored placement
+  5. Top Featured preview grid
+- This screen should be easy to hydrate from one aggregated endpoint or from separate section endpoints.
+
+Recommended REST approach:
+- Preferred: GET /search/home
+- Alternative split endpoints:
+  - GET /search/quick-filters
+  - GET /search/catalogue
+  - GET /search/promo-banners
+  - GET /search/top-featured-preview
+
+Recommended query params from frontend:
+- query: string
+- quickFilter: string
+- page: number
+- pageSize: number
+- includeCatalogue: boolean
+- includePromotions: boolean
+- includeTopFeatured: boolean
+
+Current default query payload example:
+- query: ""
+- quickFilter: "Trending now"
+- page: 1
+- pageSize: 10
+- includeCatalogue: true
+- includePromotions: true
+- includeTopFeatured: true
+
+Aggregated response fields expected by frontend:
+- requestId: string
+- query: string
+- selectedQuickFilter: string | null
+- quickFilters: SearchQuickFilterItem[]
+- catalogue: SearchCatalogueItem[]
+- promoBanners: SearchPromoBannerItem[]
+- topFeaturedPreview: SearchTopFeaturedItem[]
+- websocket: SearchPageSocketConfig
+- snapshotVersion: string
+
+Smart search header actions that backend may support:
+- typed text query
+- voice search trigger result payload (if supported later)
+- image search trigger result payload (if supported later)
+- notification badge/count payload (optional)
+
+SearchQuickFilterItem fields:
+- id: string
+- label: string
+- slug: string
+- selected?: boolean
+- icon?: string
+- count?: number
+- query?: string
+
+Current quick filter labels in UI:
+- Trending now
+- Electric cars
+- Under $20k
+- SUV deals
+- Nearby garages
+- AI picks
+
+SearchCatalogueItem fields:
+- id: string
+- badge: string
+- status: string
+- title: string
+- description: string
+- price: string
+- imageUrl?: string
+- model?: string
+- brand?: string
+- color?: string
+- condition?: string
+- inventoryStatus?: string
+- deeplink?: string
+- actionLabel?: string
+
+Catalogue section notes:
+- Rendered as a horizontal carousel.
+- Frontend currently expects enough cards to scroll sideways.
+- Cards should be stable by id.
+
+SearchPromoBannerItem fields:
+- id: string
+- badge: string
+- sponsorLabel: string
+- title: string
+- description: string
+- ctaPrimaryLabel: string
+- ctaSecondaryLabel?: string
+- imageUrl?: string
+- deeplink?: string
+- campaignId?: string
+- impressionId?: string
+
+Promo banner notes:
+- Current UI shows one sponsored placement block.
+- Backend can return one active banner or multiple banners if rotation is planned.
+
+SearchTopFeaturedItem fields:
+- id: string
+- badge: string
+- status: string
+- title: string
+- description: string
+- price: string
+- imageUrl?: string
+- model?: string
+- brand?: string
+- color?: string
+- condition?: string
+- featuredRank?: number
+- deeplink?: string
+
+Top Featured preview notes:
+- Current search page shows a small preview grid.
+- "View all" routes to the dedicated Top Featured page.
+- Keep item field names aligned with the Top Featured backend contract when possible.
+
+Recommended WebSocket channel for live refresh:
+- search_home:feed
+
+Recommended WebSocket events:
+- search_home.snapshot
+- search_home.quick_filters.updated
+- search_home.catalogue.updated
+- search_home.promo.updated
+- search_home.top_featured.updated
+
+SearchPageSocketConfig fields:
+- channel: string
+- room: string
+- events: string[]
+
+WebSocket message fields:
+- event: string
+- snapshotVersion: string
+- timestamp: ISO string
+- requestId?: string
+- section?: quickFilters | catalogue | promoBanners | topFeaturedPreview
+- itemId?: string
+- payload?: SearchQuickFilterItem | SearchCatalogueItem | SearchPromoBannerItem | SearchTopFeaturedItem | object
+
+Frontend integration notes:
+- Search screen file: components/screens/search-screen.tsx
+- Smart search header file: components/screens-components/smart-search-bar.tsx
+- Quick filters file: components/screens-components/search-quick-filters.tsx
+- Catalogue section file: components/screens-components/search-catalogue.tsx
+- Promo banner file: components/screens-components/search-promo-banner.tsx
+- Top Featured preview file: components/screens-components/search-top-featured.tsx
+- Top Featured full screen already has its own backend handoff in txt/top-featured-backend-fields.txt
+- If backend keeps field names consistent between preview and full Top Featured responses, frontend reuse will be simpler.

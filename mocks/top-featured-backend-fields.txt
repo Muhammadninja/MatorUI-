@@ -1,0 +1,84 @@
+TOP FEATURED SCREEN BACKEND HANDOFF
+
+Screen purpose:
+- Full list page for Top Featured parts.
+- Current UI uses filter groups: model, brand, color, condition.
+- Filter badge count is based on number of non-empty selected filter groups.
+- Selected filters are also shown as highlighted chips in the expanded filter panel.
+
+Recommended REST endpoint:
+- GET /top-featured
+
+Recommended query params from frontend:
+- search: string
+- sortBy: featured | newest | price_asc | price_desc
+- page: number
+- pageSize: number
+- model: string
+- brand: string
+- color: string
+- condition: string
+
+Current default query payload example:
+- search: ""
+- sortBy: "featured"
+- page: 1
+- pageSize: 24
+- model: "SUV"
+- brand: "Tesla"
+- color: "Black"
+- condition: "New"
+
+Response fields expected by frontend:
+- items: TopFeaturedItem[]
+- total: number
+- page: number
+- pageSize: number
+- availableFilters: TopFeaturedAvailableFilterPayload[]
+- snapshotVersion: string
+- socketChannel: string
+
+TopFeaturedItem fields:
+- id: string
+- badge: string
+- status: string
+- title: string
+- description: string
+- price: string
+- model: string
+- brand: string
+- color: string
+- condition: string
+
+TopFeaturedAvailableFilterPayload fields:
+- key: model | brand | color | condition
+- title: Model | Brand | Color | Condition
+- options: TopFeaturedFilterOptionPayload[]
+
+TopFeaturedFilterOptionPayload fields:
+- value: string
+- label: string
+- count?: number
+
+WebSocket channel expected by frontend:
+- top_featured:catalog
+
+WebSocket events expected by frontend:
+- top_featured.snapshot
+- top_featured.item.created
+- top_featured.item.updated
+- top_featured.item.deleted
+- top_featured.filters.updated
+
+WebSocket message fields:
+- event: string
+- snapshotVersion: string
+- timestamp: ISO string
+- item?: TopFeaturedItem
+- itemId?: string
+- availableFilters?: TopFeaturedAvailableFilterPayload[]
+
+Frontend integration note:
+- The screen now reads filter groups and response data through services/top-featured-service.ts.
+- Replacing mock data with live API data should keep the same response field names to avoid UI rewrites.
+- WebSocket updates should publish the same item and filter field names used above.
