@@ -1,4 +1,5 @@
-import { Bell, Mic, Sparkles } from 'lucide-react-native';
+import { Bell, Camera, Mic, Sparkles } from 'lucide-react-native';
+import { StyleSheet } from 'react-native';
 import { Controller } from 'react-hook-form';
 
 import { AppForm, type FieldRegistry } from '@/components/shared/app-form';
@@ -20,7 +21,7 @@ export type SmartSearchBarProps = {
 };
 
 export function SmartSearchBar({
-  placeholder = 'Smart search everything...',
+  placeholder = 'Smart search...',
   onPress,
   onVoicePress,
   onImageSearchPress,
@@ -49,7 +50,7 @@ export function SmartSearchBar({
           onBlur={rhf.onBlur}
           disabled={disabled}
           leftAdornment={
-            <AppView rounded={36} center style={{ width: 32, height: 32 }}>
+            <AppView rounded={36} center style={styles.adornmentIcon}>
               <Sparkles size={18} strokeWidth={2.4} color={tokens.text} />
             </AppView>
           }
@@ -61,8 +62,9 @@ export function SmartSearchBar({
                 onPress={onImageSearchPress}
                 androidRipple
                 accessibilityLabel="Search with photo"
-                style={{ width: 32, height: 32 }}
+                style={styles.adornmentIcon}
               >
+                <Camera size={18} strokeWidth={2.4} color={tokens.text} />
               </AppPressableView>
               <AppPressableView
                 center
@@ -70,7 +72,7 @@ export function SmartSearchBar({
                 onPress={onVoicePress}
                 androidRipple
                 accessibilityLabel="Voice search"
-                style={{ width: 32, height: 32 }}
+                style={styles.adornmentIcon}
               >
                 <Mic size={18} strokeWidth={2.4} color={tokens.text} />
               </AppPressableView>
@@ -81,7 +83,7 @@ export function SmartSearchBar({
           containerPy={8}
           containerColorName="card"
           containerBorderName="border"
-          style={{ fontSize: 14 }}
+          style={styles.searchInput}
         />
       );
 
@@ -97,7 +99,7 @@ export function SmartSearchBar({
   };
 
   return (
-      <AppView row align="center" gap={12} px={12}>
+    <AppView row align="center" gap={12} px={12}>
       <AppView flex={1}>
         <AppForm<SearchValues>
           config={{ fields: [searchField] }}
@@ -119,12 +121,26 @@ export function SmartSearchBar({
         onPress={onNotificationPress}
         androidRipple
         accessibilityLabel="Notifications"
-        style={{ width: 36, height: 36 }}
+        style={styles.notificationButton}
       >
         <Bell size={18} strokeWidth={2.4} color={tokens.onSecondary} />
       </AppPressableView>
     </AppView>
   );
 }
+
+const styles = StyleSheet.create({
+  adornmentIcon: {
+    width: 32,
+    height: 32,
+  },
+  notificationButton: {
+    width: 36,
+    height: 36,
+  },
+  searchInput: {
+    fontSize: 14,
+  },
+});
 
 export default SmartSearchBar;
