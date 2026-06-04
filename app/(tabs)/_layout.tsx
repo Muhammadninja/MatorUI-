@@ -1,5 +1,5 @@
 import { Link, Tabs } from 'expo-router';
-import { Bell, BotMessageSquare, Car, Search, ShoppingCart, UserRound } from 'lucide-react-native';
+import { Bell, BotMessageSquare, Car, Compass, ShoppingCart, UserRound } from 'lucide-react-native';
 
 import Tab_Bar from '@/components/customs/Tab_Bar';
 import { AppPressableView } from '@/components/shared/app-view';
@@ -14,7 +14,7 @@ export default function TabLayout() {
   const { itemCount } = useCartContext();
 
   const visibleIconMap = {
-    index: Search,
+    index: Compass,
     garage: Car,
     cart: ShoppingCart,
     profile: UserRound,
@@ -67,6 +67,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
+          title: 'Explore',
           headerShown: false,
           headerRight: () => (
             <Link href="/modal" asChild>
