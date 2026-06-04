@@ -1,1 +1,1 @@
-export { default } from '@/components/screens/search-screen';
+export { default } from '@/src/screens/ExploreScreen';
