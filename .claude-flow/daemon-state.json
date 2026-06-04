@@ -1,0 +1,140 @@
+{
+  "running": true,
+  "startedAt": "2026-06-04T21:03:01.460Z",
+  "workers": {
+    "map": {
+      "runCount": 1,
+      "successCount": 1,
+      "failureCount": 0,
+      "averageDurationMs": 1,
+      "isRunning": false,
+      "nextRun": "2026-06-04T21:18:01.463Z",
+      "lastStartedAt": "2026-06-04T21:03:01.462Z",
+      "lastRun": "2026-06-04T21:03:01.463Z"
+    },
+    "audit": {
+      "runCount": 1,
+      "successCount": 1,
+      "failureCount": 0,
+      "averageDurationMs": 33641,
+      "isRunning": false,
+      "nextRun": "2026-06-04T21:15:35.105Z",
+      "lastStartedAt": "2026-06-04T21:05:01.464Z",
+      "lastRun": "2026-06-04T21:05:35.105Z"
+    },
+    "optimize": {
+      "runCount": 1,
+      "successCount": 1,
+      "failureCount": 0,
+      "averageDurationMs": 159218,
+      "isRunning": false,
+      "nextRun": "2026-06-04T21:24:40.685Z",
+      "lastStartedAt": "2026-06-04T21:07:01.466Z",
+      "lastRun": "2026-06-04T21:09:40.684Z"
+    },
+    "consolidate": {
+      "runCount": 1,
+      "successCount": 1,
+      "failureCount": 0,
+      "averageDurationMs": 4,
+      "isRunning": false,
+      "nextRun": "2026-06-04T21:39:01.474Z",
+      "lastStartedAt": "2026-06-04T21:09:01.468Z",
+      "lastRun": "2026-06-04T21:09:01.472Z"
+    },
+    "testgaps": {
+      "runCount": 1,
+      "successCount": 1,
+      "failureCount": 0,
+      "averageDurationMs": 129243,
+      "isRunning": false,
+      "nextRun": "2026-06-04T21:11:01.461Z",
+      "lastStartedAt": "2026-06-04T21:11:01.470Z",
+      "lastRun": "2026-06-04T21:13:10.713Z"
+    },
+    "predict": {
+      "runCount": 0,
+      "successCount": 0,
+      "failureCount": 0,
+      "averageDurationMs": 0,
+      "isRunning": false
+    },
+    "document": {
+      "runCount": 0,
+      "successCount": 0,
+      "failureCount": 0,
+      "averageDurationMs": 0,
+      "isRunning": false
+    }
+  },
+  "config": {
+    "autoStart": false,
+    "logDir": "/Users/muhammadfotihabdullaev/Desktop/matorui/.claude-flow/logs",
+    "stateFile": "/Users/muhammadfotihabdullaev/Desktop/matorui/.claude-flow/daemon-state.json",
+    "maxConcurrent": 2,
+    "workerTimeoutMs": 960000,
+    "resourceThresholds": {
+      "maxCpuLoad": 11.200000000000001,
+      "minFreeMemoryPercent": 5
+    },
+    "workers": [
+      {
+        "type": "map",
+        "intervalMs": 900000,
+        "offsetMs": 0,
+        "priority": "normal",
+        "description": "Codebase mapping",
+        "enabled": true
+      },
+      {
+        "type": "audit",
+        "intervalMs": 600000,
+        "offsetMs": 120000,
+        "priority": "critical",
+        "description": "Security analysis",
+        "enabled": true
+      },
+      {
+        "type": "optimize",
+        "intervalMs": 900000,
+        "offsetMs": 240000,
+        "priority": "high",
+        "description": "Performance optimization",
+        "enabled": true
+      },
+      {
+        "type": "consolidate",
+        "intervalMs": 1800000,
+        "offsetMs": 360000,
+        "priority": "low",
+        "description": "Memory consolidation",
+        "enabled": true
+      },
+      {
+        "type": "testgaps",
+        "intervalMs": 1200000,
+        "offsetMs": 480000,
+        "priority": "normal",
+        "description": "Test coverage analysis",
+        "enabled": true
+      },
+      {
+        "type": "predict",
+        "intervalMs": 600000,
+        "offsetMs": 0,
+        "priority": "low",
+        "description": "Predictive preloading",
+        "enabled": false
+      },
+      {
+        "type": "document",
+        "intervalMs": 3600000,
+        "offsetMs": 0,
+        "priority": "low",
+        "description": "Auto-documentation",
+        "enabled": false
+      }
+    ]
+  },
+  "savedAt": "2026-06-04T21:13:10.714Z"
+}

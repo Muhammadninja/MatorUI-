@@ -1,0 +1,133 @@
+{
+  "timestamp": "2026-06-04T21:09:40.683Z",
+  "mode": "headless",
+  "workerType": "optimize",
+  "model": "sonnet",
+  "durationMs": 159215,
+  "executionId": "optimize_1780607221468_8oacm1",
+  "success": true,
+  "findings": {
+    "sections": [
+      {
+        "title": "Performance Analysis",
+        "content": "\nThis is a React Native / Expo app with mock data. There are no database queries, so N+1 query patterns do not apply to the current code. All other categories have real findings.\n\n---\n\n",
+        "level": 2
+      },
+      {
+        "title": "1. Unnecessary Re-renders",
+        "content": "\n",
+        "level": 3
+      },
+      {
+        "title": "A. `SmartSearchBar` — Component type recreated every render",
+        "content": "\n**File:** `components/screens-components/smart-search-bar.tsx:31–97`\n\n`searchField`, `searchRegistry`, and the inner `TextRenderer` component are defined **inside the render function body**. `TextRenderer` is a new function identity on every render, so React treats it as a brand-new component type and fully **unmounts and remounts** the `<AppTextField>` on every parent re-render — losing focus state and triggering layout.\n\n```tsx\n// PROBLEM — new object + new component type every render\nconst searchField: TextField<SearchValues> = { ... };\nconst searchRegistry: Partial<FieldRegistry> = {\n  text: ({ field, control, disabled }) => {\n    const TextRenderer = ({ field: rhf, fieldState }: any) => ( // ← created inside render\n      <AppTextField ... />\n    );\n    return <Controller render={TextRenderer} />;\n  },\n};\n```\n\n**Fix:** Move `searchField` to module level (it is static). Extract `TextRenderer` to a stable component outside `SmartSearchBar`.\n\n```tsx\n// module level — created once\nconst SEARCH_FIELD: TextField<SearchValues> = {\n  name: 'query',\n  type: 'text',\n  placeholder: 'Smart search everything...',\n  props: { autoCapitalize: 'none', autoCorrect: false },\n};\n\n// stable component — no remount on parent re-render\nfunction SearchTextRenderer({ field: rhf, fieldState, ...adornments }: any) {\n  return (\n    <AppTextField\n      value={rhf.value ?? ''}\n      onChangeText={rhf.onChange}\n      onBlur={rhf.onBlur}\n      errorText={fieldState.error?.message}\n      {...adornments}\n    />\n  );\n}\n```\n\n---\n\n",
+        "level": 4
+      },
+      {
+        "title": "B. `CartItemsSection` — Inline arrow functions break `memo` on list items",
+        "content": "\n**File:** `components/screens-components/cart-items-section.tsx:31–39`\n\nEvery render creates **three new arrow functions per item**. If `CartItemCard` uses `React.memo`, the new references defeat memoization and every card re-renders on any quantity change anywhere in the cart.\n\n```tsx\n// PROBLEM — new function references every render\n{items.map((item) => (\n  <CartItemCard\n    key={item.id}\n    item={item}\n    onIncrement={() => onIncrement(item.id)}   // new ref\n    onDecrement={() => onDecrement(item.id)}   // new ref\n    onRemove={() => onRemove(item.id)}         // new ref\n  />\n))}\n```\n\n**Fix:** Move the handlers into `CartItemCard` itself (it already receives `item.id`), or memoize the callbacks using a `useCallback` map keyed by id, or accept stable callbacks from the context directly.\n\n```tsx\n// Option: let CartItemCard close over its own id\n<CartItemCard\n  key={item.id}\n  item={item}\n  onIncrement={onIncrement}   // stable ref from useCallback in context\n  onDecrement={onDecrement}\n  onRemove={onRemove}\n/>\n\n// Inside CartItemCard:\nconst handleIncrement = useCallback(() => onIncrement(item.id), [onIncrement, item.id]);\n```\n\n---\n\n",
+        "level": 4
+      },
+      {
+        "title": "C. `ProfileScreen` — `iconBox()` and `items` arrays recreated every render",
+        "content": "\n**File:** `components/screens/profile-screen.tsx:25–111`\n\n`iconBox` is defined inside the component, so it's a new function every render. The `items` arrays passed to `ProfileSectionCard` are new object-literals every render. If `ProfileSectionCard` is or becomes memoized, this blocks it.\n\n```tsx\n// PROBLEM — new function, new arrays, new item objects every render\nfunction iconBox(Icon: ...) {\n  return <AppView>...</AppView>;  // new React element every call\n}\n\nitems={[\n  { key: 'orders', leading: iconBox(ClipboardList), onPress: () => router.push(...) },\n  ...\n]}\n```\n\n**Fix:** Move static item definitions outside the component. Use `useMemo` for items that depend on `tokens`, and `useCallback` for press handlers.\n\n```tsx\n// Outside component — no token dependency, icons are stable\nconst ACCOUNT_ITEMS_CONFIG = [\n  { key: 'orders', title: 'Order History', Icon: ClipboardList, route: '/order-history' },\n  ...\n];\n\n// Inside component — memoized\nconst accountItems = useMemo(() =>\n  ACCOUNT_ITEMS_CONFIG.map(({ key, title, Icon, route }) => ({\n    key,\n    title,\n    leading: <IconBox Icon={Icon} tokens={tokens} />,\n    rightChevron: true,\n    titleColorName: 'text' as const,\n    onPress: () => router.push(route),\n  })),\n  [tokens]\n);\n```\n\n---\n\n",
+        "level": 4
+      },
+      {
+        "title": "D. `AiChatbot` — Inline closures in suggestion chip lists",
+        "content": "\n**File:** `components/screens-components/ai-chatbot.tsx:289–321`\n\n```tsx\n// PROBLEM — new onPress every render for each chip\n{THINGS_I_CAN_DO.map((item) => (\n  <AiChatSuggestionChip\n    key={item.key}\n    label={item.label}\n    Icon={item.Icon}\n    onPress={() => { void pushMessage(item.label); }}  // new ref every render\n  />\n))}\n```\n\nSince `THINGS_I_CAN_DO` and `SHOPPING_QUESTIONS` are module-level constants, the chips are only re-rendered because their `onPress` is a new reference. **Fix:** Extract a memoized handler.\n\n```tsx\nconst handleChipPress = useCallback((label: string) => {\n  void pushMessage(label);\n}, [pushMessage]);\n\n// In render:\nonPress={() => handleChipPress(item.label)}\n// or pass the label as a prop and bind inside the chip\n```\n\n---\n\n",
+        "level": 4
+      },
+      {
+        "title": "2. Memory Leak — `AiChatbot.pushMessage`",
+        "content": "\n**File:** `components/screens-components/ai-chatbot.tsx:91–136`\n\n`pushMessage` is an `async` function. If the component unmounts while `sendAiChatMessageMock` is awaited, the `setConversationId`, `setMessages`, and `setIsSending` calls after the `await` execute on an unmounted component. In React Native this does not crash (unlike old class component `setState`), but it is a resource leak and will trigger \"Can't perform a React state update on an unmounted component\" warnings once real network calls are in place.\n\n```tsx\n// PROBLEM — no unmount guard\nasync function pushMessage(text: string) {\n  ...\n  setIsSending(true);\n  try {\n    const response = await sendAiChatMessageMock(...);  // yields here\n    setConversationId(response.conversationId);          // fires on unmounted component\n    setMessages((current) => [...current, response.reply]);\n  } finally {\n    setIsSending(false);\n  }\n}\n```\n\n**Fix:** Use an `isMounted` ref or an `AbortController`.\n\n```tsx\nconst isMountedRef = useRef(true);\nuseEffect(() => {\n  isMountedRef.current = true;\n  return () => { isMountedRef.current = false; };\n}, []);\n\nasync function pushMessage(text: string) {\n  ...\n  try {\n    const response = await sendAiChatMessageMock(...);\n    if (!isMountedRef.current) return;\n    setConversationId(response.conversationId);\n    setMessages((current) => [...current, response.reply]);\n  } finally {\n    if (isMountedRef.current) setIsSending(false);\n  }\n}\n```\n\n---\n\n",
+        "level": 3
+      },
+      {
+        "title": "3. Caching Opportunities",
+        "content": "\n",
+        "level": 3
+      },
+      {
+        "title": "A. `AppText` — 8 independent `useMemo` calls for trivial style fragments",
+        "content": "\n**File:** `components/shared/app-text/app-text.tsx:72–102`\n\nEach prop (`align`, `muted`, `italic`, `transform`, `underline`, `strike`, `fontSize`, `weight`) triggers its own `useMemo`. For text that uses none of these props (the common case), that is 8 memoized computations that all return `undefined`. Consolidating into a single `useMemo` reduces hook overhead.\n\n```tsx\n// CURRENT — 8 separate useMemo calls\nconst weightStyle  = useMemo(() => ..., [resolvedWeight]);\nconst alignStyle   = useMemo(() => ..., [align]);\nconst mutedStyle   = useMemo(() => ..., [muted, defaults.mutedOpacity]);\n// ...5 more\n\n// BETTER — single useMemo, same deps array content\nconst derivedStyles = useMemo(() => {\n  const weight    = resolvedWeight ? getWeightStyle(resolvedWeight) : undefined;\n  const alignS    = align ? { textAlign: align } : undefined;\n  const mutedS    = muted ? { opacity: defaults.mutedOpacity } : undefined;\n  const italicS   = italic ? { fontStyle: 'italic' } : undefined;\n  const transS    = transform ? { textTransform: transform } : undefined;\n  const fontSizeS = fontSize ? { fontSize } : undefined;\n  const decoLine  = underline && strike ? 'underline line-through'\n                  : underline ? 'underline' : strike ? 'line-through' : undefined;\n  const decoS     = decoLine ? { textDecorationLine: decoLine } : undefined;\n  return [weight, alignS, mutedS, italicS, transS, fontSizeS, decoS];\n}, [resolvedWeight, align, muted, defaults.mutedOpacity, italic, transform, fontSize, underline, strike]);\n```\n\n---\n\n",
+        "level": 4
+      },
+      {
+        "title": "B. Inline style objects in list maps",
+        "content": "\n**Files:**\n- `search-catalogue.tsx:73` — `style={{ width: CARD_WIDTH }}` inside `.map()`\n- `search-top-featured.tsx:45` — `style={{ width: '48%' }}` inside `.map()`\n\nThese objects are new references on every render. Extract as module-level constants.\n\n```tsx\n// search-catalogue.tsx — before map()\nconst CARD_STYLE = { width: CARD_WIDTH } as const;\n\n// search-top-featured.tsx\nconst HALF_CARD_STYLE = { width: '48%' } as const;\n```\n\n---\n\n",
+        "level": 4
+      },
+      {
+        "title": "C. `useThemeContext` fallback allocates new functions on every call",
+        "content": "\n**File:** `contexts/theme.context.tsx:58–59`\n\n```tsx\n// Called on every render of every consumer when outside a ThemeProvider\nconst fallbackSetScheme = () => undefined;    // new ref every call\nconst fallbackToggleScheme = () => undefined; // new ref every call\n```\n\n**Fix:** Hoist to module level.\n\n```tsx\nconst _noop = () => undefined;\n\nexport function useThemeContext() {\n  const context = useContext(ThemeContext);\n  const deviceScheme = useColorScheme();\n  const fallbackScheme: ThemeScheme = deviceScheme === 'dark' ? 'dark' : 'light';\n  return context ?? {\n    scheme: fallbackScheme,\n    tokens: fallbackScheme === 'dark' ? darkTokens : lightTokens,\n    setScheme: _noop,\n    toggleScheme: _noop,\n  };\n}\n```\n\n---\n\n",
+        "level": 4
+      },
+      {
+        "title": "Summary Table",
+        "content": "| # | Category | File | Severity | Fix |\n|---|----------|------|----------|-----|\n| 1 | Unnecessary re-render | `smart-search-bar.tsx:31` | **High** | Move `searchField` to module scope; extract `TextRenderer` as a stable component |\n| 2 | Unnecessary re-render | `cart-items-section.tsx:35` | **Medium** | Move handlers into `CartItemCard`; use stable callback refs |\n| 3 | Unnecessary re-render | `profile-screen.tsx:25` | **Medium** | Move static config outside; `useMemo` for items, `useCallback` for handlers |\n| 4 | Unnecessary re-render | `ai-chatbot.tsx:289` | **Low** | `useCallback` for chip press handler |\n| 5 | Memory leak | `ai-chatbot.tsx:91` | **Medium** | `isMountedRef` guard on async state updates |\n| 6 | Redundant computation | `app-text.tsx:72` | **Low** | Consolidate 8 `useMemo` into one |\n| 7 | Caching | `search-catalogue.tsx:73` | **Low** | Module-level style constants |\n| 8 | Caching | `theme.context.tsx:58` | **Low** | Module-level `_noop` for fallback callbacks |",
+        "level": 3
+      }
+    ],
+    "codeBlocks": [
+      {
+        "language": "tsx",
+        "code": "// PROBLEM — new object + new component type every render\nconst searchField: TextField<SearchValues> = { ... };\nconst searchRegistry: Partial<FieldRegistry> = {\n  text: ({ field, control, disabled }) => {\n    const TextRenderer = ({ field: rhf, fieldState }: any) => ( // ← created inside render\n      <AppTextField ... />\n    );\n    return <Controller render={TextRenderer} />;\n  },\n};"
+      },
+      {
+        "language": "tsx",
+        "code": "// module level — created once\nconst SEARCH_FIELD: TextField<SearchValues> = {\n  name: 'query',\n  type: 'text',\n  placeholder: 'Smart search everything...',\n  props: { autoCapitalize: 'none', autoCorrect: false },\n};\n\n// stable component — no remount on parent re-render\nfunction SearchTextRenderer({ field: rhf, fieldState, ...adornments }: any) {\n  return (\n    <AppTextField\n      value={rhf.value ?? ''}\n      onChangeText={rhf.onChange}\n      onBlur={rhf.onBlur}\n      errorText={fieldState.error?.message}\n      {...adornments}\n    />\n  );\n}"
+      },
+      {
+        "language": "tsx",
+        "code": "// PROBLEM — new function references every render\n{items.map((item) => (\n  <CartItemCard\n    key={item.id}\n    item={item}\n    onIncrement={() => onIncrement(item.id)}   // new ref\n    onDecrement={() => onDecrement(item.id)}   // new ref\n    onRemove={() => onRemove(item.id)}         // new ref\n  />\n))}"
+      },
+      {
+        "language": "tsx",
+        "code": "// Option: let CartItemCard close over its own id\n<CartItemCard\n  key={item.id}\n  item={item}\n  onIncrement={onIncrement}   // stable ref from useCallback in context\n  onDecrement={onDecrement}\n  onRemove={onRemove}\n/>\n\n// Inside CartItemCard:\nconst handleIncrement = useCallback(() => onIncrement(item.id), [onIncrement, item.id]);"
+      },
+      {
+        "language": "tsx",
+        "code": "// PROBLEM — new function, new arrays, new item objects every render\nfunction iconBox(Icon: ...) {\n  return <AppView>...</AppView>;  // new React element every call\n}\n\nitems={[\n  { key: 'orders', leading: iconBox(ClipboardList), onPress: () => router.push(...) },\n  ...\n]}"
+      },
+      {
+        "language": "tsx",
+        "code": "// Outside component — no token dependency, icons are stable\nconst ACCOUNT_ITEMS_CONFIG = [\n  { key: 'orders', title: 'Order History', Icon: ClipboardList, route: '/order-history' },\n  ...\n];\n\n// Inside component — memoized\nconst accountItems = useMemo(() =>\n  ACCOUNT_ITEMS_CONFIG.map(({ key, title, Icon, route }) => ({\n    key,\n    title,\n    leading: <IconBox Icon={Icon} tokens={tokens} />,\n    rightChevron: true,\n    titleColorName: 'text' as const,\n    onPress: () => router.push(route),\n  })),\n  [tokens]\n);"
+      },
+      {
+        "language": "tsx",
+        "code": "// PROBLEM — new onPress every render for each chip\n{THINGS_I_CAN_DO.map((item) => (\n  <AiChatSuggestionChip\n    key={item.key}\n    label={item.label}\n    Icon={item.Icon}\n    onPress={() => { void pushMessage(item.label); }}  // new ref every render\n  />\n))}"
+      },
+      {
+        "language": "tsx",
+        "code": "const handleChipPress = useCallback((label: string) => {\n  void pushMessage(label);\n}, [pushMessage]);\n\n// In render:\nonPress={() => handleChipPress(item.label)}\n// or pass the label as a prop and bind inside the chip"
+      },
+      {
+        "language": "tsx",
+        "code": "// PROBLEM — no unmount guard\nasync function pushMessage(text: string) {\n  ...\n  setIsSending(true);\n  try {\n    const response = await sendAiChatMessageMock(...);  // yields here\n    setConversationId(response.conversationId);          // fires on unmounted component\n    setMessages((current) => [...current, response.reply]);\n  } finally {\n    setIsSending(false);\n  }\n}"
+      },
+      {
+        "language": "tsx",
+        "code": "const isMountedRef = useRef(true);\nuseEffect(() => {\n  isMountedRef.current = true;\n  return () => { isMountedRef.current = false; };\n}, []);\n\nasync function pushMessage(text: string) {\n  ...\n  try {\n    const response = await sendAiChatMessageMock(...);\n    if (!isMountedRef.current) return;\n    setConversationId(response.conversationId);\n    setMessages((current) => [...current, response.reply]);\n  } finally {\n    if (isMountedRef.current) setIsSending(false);\n  }\n}"
+      },
+      {
+        "language": "tsx",
+        "code": "// CURRENT — 8 separate useMemo calls\nconst weightStyle  = useMemo(() => ..., [resolvedWeight]);\nconst alignStyle   = useMemo(() => ..., [align]);\nconst mutedStyle   = useMemo(() => ..., [muted, defaults.mutedOpacity]);\n// ...5 more\n\n// BETTER — single useMemo, same deps array content\nconst derivedStyles = useMemo(() => {\n  const weight    = resolvedWeight ? getWeightStyle(resolvedWeight) : undefined;\n  const alignS    = align ? { textAlign: align } : undefined;\n  const mutedS    = muted ? { opacity: defaults.mutedOpacity } : undefined;\n  const italicS   = italic ? { fontStyle: 'italic' } : undefined;\n  const transS    = transform ? { textTransform: transform } : undefined;\n  const fontSizeS = fontSize ? { fontSize } : undefined;\n  const decoLine  = underline && strike ? 'underline line-through'\n                  : underline ? 'underline' : strike ? 'line-through' : undefined;\n  const decoS     = decoLine ? { textDecorationLine: decoLine } : undefined;\n  return [weight, alignS, mutedS, italicS, transS, fontSizeS, decoS];\n}, [resolvedWeight, align, muted, defaults.mutedOpacity, italic, transform, fontSize, underline, strike]);"
+      },
+      {
+        "language": "tsx",
+        "code": "// search-catalogue.tsx — before map()\nconst CARD_STYLE = { width: CARD_WIDTH } as const;\n\n// search-top-featured.tsx\nconst HALF_CARD_STYLE = { width: '48%' } as const;"
+      },
+      {
+        "language": "tsx",
+        "code": "// Called on every render of every consumer when outside a ThemeProvider\nconst fallbackSetScheme = () => undefined;    // new ref every call\nconst fallbackToggleScheme = () => undefined; // new ref every call"
+      },
+      {
+        "language": "tsx",
+        "code": "const _noop = () => undefined;\n\nexport function useThemeContext() {\n  const context = useContext(ThemeContext);\n  const deviceScheme = useColorScheme();\n  const fallbackScheme: ThemeScheme = deviceScheme === 'dark' ? 'dark' : 'light';\n  return context ?? {\n    scheme: fallbackScheme,\n    tokens: fallbackScheme === 'dark' ? darkTokens : lightTokens,\n    setScheme: _noop,\n    toggleScheme: _noop,\n  };\n}"
+      }
+    ]
+  },
+  "rawOutputPreview": "Here is the full performance analysis of the `matorui` codebase.\n\n---\n\n## Performance Analysis\n\nThis is a React Native / Expo app with mock data. There are no database queries, so N+1 query patterns do not apply to the current code. All other categories have real findings.\n\n---\n\n### 1. Unnecessary Re-renders\n\n#### A. `SmartSearchBar` — Component type recreated every render\n\n**File:** `components/screens-components/smart-search-bar.tsx:31–97`\n\n`searchField`, `searchRegistry`, and the inner `TextRenderer` component are defined **inside the render function body**. `TextRenderer` is a new function identity on every render, so React treats it as a brand-new component type and fully **unmounts and remounts** the `<AppTextField>` on every parent re-render — losing focus state and triggering layout.\n\n```tsx\n// PROBLEM — new object + new component type every render\nconst searchField: TextField<SearchValues> = { ... };\nconst searchRegistry: Partial<FieldRegistry> = {\n  text: ({ field, control, disabled }) => {\n    const TextRenderer = ({ field: rhf, fieldState }: any) => ( // ← created inside render\n      <AppTextField ... />\n    );\n    return <Controller render={TextRenderer} />;\n  },\n};\n```\n\n**Fix:** Move `searchField` to module level (it is static). Extract `TextRenderer` to a stable component outside `SmartSearchBar`.\n\n```tsx\n// module level — created once\nconst SEARCH_FIELD: TextField<SearchValues> = {\n  name: 'query',\n  type: 'text',\n  placeholder: 'Smart search everything...',\n  props: { autoCapitalize: 'none', autoCorrect: false },\n};\n\n// stable component — no remount on parent re-render\nfunction SearchTextRenderer({ field: rhf, fieldState, ...adornments }: any) {\n  return (\n    <AppTextField\n      value={rhf.value ?? ''}\n      onChangeText={rhf.onChange}\n      onBlur={rhf.onBlur}\n      errorText={fieldState.error?.message}\n      {...adornments}\n    />\n  );\n}\n```\n\n---\n\n#### B. `CartItemsSection` — Inline arrow functions break `memo` on list items\n\n**File:** `component",
+  "rawOutputLength": 10729
+}
