@@ -1,7 +1,7 @@
 import { useCartContext } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import { triggerHaptic } from '@/utils/haptics';
-import { Image } from 'expo-image';
+import AppImage from '@/components/shared/app-image';
 import { useEffect, useRef, useState } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 
@@ -37,19 +37,10 @@ export default function SearchPartCard({
   style,
   onPress,
 }: SearchPartCardProps) {
-  const { scheme, tokens } = useThemeContext();
+  const { tokens } = useThemeContext();
   const { addItem } = useCartContext();
   const [wasJustAdded, setWasJustAdded] = useState(false);
   const resetAddedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const cardShadowStyle: StyleProp<ViewStyle> = {
-    borderWidth: 2,
-    borderColor: scheme === 'dark' ? tokens.gray400 : tokens.gray300,
-    shadowColor: scheme === 'dark' ? tokens.gray400 : tokens.gray400,
-    shadowOpacity: scheme === 'dark' ? 0.7 : 0.28,
-    shadowRadius: 30,
-    shadowOffset: { width: 2, height: 2 },
-    elevation: 12,
-  };
   const cardPadding = compact ? 10 : 12;
   const mediaPadding = compact ? 10 : 12;
   const bodyGap = compact ? 8 : 10;
@@ -88,18 +79,20 @@ export default function SearchPartCard({
 
   return (
     <AppCard
-      variant="elevated"
+      variant="outline"
       padding={cardPadding}
       rounded={24}
-      shadowLevel={8}
-      style={[cardShadowStyle, style]}
+      style={style}
       onPress={onPress}
       media={
         <AppView style={{ position: 'relative' }}>
-          <Image
+          <AppImage
             source={require('@/assets/images/test-image.png')}
-            style={{ width: '100%', height: compact ? 140 : 180 }}
+            width="100%"
+            height={compact ? 140 : 180}
             contentFit="cover"
+            priority="normal"
+            alt={title}
           />
           {/* Badge + status overlay */}
           <AppView

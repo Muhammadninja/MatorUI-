@@ -1,4 +1,4 @@
-import { Image } from 'expo-image';
+import AppImage from '@/components/shared/app-image';
 import { router } from 'expo-router';
 import { ScrollView } from 'react-native';
 
@@ -59,10 +59,12 @@ export default function ProfileRecentlyViewed() {
             }}
           >
             {/* Image */}
-            <Image
+            <AppImage
               source={require('@/assets/images/test-image.png')}
-              style={{ width: '100%', height: 110 }}
+              width="100%"
+              height={110}
               contentFit="cover"
+              alt={item.name}
             />
 
             {/* Name and price */}

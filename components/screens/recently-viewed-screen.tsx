@@ -1,4 +1,4 @@
-import { Image } from 'expo-image';
+import AppImage from '@/components/shared/app-image';
 import { router } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 
@@ -74,10 +74,12 @@ export default function RecentlyViewedScreen() {
                   overflow: 'hidden',
                 }}
               >
-                <Image
+                <AppImage
                   source={require('@/assets/images/test-image.png')}
-                  style={{ width: '100%', height: 120 }}
+                  width="100%"
+                  height={120}
                   contentFit="cover"
+                  alt={item.name}
                 />
                 <AppView px={10} py={10} gap={3}>
                   <AppText

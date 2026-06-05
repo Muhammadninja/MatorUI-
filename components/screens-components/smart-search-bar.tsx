@@ -107,13 +107,13 @@ export function SmartSearchBar({
         row
         center
         rounded={36}
-        colorName="secondary"
+        colorName="brand"
         onPress={onNotificationPress}
         androidRipple
         accessibilityLabel="Notifications"
         style={styles.notificationButton}
       >
-        <Bell size={18} strokeWidth={2.4} color={tokens.onSecondary} />
+        <Bell size={18} strokeWidth={2.4} color={tokens.onBrand} />
       </AppPressableView>
     </AppView>
   );

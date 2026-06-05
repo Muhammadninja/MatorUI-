@@ -1,0 +1,59 @@
+import { CarFront } from 'lucide-react-native';
+
+import { AppButton } from '@/components/shared/app-button';
+import { AppText } from '@/components/shared/app-text';
+import { AppView } from '@/components/shared/app-view';
+import { useThemeContext } from '@/contexts/theme.context';
+
+export type GarageEmptyStateProps = {
+  onAddVehicle: () => void;
+};
+
+export function GarageEmptyState({ onAddVehicle }: GarageEmptyStateProps) {
+  const { tokens } = useThemeContext();
+
+  return (
+    <AppView flex={1} px={20} justify="center" align="center">
+      <AppView
+        rounded={28}
+        p={24}
+        gap={20}
+        align="center"
+        colorName="card"
+        borderName="border"
+        borderWidth={1}
+        style={{ width: '100%', maxWidth: 360 }}
+      >
+        <AppView
+          center
+          rounded={32}
+          colorName="backgroundSecondary"
+          borderName="border"
+          borderWidth={1}
+          style={{ width: 72, height: 72 }}
+        >
+          <CarFront size={28} strokeWidth={2.1} color={tokens.text} />
+        </AppView>
+
+        <AppView gap={6} align="center">
+          <AppText textVariant="title" family="heading" colorName="text" align="center">
+            Build your garage
+          </AppText>
+          <AppText textVariant="bodySm" colorName="gray400" align="center">
+            Add a vehicle to filter parts by fitment and keep notes on the cars you wrench on.
+          </AppText>
+        </AppView>
+
+        <AppButton
+          title="Add vehicle"
+          kind="brand"
+          size="lg"
+          fullWidth
+          onPress={onAddVehicle}
+        />
+      </AppView>
+    </AppView>
+  );
+}
+
+export default GarageEmptyState;

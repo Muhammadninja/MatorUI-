@@ -1,4 +1,6 @@
-import { Image, type ImageSource } from 'expo-image';
+import { type ImageSource } from 'expo-image';
+
+import AppImage from '@/components/shared/app-image';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Dimensions,
@@ -163,20 +165,18 @@ const AppImageCarouselComponent: React.FC<AppImageCarouselProps> = ({
           ? String(item.uri)
           : String(idx);
       const Img = (
-        <Image
+        <AppImage
           source={item}
-          style={[{ width: itemWidth, height, borderRadius: rounded }, imageStyle] as any}
+          width={itemWidth}
+          height={height}
+          rounded={rounded}
           contentFit={contentFit}
           transition={transitionMs}
-          cachePolicy={'memory-disk'}
+          cachePolicy="memory-disk"
           recyclingKey={recyclingKey}
           priority={idx === toFlatIndex(index) ? 'high' : 'normal'}
-          accessible
-          accessibilityRole="image"
-          accessibilityLabel={`Image ${toVisualIndex(idx) + 1} of ${sources.length}`}
-          onError={undefined}
-          // If you want placeholders in the future, use blurhash or a static placeholder color
-          // placeholder={placeholder}
+          alt={`Image ${toVisualIndex(idx) + 1} of ${sources.length}`}
+          style={imageStyle as any}
         />
       );
       if (!enablePress) return Img;

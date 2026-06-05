@@ -3,7 +3,7 @@ import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import type { CartItem } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
-import { Image } from 'expo-image';
+import AppImage from '@/components/shared/app-image';
 
 export type CartItemCardProps = {
   item: CartItem;
@@ -33,10 +33,13 @@ export default function CartItemCard({
       }}
     >
       <AppView row align="center" gap={12}>
-        <Image
+        <AppImage
           source={require('@/assets/images/test-image.png')}
-          style={{ width: 72, height: 72, borderRadius: 14 }}
+          width={72}
+          height={72}
+          rounded={14}
           contentFit="cover"
+          alt={item.title}
         />
         <AppView gap={4} style={{ flex: 1 }}>
           <AppText textVariant="bodySemibold">{item.title}</AppText>

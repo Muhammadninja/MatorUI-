@@ -1,4 +1,4 @@
-import { Image, type ImageSource } from 'expo-image';
+import { type ImageSource } from 'expo-image';
 import type { ReactNode } from 'react';
 import React, { memo, useMemo } from 'react';
 import {
@@ -12,6 +12,7 @@ import {
 
 import { AppBadge } from '@/components/shared/app-badge';
 import { AppIcon, type Family } from '@/components/shared/app-icon';
+import AppImage from '@/components/shared/app-image';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useColorToken } from '@/components/shared/app-view/colors';
@@ -248,11 +249,15 @@ const AppListItemComponent: React.FC<AppListItemProps> = ({
     if (leadingImage === null) return null;
     if (leadingImage && !leadingIcon) {
       const dim = leadingImage.size ?? (sz.icon === 'sm' ? 20 : sz.icon === 'md' ? 24 : 24);
-      const imgStyle: StyleProp<ImageStyle> = [
-        { width: dim, height: dim, borderRadius: leadingImage.rounded ?? Math.round(dim / 2) },
-        leadingImage.style,
-      ];
-      return <Image source={leadingImage.source} style={imgStyle as any} />;
+      return (
+        <AppImage
+          source={leadingImage.source}
+          width={dim}
+          height={dim}
+          rounded={leadingImage.rounded ?? Math.round(dim / 2)}
+          style={leadingImage.style as StyleProp<ViewStyle>}
+        />
+      );
     }
     if (leadingIcon)
       return (

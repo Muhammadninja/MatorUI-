@@ -1,7 +1,7 @@
 import MaskedView from '@react-native-masked-view/masked-view';
 import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import SearchCatalogue from '@/components/screens-components/search-catalogue';
@@ -19,14 +19,22 @@ const FADE_STEPS = [0.9, 0.75, 0.6, 0.45, 0.3, 0.18, 0.08, 0.02];
 
 export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
-  const { scheme } = useThemeContext();
-  const topOffset = insets.top + SEARCH_BAR_HEIGHT - 30;
+  const { scheme, tokens } = useThemeContext();
+  // Push content below the entire blur strip (safe area + bar + fade) so the
+  // quick-filter chips at the top of the scroll aren't obscured by the search.
+  const topOffset = insets.top + SEARCH_BAR_HEIGHT + FADE_HEIGHT;
+  // expo-blur on Android renders a translucent gray fallback (no real backdrop
+  // blur), which shows as an ugly gray shadow around the search bar. Fall back
+  // to a solid theme-bg fill on Android — the bottom fade gradient still works
+  // because the MaskedView mask is independent of the fill content.
+  const isAndroid = Platform.OS === 'android';
 
   return (
     <AppView flex={1} colorName="background">
       <AppScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: topOffset }}
+        contentInsetAdjustmentBehavior="never"
       >
         <SearchQuickFilters />
         <SearchCatalogue />
@@ -47,14 +55,21 @@ export default function ExploreScreen() {
           </View>
         }
       >
-        <BlurView
-          tint={scheme === 'dark' ? 'dark' : 'light'}
-          intensity={80}
-          style={styles.blurFill}
-        />
+        {isAndroid ? (
+          <View style={[styles.blurFill, { backgroundColor: tokens.background }]} />
+        ) : (
+          <BlurView
+            tint={scheme === 'dark' ? 'dark' : 'light'}
+            intensity={80}
+            style={styles.blurFill}
+          />
+        )}
       </MaskedView>
 
-      <View style={[styles.searchBarOverlay, { paddingTop: insets.top }]}>
+      <View
+        pointerEvents="box-none"
+        style={[styles.searchBarOverlay, { paddingTop: insets.top }]}
+      >
         <SmartSearchBar
           onNotificationPress={() => router.push('/notifications')}
         />

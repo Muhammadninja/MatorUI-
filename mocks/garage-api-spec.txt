@@ -1,0 +1,115 @@
+GARAGE API SPEC
+================================================================================
+Consumed by: services/garage-api.ts (HttpGarageTransport)
+Cached by:   services/garage-service.ts
+Surfaced via: hooks/use-garage.ts
+Screens:     components/screens/garage-screen.tsx,
+             components/screens/vehicle-detail-screen.tsx
+             components/screens-components/add-vehicle-wizard.tsx
+
+Base URL: <EXPO_PUBLIC_API_BASE_URL>/garage
+
+Auth:    Bearer token in `Authorization` header (pulled from auth context).
+Errors:  Any non-2xx returns JSON `{ "error": string }` and the client throws.
+
+
+================================================================================
+DTOs
+================================================================================
+
+Vehicle {
+  id:        string            // server-generated, unique
+  year:      number            // 1900–2100
+  make:      string            // e.g. "Toyota"
+  model:     string            // e.g. "4Runner"
+  trim?:     string            // e.g. "TRD Pro"
+  nickname?: string            // user label, e.g. "Trail truck"
+  vin?:      string            // 17 chars when present
+  plate?:    string            // license plate, uppercase
+  mileage?:  number            // miles, integer
+  color:     "midnight" | "graphite" | "pearl" | "matte"
+  isPrimary: boolean           // exactly one vehicle is primary per user
+  addedAt:   number            // unix epoch ms, server-stamped
+}
+
+VehicleInput {
+  year:           number
+  make:           string
+  model:          string
+  trim?:          string
+  nickname?:      string
+  vin?:           string
+  plate?:         string
+  mileage?:       number
+  color:          VehicleColor
+  setAsPrimary?:  boolean     // when true server flips current primary off
+}
+
+VehiclePatch = Partial<Omit<Vehicle, "id" | "addedAt">>
+
+
+================================================================================
+Endpoints
+================================================================================
+
+GET /vehicles
+  → 200 { "vehicles": Vehicle[] }
+  List the authenticated user's garage. Order: primary first, then by addedAt desc.
+
+GET /vehicles/:id
+  → 200 { "vehicle": Vehicle }
+  → 404 { "error": "Vehicle not found" }
+
+POST /vehicles
+  body: VehicleInput
+  → 201 { "vehicle": Vehicle }
+  When body.setAsPrimary === true OR garage was empty, server marks the new
+  vehicle isPrimary and flips any previous primary to false.
+
+PATCH /vehicles/:id
+  body: VehiclePatch
+  → 200 { "vehicle": Vehicle }
+  Patch is partial — only provided keys are applied. isPrimary in the patch
+  is ignored here; clients must use POST /vehicles/:id/set-primary instead.
+
+DELETE /vehicles/:id
+  → 204 (no body)
+  If the removed vehicle was primary, server promotes the next vehicle by
+  addedAt (oldest remaining) to isPrimary.
+
+POST /vehicles/:id/set-primary
+  → 200 { "vehicles": Vehicle[] }
+  Flips isPrimary to the target vehicle and returns the full list (primary
+  first). Atomic on the server side.
+
+
+================================================================================
+Future: WebSocket / live cache invalidation
+================================================================================
+
+Channel: garage:{userId}
+Events:
+  garage.vehicle.created  { vehicle: Vehicle }
+  garage.vehicle.updated  { vehicle: Vehicle }
+  garage.vehicle.removed  { id: string, newPrimaryId?: string }
+  garage.primary.changed  { id: string }
+
+Client should call garageService.refresh() on receipt, or apply the event
+payload directly to the cache for optimistic UX.
+
+
+================================================================================
+Switching from mock to real API
+================================================================================
+
+1. In services/garage-service.ts, swap:
+     new MockGarageTransport()
+   for:
+     new HttpGarageTransport(process.env.EXPO_PUBLIC_API_BASE_URL!, getAuthToken)
+
+2. Uncomment HttpGarageTransport in services/garage-api.ts.
+
+3. Provide a getAuthToken(): Promise<string | null> from the auth layer.
+
+The hook (use-garage), service (garage-service), and UI components do not
+change — they consume the GarageTransport interface, not the implementation.

@@ -1,0 +1,72 @@
+import { ChevronRight } from 'lucide-react-native';
+import type { ReactNode } from 'react';
+
+import { AppText } from '@/components/shared/app-text';
+import { AppPressableView, AppView } from '@/components/shared/app-view';
+import { useThemeContext } from '@/contexts/theme.context';
+
+export type VehicleDetailActionRowProps = {
+  icon: ReactNode;
+  label: string;
+  hint?: string;
+  onPress?: () => void;
+  destructive?: boolean;
+  muted?: boolean;
+};
+
+export function VehicleDetailActionRow({
+  icon,
+  label,
+  hint,
+  onPress,
+  destructive,
+  muted,
+}: VehicleDetailActionRowProps) {
+  const { tokens } = useThemeContext();
+
+  return (
+    <AppPressableView
+      rounded={20}
+      colorName="card"
+      borderName="border"
+      borderWidth={1}
+      androidRipple
+      onPress={onPress}
+      disabled={muted}
+      accessibilityLabel={label}
+    >
+      <AppView row align="center" gap={14} px={16} py={14}>
+        <AppView
+          center
+          rounded={12}
+          colorName="backgroundSecondary"
+          style={{ width: 36, height: 36, flexShrink: 0, opacity: muted ? 0.5 : 1 }}
+        >
+          {icon}
+        </AppView>
+        <AppView flex={1} gap={2} style={{ opacity: muted ? 0.5 : 1 }}>
+          <AppText
+            textVariant="bodySemibold"
+            numberOfLines={1}
+            ellipsizeMode="tail"
+            style={{ color: destructive ? tokens.error : tokens.text }}
+          >
+            {label}
+          </AppText>
+          {hint ? (
+            <AppText textVariant="bodyXs" colorName="gray400" numberOfLines={1}>
+              {hint}
+            </AppText>
+          ) : null}
+        </AppView>
+        {!muted ? (
+          <AppView style={{ flexShrink: 0 }}>
+            <ChevronRight size={18} strokeWidth={2.2} color={tokens.gray400} />
+          </AppView>
+        ) : null}
+      </AppView>
+    </AppPressableView>
+  );
+}
+
+export default VehicleDetailActionRow;
