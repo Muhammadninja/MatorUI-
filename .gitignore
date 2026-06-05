@@ -39,3 +39,12 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Claude tooling — runtime state, locally-installed skills, agent memory db.
+# The agent/command/helper definitions under .claude/ stay tracked; only the
+# noise that auto-updates as the daemon runs is excluded here.
+.claude/skills/
+.claude/memory.db
+.claude-flow/daemon.pid
+.claude-flow/daemon-state.json
+.claude-flow/metrics/
