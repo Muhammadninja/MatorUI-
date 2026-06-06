@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Heart, Share2 } from 'lucide-react-native';
 import { useRef, useState } from 'react';
-import { Animated, StyleSheet } from 'react-native';
+import { Animated, Platform, StatusBar, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/shared/app-button';
@@ -11,6 +11,7 @@ import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useCartContext } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import { getCatalogMockDetail } from '@/services/catalog-service';
+import { getTopFeaturedMockDetail } from '@/services/top-featured-service';
 import { triggerHaptic } from '@/utils/haptics';
 
 const IMAGE_HEIGHT = 360;
@@ -37,24 +38,37 @@ const FALLBACK_FEATURES = [
 ];
 
 export default function ItemDetailScreen() {
-  const { id, title, description, price, priceLabel } = useLocalSearchParams<{
+  const params = useLocalSearchParams<{
     id: string;
-    title: string;
-    description: string;
-    price: string;
-    priceLabel: string;
-    badge: string;
-    status: string;
+    title?: string;
+    description?: string;
+    price?: string;
+    priceLabel?: string;
+    badge?: string;
+    status?: string;
   }>();
 
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
   const { addItem } = useCartContext();
 
-  // Fetch full detail from service (falls back to route params)
-  const detail = id ? getCatalogMockDetail(id) : null;
-  const specs = detail?.item.specs ?? FALLBACK_SPECS;
-  const features = detail?.item.features ?? FALLBACK_FEATURES;
+  // Resolve the item dynamically from id — checks catalog first, then top-featured.
+  const id = params.id;
+  const catalogDetail = id ? getCatalogMockDetail(id) : null;
+  const topFeaturedDetail = !catalogDetail && id ? getTopFeaturedMockDetail(id) : null;
+
+  const title = catalogDetail?.item.title ?? topFeaturedDetail?.title ?? params.title ?? '';
+  const description =
+    catalogDetail?.item.description ??
+    topFeaturedDetail?.description ??
+    params.description ??
+    '';
+  const price = catalogDetail?.item.price ?? topFeaturedDetail?.price ?? params.price ?? '';
+  const priceLabel = catalogDetail?.item.priceLabel ?? params.priceLabel ?? 'Starting at';
+  const badge = catalogDetail?.item.badge ?? topFeaturedDetail?.badge ?? params.badge;
+  const status = catalogDetail?.item.status ?? topFeaturedDetail?.status ?? params.status;
+  const specs = catalogDetail?.item.specs ?? FALLBACK_SPECS;
+  const features = catalogDetail?.item.features ?? FALLBACK_FEATURES;
 
   const [wasAdded, setWasAdded] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
@@ -65,10 +79,12 @@ export default function ItemDetailScreen() {
     triggerHaptic('success');
     addItem({
       id: id ?? '',
-      title: title ?? '',
-      description: description ?? '',
-      price: price ?? '',
-      priceLabel: priceLabel ?? 'Starting at',
+      title,
+      description,
+      price,
+      priceLabel,
+      badge,
+      status,
     });
     setWasAdded(true);
     if (resetRef.current) clearTimeout(resetRef.current);
@@ -84,6 +100,9 @@ export default function ItemDetailScreen() {
 
   return (
     <AppView flex={1} colorName="background">
+      {Platform.OS === 'android' ? (
+        <StatusBar translucent backgroundColor="transparent" />
+      ) : null}
       {/* Nav buttons (floating) */}
       <AppView
         row
@@ -133,6 +152,8 @@ export default function ItemDetailScreen() {
 
       <Animated.ScrollView
         showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="never"
+        automaticallyAdjustContentInsets={false}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
           { useNativeDriver: true },
@@ -246,6 +267,7 @@ export default function ItemDetailScreen() {
         <AppButton
           kind="secondary"
           size="md"
+          accessibilityLabel={wasAdded ? 'Added to cart' : 'Add to cart'}
           onPress={handleAddToCart}
         >
           <AppView row align="center" gap={6}>

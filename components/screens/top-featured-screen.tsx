@@ -3,7 +3,7 @@ import { ArrowLeft, SlidersHorizontal, Trash2, X } from 'lucide-react-native';
 import { useState } from 'react';
 
 import ScreenShell from '@/components/screens-components/screen-shell';
-import SearchPartCard from '@/components/screens-components/search-part-card';
+import SearchPartCard from '@/components/screens-components/search/search-part-card';
 import { AppChip } from '@/components/shared/app-chip';
 import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
 import { AppText } from '@/components/shared/app-text';
@@ -276,6 +276,12 @@ export default function TopFeaturedScreen() {
                   actionLabel="Add"
                   compact
                   style={{ width: '48%' }}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/item-detail/[id]',
+                      params: { id: item.id },
+                    })
+                  }
                 />
               ))}
             </AppView>

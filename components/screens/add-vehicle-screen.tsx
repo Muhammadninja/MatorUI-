@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import AddVehicleWizard, {
     type AddVehicleWizardSubmit,
-} from '@/components/screens-components/add-vehicle-wizard';
+} from '@/components/screens-components/add-vehicle/add-vehicle-wizard';
 import AppBottomSheet from '@/components/shared/app-bottom-sheet';
 import useGarage from '@/hooks/use-garage';
 import { garageService } from '@/services/garage-service';

@@ -1,5 +1,7 @@
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Modal } from 'react-native';
+import { Modal, Platform, View } from 'react-native';
+import { Lock } from 'lucide-react-native';
 
 import { AppButton } from '@/components/shared/app-button';
 import { AppChip } from '@/components/shared/app-chip';
@@ -41,6 +43,20 @@ type CheckoutSheetPayload = {
   onSubmit?: (values: CheckoutSheetValues) => void;
   onCancel?: () => void;
 };
+
+type AuthRequiredPayload = {
+  title?: string;
+  message?: string;
+  /** Called after the user completes login. Defaults to no-op. */
+  onAuthenticated?: () => void;
+  onCancel?: () => void;
+  /** Optional URL the auth screen replaces to after a successful sign-in. */
+  redirectTo?: string;
+};
+
+function isAuthRequiredPayload(payload?: ModalPayload): payload is AuthRequiredPayload {
+  return Boolean(payload && typeof payload === 'object');
+}
 
 const INSTALLMENT_OPTIONS = [
   { label: 'No installment', value: false },
@@ -241,6 +257,11 @@ export default function GlobalModalHost() {
     );
   }
 
+  // ── Auth-required gate (guest tries to check out) ───────────────────────
+  if (activeModal.name === 'authRequired' && isAuthRequiredPayload(activeModal.payload)) {
+    return <AuthRequiredModal payload={activeModal.payload} />;
+  }
+
   if (activeModal.name !== 'checkoutSheet' || !isCheckoutSheetPayload(activeModal.payload)) {
     return null;
   }
@@ -430,6 +451,135 @@ export default function GlobalModalHost() {
           </AppView>
           </AppKeyboardController>
         </AppView>
+      </AppView>
+    </Modal>
+  );
+}
+
+// ── Auth-required modal ────────────────────────────────────────────────────
+
+function AuthRequiredModal({ payload }: { payload: AuthRequiredPayload }) {
+  const { tokens, scheme } = useThemeContext();
+  const isDark = scheme === 'dark';
+
+  const {
+    title = 'Sign in to continue',
+    message = 'You must sign up or log in before you can place an order. Your cart will stay saved.',
+    onCancel,
+    redirectTo,
+  } = payload;
+
+  const handleClose = () => {
+    onCancel?.();
+    modalService.closeModal();
+  };
+
+  const goToAuth = (target: '/sign-in' | '/sign-up') => {
+    modalService.closeModal();
+    const query = redirectTo ? `?next=${encodeURIComponent(redirectTo)}` : '';
+    router.push(`${target}${query}` as never);
+  };
+
+  const handleLogin = () => goToAuth('/sign-in');
+  const handleSignUp = () => goToAuth('/sign-up');
+
+  return (
+    <Modal transparent animationType="fade" visible onRequestClose={handleClose}>
+      <AppView flex={1} center px={20} style={{ backgroundColor: 'rgba(0, 0, 0, 0.55)' }}>
+        <View
+          style={{
+            width: '100%',
+            maxWidth: 380,
+            borderRadius: 28,
+            borderWidth: 1,
+            borderColor: isDark ? `${tokens.border}80` : tokens.border,
+            backgroundColor: scheme === 'dark' ? tokens.card : tokens.white,
+            overflow: 'hidden',
+            ...Platform.select({
+              ios: {
+                shadowColor: '#000000',
+                shadowOffset: { width: 0, height: 22 },
+                shadowOpacity: isDark ? 0.55 : 0.22,
+                shadowRadius: 32,
+              },
+              android: { elevation: 22 },
+            }),
+          }}
+        >
+          {/* Top highlight rim for the 3D feel */}
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 1,
+              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.65)',
+            }}
+          />
+
+          <AppView px={22} pt={26} pb={20} gap={18} align="center">
+            <View
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: 32,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: `${tokens.brand}18`,
+                borderWidth: 1,
+                borderColor: `${tokens.brand}30`,
+              }}
+            >
+              <Lock size={26} strokeWidth={2.1} color={tokens.brand} />
+            </View>
+
+            <AppView gap={6} align="center">
+              <AppText
+                textVariant="title"
+                family="heading"
+                weight="bold"
+                style={{ textAlign: 'center' }}
+              >
+                {title}
+              </AppText>
+              <AppText
+                textVariant="bodySm"
+                colorName="gray400"
+                style={{ textAlign: 'center', maxWidth: 300 }}
+              >
+                {message}
+              </AppText>
+            </AppView>
+
+            <AppView gap={10} style={{ width: '100%' }}>
+              <AppButton
+                title="Log in"
+                kind="brand"
+                size="md"
+                fullWidth
+                onPress={handleLogin}
+              />
+              <AppButton
+                title="Sign up"
+                kind="secondary"
+                variant="outline"
+                size="md"
+                fullWidth
+                onPress={handleSignUp}
+              />
+              <AppButton
+                title="Not now"
+                kind="text"
+                variant="ghost"
+                size="sm"
+                fullWidth
+                onPress={handleClose}
+              />
+            </AppView>
+          </AppView>
+        </View>
       </AppView>
     </Modal>
   );

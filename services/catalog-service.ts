@@ -2,7 +2,10 @@
 
 export type CatalogItem = {
   id: string;
-  badge: string;
+  /** Optional corner-ribbon label ("Hot pick", "New"). Items without
+   *  a badge render with no ribbon. "Featured" and "Premium" were
+   *  retired — don't reintroduce them. */
+  badge?: string;
   status: string;
   title: string;
   description: string;
@@ -81,9 +84,8 @@ const MOCK_FEATURES = [
 const MOCK_CATALOG_ITEMS: CatalogItem[] = [
   {
     id: 'urban-glide-x',
-    badge: 'Featured',
     status: 'Ready to ship',
-    title: 'Urban Glide X',
+    title: 'Chevrolet Cobalt EV Urban Glide X',
     description: 'Compact EV for city runs with fast charge support.',
     price: '$18,400',
     priceLabel: 'Starting at',
@@ -94,9 +96,8 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
   },
   {
     id: 'northline-suv',
-    badge: 'Hot pick',
     status: 'Low stock',
-    title: 'Northline SUV',
+    title: 'Northline SUV Family Edition',
     description: 'Family-ready drive with smart safety assist and roomy cabin.',
     price: '$29,900',
     priceLabel: 'Starting at',
@@ -112,7 +113,6 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
   },
   {
     id: 'aero-coupe-s',
-    badge: 'Premium',
     status: 'Pre-order',
     title: 'Aero Coupe S',
     description: 'Sport coupe tuned for range, speed, and sleek daily comfort.',
@@ -130,7 +130,6 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
   },
   {
     id: 'trail-pro-ev',
-    badge: 'New',
     status: 'Ready to ship',
     title: 'Trail Pro EV',
     description: 'Adventure-focused build with rugged stance and long battery life.',

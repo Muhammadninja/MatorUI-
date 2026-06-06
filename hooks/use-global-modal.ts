@@ -15,6 +15,14 @@ type CheckoutSheetPayload = {
   onCancel?: () => void;
 };
 
+type AuthRequiredPayload = {
+  title?: string;
+  message?: string;
+  onAuthenticated?: () => void;
+  onCancel?: () => void;
+  redirectTo?: string;
+};
+
 export function useGlobalModal() {
   return {
     openModal: (name: string, payload?: ModalPayload) => modalService.openModal(name, payload),
@@ -22,6 +30,8 @@ export function useGlobalModal() {
     openConfirm: (payload?: ModalPayload) => modalService.openModal('confirmAction', payload),
     openCheckoutSheet: (payload?: CheckoutSheetPayload) =>
       modalService.openModal('checkoutSheet', payload),
+    openAuthRequired: (payload?: AuthRequiredPayload) =>
+      modalService.openModal('authRequired', payload),
   };
 }
 

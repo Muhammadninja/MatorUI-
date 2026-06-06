@@ -7,21 +7,37 @@ import {
   LogOut,
   Mail,
   Moon,
-  ShieldCheck,
 } from 'lucide-react-native';
 
-import ProfileSectionCard from '@/components/screens-components/profile-section-card';
+import ProfileSectionCard from '@/components/screens-components/profile/profile-section-card';
 import ScreenShell from '@/components/screens-components/screen-shell';
 import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useUserContext } from '@/contexts/user.context';
+import { useGlobalModal } from '@/hooks/use-global-modal';
+import { triggerHaptic } from '@/utils/haptics';
 
 export default function SettingsSecurityScreen() {
   const { tokens, scheme, setScheme } = useThemeContext();
-  const { profile } = useUserContext();
+  const { profile, isAuthenticated, signOut } = useUserContext();
+  const { openConfirm } = useGlobalModal();
   const isDark = scheme === 'dark';
+
+  const handleSignOut = () => {
+    openConfirm({
+      title: 'Sign out?',
+      message: 'You can sign back in anytime. Your cart will stay saved on this device.',
+      confirmLabel: 'Sign out',
+      cancelLabel: 'Cancel',
+      onConfirm: () => {
+        triggerHaptic('warning');
+        signOut();
+        router.replace('/profile');
+      },
+    });
+  };
 
   function iconBox(
     Icon: React.ComponentType<{ size: number; strokeWidth: number; color: string }>,
@@ -76,18 +92,22 @@ export default function SettingsSecurityScreen() {
             </AppView>
           </AppView>
 
-          {/* Account */}
+          {/* Account — partially hidden for guests (only Language is universal) */}
           <ProfileSectionCard
             title="Account"
             items={[
-              {
-                key: 'change-email',
-                title: 'Change Email',
-                leading: iconBox(Mail),
-                rightText: profile?.email ?? '',
-                rightChevron: true,
-                titleColorName: 'text',
-              },
+              ...(isAuthenticated
+                ? [
+                    {
+                      key: 'change-email',
+                      title: 'Change Email',
+                      leading: iconBox(Mail),
+                      rightText: profile?.email ?? '',
+                      rightChevron: true,
+                      titleColorName: 'text' as const,
+                    },
+                  ]
+                : []),
               {
                 key: 'language',
                 title: 'Language',
@@ -99,36 +119,30 @@ export default function SettingsSecurityScreen() {
             ]}
           />
 
-          {/* Security */}
-          <ProfileSectionCard
-            title="Security"
-            items={[
-              {
-                key: 'password',
-                title: 'Change Password',
-                leading: iconBox(KeyRound),
-                rightChevron: true,
-                titleColorName: 'text',
-              },
-              {
-                key: 'biometrics',
-                title: 'Biometric Login',
-                leading: iconBox(Fingerprint),
-                rightChevron: true,
-                titleColorName: 'text',
-              },
-              {
-                key: '2fa',
-                title: 'Two-Factor Auth',
-                leading: iconBox(ShieldCheck),
-                rightText: 'Off',
-                rightChevron: true,
-                titleColorName: 'text',
-              },
-            ]}
-          />
+          {/* Security — entirely hidden for guests; nothing here works without an account */}
+          {isAuthenticated ? (
+            <ProfileSectionCard
+              title="Security"
+              items={[
+                {
+                  key: 'password',
+                  title: 'Change Password',
+                  leading: iconBox(KeyRound),
+                  rightChevron: true,
+                  titleColorName: 'text',
+                },
+                {
+                  key: 'biometrics',
+                  title: 'Biometric Login',
+                  leading: iconBox(Fingerprint),
+                  rightChevron: true,
+                  titleColorName: 'text',
+                },
+              ]}
+            />
+          ) : null}
 
-          {/* Preferences */}
+          {/* Preferences — works for everyone */}
           <ProfileSectionCard
             title="Preferences"
             items={[
@@ -143,20 +157,23 @@ export default function SettingsSecurityScreen() {
             ]}
           />
 
-          {/* Danger zone */}
-          <ProfileSectionCard
-            title="Account Actions"
-            items={[
-              {
-                key: 'sign-out',
-                title: 'Sign Out',
-                leading: iconBox(LogOut, true),
-                titleColorName: 'text',
-                rightChevron: true,
-                titleStyle: { color: tokens.error },
-              },
-            ]}
-          />
+          {/* Account Actions — only meaningful when signed in */}
+          {isAuthenticated ? (
+            <ProfileSectionCard
+              title="Account Actions"
+              items={[
+                {
+                  key: 'sign-out',
+                  title: 'Sign Out',
+                  leading: iconBox(LogOut, true),
+                  titleColorName: 'text',
+                  rightChevron: true,
+                  titleStyle: { color: tokens.error },
+                  onPress: handleSignOut,
+                },
+              ]}
+            />
+          ) : null}
         </AppView>
       </AppScrollView>
     </ScreenShell>

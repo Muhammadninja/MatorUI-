@@ -8,56 +8,80 @@ import { useColorScheme } from '@/components/useColorScheme';
 import { useCartContext } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
 
+export const unstable_settings = {
+  initialRouteName: '(explore)',
+};
+
+const TAB_META = {
+  '(explore)': { label: 'Explore', icon: Compass, primary: 'explore' },
+  '(garage)': { label: 'Garage', icon: Car, primary: 'garage' },
+  '(cart)': { label: 'Cart', icon: ShoppingCart, primary: 'cart' },
+  '(profile)': { label: 'Profile', icon: UserRound, primary: 'profile' },
+  '(ai-chat)': { label: 'AI Chat', icon: BotMessageSquare, primary: 'ai-chat' },
+} as const;
+
+type TabKey = keyof typeof TAB_META;
+
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const { tokens } = useThemeContext();
   const { itemCount } = useCartContext();
 
-  const visibleIconMap = {
-    index: Compass,
-    garage: Car,
-    cart: ShoppingCart,
-    profile: UserRound,
-    'ai-chat': BotMessageSquare,
-  } as const;
-
   return (
     <Tabs
-      tabBar={({ state, descriptors, navigation }) => (
-        <Tab_Bar
-          activeKey={state.routes[state.index]?.name}
-          items={state.routes
-            .filter((route) => route.name !== 'two')
-            .map((route) => {
-              const descriptor = descriptors[route.key];
-              const title =
-                typeof descriptor.options.title === 'string'
-                  ? descriptor.options.title
-                  : route.name;
-              const Icon = visibleIconMap[route.name as keyof typeof visibleIconMap];
+      tabBar={({ state, descriptors, navigation }) => {
+        // Hide tab bar when the active tab is showing a secondary stack screen
+        // (e.g. /track-order under (cart), /item-detail under (explore)).
+        const activeRoute = state.routes[state.index];
+        const activeTabKey = activeRoute?.name as TabKey | undefined;
+        if (activeTabKey && activeTabKey in TAB_META) {
+          const childState = activeRoute.state as
+            | { index?: number; routes: { name: string }[] }
+            | undefined;
+          const focusedChild = childState
+            ? childState.routes[childState.index ?? childState.routes.length - 1]?.name
+            : undefined;
+          const primary = TAB_META[activeTabKey].primary;
+          const onPrimary = !focusedChild || focusedChild === primary;
+          if (!onPrimary) return null;
+        }
 
-              return {
-                key: route.name,
-                label: title,
-                onPress: () => navigation.navigate(route.name),
-                badgeLabel:
-                  route.name === 'cart' && itemCount > 0
-                    ? itemCount > 99
-                      ? '99+'
-                      : String(itemCount)
-                    : undefined,
-                icon: (isActive: boolean) =>
-                  Icon ? (
+        return (
+          <Tab_Bar
+            activeKey={state.routes[state.index]?.name}
+            items={state.routes
+              .filter((route): route is typeof route & { name: TabKey } => route.name in TAB_META)
+              .map((route) => {
+                const descriptor = descriptors[route.key];
+                const meta = TAB_META[route.name];
+                const title =
+                  typeof descriptor.options.title === 'string'
+                    ? descriptor.options.title
+                    : meta.label;
+                const Icon = meta.icon;
+
+                return {
+                  key: route.name,
+                  label: title,
+                  onPress: () => navigation.navigate(route.name),
+                  badgeLabel:
+                    route.name === '(cart)' && itemCount > 0
+                      ? itemCount > 99
+                        ? '99+'
+                        : String(itemCount)
+                      : undefined,
+                  icon: (isActive: boolean) => (
                     <Icon
                       size={18}
                       strokeWidth={2.2}
                       color={isActive ? tokens.text : tokens.gray400}
                     />
-                  ) : null,
-              };
-            })}
-        />
-      )}
+                  ),
+                };
+              })}
+          />
+        );
+      }}
       screenOptions={{
         // Disable the static render of the header on web
         // to prevent a hydration error in React Navigation v6.
@@ -65,7 +89,7 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="(explore)"
         options={{
           title: 'Explore',
           headerShown: false,
@@ -78,30 +102,10 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="garage"
-        options={{
-          headerShown: false,
-        }}
-      />
-      <Tabs.Screen
-        name="cart"
-        options={{
-          headerShown: false,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          headerShown: false,
-        }}
-      />
-      <Tabs.Screen
-        name="ai-chat"
-        options={{
-          headerShown: false,
-        }}
-      />
+      <Tabs.Screen name="(garage)" options={{ title: 'Garage', headerShown: false }} />
+      <Tabs.Screen name="(cart)" options={{ title: 'Cart', headerShown: false }} />
+      <Tabs.Screen name="(profile)" options={{ title: 'Profile', headerShown: false }} />
+      <Tabs.Screen name="(ai-chat)" options={{ title: 'AI Chat', headerShown: false }} />
     </Tabs>
   );
 }

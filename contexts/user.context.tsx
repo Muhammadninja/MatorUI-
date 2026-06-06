@@ -16,6 +16,7 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useRef,
   useState,
   type PropsWithChildren,
 } from 'react';
@@ -41,6 +42,9 @@ export type UserProfile = {
 
 type UserContextValue = {
   profile: UserProfile | null;
+  isAuthenticated: boolean;
+  /** Stable opaque ID assigned to unauthenticated sessions for support / analytics. */
+  guestId: string;
   isLoading: boolean;
   error: string | null;
   /** Re-fetch the profile from the API */
@@ -50,6 +54,9 @@ type UserContextValue = {
    * Optimistically updates local state; rolls back on failure.
    */
   updateProfile: (patch: Partial<Omit<UserProfile, 'id' | 'memberSince'>>) => Promise<void>;
+  /** Dev-only helpers to flip between guest and signed-in until real auth lands. */
+  signInWithMock: () => void;
+  signOut: () => void;
 };
 
 // ─── Mock data (remove when real API is wired) ───────────────────────────────
@@ -70,10 +77,32 @@ const MOCK_PROFILE: UserProfile = {
 
 const UserContext = createContext<UserContextValue | undefined>(undefined);
 
+/** Short opaque ID like "A8F2K3" — readable, unambiguous, no real PII. */
+function makeGuestId(): string {
+  const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let out = '';
+  for (let i = 0; i < 6; i += 1) {
+    out += ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
+  }
+  return out;
+}
+
 export function UserProvider({ children }: PropsWithChildren) {
-  const [profile, setProfile] = useState<UserProfile | null>(MOCK_PROFILE);
+  // Default to guest. Flip to MOCK_PROFILE via signInWithMock() during dev,
+  // or wire real auth into setProfile when the backend is ready.
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Stable for the lifetime of the provider; persists across re-renders.
+  const guestIdRef = useRef<string>(makeGuestId());
+
+  const signInWithMock = useCallback(() => {
+    setProfile(MOCK_PROFILE);
+  }, []);
+
+  const signOut = useCallback(() => {
+    setProfile(null);
+  }, []);
 
   const refreshProfile = useCallback(async () => {
     setIsLoading(true);
@@ -110,8 +139,18 @@ export function UserProvider({ children }: PropsWithChildren) {
   );
 
   const value = useMemo<UserContextValue>(
-    () => ({ profile, isLoading, error, refreshProfile, updateProfile }),
-    [profile, isLoading, error, refreshProfile, updateProfile],
+    () => ({
+      profile,
+      isAuthenticated: profile !== null,
+      guestId: guestIdRef.current,
+      isLoading,
+      error,
+      refreshProfile,
+      updateProfile,
+      signInWithMock,
+      signOut,
+    }),
+    [profile, isLoading, error, refreshProfile, updateProfile, signInWithMock, signOut],
   );
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;

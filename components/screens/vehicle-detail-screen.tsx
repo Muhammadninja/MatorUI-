@@ -6,11 +6,11 @@ import { ScrollView } from 'react-native';
 import ScreenShell from '@/components/screens-components/screen-shell';
 import AddVehicleWizard, {
   type AddVehicleWizardSubmit,
-} from '@/components/screens-components/add-vehicle-wizard';
-import VehicleDetailActionRow from '@/components/screens-components/vehicle-detail-action-row';
-import VehicleDetailHeader from '@/components/screens-components/vehicle-detail-header';
-import VehicleDetailHeadline from '@/components/screens-components/vehicle-detail-headline';
-import VehicleDetailStats from '@/components/screens-components/vehicle-detail-stats';
+} from '@/components/screens-components/add-vehicle/add-vehicle-wizard';
+import VehicleDetailActionRow from '@/components/screens-components/vehicle-detail/vehicle-detail-action-row';
+import VehicleDetailHeader from '@/components/screens-components/vehicle-detail/vehicle-detail-header';
+import VehicleDetailHeadline from '@/components/screens-components/vehicle-detail/vehicle-detail-headline';
+import VehicleDetailStats from '@/components/screens-components/vehicle-detail/vehicle-detail-stats';
 import AppBlurView, { useBlurHeaderInset } from '@/components/shared/app-blur-view';
 import AppBottomSheet from '@/components/shared/app-bottom-sheet';
 import { AppText } from '@/components/shared/app-text';
@@ -107,7 +107,7 @@ export default function VehicleDetailScreen() {
 
   function handleFindParts() {
     triggerHaptic('selection');
-    router.push('/');
+    router.push('/explore');
   }
 
   function handleRemove() {

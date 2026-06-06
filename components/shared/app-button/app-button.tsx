@@ -272,6 +272,18 @@ const AppButtonImpl = forwardRef<View, AppButtonProps>(function AppButton(
     }
   }, [title, accessibilityLabel, hasTextChild]);
 
+  // Runtime fallback so icon-only buttons still announce SOMETHING via
+  // TalkBack / VoiceOver when a caller forgets to pass accessibilityLabel.
+  // Without this, Android reads no label at all and the button is unusable
+  // for assistive tech.
+  const resolvedAccessibilityLabel = useMemo(() => {
+    if (accessibilityLabel) return accessibilityLabel;
+    if (displayTitle) return displayTitle;
+    const iconName = startIcon?.name ?? endIcon?.name;
+    if (iconName) return humanizeIconName(iconName);
+    return undefined;
+  }, [accessibilityLabel, displayTitle, startIcon?.name, endIcon?.name]);
+
   const handlePress = useDebouncedPress({
     debounceMs: effectiveDebounce,
     disabled,
@@ -310,7 +322,7 @@ const AppButtonImpl = forwardRef<View, AppButtonProps>(function AppButton(
       <Pressable
         ref={ref as any}
         accessibilityRole={accessibilityRole}
-        accessibilityLabel={accessibilityLabel ?? displayTitle}
+        accessibilityLabel={resolvedAccessibilityLabel}
         accessibilityHint={accessibilityHint}
         accessibilityState={{
           disabled: !!(disabled || loading),
@@ -370,3 +382,10 @@ const AppButtonImpl = forwardRef<View, AppButtonProps>(function AppButton(
 AppButtonImpl.displayName = 'AppButton';
 
 export const AppButton = memo(AppButtonImpl);
+
+// "chevron.left" → "Chevron left", "icons-arrow-right-2" → "Icons arrow right 2"
+function humanizeIconName(name: string): string {
+  const cleaned = name.replace(/[._-]+/g, ' ').trim();
+  if (!cleaned) return name;
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}

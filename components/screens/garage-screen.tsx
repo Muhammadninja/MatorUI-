@@ -4,11 +4,11 @@ import { ActivityIndicator, RefreshControl, ScrollView } from 'react-native';
 
 import AddVehicleWizard, {
     type AddVehicleWizardSubmit,
-} from '@/components/screens-components/add-vehicle-wizard';
-import GarageEmptyState from '@/components/screens-components/garage-empty-state';
-import GarageHeader from '@/components/screens-components/garage-header';
-import GaragePrimaryVehicleCard from '@/components/screens-components/garage-primary-vehicle-card';
-import GarageVehicleTile from '@/components/screens-components/garage-vehicle-tile';
+} from '@/components/screens-components/add-vehicle/add-vehicle-wizard';
+import GarageEmptyState from '@/components/screens-components/garage/garage-empty-state';
+import GarageHeader from '@/components/screens-components/garage/garage-header';
+import GaragePrimaryVehicleCard from '@/components/screens-components/garage/garage-primary-vehicle-card';
+import GarageVehicleTile from '@/components/screens-components/garage/garage-vehicle-tile';
 import ScreenShell from '@/components/screens-components/screen-shell';
 import AppBlurView, { useBlurHeaderInset } from '@/components/shared/app-blur-view';
 import AppBottomSheet from '@/components/shared/app-bottom-sheet';
@@ -56,11 +56,11 @@ export default function GarageScreen() {
   );
 
   const goToDetail = useCallback((id: string) => {
-    router.push({ pathname: '/(garage)/vehicle-detail', params: { id } });
+    router.push({ pathname: '/vehicle-detail', params: { id } });
   }, []);
 
   const goToCatalog = useCallback(() => {
-    router.push('/');
+    router.push('/explore');
   }, []);
 
   const handleSetPrimary = useCallback(

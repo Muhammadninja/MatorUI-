@@ -7,20 +7,31 @@ import {
 } from '@expo-google-fonts/montserrat';
 import { SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk';
 import { useFonts } from 'expo-font';
-import * as NavigationBar from 'expo-navigation-bar';
+import { requireNativeModule } from 'expo-modules-core';
 import { ThemeProvider as NavigationThemeProvider, Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import * as SystemUI from 'expo-system-ui';
 import { useEffect } from 'react';
-import { Platform, StatusBar } from 'react-native';
+import { LogBox, Platform, StatusBar } from 'react-native';
+
+// Android Fast Refresh / activity-lifecycle races can bubble bare
+// `java.lang.reflect.InvocationTargetException` text through the JS log bridge
+// (expo-modules-core's NativeJSLogger). They're dev-only noise — no inner
+// stack, no impact on production. Suppress the LogBox overlay for them.
+if (Platform.OS === 'android') {
+  LogBox.ignoreLogs([/InvocationTargetException/]);
+}
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { AppToastHost } from '@/components/shared/app-toast';
 import { AppView } from '@/components/shared/app-view';
 import GlobalModalHost from '@/components/shared/global-modal-host';
+import LikesListSuggestionHost from '@/components/shared/likes-list-suggestion-host';
 import { useColorScheme } from '@/components/useColorScheme';
 import { CartProvider } from '@/contexts/cart.context';
+import { LikesProvider } from '@/contexts/likes.context';
 import { ThemeProvider as AppThemeProvider, useThemeContext } from '@/contexts/theme.context';
 import { UserProvider } from '@/contexts/user.context';
 import { createNavigationTheme } from '@/themes';
@@ -74,8 +85,12 @@ function RootLayoutNav() {
         <AppThemeProvider>
           <UserProvider>
             <CartProvider>
-              <RootNavigation />
-              <GlobalModalHost />
+              <LikesProvider>
+                <RootNavigation />
+                <GlobalModalHost />
+                <LikesListSuggestionHost />
+                <AppToastHost />
+              </LikesProvider>
             </CartProvider>
           </UserProvider>
         </AppThemeProvider>
@@ -94,11 +109,21 @@ function RootNavigation() {
     SystemUI.setBackgroundColorAsync(tokens.background).catch(() => undefined);
 
     if (Platform.OS === 'android') {
-      try {
-        NavigationBar.NavigationBar.setStyle(resolvedScheme === 'dark' ? 'dark' : 'light');
-      } catch {
-        // no-op when navigation bar API is unavailable
-      }
+      // ExpoNavigationBar.setStyle can throw OR reject with
+      // "current activity is no longer available" / InvocationTargetException
+      // during Fast Refresh and background↔foreground transitions. We wrap the
+      // whole call in a Promise so both synchronous throws and async rejections
+      // are absorbed by the same `.catch`.
+      Promise.resolve()
+        .then(() => {
+          const nativeModule = requireNativeModule('ExpoNavigationBar') as {
+            setStyle?: (style: string) => Promise<unknown> | void;
+          };
+          return nativeModule.setStyle?.(
+            resolvedScheme === 'dark' ? 'dark' : 'light',
+          );
+        })
+        .catch(() => undefined);
     }
   }, [tokens.background, resolvedScheme]);
 
@@ -110,15 +135,26 @@ function RootNavigation() {
         translucent
       />
       <NavigationThemeProvider value={navigationTheme}>
-        <Stack screenOptions={{ contentStyle: { backgroundColor: tokens.background } }}>
+        <Stack
+          screenOptions={{
+            contentStyle: { backgroundColor: tokens.background },
+            statusBarTranslucent: true,
+            statusBarBackgroundColor: 'transparent',
+          }}
+        >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="(profile)" options={{ headerShown: false }} />
-          <Stack.Screen name="(settings)" options={{ headerShown: false }} />
-          <Stack.Screen name="(garage)" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="(auth)"
+            options={{
+              headerShown: false,
+              animation: 'slide_from_bottom',
+              animationDuration: 180,
+              gestureEnabled: true,
+              gestureDirection: 'vertical',
+            }}
+          />
           <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
           <Stack.Screen name="notifications" options={{ headerShown: false }} />
-          <Stack.Screen name="top-featured" options={{ headerShown: false }} />
-          <Stack.Screen name="item-detail" options={{ headerShown: false }} />
         </Stack>
       </NavigationThemeProvider>
     </AppView>

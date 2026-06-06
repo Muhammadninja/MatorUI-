@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { ArrowLeft, Bell, BellOff, Package, Percent, Star, Tag } from 'lucide-react-native';
 import { useState } from 'react';
 
-import ProfileSectionCard from '@/components/screens-components/profile-section-card';
+import ProfileSectionCard from '@/components/screens-components/profile/profile-section-card';
 import ScreenShell from '@/components/screens-components/screen-shell';
 import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
 import { AppText } from '@/components/shared/app-text';

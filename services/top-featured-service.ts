@@ -1,4 +1,4 @@
-import TOP_FEATURED_ITEMS from '@/components/screens-components/search-top-featured.data';
+import TOP_FEATURED_ITEMS from '@/components/screens-components/search/search-top-featured.data';
 
 export const TOP_FEATURED_FILTER_GROUPS = [
   {
@@ -150,6 +150,10 @@ export function getTopFeaturedMockItems(): TopFeaturedItem[] {
     ...item,
     ...MOCK_ITEM_ATTRIBUTES[item.id],
   }));
+}
+
+export function getTopFeaturedMockDetail(id: string): TopFeaturedItem | null {
+  return getTopFeaturedMockItems().find((item) => item.id === id) ?? null;
 }
 
 export function getTopFeaturedMockResponse(filters: TopFeaturedFilters): TopFeaturedListResponse {

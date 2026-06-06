@@ -8,19 +8,39 @@ import {
 } from 'lucide-react-native';
 import React from 'react';
 
-import ProfileHeroCard from '@/components/screens-components/profile-hero-card';
-import ProfilePaymentMethods from '@/components/screens-components/profile-payment-methods';
-import ProfileRecentlyViewed from '@/components/screens-components/profile-recently-viewed';
-import ProfileSectionCard from '@/components/screens-components/profile-section-card';
+import ProfileGuestEmpty from '@/components/screens-components/profile/profile-guest-empty';
+import ProfileHeroCard from '@/components/screens-components/profile/profile-hero-card';
+import ProfilePaymentMethods from '@/components/screens-components/profile/profile-payment-methods';
+import ProfileRecentlyViewed from '@/components/screens-components/profile/profile-recently-viewed';
+import ProfileSectionCard from '@/components/screens-components/profile/profile-section-card';
 import ScreenShell from '@/components/screens-components/screen-shell';
+import { AppButton } from '@/components/shared/app-button';
 import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
+import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
+import { useUserContext } from '@/contexts/user.context';
+import { useToast } from '@/hooks/use-toast';
 import { modalService } from '@/services/global-modal-service/global-modal.service';
 import { router } from 'expo-router';
 
 export default function ProfileScreen() {
   const { tokens } = useThemeContext();
+  const { isAuthenticated } = useUserContext();
+  const toast = useToast();
+
+  if (!isAuthenticated) {
+    return (
+      <ScreenShell>
+        <AppScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 32 }}
+        >
+          <ProfileGuestEmpty />
+        </AppScrollView>
+      </ScreenShell>
+    );
+  }
 
   function iconBox(
     Icon: React.ComponentType<{ size: number; strokeWidth: number; color: string }>,
@@ -111,6 +131,57 @@ export default function ProfileScreen() {
           />
 
           <ProfileRecentlyViewed />
+
+          {/* Toast playground — dev-only sanity checks for the toast system */}
+          <AppView px={16} gap={10}>
+            <AppText
+              textVariant="caption"
+              family="accent"
+              weight="semibold"
+              colorName="gray400"
+              transform="uppercase"
+              style={{ letterSpacing: 1.2 }}
+            >
+              Toast playground
+            </AppText>
+            <AppView row gap={8}>
+              <AppButton
+                title="Success"
+                kind="success"
+                size="sm"
+                containerStyle={{ flex: 1 }}
+                onPress={() =>
+                  toast.success('Saved successfully', {
+                    description: 'Your changes are now live.',
+                  })
+                }
+              />
+              <AppButton
+                title="Info"
+                kind="warning"
+                size="sm"
+                containerStyle={{ flex: 1 }}
+                onPress={() =>
+                  toast.info('Heads up', {
+                    description: 'Connection is slow but holding.',
+                  })
+                }
+              />
+              <AppButton
+                title="Danger"
+                kind="error"
+                size="sm"
+                containerStyle={{ flex: 1 }}
+                onPress={() =>
+                  toast.danger('Something broke', {
+                    description: 'Tap to retry the last action.',
+                    actionLabel: 'Retry',
+                    onAction: () => toast.success('Retried'),
+                  })
+                }
+              />
+            </AppView>
+          </AppView>
         </AppView>
       </AppScrollView>
     </ScreenShell>
