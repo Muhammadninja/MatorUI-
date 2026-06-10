@@ -1,14 +1,22 @@
 import AppImage from '@/components/shared/app-image';
 import { useCartContext } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
+import { toastService } from '@/services/toast-service';
 import { triggerHaptic } from '@/utils/haptics';
 import { useEffect, useRef, useState } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 
 import { AppButton } from '../../shared/app-button';
-import { AppCard } from '../../shared/app-card';
+import { AppCard } from '../../shared/app-card/app-card';
 import { AppText } from '../../shared/app-text';
 import { AppView } from '../../shared/app-view';
+import { RADIUS_SHEET } from './radii';
+
+/** Card placeholder used when no real product image is available. The
+ *  card was historically hard-coded to this require — Step 6 moves it
+ *  into a single named constant so the placeholder behavior is honest
+ *  and easy to find/replace later. */
+const PLACEHOLDER_IMAGE = require('@/assets/images/test-image.png');
 
 export type SearchPartCardProps = {
   id: string;
@@ -19,6 +27,14 @@ export type SearchPartCardProps = {
   priceLabel?: string;
   price: string;
   actionLabel?: string;
+  /** Primary product image URL. When omitted (or empty string), the card
+   *  falls back to a built-in placeholder. Strings are rendered as
+   *  `{ uri }`; passing a static require result is also supported for
+   *  legacy callers via `imageSource`. */
+  image?: string;
+  /** Escape hatch for static-asset callers (`require()` results). When
+   *  both `image` and `imageSource` are provided, `image` wins. */
+  imageSource?: number;
   compact?: boolean;
   style?: StyleProp<ViewStyle>;
   onPress?: () => void;
@@ -33,6 +49,8 @@ export default function SearchPartCard({
   priceLabel = 'Starting at',
   price,
   actionLabel = 'Add to cart',
+  image,
+  imageSource,
   compact = false,
   style,
   onPress,
@@ -40,6 +58,13 @@ export default function SearchPartCard({
   const { tokens } = useThemeContext();
   const { addItem } = useCartContext();
   const [wasJustAdded, setWasJustAdded] = useState(false);
+  // Resolve the image source: prefer a URL string, fall back to a static
+  // require result, fall back to the built-in placeholder. Empty string
+  // counts as "no image" so the backend can ship `''` instead of null.
+  const resolvedImageSource =
+    image && image.length > 0
+      ? { uri: image }
+      : imageSource ?? PLACEHOLDER_IMAGE;
   const resetAddedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cardPadding = compact ? 10 : 12;
   const mediaPadding = compact ? 10 : 12;
@@ -65,7 +90,13 @@ export default function SearchPartCard({
       priceLabel,
       badge,
       status,
+      imageUrl: image && image.length > 0 ? image : undefined,
     });
+    // Toast for cross-surface parity: search row + item-detail + this
+    // card all fire the same "Added to cart" toast on add. Without it,
+    // catalogue / top-featured cards felt silent compared to the other
+    // entry points.
+    toastService.success('Added to cart', { description: title });
     setWasJustAdded(true);
 
     if (resetAddedTimeoutRef.current) {
@@ -81,13 +112,13 @@ export default function SearchPartCard({
     <AppCard
       variant="outline"
       padding={cardPadding}
-      rounded={24}
+      rounded={RADIUS_SHEET}
       style={style}
       onPress={onPress}
       media={
-        <AppView style={{ position: 'relative' }}>
+        <AppView>
           <AppImage
-            source={require('@/assets/images/test-image.png')}
+            source={resolvedImageSource}
             width="100%"
             height={compact ? 140 : 180}
             contentFit="cover"
@@ -112,8 +143,8 @@ export default function SearchPartCard({
             ) : (
               <AppView />
             )}
-            <AppView px={8} py={4} rounded={36} style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}>
-              <AppText textVariant="bodyXs" style={{ color: '#fff' }}>
+            <AppView px={8} py={4} rounded={36} style={{ backgroundColor: tokens.scrim }}>
+              <AppText textVariant="bodyXs" style={{ color: tokens.white }}>
                 {status}
               </AppText>
             </AppView>
