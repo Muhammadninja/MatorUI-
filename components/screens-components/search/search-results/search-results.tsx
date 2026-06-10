@@ -32,6 +32,14 @@ export type SearchResultsProps = {
   onEndReached?: () => void;
   /** Footer spinner while loading the next page. */
   isLoadingMore?: boolean;
+  /**
+   * Top offset so the first row starts below the blur header.
+   * Applied as the FlashList's contentContainerStyle.paddingTop (so rows
+   * scroll UNDER the blur), and as paddingTop on the static states.
+   */
+  topInset?: number;
+  /** Opens the filter sheet. Surfaced in the results header. */
+  onFilterPress?: () => void;
 };
 
 /**
@@ -52,6 +60,8 @@ export default function SearchResults({
   onUseSuggestion,
   onEndReached,
   isLoadingMore,
+  topInset = 0,
+  onFilterPress,
 }: SearchResultsProps) {
   const cheapestId = useMemo(() => findCheapestId(results), [results]);
 
@@ -79,23 +89,33 @@ export default function SearchResults({
   const keyExtractor = useCallback((item: SearchResult) => item.id, []);
 
   if (state === 'loading') {
-    return <ResultsLoading query={query} />;
+    return (
+      <AppView style={{ paddingTop: topInset }}>
+        <ResultsLoading query={query} />
+      </AppView>
+    );
   }
 
   if (state === 'empty') {
     return (
-      <ResultsEmpty
-        query={query}
-        didYouMean={didYouMean}
-        hasActiveFilters={hasActiveFilters}
-        onClearFilters={onClearFilters}
-        onUseSuggestion={onUseSuggestion}
-      />
+      <AppView style={{ paddingTop: topInset }}>
+        <ResultsEmpty
+          query={query}
+          didYouMean={didYouMean}
+          hasActiveFilters={hasActiveFilters}
+          onClearFilters={onClearFilters}
+          onUseSuggestion={onUseSuggestion}
+        />
+      </AppView>
     );
   }
 
   if (state === 'error') {
-    return <ResultsError error={error} />;
+    return (
+      <AppView style={{ paddingTop: topInset }}>
+        <ResultsError error={error} />
+      </AppView>
+    );
   }
 
   if (state === 'success') {
@@ -104,11 +124,17 @@ export default function SearchResults({
         data={results}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
-        contentContainerStyle={{ paddingHorizontal: 12 }}
         onEndReached={onEndReached}
         onEndReachedThreshold={0.5}
+        contentContainerStyle={{ paddingTop: topInset }}
         ListHeaderComponent={
-          <ResultsHeader query={query} total={total} durationMs={durationMs} />
+          <ResultsHeader
+            query={query}
+            total={total}
+            durationMs={durationMs}
+            onFilterPress={onFilterPress}
+            hasActiveFilters={hasActiveFilters}
+          />
         }
         ListFooterComponent={isLoadingMore ? <FooterSpinner /> : null}
       />

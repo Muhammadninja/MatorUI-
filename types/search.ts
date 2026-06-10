@@ -13,6 +13,15 @@
 
 // ── Result + response ────────────────────────────────────────────────
 
+/**
+ * Server-driven accent-tag kind. The client maps each kind to its label
+ * + icon through the registry in `signal.ts` — kind is the contract,
+ * the display is an implementation detail.
+ */
+export type AccentTagKind =
+  | 'lowest_price'
+  | 'bestseller';
+
 export type SearchResult = {
   id: string;
   title: string;
@@ -26,7 +35,19 @@ export type SearchResult = {
   /** Authoritative numeric price in cents. Server-issued. Filterable. */
   priceCents?: number;
   category: string;
+  /**
+   * Free-text editorial badge from the backend ("Top", "New", "Hot pick").
+   * Renders as the standalone single-signal ribbon when no higher
+   * priority signal fires. Keep server-supplied strings short.
+   */
   badge?: string;
+  /**
+   * Trust/quality accent tag (Bestseller / Mator Verified / Lowest price /
+   * Editor's pick). Server-driven, enum-typed so the client owns
+   * label + icon. When absent, client may fall back to its mock
+   * hash-derivation during the transition.
+   */
+  accentTagKind?: AccentTagKind;
   status?: string;
   /** Average rating 0–5 (numeric — replaces the deterministic mock). */
   rating?: number;

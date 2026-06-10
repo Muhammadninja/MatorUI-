@@ -1,9 +1,12 @@
-import { AppButton } from '@/components/shared/app-button';
+import { Minus, Plus, Trash2 } from 'lucide-react-native';
+
+import AppImage from '@/components/shared/app-image';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import type { CartItem } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
-import AppImage from '@/components/shared/app-image';
+
+const FALLBACK_IMAGE = require('@/assets/images/test-image.png');
 
 export type CartItemCardProps = {
   item: CartItem;
@@ -19,13 +22,14 @@ export default function CartItemCard({
   onRemove,
 }: CartItemCardProps) {
   const { tokens, scheme } = useThemeContext();
+  const imageSource = item.imageUrl ? { uri: item.imageUrl } : FALLBACK_IMAGE;
 
   return (
     <AppView
-      rounded={24}
+      rounded={16}
       px={14}
       py={14}
-      gap={10}
+      gap={12}
       style={{
         borderWidth: 1,
         borderColor: tokens.border,
@@ -34,59 +38,68 @@ export default function CartItemCard({
     >
       <AppView row align="center" gap={12}>
         <AppImage
-          source={require('@/assets/images/test-image.png')}
-          width={72}
-          height={72}
-          rounded={14}
+          source={imageSource}
+          width={64}
+          height={64}
+          rounded={8}
           contentFit="cover"
           alt={item.title}
         />
         <AppView gap={4} style={{ flex: 1 }}>
-          <AppText textVariant="bodySemibold">{item.title}</AppText>
-          <AppText textVariant="bodySm" colorName="gray400">
-            {item.description}
+          <AppText textVariant="bodySemibold" numberOfLines={2}>
+            {item.title}
+          </AppText>
+          <AppText textVariant="bodyXs" colorName="gray400">
+            {item.badge ? `${item.badge} · ` : ''}
+            {item.status ?? 'Ready'}
           </AppText>
         </AppView>
         <AppText textVariant="bodySemibold">{item.price}</AppText>
       </AppView>
       <AppView row align="center" justify="space-between" gap={12}>
-        <AppText textVariant="bodyXs" colorName="gray400">
-          {item.badge ? `${item.badge} · ` : ''}
-          {item.status ?? 'Ready'}
-        </AppText>
-        <AppView row align="center" gap={8}>
+        <AppPressableView
+          onPress={onRemove}
+          p={6}
+          rounded={8}
+          accessibilityRole="button"
+          accessibilityLabel={`Remove ${item.title} from cart`}
+        >
+          <Trash2 size={18} strokeWidth={2} color={tokens.gray400} />
+        </AppPressableView>
+        <AppView row align="center" gap={4}>
           <AppPressableView
-            rounded={36}
+            rounded={8}
             px={10}
             py={6}
             colorName="card"
             borderWidth={1}
             borderName="border"
             onPress={onDecrement}
+            accessibilityRole="button"
+            accessibilityLabel={`Decrease quantity of ${item.title}`}
           >
-            <AppText textVariant="bodySm">-</AppText>
+            <Minus size={14} strokeWidth={2.2} color={tokens.text} />
           </AppPressableView>
-          <AppText textVariant="bodySm" family="heading">
-            {item.quantity}
-          </AppText>
+          <AppView
+            style={{ minWidth: 28, alignItems: 'center' }}
+          >
+            <AppText textVariant="bodySm" family="heading">
+              {item.quantity}
+            </AppText>
+          </AppView>
           <AppPressableView
-            rounded={36}
+            rounded={8}
             px={10}
             py={6}
             colorName="card"
             borderWidth={1}
             borderName="border"
             onPress={onIncrement}
+            accessibilityRole="button"
+            accessibilityLabel={`Increase quantity of ${item.title}`}
           >
-            <AppText textVariant="bodySm">+</AppText>
+            <Plus size={14} strokeWidth={2.2} color={tokens.text} />
           </AppPressableView>
-          <AppButton
-            title="Remove"
-            kind="secondary"
-            variant="outline"
-            size="xs"
-            onPress={onRemove}
-          />
         </AppView>
       </AppView>
     </AppView>

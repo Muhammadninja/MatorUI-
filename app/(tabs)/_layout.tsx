@@ -1,11 +1,12 @@
 import { Link, Tabs } from 'expo-router';
 import { Bell, BotMessageSquare, Car, Compass, ShoppingCart, UserRound } from 'lucide-react-native';
 
-import Tab_Bar from '@/components/customs/Tab_Bar';
+import AppTabBar from '@/components/shared/app-tab-bar';
 import { AppPressableView } from '@/components/shared/app-view';
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useCartContext } from '@/contexts/cart.context';
+import { useSearchUIContext } from '@/contexts/search-ui.context';
 import { useThemeContext } from '@/contexts/theme.context';
 
 export const unstable_settings = {
@@ -26,10 +27,16 @@ export default function TabLayout() {
   const colorScheme = useColorScheme();
   const { tokens } = useThemeContext();
   const { itemCount } = useCartContext();
+  const { isSearchActive } = useSearchUIContext();
 
   return (
     <Tabs
       tabBar={({ state, descriptors, navigation }) => {
+        // Hide tab bar when search is active on the explore tab (input
+        // focused or results showing) — the search surface needs the
+        // full screen and the tab bar would just compete with results.
+        if (isSearchActive) return null;
+
         // Hide tab bar when the active tab is showing a secondary stack screen
         // (e.g. /track-order under (cart), /item-detail under (explore)).
         const activeRoute = state.routes[state.index];
@@ -47,7 +54,7 @@ export default function TabLayout() {
         }
 
         return (
-          <Tab_Bar
+          <AppTabBar
             activeKey={state.routes[state.index]?.name}
             items={state.routes
               .filter((route): route is typeof route & { name: TabKey } => route.name in TAB_META)

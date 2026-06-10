@@ -47,5 +47,23 @@ export type ThemeTokens = {
   gray400: string;
   white: string;
   black: string;
+  /** Amber used for filled review stars. Same in light and dark — reads on
+   *  both card backgrounds. */
+  rating: string;
+  /** Gold used for the composite "decorated / award-winning" ribbon star.
+   *  Brighter in light mode (sits on a black ribbon), deeper in dark mode
+   *  (sits on a white ribbon) so it never washes out. */
+  accolade: string;
+  /** Green used for "value / savings" ribbon icons (Cheapest, Lowest
+   *  price). Tuned for ribbon-background contrast — bright in light mode
+   *  (black ribbon), deeper in dark mode (white ribbon). Separate from
+   *  `success` because that token is tuned for normal page backgrounds. */
+  value: string;
+  /** Near-black backdrop for badges, modal scrims, and other "always
+   *  dark over content" surfaces. Theme-independent — scrims read as
+   *  dark in both light and dark mode (they sit ON photographic content,
+   *  not next to neutral chrome). Use instead of hardcoded
+   *  `rgba(0,0,0,0.x)` values. */
+  scrim: string;
   [key: string]: string;
 };

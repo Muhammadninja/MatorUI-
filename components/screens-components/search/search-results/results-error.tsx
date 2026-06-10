@@ -13,7 +13,7 @@ export default function ResultsError({ error }: ResultsErrorProps) {
   const { tokens } = useThemeContext();
   return (
     <AppView gap={14} px={16} pt={40} align="center">
-      <AlertCircle size={48} strokeWidth={1.6} color={tokens.error} />
+      <AlertCircle size={48} strokeWidth={2} color={tokens.error} />
       <AppView gap={4} align="center">
         <AppText textVariant="bodySemibold">Search failed</AppText>
         <AppText textVariant="bodySm" colorName="gray400" style={{ textAlign: 'center' }}>

@@ -111,11 +111,17 @@ export default function ItemDetailScreen() {
         px={16}
         style={[styles.navBar, { top: insets.top + 4 }]}
       >
+        {/* Floating nav buttons over the hero image. The 1px border is
+         *  load-bearing in light mode: `tokens.surface` is near-white,
+         *  so on a white-background product photo the filled circle
+         *  disappears without a stroke outlining it. */}
         <AppPressableView
           center
           rounded={36}
           onPress={() => router.back()}
           androidRipple
+          borderWidth={1}
+          borderName="border"
           style={[styles.iconButton, { backgroundColor: tokens.surface }]}
         >
           <ArrowLeft size={20} strokeWidth={2.2} color={tokens.text} />
@@ -130,19 +136,23 @@ export default function ItemDetailScreen() {
               setIsLiked((v) => !v);
             }}
             androidRipple
+            borderWidth={1}
+            borderName="border"
             style={[styles.iconButton, { backgroundColor: tokens.surface }]}
           >
             <Heart
               size={20}
               strokeWidth={2.2}
-              color={isLiked ? '#ef4444' : tokens.text}
-              fill={isLiked ? '#ef4444' : 'none'}
+              color={isLiked ? tokens.error : tokens.text}
+              fill={isLiked ? tokens.error : 'none'}
             />
           </AppPressableView>
           <AppPressableView
             center
             rounded={36}
             androidRipple
+            borderWidth={1}
+            borderName="border"
             style={[styles.iconButton, { backgroundColor: tokens.surface }]}
           >
             <Share2 size={20} strokeWidth={2.2} color={tokens.text} />

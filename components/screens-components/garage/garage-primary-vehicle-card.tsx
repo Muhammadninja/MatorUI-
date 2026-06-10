@@ -1,6 +1,7 @@
 import { CarFront, ChevronRight, Gauge, ScanLine, Wrench } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 
+import { RADIUS_PILL, RADIUS_SHEET } from '@/components/screens-components/search/radii';
 import AppImage from '@/components/shared/app-image';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
@@ -14,6 +15,11 @@ export type GaragePrimaryVehicleCardProps = {
   onOpenDetail?: (id: string) => void;
   onFindParts?: (id: string) => void;
   onLogService?: (id: string) => void;
+  /** Hero image URL. When omitted, the card falls back to a stable
+   *  seeded Picsum placeholder so dev environments still get visual
+   *  variety. Production should pass `vehicle.images[0]` (or similar)
+   *  once the garage transport ships image URLs. */
+  image?: string;
 };
 
 function formatMileage(mi?: number): string {
@@ -26,6 +32,7 @@ export function GaragePrimaryVehicleCard({
   onOpenDetail,
   onFindParts,
   onLogService,
+  image,
 }: GaragePrimaryVehicleCardProps) {
   const { tokens } = useThemeContext();
 
@@ -35,13 +42,15 @@ export function GaragePrimaryVehicleCard({
   return (
     <AppView gap={14} mt={55} >
       <AppPressableView
-        rounded={28}
+        rounded={RADIUS_SHEET}
         colorName="card"
         borderName="border"
         borderWidth={1}
         androidRipple={false}
         pressedOpacity={0.96}
-        accessibilityLabel={`Open ${headline} details`}
+        accessibilityRole="button"
+        accessibilityLabel={`${headline}, primary vehicle`}
+        accessibilityHint="Opens vehicle details"
         onPress={() => onOpenDetail?.(vehicle.id)}
       >
         <AppView gap={20} p={20}>
@@ -49,7 +58,7 @@ export function GaragePrimaryVehicleCard({
             <AppView row align="center" gap={10} flex={1}>
               <AppView
                 center
-                rounded={999}
+                rounded={RADIUS_PILL}
                 colorName="secondary"
                 style={{ width: 28, height: 28, flexShrink: 0 }}
               >
@@ -70,11 +79,11 @@ export function GaragePrimaryVehicleCard({
               </AppText>
             </AppView>
             <AppView style={{ flexShrink: 0 }}>
-              <ChevronRight size={18} strokeWidth={2.2} color={tokens.gray400} />
+              <ChevronRight size={18} strokeWidth={2} color={tokens.gray400} />
             </AppView>
           </AppView>
 
-          <VehicleMedia vehicleId={vehicle.id} headline={headline} />
+          <VehicleMedia vehicleId={vehicle.id} headline={headline} image={image} />
 
           <AppView gap={4}>
             <AppText textVariant="title" family="heading" weight="bold" colorName="text">
@@ -96,13 +105,13 @@ export function GaragePrimaryVehicleCard({
             }}
           >
             <MetaCell
-              icon={<Gauge size={16} strokeWidth={2.1} color={tokens.text} />}
+              icon={<Gauge size={16} strokeWidth={2} color={tokens.text} />}
               label="Mileage"
               value={formatMileage(vehicle.mileage)}
             />
             <AppView style={{ width: 1, backgroundColor: tokens.divider }} />
             <MetaCell
-              icon={<ScanLine size={16} strokeWidth={2.1} color={tokens.text} />}
+              icon={<ScanLine size={16} strokeWidth={2} color={tokens.text} />}
               label="Plate"
               value={vehicle.plate ?? '—'}
             />
@@ -113,13 +122,13 @@ export function GaragePrimaryVehicleCard({
       <AppView row gap={10}>
         <ActionPill
           label="Parts"
-          icon={<ScanLine size={16} strokeWidth={2.2} color={tokens.onBrand} />}
+          icon={<ScanLine size={16} strokeWidth={2} color={tokens.onBrand} />}
           onPress={() => onFindParts?.(vehicle.id)}
           primary
         />
         <ActionPill
           label="Service"
-          icon={<Wrench size={16} strokeWidth={2.2} color={tokens.text} />}
+          icon={<Wrench size={16} strokeWidth={2} color={tokens.text} />}
           onPress={() => onLogService?.(vehicle.id)}
         />
       </AppView>
@@ -130,15 +139,23 @@ export function GaragePrimaryVehicleCard({
 type VehicleMediaProps = {
   vehicleId: string;
   headline: string;
+  image?: string;
 };
 
-function VehicleMedia({ vehicleId, headline }: VehicleMediaProps) {
+function VehicleMedia({ vehicleId, headline, image }: VehicleMediaProps) {
   const { tokens } = useThemeContext();
+  // Prefer the explicit URL. Fall back to a seeded Picsum so dev gets
+  // consistent-but-varied placeholders; empty string counts as "no
+  // image" so backends sending '' instead of null don't break the chain.
+  const source =
+    image && image.length > 0
+      ? image
+      : `https://picsum.photos/seed/${vehicleId}/800/400`;
   return (
     <AppImage
-      source={`https://picsum.photos/seed/${vehicleId}/800/400`}
+      source={source}
       height={MEDIA_HEIGHT}
-      rounded={16}
+      rounded={RADIUS_SHEET}
       borderName="border"
       borderWidth={1}
       placeholderColorName="backgroundSecondary"
@@ -149,7 +166,7 @@ function VehicleMedia({ vehicleId, headline }: VehicleMediaProps) {
       alt={`${headline} photo`}
       fallback={
         <AppView flex={1} center>
-          <CarFront size={36} strokeWidth={1.6} color={tokens.gray400} />
+          <CarFront size={36} strokeWidth={2} color={tokens.gray400} />
         </AppView>
       }
     />
@@ -197,12 +214,13 @@ function ActionPill({ label, icon, onPress, primary }: ActionPillProps) {
   return (
     <AppPressableView
       flex={1}
-      rounded={999}
+      rounded={RADIUS_PILL}
       colorName={primary ? 'brand' : 'card'}
       borderName={primary ? undefined : 'border'}
       borderWidth={primary ? 0 : 1}
       androidRipple
       onPress={onPress}
+      accessibilityRole="button"
       accessibilityLabel={label}
     >
       <AppView row center gap={8} px={10} py={12}>

@@ -17,6 +17,9 @@ export type CartItem = {
   priceLabel?: string;
   badge?: string;
   status?: string;
+  /** Remote image URL for the product. When absent, surfaces fall back
+   *  to a generic placeholder. */
+  imageUrl?: string;
   quantity: number;
 };
 

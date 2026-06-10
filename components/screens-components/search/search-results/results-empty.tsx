@@ -4,6 +4,8 @@ import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 
+import { RADIUS_PILL } from '../radii';
+
 export type ResultsEmptyProps = {
   query: string;
   /** Server-suggested correction ("urbon" → "urban"). Tap to replace query. */
@@ -35,7 +37,7 @@ export default function ResultsEmpty({
   if (didYouMean) {
     return (
       <AppView gap={14} px={16} pt={40} align="center">
-        <Sparkles size={40} strokeWidth={1.6} color={tokens.text} />
+        <Sparkles size={40} strokeWidth={2} color={tokens.text} />
         <AppView gap={6} align="center">
           <AppText textVariant="bodySemibold">No matches for “{query.trim()}”</AppText>
           <AppText textVariant="bodySm" colorName="gray400" style={{ textAlign: 'center' }}>
@@ -49,7 +51,7 @@ export default function ResultsEmpty({
               marginTop: 6,
               paddingHorizontal: 14,
               paddingVertical: 10,
-              borderRadius: 36,
+              borderRadius: RADIUS_PILL,
               borderWidth: 1,
               borderColor: tokens.text,
             }}
@@ -67,7 +69,7 @@ export default function ResultsEmpty({
   if (hasActiveFilters) {
     return (
       <AppView gap={14} px={16} pt={40} align="center">
-        <Filter size={40} strokeWidth={1.6} color={tokens.gray400} />
+        <Filter size={40} strokeWidth={2} color={tokens.gray400} />
         <AppView gap={4} align="center">
           <AppText textVariant="bodySemibold">No results match your filters</AppText>
           <AppText
@@ -87,7 +89,7 @@ export default function ResultsEmpty({
               marginTop: 4,
               paddingHorizontal: 16,
               paddingVertical: 10,
-              borderRadius: 36,
+              borderRadius: RADIUS_PILL,
               backgroundColor: tokens.text,
             }}
           >
@@ -103,7 +105,7 @@ export default function ResultsEmpty({
   // 3) Plain "no match" — try a different word.
   return (
     <AppView gap={14} px={16} pt={40} align="center">
-      <SearchX size={48} strokeWidth={1.6} color={tokens.gray400} />
+      <SearchX size={48} strokeWidth={2} color={tokens.gray400} />
       <AppView gap={4} align="center">
         <AppText textVariant="bodySemibold">No matches</AppText>
         <AppText textVariant="bodySm" colorName="gray400" style={{ textAlign: 'center' }}>

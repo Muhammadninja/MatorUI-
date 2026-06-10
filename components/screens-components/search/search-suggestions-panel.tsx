@@ -8,6 +8,8 @@ import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import type { TypeaheadResponse } from '@/types/search';
 
+import { RADIUS_SHEET } from './radii';
+
 type TypeaheadSuggestion = TypeaheadResponse['suggestions'][number];
 
 /**
@@ -50,7 +52,7 @@ export default function SearchSuggestionsPanel({
     <AppView
       mx={12}
       mt={4}
-      rounded={20}
+      rounded={RADIUS_SHEET}
       colorName="card"
       style={[
         styles.panel,
@@ -74,7 +76,7 @@ export default function SearchSuggestionsPanel({
                 contentStyle={styles.loadingIndicatorContent}
               />
             ) : (
-              <Search size={16} strokeWidth={2.2} color={tokens.gray400} />
+              <Search size={16} strokeWidth={2} color={tokens.gray400} />
             )}
             <AppText textVariant="bodySm" colorName="gray400">
               {isLoadingSuggestions ? 'Searching…' : 'No suggestions'}
@@ -96,7 +98,7 @@ export default function SearchSuggestionsPanel({
                   title={suggestion.text}
                   titleVariant="bodySm"
                   titleStyle={styles.rowText}
-                  leading={<Search size={16} strokeWidth={2.2} color={tokens.gray400} />}
+                  leading={<Search size={16} strokeWidth={2} color={tokens.gray400} />}
                   rightAccessory={
                     suggestion.kind === 'product' ? (
                       <AppText textVariant="bodyXs" colorName="gray400">
@@ -148,7 +150,7 @@ export default function SearchSuggestionsPanel({
                   title={query}
                   titleVariant="bodySm"
                   titleStyle={styles.rowText}
-                  leading={<Clock size={16} strokeWidth={2.2} color={tokens.gray400} />}
+                  leading={<Clock size={16} strokeWidth={2} color={tokens.gray400} />}
                   style={styles.recentItem}
                   contentStyle={styles.listItemContent}
                   onPress={() => onSelectRecent(query)}

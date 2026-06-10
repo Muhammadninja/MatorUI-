@@ -1,4 +1,4 @@
-import { Bell, Mic, SlidersHorizontal, Sparkles, X } from 'lucide-react-native';
+import { ArrowLeft, Bell, Mic, Sparkles, X } from 'lucide-react-native';
 import { useEffect, useMemo, useRef } from 'react';
 import { Controller } from 'react-hook-form';
 import { StyleSheet } from 'react-native';
@@ -24,15 +24,25 @@ export type SmartSearchBarProps = {
   onVoicePress?: () => void;
   onImageSearchPress?: () => void;
   onNotificationPress?: () => void;
-  /** When true, the right-side trailing button shows a filter icon and
-   *  routes to onFilterPress instead of the notification bell. */
+  /** When true, the right-side notification bell is hidden — the user
+   *  is in a search/results context and notifications would compete
+   *  with the search affordances. */
   isSearching?: boolean;
-  onFilterPress?: () => void;
-  /** Optional dot indicator on the filter icon when any filter is active. */
-  hasActiveFilters?: boolean;
   /** Emitted when the inner TextInput focuses / blurs. Lets the parent
    *  decide when to render the suggestions panel. */
   onFocusChange?: (focused: boolean) => void;
+  /** True when the user has typed something OR results are showing.
+   *  Drives the left-side back button visibility and swaps the mic for
+   *  an X-clear in the right adornment. */
+  isSearchActive?: boolean;
+  /** Called when the back button is pressed. Parent should clear the
+   *  query, dismiss the keyboard, and bump `formResetKey` to force the
+   *  internal form to remount with an empty value. */
+  onBackPress?: () => void;
+  /** When this value changes, the internal AppForm is remounted with
+   *  its default empty value — the only clean way to clear the form
+   *  from outside without making it fully controlled. */
+  formResetKey?: number | string;
 };
 
 export function SmartSearchBar({
@@ -42,9 +52,10 @@ export function SmartSearchBar({
   onImageSearchPress,
   onNotificationPress,
   isSearching = false,
-  onFilterPress,
-  hasActiveFilters = false,
   onFocusChange,
+  isSearchActive = false,
+  onBackPress,
+  formResetKey,
 }: SmartSearchBarProps) {
   const { tokens } = useThemeContext();
 
@@ -101,28 +112,30 @@ export function SmartSearchBar({
               disabled={disabled}
               leftAdornment={
                 <AppView rounded={36} center style={styles.adornmentIcon}>
-                  <Sparkles size={18} strokeWidth={2.4} color={tokens.text} />
+                  <Sparkles size={18} strokeWidth={2} color={tokens.text} />
                 </AppView>
               }
               rightAdornment={
-                <AppView row align="center" gap={4}>
-                  {(rhf.value as string)?.length > 0 ? (
-                    <AppPressableView
-                      center
-                      rounded={36}
-                      onPress={() => {
-                        rhf.onChange('');
-                      }}
-                      androidRipple
-                      accessibilityLabel="Clear search"
-                      style={[
-                        styles.adornmentIcon,
-                        { backgroundColor: tokens.gray200 },
-                      ]}
-                    >
-                      <X size={14} strokeWidth={2.4} color={tokens.text} />
-                    </AppPressableView>
-                  ) : null}
+                // Mic and X are mutually exclusive: while the user has
+                // typed something, the right slot is the clear-X. Empty
+                // input → mic (voice search). One slot, two roles.
+                (rhf.value as string)?.length > 0 ? (
+                  <AppPressableView
+                    center
+                    rounded={36}
+                    onPress={() => {
+                      rhf.onChange('');
+                    }}
+                    androidRipple
+                    accessibilityLabel="Clear search"
+                    style={[
+                      styles.adornmentIcon,
+                      { backgroundColor: tokens.gray200 },
+                    ]}
+                  >
+                    <X size={14} strokeWidth={2} color={tokens.text} />
+                  </AppPressableView>
+                ) : (
                   <AppPressableView
                     center
                     rounded={36}
@@ -131,9 +144,9 @@ export function SmartSearchBar({
                     accessibilityLabel="Voice search"
                     style={styles.adornmentIcon}
                   >
-                    <Mic size={18} strokeWidth={2.4} color={tokens.text} />
+                    <Mic size={18} strokeWidth={2} color={tokens.text} />
                   </AppPressableView>
-                </AppView>
+                )
               }
               containerRounded={36}
               containerPx={12}
@@ -155,8 +168,25 @@ export function SmartSearchBar({
 
   return (
     <AppView row align="center" gap={12} px={12}>
+      {isSearchActive ? (
+        <AppPressableView
+          center
+          rounded={36}
+          onPress={onBackPress}
+          androidRipple
+          accessibilityLabel="Back to home"
+          style={styles.notificationButton}
+        >
+          <ArrowLeft size={20} strokeWidth={2} color={tokens.text} />
+        </AppPressableView>
+      ) : null}
       <AppView flex={1}>
+        {/* key={formResetKey} forces the form to remount with empty
+         *  defaultValues when the parent bumps the key — the only way
+         *  to clear the field from outside without making AppForm fully
+         *  controlled. */}
         <AppForm<SearchValues>
+          key={formResetKey}
           config={{ fields: [searchField] }}
           defaultValues={{ query: '' }}
           onSubmit={({ query }) => onPress?.(query)}
@@ -168,32 +198,10 @@ export function SmartSearchBar({
         />
       </AppView>
 
-      {isSearching ? (
-        <AppPressableView
-          row
-          center
-          rounded={36}
-          onPress={onFilterPress}
-          androidRipple
-          accessibilityLabel="Filters"
-          style={styles.notificationButton}
-        >
-          <SlidersHorizontal size={18} strokeWidth={2.4} color={tokens.gray400} />
-          {hasActiveFilters ? (
-            <AppView
-              rounded={36}
-              style={{
-                position: 'absolute',
-                top: 2,
-                right: 2,
-                width: 8,
-                height: 8,
-                backgroundColor: tokens.text,
-              }}
-            />
-          ) : null}
-        </AppPressableView>
-      ) : (
+      {/* Right-side affordance: bell on the landing surface, nothing
+       *  during search/results. Filters moved to the results header so
+       *  the search field stays roomy on small screens. */}
+      {!isSearching ? (
         <AppPressableView
           row
           center
@@ -204,9 +212,9 @@ export function SmartSearchBar({
           accessibilityLabel="Notifications"
           style={styles.notificationButton}
         >
-          <Bell size={18} strokeWidth={2.4} color={tokens.onBrand} />
+          <Bell size={18} strokeWidth={2} color={tokens.onBrand} />
         </AppPressableView>
-      )}
+      ) : null}
     </AppView>
   );
 }

@@ -24,6 +24,7 @@ export type AddItemInput = {
   priceLabel?: string;
   badge?: string;
   status?: string;
+  imageUrl?: string;
 };
 
 export interface CartTransport {
@@ -95,6 +96,7 @@ export class MockCartTransport implements CartTransport {
       priceLabel: input.priceLabel,
       badge: input.badge,
       status: input.status,
+      imageUrl: input.imageUrl,
       quantity: 1,
     };
     this.items.push(created);
@@ -162,81 +164,51 @@ export class MockCartTransport implements CartTransport {
  *   POST   /api/v1/cart/promo                  → PromoResult     (body: { code })
  *   DELETE /api/v1/cart/promo                  → 204
  */
-// export class HttpCartTransport implements CartTransport {
-//   constructor(
-//     private baseUrl: string,
-//     private getAuthToken: () => Promise<string | null>,
-//   ) {}
-//
-//   private async request<T>(path: string, init?: RequestInit): Promise<T> {
-//     const token = await this.getAuthToken();
-//     const res = await fetch(`${this.baseUrl}${path}`, {
-//       ...init,
-//       headers: {
-//         'Content-Type': 'application/json',
-//         ...(token ? { Authorization: `Bearer ${token}` } : {}),
-//         ...init?.headers,
-//       },
-//     });
-//     if (!res.ok) {
-//       const message = await res.text().catch(() => res.statusText);
-//       throw new Error(`Cart API ${res.status}: ${message}`);
-//     }
-//     if (res.status === 204) return undefined as T;
-//     return res.json() as Promise<T>;
-//   }
-//
-//   async fetch() {
-//     return this.request<CartSnapshot>('/api/v1/cart');
-//   }
-//
-//   async addItem(input: AddItemInput) {
-//     const data = await this.request<{ item: CartItem }>('/api/v1/cart/items', {
-//       method: 'POST',
-//       body: JSON.stringify(input),
-//     });
-//     return data.item;
-//   }
-//
-//   async updateQuantity(itemId: string, quantity: number) {
-//     if (quantity <= 0) {
-//       await this.removeItem(itemId);
-//       return null;
-//     }
-//     const data = await this.request<{ item: CartItem }>(
-//       `/api/v1/cart/items/${encodeURIComponent(itemId)}`,
-//       { method: 'PATCH', body: JSON.stringify({ quantity }) },
-//     );
-//     return data.item;
-//   }
-//
-//   async removeItem(itemId: string) {
-//     await this.request<void>(`/api/v1/cart/items/${encodeURIComponent(itemId)}`, {
-//       method: 'DELETE',
-//     });
-//   }
-//
-//   async clear() {
-//     await this.request<void>('/api/v1/cart/clear', { method: 'POST' });
-//   }
-//
-//   async applyPromo(code: string) {
-//     return this.request<PromoResult>('/api/v1/cart/promo', {
-//       method: 'POST',
-//       body: JSON.stringify({ code }),
-//     });
-//   }
-//
-//   async removePromo() {
-//     await this.request<void>('/api/v1/cart/promo', { method: 'DELETE' });
-//   }
-// }
+import { shouldUseHttpTransport } from '@/config/api';
+import { apiClient } from '@/services/api-client';
+
+export class HttpCartTransport implements CartTransport {
+  fetch(): Promise<CartSnapshot> {
+    return apiClient.get<CartSnapshot>('/api/v1/cart');
+  }
+
+  async addItem(input: AddItemInput): Promise<CartItem> {
+    const { item } = await apiClient.post<{ item: CartItem }>('/api/v1/cart/items', input);
+    return item;
+  }
+
+  async updateQuantity(itemId: string, quantity: number): Promise<CartItem | null> {
+    if (quantity <= 0) {
+      await this.removeItem(itemId);
+      return null;
+    }
+    const { item } = await apiClient.patch<{ item: CartItem }>(
+      `/api/v1/cart/items/${encodeURIComponent(itemId)}`,
+      { quantity },
+    );
+    return item;
+  }
+
+  async removeItem(itemId: string): Promise<void> {
+    await apiClient.delete(`/api/v1/cart/items/${encodeURIComponent(itemId)}`);
+  }
+
+  async clear(): Promise<void> {
+    await apiClient.post('/api/v1/cart/clear');
+  }
+
+  applyPromo(code: string): Promise<PromoResult> {
+    return apiClient.post<PromoResult>('/api/v1/cart/promo', { code });
+  }
+
+  async removePromo(): Promise<void> {
+    await apiClient.delete('/api/v1/cart/promo');
+  }
+}
 
 // ── Singleton ────────────────────────────────────────────────────────
 
-/**
- * Swap this constant to flip the whole app from mock to real backend.
- * Nothing else in the codebase imports the concrete transport class
- * — only this export.
- */
-export const cartTransport: CartTransport = new MockCartTransport();
+/** Flips automatically based on `EXPO_PUBLIC_API_BASE_URL`. */
+export const cartTransport: CartTransport = shouldUseHttpTransport()
+  ? new HttpCartTransport()
+  : new MockCartTransport();

@@ -1,5 +1,6 @@
 import { CarFront } from 'lucide-react-native';
 
+import { RADIUS_PILL, RADIUS_SHEET } from '@/components/screens-components/search/radii';
 import { AppButton } from '@/components/shared/app-button';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
@@ -15,7 +16,7 @@ export function GarageEmptyState({ onAddVehicle }: GarageEmptyStateProps) {
   return (
     <AppView flex={1} px={20} justify="center" align="center">
       <AppView
-        rounded={28}
+        rounded={RADIUS_SHEET}
         p={24}
         gap={20}
         align="center"
@@ -24,15 +25,18 @@ export function GarageEmptyState({ onAddVehicle }: GarageEmptyStateProps) {
         borderWidth={1}
         style={{ width: '100%', maxWidth: 360 }}
       >
+        {/* True circle (radius >> half side) for the icon medallion.
+         *  Uses RADIUS_PILL because 72/2=36 happens to match the pill
+         *  constant, so the value is grep-able alongside other pills. */}
         <AppView
           center
-          rounded={32}
+          rounded={RADIUS_PILL}
           colorName="backgroundSecondary"
           borderName="border"
           borderWidth={1}
           style={{ width: 72, height: 72 }}
         >
-          <CarFront size={28} strokeWidth={2.1} color={tokens.text} />
+          <CarFront size={28} strokeWidth={2} color={tokens.text} />
         </AppView>
 
         <AppView gap={6} align="center">

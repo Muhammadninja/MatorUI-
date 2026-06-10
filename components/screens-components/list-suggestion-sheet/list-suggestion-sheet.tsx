@@ -86,12 +86,12 @@ export default function ListSuggestionSheet({
                 style={{
                   width: 64,
                   height: 64,
-                  backgroundColor: '#ef444418',
+                  backgroundColor: `${tokens.error}18`,
                   borderWidth: 1,
-                  borderColor: '#ef444430',
+                  borderColor: `${tokens.error}30`,
                 }}
               >
-                <Heart size={28} strokeWidth={2.2} color="#ef4444" fill="#ef4444" />
+                <Heart size={28} strokeWidth={2.2} color={tokens.error} fill={tokens.error} />
               </AppView>
             </AppView>
 

@@ -1,15 +1,5 @@
 /** Pure non-component helpers shared by the result-row sub-components. */
 
-export function pseudoRating(id: string): number {
-  // 3.8 – 4.9 stars
-  return 3.8 + (hashCode(id) % 12) / 10;
-}
-
-export function pseudoReviewCount(id: string): number {
-  // 50 – 4,999 reviews
-  return 50 + (hashCode(id + ':r') % 5000);
-}
-
 export function formatCount(n: number): string {
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
   return String(n);

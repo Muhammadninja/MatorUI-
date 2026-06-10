@@ -1,84 +1,146 @@
 import { router } from 'expo-router';
 import {
+  Apple,
   ArrowRight,
-  Check,
   ChevronRight,
   CreditCard,
   Lock,
   MapPin,
-  Truck,
+  ShoppingBag,
   X,
 } from 'lucide-react-native';
-import { useState } from 'react';
-import { ActivityIndicator, TextInput } from 'react-native';
+import type { ComponentType } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/shared/app-button';
 import AppBlurView, { useBlurHeaderInset } from '@/components/shared/app-blur-view';
 import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useCartContext } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
+import {
+  useAddresses,
+  useCreateOrder,
+  usePaymentMethods,
+  useShippingQuote,
+} from '@/hooks/use-orders';
 import { useToast } from '@/hooks/use-toast';
 import { triggerHaptic } from '@/utils/haptics';
 
 const HEADER_HEIGHT = 56;
-
-type DeliveryKey = 'standard' | 'express' | 'same_day';
-type Phase = 'idle' | 'placing' | 'success';
-
-const DELIVERY_OPTIONS: { key: DeliveryKey; label: string; eta: string; price: number }[] = [
-  { key: 'standard', label: 'Standard', eta: '3–5 business days', price: 0 },
-  { key: 'express', label: 'Express', eta: '1–2 business days', price: 9.99 },
-  { key: 'same_day', label: 'Same day', eta: 'By 9 PM today', price: 19.99 },
-];
-
-const MOCK_ADDRESS = {
-  label: 'Home',
-  line1: '128 Marrakesh Rd, Suite 4',
-  city: 'Brooklyn, NY 11211',
-};
-
-const MOCK_CARD = {
-  brand: 'Mastercard',
-  last4: '4242',
-  exp: '09/27',
-};
 
 export default function CheckoutScreen() {
   const { tokens, scheme } = useThemeContext();
   const toast = useToast();
   const topInset = useBlurHeaderInset(HEADER_HEIGHT);
   const insets = useSafeAreaInsets();
-  const { items, itemCount, totals, formatCurrency, clearCart } = useCartContext();
+  const { items, itemCount, totals, appliedPromo, formatCurrency, clearCart } = useCartContext();
   const bottomInset = Math.max(insets.bottom, 16);
 
-  const [delivery, setDelivery] = useState<DeliveryKey>('standard');
+  // ── Server-driven address / payment / shipping ──────────────────────
+  const addresses = useAddresses();
+  const paymentMethods = usePaymentMethods();
+
+  // Default to first / default-flagged. UI lets the user "Change" later
+  // (the picker sheet is a follow-up; the data is already ready).
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!selectedAddressId && addresses.items.length > 0) {
+      setSelectedAddressId(addresses.items[0]!.id);
+    }
+  }, [addresses.items, selectedAddressId]);
+
+  useEffect(() => {
+    if (!selectedPaymentId && paymentMethods.items.length > 0) {
+      const def = paymentMethods.items.find((p) => p.isDefault) ?? paymentMethods.items[0];
+      setSelectedPaymentId(def?.id ?? null);
+    }
+  }, [paymentMethods.items, selectedPaymentId]);
+
+  const selectedAddress = useMemo(
+    () => addresses.items.find((a) => a.id === selectedAddressId) ?? null,
+    [addresses.items, selectedAddressId],
+  );
+  const selectedPayment = useMemo(
+    () => paymentMethods.items.find((p) => p.id === selectedPaymentId) ?? null,
+    [paymentMethods.items, selectedPaymentId],
+  );
+
+  const shippingRequest = useMemo(
+    () =>
+      selectedAddressId
+        ? { addressId: selectedAddressId, subtotal: totals.subtotal }
+        : null,
+    [selectedAddressId, totals.subtotal],
+  );
+  const shipping = useShippingQuote(shippingRequest);
+
+  const [selectedShippingKey, setSelectedShippingKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (shipping.options.length === 0) return;
+    // Auto-select first option when quote refreshes; preserve user's pick
+    // if it's still present in the new quote.
+    if (!selectedShippingKey || !shipping.options.find((o) => o.key === selectedShippingKey)) {
+      setSelectedShippingKey(shipping.options[0]!.key);
+    }
+  }, [shipping.options, selectedShippingKey]);
+
+  const selectedShipping = useMemo(
+    () => shipping.options.find((o) => o.key === selectedShippingKey) ?? null,
+    [shipping.options, selectedShippingKey],
+  );
+
   const [note, setNote] = useState('');
-  const [phase, setPhase] = useState<Phase>('idle');
-  const [orderId, setOrderId] = useState<string | null>(null);
+  const { phase, error, placeOrder } = useCreateOrder();
 
-  const deliveryFee = DELIVERY_OPTIONS.find((d) => d.key === delivery)?.price ?? 0;
+  const deliveryFee = selectedShipping?.price ?? 0;
   const grandTotal = totals.total + deliveryFee;
-  const orderEta = DELIVERY_OPTIONS.find((d) => d.key === delivery)?.eta ?? '';
 
-  const placeOrder = () => {
-    if (phase !== 'idle') return;
+  const canPlaceOrder =
+    items.length > 0 &&
+    !!selectedAddress &&
+    !!selectedPayment &&
+    !!selectedShipping &&
+    phase !== 'placing';
+
+  const handleClose = () => {
     triggerHaptic('selection');
-    setPhase('placing');
-    setTimeout(() => {
-      const id = `M-${Math.floor(40000 + Math.random() * 60000)}`;
-      setOrderId(id);
-      setPhase('success');
-      triggerHaptic('success');
-      clearCart();
-    }, 1400);
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/cart');
+    }
   };
 
-  if (phase === 'success' && orderId) {
-    return <SuccessView orderId={orderId} eta={orderEta} />;
-  }
+  const handlePlaceOrder = async () => {
+    if (!canPlaceOrder || !selectedAddress || !selectedPayment || !selectedShipping) return;
+    triggerHaptic('selection');
+    const result = await placeOrder({
+      items: items.map((i) => ({ productId: i.id, quantity: i.quantity })),
+      addressId: selectedAddress.id,
+      paymentMethodId: selectedPayment.id,
+      shippingOptionKey: selectedShipping.key,
+      promoCode: appliedPromo?.code ?? null,
+      note: note.trim() || undefined,
+    });
+    if (!result) {
+      triggerHaptic('error');
+      toast.danger('Could not place order', { description: error ?? 'Try again.' });
+      return;
+    }
+    triggerHaptic('success');
+    clearCart();
+    // Replace (not push) so the order can't be re-placed by tapping back —
+    // back stack becomes [cart, order-confirmation] and Close/swipe-down
+    // from the confirmation lands on cart directly.
+    router.replace(
+      `/order-confirmation?orderId=${encodeURIComponent(result.orderId)}&eta=${encodeURIComponent(result.eta)}`,
+    );
+  };
 
   return (
     <AppView flex={1} colorName="background">
@@ -98,9 +160,21 @@ export default function CheckoutScreen() {
             EXPRESS CHECKOUT
           </AppText>
           <AppView row gap={8}>
-            <ExpressButton label="Apple Pay" symbol="" onPress={() => toast.info('Apple Pay placeholder')} />
-            <ExpressButton label="G Pay" symbol="G" onPress={() => toast.info('Google Pay placeholder')} />
-            <ExpressButton label="Shop Pay" symbol="S" onPress={() => toast.info('Shop Pay placeholder')} />
+            <ExpressButton
+              label="Apple Pay"
+              Icon={Apple}
+              onPress={() => toast.info('Apple Pay placeholder')}
+            />
+            <ExpressButton
+              label="Google Pay"
+              Icon={CreditCard}
+              onPress={() => toast.info('Google Pay placeholder')}
+            />
+            <ExpressButton
+              label="Shop Pay"
+              Icon={ShoppingBag}
+              onPress={() => toast.info('Shop Pay placeholder')}
+            />
           </AppView>
           <AppView row align="center" gap={10} mt={6}>
             <AppView style={{ flex: 1, height: 1, backgroundColor: tokens.divider }} />
@@ -114,116 +188,152 @@ export default function CheckoutScreen() {
         {/* Delivery address */}
         <Section
           title="Deliver to"
-          onChange={() => toast.info('Address picker placeholder')}
+          onChange={
+            addresses.items.length > 1
+              ? () => toast.info('Address picker', { description: 'Multi-address picker coming next.' })
+              : undefined
+          }
         >
-          <AppView row align="center" gap={12}>
-            <AppView
-              center
-              rounded={36}
-              style={{
-                width: 36,
-                height: 36,
-                backgroundColor: scheme === 'dark' ? tokens.gray200 : tokens.gray100,
-              }}
-            >
-              <MapPin size={16} strokeWidth={2.2} color={tokens.text} />
+          {addresses.state === 'loading' ? (
+            <RowLoading />
+          ) : selectedAddress ? (
+            <AppView row align="center" gap={12}>
+              <AppView
+                center
+                rounded={36}
+                style={{
+                  width: 36,
+                  height: 36,
+                  backgroundColor: scheme === 'dark' ? tokens.gray200 : tokens.gray100,
+                }}
+              >
+                <MapPin size={16} strokeWidth={2.2} color={tokens.text} />
+              </AppView>
+              <AppView gap={2} style={{ flex: 1 }}>
+                <AppText textVariant="bodySemibold">{selectedAddress.label}</AppText>
+                <AppText textVariant="bodyXs" colorName="gray400">
+                  {selectedAddress.line1} · {selectedAddress.city}
+                </AppText>
+              </AppView>
             </AppView>
-            <AppView gap={2} style={{ flex: 1 }}>
-              <AppText textVariant="bodySemibold">{MOCK_ADDRESS.label}</AppText>
-              <AppText textVariant="bodyXs" colorName="gray400">
-                {MOCK_ADDRESS.line1} · {MOCK_ADDRESS.city}
-              </AppText>
-            </AppView>
-          </AppView>
+          ) : (
+            <AppText textVariant="bodyXs" colorName="gray400">
+              No address on file. Add one in Profile → Shipping Addresses.
+            </AppText>
+          )}
         </Section>
 
-        {/* Delivery speed */}
+        {/* Delivery speed — driven by the shipping quote */}
         <Section title="Delivery speed">
-          <AppView gap={8}>
-            {DELIVERY_OPTIONS.map((opt) => {
-              const selected = opt.key === delivery;
-              return (
-                <AppPressableView
-                  key={opt.key}
-                  onPress={() => {
-                    triggerHaptic('selection');
-                    setDelivery(opt.key);
-                  }}
-                  androidRipple={false}
-                  style={{
-                    borderRadius: 16,
-                    borderWidth: 1,
-                    borderColor: selected ? tokens.text : tokens.border,
-                    backgroundColor: selected
-                      ? scheme === 'dark'
-                        ? tokens.gray200
-                        : tokens.gray100
-                      : 'transparent',
-                  }}
-                >
-                  <AppView row align="center" gap={12} px={12} py={12}>
-                    <AppView
-                      center
-                      rounded={36}
-                      style={{
-                        width: 18,
-                        height: 18,
-                        borderWidth: 2,
-                        borderColor: selected ? tokens.text : tokens.gray400,
-                        backgroundColor: 'transparent',
-                      }}
-                    >
-                      {selected ? (
-                        <AppView
-                          rounded={36}
-                          style={{ width: 8, height: 8, backgroundColor: tokens.text }}
-                        />
-                      ) : null}
-                    </AppView>
-                    <AppView gap={2} style={{ flex: 1 }}>
+          {shipping.state === 'loading' && shipping.options.length === 0 ? (
+            <RowLoading />
+          ) : shipping.state === 'error' ? (
+            <AppText textVariant="bodyXs" colorName="gray400">
+              {shipping.error ?? 'Could not load shipping options.'}
+            </AppText>
+          ) : shipping.options.length === 0 ? (
+            <AppText textVariant="bodyXs" colorName="gray400">
+              No shipping options for this address.
+            </AppText>
+          ) : (
+            <AppView gap={8}>
+              {shipping.options.map((opt) => {
+                const selected = opt.key === selectedShippingKey;
+                return (
+                  <AppPressableView
+                    key={opt.key}
+                    onPress={() => {
+                      triggerHaptic('selection');
+                      setSelectedShippingKey(opt.key);
+                    }}
+                    androidRipple={false}
+                    style={{
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: selected ? tokens.text : tokens.border,
+                      backgroundColor: selected
+                        ? scheme === 'dark'
+                          ? tokens.gray200
+                          : tokens.gray100
+                        : 'transparent',
+                    }}
+                  >
+                    <AppView row align="center" gap={12} px={12} py={12}>
+                      <AppView
+                        center
+                        rounded={36}
+                        style={{
+                          width: 18,
+                          height: 18,
+                          borderWidth: 2,
+                          borderColor: selected ? tokens.text : tokens.gray400,
+                          backgroundColor: 'transparent',
+                        }}
+                      >
+                        {selected ? (
+                          <AppView
+                            rounded={36}
+                            style={{ width: 8, height: 8, backgroundColor: tokens.text }}
+                          />
+                        ) : null}
+                      </AppView>
+                      <AppView gap={2} style={{ flex: 1 }}>
+                        <AppText textVariant="bodySm" weight="semibold">
+                          {opt.label}
+                        </AppText>
+                        <AppText textVariant="bodyXs" colorName="gray400">
+                          {opt.eta}
+                        </AppText>
+                      </AppView>
                       <AppText textVariant="bodySm" weight="semibold">
-                        {opt.label}
-                      </AppText>
-                      <AppText textVariant="bodyXs" colorName="gray400">
-                        {opt.eta}
+                        {opt.price === 0 ? 'Free' : formatCurrency(opt.price)}
                       </AppText>
                     </AppView>
-                    <AppText textVariant="bodySm" weight="semibold">
-                      {opt.price === 0 ? 'Free' : formatCurrency(opt.price)}
-                    </AppText>
-                  </AppView>
-                </AppPressableView>
-              );
-            })}
-          </AppView>
+                  </AppPressableView>
+                );
+              })}
+            </AppView>
+          )}
         </Section>
 
         {/* Payment */}
         <Section
           title="Payment"
-          onChange={() => toast.info('Payment method picker placeholder')}
+          onChange={
+            paymentMethods.items.length > 1
+              ? () => toast.info('Payment picker', { description: 'Multi-card picker coming next.' })
+              : undefined
+          }
         >
-          <AppView row align="center" gap={12}>
-            <AppView
-              center
-              rounded={10}
-              style={{
-                width: 44,
-                height: 32,
-                backgroundColor: scheme === 'dark' ? tokens.gray200 : tokens.gray100,
-              }}
-            >
-              <CreditCard size={16} strokeWidth={2.2} color={tokens.text} />
+          {paymentMethods.state === 'loading' ? (
+            <RowLoading />
+          ) : selectedPayment ? (
+            <AppView row align="center" gap={12}>
+              <AppView
+                center
+                rounded={10}
+                style={{
+                  width: 44,
+                  height: 32,
+                  backgroundColor: scheme === 'dark' ? tokens.gray200 : tokens.gray100,
+                }}
+              >
+                <CreditCard size={16} strokeWidth={2.2} color={tokens.text} />
+              </AppView>
+              <AppView gap={2} style={{ flex: 1 }}>
+                <AppText textVariant="bodySemibold">
+                  {selectedPayment.brand} •••• {selectedPayment.last4}
+                </AppText>
+                <AppText textVariant="bodyXs" colorName="gray400">
+                  Exp {selectedPayment.exp}
+                </AppText>
+              </AppView>
             </AppView>
-            <AppView gap={2} style={{ flex: 1 }}>
-              <AppText textVariant="bodySemibold">
-                {MOCK_CARD.brand} •••• {MOCK_CARD.last4}
-              </AppText>
-              <AppText textVariant="bodyXs" colorName="gray400">
-                Exp {MOCK_CARD.exp}
-              </AppText>
-            </AppView>
-          </AppView>
+          ) : (
+            <AppText textVariant="bodyXs" colorName="gray400">
+              No saved payment methods. Add one in Profile → Payment.
+            </AppText>
+          )}
         </Section>
 
         {/* Items review */}
@@ -322,22 +432,25 @@ export default function CheckoutScreen() {
       {/* Blur header */}
       <AppBlurView contentHeight={HEADER_HEIGHT}>
         <AppView row align="center" justify="space-between" px={16} pt={8} pb={12}>
-          <AppPressableView
-            center
-            rounded={36}
-            onPress={() => router.back()}
-            androidRipple
+          <Pressable
+            onPress={handleClose}
+            accessibilityRole="button"
             accessibilityLabel="Close checkout"
-            style={{
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={({ pressed }) => ({
               width: 36,
               height: 36,
+              borderRadius: 36,
+              alignItems: 'center',
+              justifyContent: 'center',
               borderWidth: 1,
               borderColor: tokens.border,
               backgroundColor: scheme === 'dark' ? tokens.card : tokens.white,
-            }}
+              opacity: pressed ? 0.7 : 1,
+            })}
           >
             <X size={18} strokeWidth={2.2} color={tokens.text} />
-          </AppPressableView>
+          </Pressable>
           <AppText textVariant="bodySm" weight="semibold">
             Checkout
           </AppText>
@@ -370,8 +483,8 @@ export default function CheckoutScreen() {
             </AppText>
           </AppView>
           <AppPressableView
-            onPress={placeOrder}
-            disabled={items.length === 0 || phase === 'placing'}
+            onPress={handlePlaceOrder}
+            disabled={!canPlaceOrder}
             androidRipple
             accessibilityLabel="Place order"
             style={{
@@ -379,7 +492,7 @@ export default function CheckoutScreen() {
               paddingHorizontal: 20,
               paddingVertical: 14,
               backgroundColor: tokens.brandBg,
-              opacity: items.length === 0 ? 0.5 : 1,
+              opacity: canPlaceOrder ? 1 : 0.5,
               minWidth: 160,
             }}
           >
@@ -398,6 +511,18 @@ export default function CheckoutScreen() {
           </AppPressableView>
         </AppView>
       </AppView>
+    </AppView>
+  );
+}
+
+function RowLoading() {
+  const { tokens } = useThemeContext();
+  return (
+    <AppView row align="center" gap={10}>
+      <ActivityIndicator color={tokens.gray400} size="small" />
+      <AppText textVariant="bodyXs" colorName="gray400">
+        Loading…
+      </AppText>
     </AppView>
   );
 }
@@ -473,125 +598,39 @@ function SummaryRow({
 
 function ExpressButton({
   label,
-  symbol,
+  Icon,
   onPress,
 }: {
   label: string;
-  symbol: string;
+  Icon: ComponentType<{ size?: number; strokeWidth?: number; color?: string }>;
   onPress: () => void;
 }) {
   const { tokens } = useThemeContext();
   return (
-    <AppPressableView
+    <Pressable
       onPress={() => {
         triggerHaptic('selection');
         onPress();
       }}
-      androidRipple
-      style={{
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => ({
         flex: 1,
         borderRadius: 14,
         paddingVertical: 14,
         backgroundColor: tokens.text,
-      }}
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        opacity: pressed ? 0.8 : 1,
+      })}
     >
-      <AppView row align="center" justify="center" gap={6}>
-        <AppText weight="bold" style={{ color: tokens.background, fontSize: 14 }}>
-          {symbol || ''} {label}
-        </AppText>
-      </AppView>
-    </AppPressableView>
+      <Icon size={15} strokeWidth={2.2} color={tokens.background} />
+      <AppText weight="bold" style={{ color: tokens.background, fontSize: 13 }}>
+        {label}
+      </AppText>
+    </Pressable>
   );
 }
 
-function SuccessView({ orderId, eta }: { orderId: string; eta: string }) {
-  const { tokens, scheme } = useThemeContext();
-  const insets = useSafeAreaInsets();
-
-  return (
-    <AppView flex={1} colorName="background" px={20} pt={80}>
-      <AppView align="center" gap={20}>
-        <AppView
-          center
-          rounded={64}
-          style={{ width: 80, height: 80, backgroundColor: tokens.success }}
-        >
-          <Check size={36} strokeWidth={3} color={tokens.white} />
-        </AppView>
-        <AppView align="center" gap={6}>
-          <AppText textVariant="title" family="heading" weight="bold">
-            Order placed
-          </AppText>
-          <AppText textVariant="bodySm" colorName="gray400" style={{ textAlign: 'center' }}>
-            We sent a confirmation to your email. You can follow it on the way.
-          </AppText>
-        </AppView>
-
-        <AppView
-          rounded={24}
-          px={20}
-          py={20}
-          gap={14}
-          style={{
-            alignSelf: 'stretch',
-            borderWidth: 1,
-            borderColor: tokens.border,
-            backgroundColor: scheme === 'dark' ? tokens.card : tokens.white,
-          }}
-        >
-          <AppView row align="center" justify="space-between">
-            <AppText textVariant="bodyXs" colorName="gray400">
-              Order number
-            </AppText>
-            <AppText textVariant="bodySm" weight="semibold">
-              #{orderId}
-            </AppText>
-          </AppView>
-          <AppView row align="center" justify="space-between">
-            <AppText textVariant="bodyXs" colorName="gray400">
-              Estimated arrival
-            </AppText>
-            <AppText textVariant="bodySm" weight="semibold">
-              {eta}
-            </AppText>
-          </AppView>
-        </AppView>
-      </AppView>
-
-      <AppView style={{ flex: 1 }} />
-
-      <AppView gap={10} style={{ paddingBottom: Math.max(insets.bottom, 24) }}>
-        <AppPressableView
-          onPress={() => {
-            triggerHaptic('selection');
-            router.replace('/track-order');
-          }}
-          androidRipple
-          style={{
-            borderRadius: 36,
-            paddingVertical: 16,
-            backgroundColor: tokens.brandBg,
-          }}
-        >
-          <AppView row align="center" justify="center" gap={8}>
-            <Truck size={18} strokeWidth={2.4} color={tokens.onBrand} />
-            <AppText weight="bold" style={{ color: tokens.onBrand }}>
-              Track order
-            </AppText>
-          </AppView>
-        </AppPressableView>
-        <AppButton
-          title="Continue shopping"
-          kind="secondary"
-          variant="outline"
-          size="md"
-          fullWidth
-          onPress={() => {
-            triggerHaptic('selection');
-            router.replace('/explore');
-          }}
-        />
-      </AppView>
-    </AppView>
-  );
-}

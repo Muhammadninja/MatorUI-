@@ -96,7 +96,7 @@ export default function SearchFiltersSheet({
 
   return (
     <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
-      <AppView flex={1} justify="flex-end" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}>
+      <AppView flex={1} justify="flex-end" style={{ backgroundColor: tokens.scrim }}>
         <AppPressableView style={{ flex: 1 }} onPress={onClose} accessibilityLabel="Dismiss" />
         <AppView
           roundedTop={28}
@@ -132,7 +132,7 @@ export default function SearchFiltersSheet({
                 borderColor: tokens.border,
               }}
             >
-              <X size={16} strokeWidth={2.2} color={tokens.text} />
+              <X size={16} strokeWidth={2} color={tokens.text} />
             </AppPressableView>
           </AppView>
 

@@ -127,6 +127,23 @@ const AppPressableViewBase = forwardRef<React.ElementRef<typeof Pressable>, AppP
     // Animated value for pressed background fade
     const pressedAnim = useRef(new Animated.Value(0)).current;
 
+    // Flexbox + gap need to apply to the inner Pressable so its CHILDREN
+    // arrange correctly (row/center/gap) — applying these to the outer
+    // Animated.View doesn't reach the Pressable's children. Padding +
+    // border + bg stay on the outer so visual chrome is unchanged.
+    // Width/height are NOT forced here — that would make the Pressable
+    // stretch in flex-row parents with default `alignItems: 'stretch'`
+    // (e.g. chips in a horizontal ScrollView blow up to screen height).
+    // Use `fillContainer` to opt in to filling explicitly.
+    const innerLayout = useMemo<ViewStyle>(() => {
+      const flexbox = composeFlexbox({ row, center, align, justify, wrap, flex, grow, shrink });
+      const out: ViewStyle = { ...flexbox };
+      if (gap !== undefined) out.gap = gap;
+      if (rowGap !== undefined) out.rowGap = rowGap;
+      if (columnGap !== undefined) out.columnGap = columnGap;
+      return out;
+    }, [row, center, align, justify, wrap, flex, grow, shrink, gap, rowGap, columnGap]);
+
     const base = useMemo<ViewStyle>(() => {
       const spacing = composeSpacing({
         p,
@@ -291,7 +308,11 @@ const AppPressableViewBase = forwardRef<React.ElementRef<typeof Pressable>, AppP
           hitSlop={hitSlop ?? defaultHitSlop}
           android_ripple={Platform.OS === 'android' ? ripple : undefined}
           style={({ pressed }) => [
+            // Inner carries flexbox so children arrange via row/center/gap.
+            // (Outer Animated.View keeps the chrome — bg/border/rounded/padding.)
+            // Only fill the wrapper when explicitly requested via `fillContainer`.
             fillContainer ? { flex: 1, width: '100%', height: '100%' } : null,
+            innerLayout,
             pressed && !pressedBackgroundColor
               ? pressedScale && pressedScale !== 1
                 ? {

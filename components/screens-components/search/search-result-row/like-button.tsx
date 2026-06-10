@@ -1,6 +1,7 @@
 import { Heart } from 'lucide-react-native';
 
-import { AppPressableView } from '@/components/shared/app-view';
+import { AppIconButton } from '@/components/shared/app-icon-button';
+import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import { triggerHaptic } from '@/utils/haptics';
 
@@ -9,8 +10,7 @@ export default function LikeButton(props: {
   onToggle: () => void;
 }) {
   const { liked, onToggle } = props;
-  const { tokens, scheme } = useThemeContext();
-  const isDark = scheme === 'dark';
+  const { tokens } = useThemeContext();
 
   const handlePress = () => {
     triggerHaptic(liked ? 'selection' : 'success');
@@ -21,31 +21,21 @@ export default function LikeButton(props: {
   // in dark mode) so the filled heart reads as a deliberate brand
   // accent rather than a red flag. Unliked stays neutral gray.
   const likedColor = tokens.text;
-  const heartColor = liked ? likedColor : tokens.gray400;
 
   return (
-    <AppPressableView
-      center
-      rounded={36}
-      onPress={handlePress}
-      androidRipple
-      accessibilityLabel={liked ? 'Unlike' : 'Like'}
-      accessibilityRole="button"
-      hitSlop={8}
-      style={{
-        width: 32,
-        height: 32,
-        backgroundColor: isDark ? tokens.gray200 : tokens.gray100,
-        borderWidth: 1,
-        borderColor: liked ? likedColor : tokens.border,
-      }}
-    >
-      <Heart
-        size={16}
-        strokeWidth={2.4}
-        color={heartColor}
+    <AppView mt={8} mr={8}>
+      <AppIconButton
+        Icon={Heart}
+        onPress={handlePress}
+        size={32}
+        iconSize={16}
+        strokeWidth={2}
+        backgroundColorName="gray100"
+        borderColorName={liked ? 'text' : 'border'}
+        color={liked ? likedColor : tokens.gray400}
         fill={liked ? likedColor : 'transparent'}
+        accessibilityLabel={liked ? 'Unlike' : 'Like'}
       />
-    </AppPressableView>
+    </AppView>
   );
 }

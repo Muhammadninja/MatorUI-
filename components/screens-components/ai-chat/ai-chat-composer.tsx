@@ -1,4 +1,4 @@
-import { Plus, SendHorizontal } from 'lucide-react-native';
+import { SendHorizontal, Square } from 'lucide-react-native';
 
 import AppTextField from '@/components/shared/app-text-field';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
@@ -8,56 +8,50 @@ type AiChatComposerProps = {
   value: string;
   onChangeText: (value: string) => void;
   onSend: () => void;
-  onLeftActionPress?: () => void;
-  disabled?: boolean;
+  /** Fired when the send button is tapped while empty (and not sending).
+   *  Lets the screen play a haptic so the press doesn't feel ignored. */
+  onEmptyTap?: () => void;
+  /** True while a streaming response is in flight; flips the send button
+   *  into a Stop button and routes its press to `onStop`. */
+  isSending?: boolean;
+  onStop?: () => void;
 };
 
 export default function AiChatComposer({
   value,
   onChangeText,
   onSend,
-  onLeftActionPress,
-  disabled = false,
+  onEmptyTap,
+  isSending = false,
+  onStop,
 }: AiChatComposerProps) {
   const { tokens } = useThemeContext();
-  const canSend = value.trim().length > 0 && !disabled;
+  const canSend = value.trim().length > 0 && !isSending;
+  const handleRightPress = isSending
+    ? onStop
+    : canSend
+      ? onSend
+      : onEmptyTap ?? undefined;
 
   return (
-    <AppView
-      px={6}
-      py={6}
-      row
-      align="center"
-      gap={8}
-      style={{
-        borderColor: tokens.border,
-        borderTopLeftRadius: 1,
-        borderTopRightRadius: 36,
-      }}
-    >
-      <AppPressableView
-        center
-        rounded={36}
-        androidRipple={false}
-        pressedOpacity={0.7}
-        onPress={disabled ? undefined : onLeftActionPress}
-        style={{
-          width: 38,
-          height: 38,
-          backgroundColor: tokens.backgroundSecondary,
-        }}
-      >
-        <Plus size={18} strokeWidth={2.2} color={tokens.icon} />
-      </AppPressableView>
-
-      <AppView flex={1}>
+    <AppView px={10} py={6} row align="center" gap={8}>
+      <AppView flex={1} >
         <AppTextField
-          placeholder="Ask a parts question"
+          placeholder="Ask a parts question…"
           value={value}
           onChangeText={onChangeText}
-          disabled={disabled}
           autoCapitalize="sentences"
           autoCorrect={false}
+          multiline
+          /* Override the primitive's 100dp multiline minHeight: the
+           *  composer should look like a single-line input until the
+           *  user types past one line, then grow up to ~4 lines. */
+          style={{ minHeight: 0, maxHeight: 96 }}
+          /* Match field fill to the composer strip (now solid
+           *  `tokens.background` since the BlurView underlay was removed).
+           *  No border — field reads as one clean surface. */
+          containerColorName="background"
+          containerStyle={{ borderWidth: 0 }}
         />
       </AppView>
 
@@ -66,18 +60,29 @@ export default function AiChatComposer({
         rounded={36}
         androidRipple={false}
         pressedOpacity={0.7}
-        onPress={canSend ? onSend : undefined}
+        onPress={handleRightPress}
+        accessibilityRole="button"
+        accessibilityLabel={isSending ? 'Stop generating' : 'Send message'}
         style={{
           width: 38,
           height: 38,
-          backgroundColor: canSend ? tokens.brand : tokens.backgroundSecondary,
+          backgroundColor: isSending ? tokens.error : canSend ? tokens.brand : tokens.backgroundSecondary,
         }}
       >
-        <SendHorizontal
-          size={18}
-          strokeWidth={2.2}
-          color={canSend ? tokens.onBrand : tokens.icon}
-        />
+        {isSending ? (
+          <Square
+            size={14}
+            strokeWidth={2.4}
+            color={tokens.onBrand}
+            fill={tokens.onBrand}
+          />
+        ) : (
+          <SendHorizontal
+            size={18}
+            strokeWidth={2.2}
+            color={canSend ? tokens.onBrand : tokens.icon}
+          />
+        )}
       </AppPressableView>
     </AppView>
   );

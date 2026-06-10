@@ -20,6 +20,35 @@ export type TextVariant =
 export type ShadowLevel = 0 | 1 | 2 | 3 | 4 | 6 | 8 | 12;
 export type ColorName = keyof ThemeTokens;
 
+/**
+ * Spacing scale. Eight rungs cover the entire app's spacing needs and
+ * line up with a 4-pixel grid. AppView's `px/py/p/m/gap/...` props accept
+ * either a `SpacingKey` (e.g. `px="md"`) or a raw number for one-offs.
+ *
+ * Why a scale: drift. Without one, half the screens used `px={16}`,
+ * some used `px={14}`, the new-address form used `px={10}`. With a scale,
+ * consumers commit to `md` / `sm` / `lg` and visual rhythm is enforced.
+ */
+export const SPACING = {
+  none: 0,
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  xxl: 32,
+  xxxl: 48,
+} as const;
+
+export type SpacingKey = keyof typeof SPACING;
+
+/** Coerce either a scale key (`"md"`) or a number to a pixel value. */
+export function resolveSpace(value: number | SpacingKey | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value === 'number') return value;
+  return SPACING[value];
+}
+
 export const APP_FONTS: Record<FontFamilyName, string | undefined> = {
   default: 'Montserrat_400Regular',
   heading: 'SpaceGrotesk_700Bold',
@@ -115,6 +144,10 @@ export const lightTokens: ThemeTokens = {
   gray400: '#9a9a9a',
   white: '#ffffff',
   black: '#000000',
+  rating: '#F59E0B',
+  accolade: '#f4c542',
+  value: '#4ade80',
+  scrim: 'rgba(0, 0, 0, 0.55)',
 };
 
 export const darkTokens: ThemeTokens = {
@@ -166,6 +199,10 @@ export const darkTokens: ThemeTokens = {
   gray400: '#737373',
   white: '#ffffff',
   black: '#000000',
+  rating: '#F59E0B',
+  accolade: '#b8860b',
+  value: '#15803d',
+  scrim: 'rgba(0, 0, 0, 0.55)',
 };
 
 export function createNavigationTheme(scheme: 'light' | 'dark') {

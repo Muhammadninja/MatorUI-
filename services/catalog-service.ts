@@ -28,6 +28,9 @@ export type CatalogListRequest = {
   category?: string;
   search?: string | null;
   sortBy?: 'featured' | 'newest' | 'price_asc' | 'price_desc';
+  /** Cancellation token. The HTTP transport must pass this to fetch.
+   *  Mock transport honors it by aborting the simulated delay. */
+  signal?: AbortSignal;
 };
 
 export type CatalogListResponse = {
@@ -87,7 +90,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     status: 'Ready to ship',
     title: 'Chevrolet Cobalt EV Urban Glide X',
     description: 'Compact EV for city runs with fast charge support.',
-    price: '$18,400',
+    price: 'UZS 11,008,400',
     priceLabel: 'Starting at',
     images: [],
     specs: MOCK_SPECS,
@@ -99,7 +102,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     status: 'Low stock',
     title: 'Northline SUV Family Edition',
     description: 'Family-ready drive with smart safety assist and roomy cabin.',
-    price: '$29,900',
+    price: 'UZS29,900',
     priceLabel: 'Starting at',
     images: [],
     specs: [
@@ -116,7 +119,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     status: 'Pre-order',
     title: 'Aero Coupe S',
     description: 'Sport coupe tuned for range, speed, and sleek daily comfort.',
-    price: '$34,200',
+    price: 'UZS 34,200',
     priceLabel: 'Starting at',
     images: [],
     specs: [
@@ -131,9 +134,9 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
   {
     id: 'trail-pro-ev',
     status: 'Ready to ship',
-    title: 'Trail Pro EV',
+    title: 'Cobalt Remen Generator Xitoy Original',
     description: 'Adventure-focused build with rugged stance and long battery life.',
-    price: '$26,750',
+    price: 'UZS 850,750',
     priceLabel: 'Starting at',
     images: [],
     specs: [
@@ -144,6 +147,53 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     ],
     features: MOCK_FEATURES,
     category: 'truck',
+  },
+  // Test fixture for the "Mator Verified" ribbon. The id is chosen so
+  // that `(hashCode(id) * 7) % tagOptions.length === 2` in variant.ts,
+  // which deterministically maps to the Mator Verified slot. Mid-range
+  // price so it won't be the cheapest in any result set (Cheapest would
+  // otherwise override). Searchable by "elite", "mator", or "sedan".
+  {
+    id: 'mator-elite',
+    status: 'Ready to ship',
+    title: 'Mator Elite Sedan',
+    description: 'Premium sedan with Mator Verified inspection and warranty.',
+    price: 'UZS 24,500',
+    priceLabel: 'Starting at',
+    images: [],
+    specs: [
+      { label: 'Range', value: '320 mi' },
+      { label: '0–60 mph', value: '4.2s' },
+      { label: 'Top Speed', value: '155 mph' },
+      { label: 'Drivetrain', value: 'AWD' },
+    ],
+    features: MOCK_FEATURES,
+    category: 'sedan',
+  },
+  // Test fixture for the COMPOSITE "Elite Pick" ribbon (Option A
+  // escalation). This product qualifies for all three signal sources:
+  //   - lowest price in the catalog ($16,900) → Cheapest
+  //   - server badge "Bestseller"             → Bestseller
+  //   - id 'mator-prime' hashes to slot 2     → Mator Verified
+  // resolvePriceSignal collapses them into a single "ELITE PICK"
+  // ribbon that carries all three icons. Searchable by "prime", "mator".
+  {
+    id: 'mator-prime',
+    status: 'Ready to ship',
+    title: 'Mator Prime',
+    description: 'Flagship sedan — top-selling, lowest entry price, full Mator Verified inspection.',
+    price: 'UZS 16,900',
+    priceLabel: 'Starting at',
+    badge: 'Bestseller',
+    images: [],
+    specs: [
+      { label: 'Range', value: '340 mi' },
+      { label: '0–60 mph', value: '3.9s' },
+      { label: 'Top Speed', value: '160 mph' },
+      { label: 'Drivetrain', value: 'AWD' },
+    ],
+    features: MOCK_FEATURES,
+    category: 'sedan',
   },
 ];
 
@@ -192,25 +242,85 @@ export function getCatalogMockDetail(id: string): CatalogDetailResponse | null {
   return { item };
 }
 
-// ── API Functions (replace mock calls when backend is ready) ─────────
+// ── Transport ────────────────────────────────────────────────────────
+
+import { shouldUseHttpTransport } from '@/config/api';
+import { apiClient, ApiError } from '@/services/api-client';
 
 const API_BASE = '/api/v1/catalog';
+const MOCK_LATENCY_MS = 350;
 
-export async function fetchCatalogList(request: CatalogListRequest): Promise<CatalogListResponse> {
-  // TODO: Replace with actual API call
-  // const response = await fetch(`${API_BASE}/items?page=${request.page}&pageSize=${request.pageSize}`);
-  // return response.json();
-  return getCatalogMockList(request);
+export interface CatalogTransport {
+  list(request: CatalogListRequest): Promise<CatalogListResponse>;
+  detail(id: string, signal?: AbortSignal): Promise<CatalogDetailResponse | null>;
 }
 
-export async function fetchCatalogDetail(id: string): Promise<CatalogDetailResponse | null> {
-  // TODO: Replace with actual API call
-  // const response = await fetch(`${API_BASE}/items/${id}`);
-  // return response.json();
-  return getCatalogMockDetail(id);
+class MockCatalogTransport implements CatalogTransport {
+  async list(request: CatalogListRequest): Promise<CatalogListResponse> {
+    await delay(MOCK_LATENCY_MS, request.signal);
+    return getCatalogMockList(request);
+  }
+  async detail(id: string, signal?: AbortSignal): Promise<CatalogDetailResponse | null> {
+    await delay(MOCK_LATENCY_MS, signal);
+    return getCatalogMockDetail(id);
+  }
+}
+
+class HttpCatalogTransport implements CatalogTransport {
+  list(request: CatalogListRequest): Promise<CatalogListResponse> {
+    const params = new URLSearchParams({
+      page: String(request.page),
+      pageSize: String(request.pageSize),
+    });
+    if (request.category) params.set('category', request.category);
+    if (request.search) params.set('search', request.search);
+    if (request.sortBy) params.set('sortBy', request.sortBy);
+    return apiClient.get<CatalogListResponse>(`${API_BASE}/items?${params.toString()}`, {
+      signal: request.signal,
+    });
+  }
+  async detail(id: string, signal?: AbortSignal): Promise<CatalogDetailResponse | null> {
+    try {
+      return await apiClient.get<CatalogDetailResponse>(`${API_BASE}/items/${id}`, { signal });
+    } catch (err) {
+      // 404 is a normal "not found" — surface as null instead of throwing.
+      if (err instanceof ApiError && err.status === 404) return null;
+      throw err;
+    }
+  }
+}
+
+export const catalogTransport: CatalogTransport = shouldUseHttpTransport()
+  ? new HttpCatalogTransport()
+  : new MockCatalogTransport();
+
+// Back-compat facades — existing callers (hooks/use-catalog-*) keep working.
+export function fetchCatalogList(request: CatalogListRequest): Promise<CatalogListResponse> {
+  return catalogTransport.list(request);
+}
+export function fetchCatalogDetail(
+  id: string,
+  signal?: AbortSignal,
+): Promise<CatalogDetailResponse | null> {
+  return catalogTransport.detail(id, signal);
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
+
+/** Simulated delay that respects an AbortSignal — used by the mock. */
+function delay(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(resolve, ms);
+    if (signal) {
+      const onAbort = () => {
+        clearTimeout(t);
+        reject(new DOMException('Aborted', 'AbortError'));
+      };
+      if (signal.aborted) onAbort();
+      else signal.addEventListener('abort', onAbort, { once: true });
+    }
+  });
+}
 
 function parsePrice(price: string): number {
   return Number(price.replace(/[^0-9.]/g, '')) || 0;

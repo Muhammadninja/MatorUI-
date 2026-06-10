@@ -5,7 +5,13 @@ import { View, type StyleProp, type ViewProps, type ViewStyle } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorToken, useResolvedBackgroundColor } from './colors';
 import { composeSafeAreaPadding } from './safe-area';
-import { composeBorder, composeFlexbox, composeRounding, composeSpacing } from './style-compose';
+import {
+  composeBorder,
+  composeFlexbox,
+  composeRounding,
+  composeSpacing,
+  type SpaceValue,
+} from './style-compose';
 import { SHADOW_DEFAULT_LEVEL } from './tokens';
 
 export type AppViewProps = Omit<ViewProps, 'style'> & {
@@ -14,24 +20,26 @@ export type AppViewProps = Omit<ViewProps, 'style'> & {
   darkColor?: string;
   /** Theme color token to use for background. If omitted, no background is applied. */
   colorName?: ColorName;
-  p?: number; // padding
-  px?: number;
-  py?: number;
-  pt?: number;
-  pb?: number;
-  pl?: number;
-  pr?: number;
-  m?: number; // margin
-  mx?: number;
-  my?: number;
-  mt?: number;
-  mb?: number;
-  ml?: number;
-  mr?: number;
-  /** Gap between children (requires RN 0.71+) */
-  gap?: number;
-  rowGap?: number;
-  columnGap?: number;
+  /** Padding. Either a SpacingKey ("md") or a raw pixel number. */
+  p?: SpaceValue;
+  px?: SpaceValue;
+  py?: SpaceValue;
+  pt?: SpaceValue;
+  pb?: SpaceValue;
+  pl?: SpaceValue;
+  pr?: SpaceValue;
+  /** Margin. Either a SpacingKey or a raw pixel number. */
+  m?: SpaceValue;
+  mx?: SpaceValue;
+  my?: SpaceValue;
+  mt?: SpaceValue;
+  mb?: SpaceValue;
+  ml?: SpaceValue;
+  mr?: SpaceValue;
+  /** Gap between children (requires RN 0.71+). */
+  gap?: SpaceValue;
+  rowGap?: SpaceValue;
+  columnGap?: SpaceValue;
   /** Rounded corners (number maps to borderRadius) */
   rounded?: number;
   roundedTop?: number;

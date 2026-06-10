@@ -10,14 +10,14 @@ export default function StarBar({ rating }: { rating: number }) {
       {[0, 1, 2, 3, 4].map((i) => {
         const filled = rating >= i + 1;
         const half = !filled && rating >= i + 0.5;
-        const color = filled || half ? '#F59E0B' : tokens.gray200;
+        const color = filled || half ? tokens.rating : tokens.gray200;
         return (
           <Star
             key={i}
             size={12}
             strokeWidth={2}
             color={color}
-            fill={filled ? '#F59E0B' : 'transparent'}
+            fill={filled ? tokens.rating : 'transparent'}
           />
         );
       })}

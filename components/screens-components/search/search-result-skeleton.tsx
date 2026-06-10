@@ -1,14 +1,25 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Easing } from 'react-native';
+import { Animated, Easing, StyleSheet } from 'react-native';
 
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 
+import { RADIUS_MEDIA, RADIUS_PLACEHOLDER, RADIUS_TAG } from './radii';
+
+const THUMB_WIDTH = 150;
+const THUMB_HEIGHT = 150;
+const ROW_GAP = 20;
+
 /**
- * Shimmer placeholder that matches the geometry of `SearchResultRow`
- * (thumbnail + title bar + description bar + price bar + chevron slot).
- * Use multiple instances stacked for a believable "results are coming"
- * effect — most search-result UIs render 4-6 skeleton rows.
+ * Shimmer placeholder that mirrors the geometry of `SearchResultRow`:
+ * edge-to-edge card (no divider, gap-only separation), 150×150 thumbnail
+ * with rounded corners, text column with title, price line + trailing
+ * ribbon placeholder, delivery line + AddToCartButton placeholder pinned
+ * bottom-right. No rating line — the real row hides its rating when the
+ * server hasn't supplied `result.rating`, so the skeleton must match.
+ *
+ * Pulses opacity 1 → 0.55 → 1 on the native driver. Render multiple
+ * stacked instances for a believable "results are coming" effect.
  */
 export default function SearchResultSkeleton() {
   const { tokens, scheme } = useThemeContext();
@@ -17,9 +28,6 @@ export default function SearchResultSkeleton() {
   const baseColor = isDark ? tokens.gray200 : tokens.gray100;
   const highlightColor = isDark ? tokens.gray300 : tokens.gray200;
 
-  // Pulse the row opacity 1 → 0.55 → 1 with a slow ease so the skeleton
-  // feels "alive" without being distracting. useNativeDriver keeps the
-  // animation off the JS thread.
   const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -40,9 +48,7 @@ export default function SearchResultSkeleton() {
       ]),
     );
     loop.start();
-    return () => {
-      loop.stop();
-    };
+    return () => loop.stop();
   }, [pulse]);
 
   const opacity = pulse.interpolate({
@@ -54,51 +60,69 @@ export default function SearchResultSkeleton() {
     <Animated.View
       style={{
         opacity,
-        borderRadius: 14,
-        borderWidth: 1,
-        borderColor: isDark ? tokens.border : tokens.gray100,
         backgroundColor: isDark ? tokens.card : tokens.white,
-        paddingHorizontal: 12,
-        paddingVertical: 12,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: tokens.divider,
       }}
     >
-      <AppView row gap={12} align="flex-start">
-        {/* Large square thumbnail (Amazon-style) */}
+      <AppView row gap={ROW_GAP} align="stretch">
         <AppView
           style={{
-            width: 100,
-            height: 100,
-            borderRadius: 10,
+            width: THUMB_WIDTH,
+            minWidth: THUMB_WIDTH,
+            maxWidth: THUMB_WIDTH,
+            flexBasis: THUMB_WIDTH,
+            flexGrow: 0,
+            flexShrink: 0,
+            alignSelf: 'stretch',
+            minHeight: THUMB_HEIGHT,
+            borderRadius: RADIUS_MEDIA,
             backgroundColor: highlightColor,
           }}
         />
 
-        {/* Right column — title, rating, price, delivery */}
-        <AppView gap={8} style={{ flex: 1, paddingTop: 4 }}>
-          {/* Title (2 lines) */}
+        {/* Text column matches search-result-row.tsx: flex: 1,
+         *  paddingBottom: 8, internal gap from the rendered children. */}
+        <AppView
+          gap={8}
+          style={{ flex: 1, paddingBottom: 8 }}
+        >
+          {/* Title — two lines, like a typical product title. */}
           <AppView gap={6}>
             <AppView
-              style={{ height: 11, width: '88%', borderRadius: 5, backgroundColor: highlightColor }}
+              style={{ height: 14, width: '92%', borderRadius: RADIUS_PLACEHOLDER, backgroundColor: highlightColor }}
             />
             <AppView
-              style={{ height: 11, width: '55%', borderRadius: 5, backgroundColor: highlightColor }}
+              style={{ height: 14, width: '58%', borderRadius: RADIUS_PLACEHOLDER, backgroundColor: highlightColor }}
             />
           </AppView>
 
-          {/* Rating row */}
+          {/* Price line + ribbon placeholder (mirrors PriceBlock's
+           *  align="flex-end" justifyContent: 'space-between'). */}
           <AppView
-            style={{ height: 9, width: '40%', borderRadius: 5, backgroundColor: baseColor }}
-          />
+            row
+            align="flex-end"
+            style={{ justifyContent: 'space-between', gap: 8, marginTop: 4 }}
+          >
+            <AppView
+              style={{ height: 18, width: '36%', borderRadius: RADIUS_PLACEHOLDER, backgroundColor: highlightColor }}
+            />
+            <AppView
+              style={{ height: 18, width: 84, borderRadius: RADIUS_TAG, backgroundColor: baseColor }}
+            />
+          </AppView>
 
-          {/* Price */}
-          <AppView
-            style={{ height: 16, width: '32%', borderRadius: 5, backgroundColor: highlightColor }}
-          />
-
-          {/* Delivery + status line */}
-          <AppView
-            style={{ height: 8, width: '60%', borderRadius: 4, backgroundColor: baseColor }}
-          />
+          {/* Delivery row + AddToCartButton placeholder (32px circle) pinned
+           *  bottom-right to mirror the real row's right-side action axis. */}
+          <AppView row align="flex-end" style={{ gap: 8 }}>
+            <AppView
+              style={{ flex: 1, height: 10, borderRadius: RADIUS_PLACEHOLDER, backgroundColor: baseColor, maxWidth: '60%' }}
+            />
+            <AppView style={{ flex: 1 }} />
+            <AppView
+              style={{ width: 32, height: 32, borderRadius: 999, backgroundColor: highlightColor, marginRight: 8 }}
+            />
+          </AppView>
         </AppView>
       </AppView>
     </Animated.View>

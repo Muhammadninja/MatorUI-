@@ -1,20 +1,33 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Modal, Platform, View } from 'react-native';
-import { Lock } from 'lucide-react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+    ActivityIndicator,
+    Animated,
+    Dimensions,
+    Modal,
+    PanResponder,
+    Platform,
+    Pressable,
+    View,
+} from 'react-native';
+import { Car, CheckCircle2, Lock, X } from 'lucide-react-native';
 
 import { AppButton } from '@/components/shared/app-button';
 import { AppChip } from '@/components/shared/app-chip';
 import { AppText } from '@/components/shared/app-text';
 import AppTextField from '@/components/shared/app-text-field';
-import { AppView } from '@/components/shared/app-view';
+import { AppPressableView, AppView } from '@/components/shared/app-view';
 import AppKeyboardController from '@/components/shared/keyboard-controller/app-keyboard-controller';
 import { useThemeContext } from '@/contexts/theme.context';
+import useGarage from '@/hooks/use-garage';
 import {
     modalService,
     type GlobalModalState,
     type ModalPayload,
 } from '@/services/global-modal-service/global-modal.service';
+import type { Vehicle } from '@/services/garage-service';
+import type { AiChatVehicleContext } from '@/types/ai-chat';
+import { triggerHaptic } from '@/utils/haptics';
 
 type ConfirmModalPayload = {
   title?: string;
@@ -53,6 +66,21 @@ type AuthRequiredPayload = {
   /** Optional URL the auth screen replaces to after a successful sign-in. */
   redirectTo?: string;
 };
+
+type CarSelectionPayload = {
+  /** Currently-selected vehicle identifiers (used to render a check). */
+  initialMake?: string;
+  initialModel?: string;
+  initialTrim?: string;
+  /** Fires with the AI-shaped vehicle context when the user picks one. */
+  onSelect?: (selection: AiChatVehicleContext) => void;
+  /** Optional cancel handler (default: just close). */
+  onCancel?: () => void;
+};
+
+function isCarSelectionPayload(payload?: ModalPayload): payload is CarSelectionPayload {
+  return Boolean(payload && typeof payload === 'object');
+}
 
 function isAuthRequiredPayload(payload?: ModalPayload): payload is AuthRequiredPayload {
   return Boolean(payload && typeof payload === 'object');
@@ -260,6 +288,11 @@ export default function GlobalModalHost() {
   // ── Auth-required gate (guest tries to check out) ───────────────────────
   if (activeModal.name === 'authRequired' && isAuthRequiredPayload(activeModal.payload)) {
     return <AuthRequiredModal payload={activeModal.payload} />;
+  }
+
+  // ── Vehicle picker (AI chat copilot, fitment forms) ─────────────────────
+  if (activeModal.name === 'carSelection' && isCarSelectionPayload(activeModal.payload)) {
+    return <CarSelectionModal payload={activeModal.payload} />;
   }
 
   if (activeModal.name !== 'checkoutSheet' || !isCheckoutSheetPayload(activeModal.payload)) {
@@ -581,6 +614,290 @@ function AuthRequiredModal({ payload }: { payload: AuthRequiredPayload }) {
           </AppView>
         </View>
       </AppView>
+    </Modal>
+  );
+}
+
+// ── Vehicle picker bottom sheet ────────────────────────────────────────────
+
+function vehicleLabel(v: Vehicle): string {
+  return `${v.year} ${v.make} ${v.model}${v.trim ? ` ${v.trim}` : ''}`;
+}
+
+function vehicleToContext(v: Vehicle): AiChatVehicleContext {
+  return {
+    makeId: v.make.toLowerCase(),
+    modelId: v.model.toLowerCase(),
+    trimId: v.trim?.toLowerCase() ?? '',
+    selectedCarName: vehicleLabel(v),
+  };
+}
+
+function CarSelectionModal({ payload }: { payload: CarSelectionPayload }) {
+  const { tokens, scheme } = useThemeContext();
+  const { vehicles, state, primaryVehicle } = useGarage();
+  const isDark = scheme === 'dark';
+
+  // ── Swipe-down-to-close gesture ─────────────────────────────────────
+  const SCREEN_HEIGHT = Dimensions.get('window').height;
+  const SHEET_HEIGHT_HINT = Math.min(SCREEN_HEIGHT * 0.8, 640);
+  const DISMISS_DISTANCE = 120;
+  const DISMISS_VELOCITY = 1.2;
+
+  const translateY = useRef(new Animated.Value(0)).current;
+
+  const handleClose = () => {
+    payload.onCancel?.();
+    modalService.closeModal();
+  };
+
+  const dismissAnimated = () => {
+    Animated.timing(translateY, {
+      toValue: SHEET_HEIGHT_HINT,
+      duration: 180,
+      useNativeDriver: true,
+    }).start(() => {
+      handleClose();
+    });
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) =>
+        Math.abs(g.dy) > 6 && Math.abs(g.dy) > Math.abs(g.dx),
+      onPanResponderMove: (_, g) => {
+        translateY.setValue(Math.max(0, g.dy));
+      },
+      onPanResponderRelease: (_, g) => {
+        if (g.dy > DISMISS_DISTANCE || g.vy > DISMISS_VELOCITY) {
+          dismissAnimated();
+        } else {
+          Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            damping: 18,
+            stiffness: 220,
+            mass: 0.8,
+          }).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(translateY, {
+          toValue: 0,
+          useNativeDriver: true,
+          damping: 18,
+          stiffness: 220,
+          mass: 0.8,
+        }).start();
+      },
+    }),
+  ).current;
+
+  const handleSelect = (v: Vehicle) => {
+    triggerHaptic('selection');
+    payload.onSelect?.(vehicleToContext(v));
+    modalService.closeModal();
+  };
+
+  // Sort: primary first, then the rest in their existing order.
+  const ordered = useMemo<Vehicle[]>(() => {
+    if (!primaryVehicle) return vehicles;
+    return [
+      primaryVehicle,
+      ...vehicles.filter((v) => v.id !== primaryVehicle.id),
+    ];
+  }, [primaryVehicle, vehicles]);
+
+  const isSelected = (v: Vehicle): boolean => {
+    if (!payload.initialMake && !payload.initialModel) return false;
+    const makeMatches = !payload.initialMake || v.make.toLowerCase() === payload.initialMake.toLowerCase();
+    const modelMatches = !payload.initialModel || v.model.toLowerCase() === payload.initialModel.toLowerCase();
+    return makeMatches && modelMatches;
+  };
+
+  const isLoading = state === 'loading' || state === 'idle';
+
+  return (
+    <Modal transparent animationType="slide" visible onRequestClose={handleClose}>
+      <View style={{ flex: 1 }}>
+        {/* Backdrop fills all space above the sheet — tap to dismiss. */}
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.42)' }} onPress={handleClose} />
+        <Animated.View
+          style={{
+            width: '100%',
+            transform: [{ translateY }],
+            backgroundColor: scheme === 'dark' ? tokens.card : tokens.white,
+            borderTopLeftRadius: 28,
+            borderTopRightRadius: 28,
+            borderWidth: 1,
+            borderBottomWidth: 0,
+            borderColor: tokens.border,
+            paddingHorizontal: 18,
+            paddingTop: 8,
+            paddingBottom: 24,
+            minHeight: 320,
+            maxHeight: SHEET_HEIGHT_HINT,
+          }}
+        >
+          {/* Drag handle — full-width gesture surface, big enough to grab. */}
+          <View
+            {...panResponder.panHandlers}
+            style={{ paddingTop: 6, paddingBottom: 14, alignItems: 'center' }}
+          >
+            <View
+              style={{
+                width: 44,
+                height: 5,
+                borderRadius: 999,
+                backgroundColor: tokens.divider,
+              }}
+            />
+          </View>
+
+          <AppView gap={16} style={{ flexShrink: 1 }}>
+          <AppView row align="center" justify="space-between">
+            <AppView row align="center" gap={10}>
+              <AppView
+                center
+                rounded={999}
+                style={{
+                  width: 36,
+                  height: 36,
+                  backgroundColor: `${tokens.brand}1F`,
+                }}
+              >
+                <Car size={18} strokeWidth={2.2} color={tokens.brand} />
+              </AppView>
+              <AppView gap={2}>
+                <AppText textVariant="bodySemibold" weight="bold">
+                  Pick a vehicle
+                </AppText>
+                <AppText textVariant="bodyXs" colorName="gray400">
+                  Answers below will use this context
+                </AppText>
+              </AppView>
+            </AppView>
+            <AppPressableView
+              center
+              rounded={999}
+              onPress={handleClose}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+              style={{
+                width: 32,
+                height: 32,
+                borderWidth: 1,
+                borderColor: tokens.border,
+                backgroundColor: isDark ? tokens.backgroundSecondary : tokens.background,
+              }}
+            >
+              <X size={14} strokeWidth={2.2} color={tokens.text} />
+            </AppPressableView>
+          </AppView>
+
+          {isLoading ? (
+            <AppView py={32} center>
+              <ActivityIndicator color={tokens.text} />
+            </AppView>
+          ) : ordered.length === 0 ? (
+            <AppView
+              rounded={16}
+              px={18}
+              py={24}
+              gap={10}
+              align="center"
+              style={{
+                borderWidth: 1,
+                borderColor: tokens.border,
+                backgroundColor: tokens.backgroundSecondary,
+              }}
+            >
+              <AppView
+                center
+                rounded={999}
+                style={{
+                  width: 48,
+                  height: 48,
+                  backgroundColor: tokens.background,
+                  borderWidth: 1,
+                  borderColor: tokens.border,
+                }}
+              >
+                <Car size={20} strokeWidth={2} color={tokens.gray400} />
+              </AppView>
+              <AppText textVariant="bodySemibold" align="center">
+                No cars found in your list
+              </AppText>
+              <AppText
+                textVariant="bodyXs"
+                colorName="gray400"
+                align="center"
+                style={{ maxWidth: 280 }}
+              >
+                Add a vehicle from your Garage to get fitment-aware answers here.
+              </AppText>
+            </AppView>
+          ) : (
+            <View style={{ gap: 8 }}>
+              {ordered.map((v) => {
+                const selected = isSelected(v);
+                return (
+                  <Pressable
+                    key={v.id}
+                    onPress={() => handleSelect(v)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Select ${vehicleLabel(v)}`}
+                    style={({ pressed }) => ({
+                      borderRadius: 14,
+                      paddingHorizontal: 14,
+                      paddingVertical: 12,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 12,
+                      borderWidth: 1,
+                      borderColor: selected ? tokens.brand : tokens.border,
+                      backgroundColor: selected
+                        ? `${tokens.brand}10`
+                        : isDark
+                          ? tokens.backgroundSecondary
+                          : tokens.background,
+                      opacity: pressed ? 0.8 : 1,
+                    })}
+                  >
+                    <View
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 999,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: tokens.backgroundSecondary,
+                      }}
+                    >
+                      <Car size={14} strokeWidth={2.2} color={tokens.text} />
+                    </View>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <AppText textVariant="bodySm" weight="semibold" numberOfLines={1}>
+                        {vehicleLabel(v)}
+                      </AppText>
+                      {v.nickname || v.isPrimary ? (
+                        <AppText textVariant="bodyXs" colorName="gray400" numberOfLines={1}>
+                          {v.isPrimary ? 'Primary' : v.nickname}
+                          {v.isPrimary && v.nickname ? ` · ${v.nickname}` : ''}
+                        </AppText>
+                      ) : null}
+                    </View>
+                    {selected ? (
+                      <CheckCircle2 size={18} strokeWidth={2.4} color={tokens.brand} />
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+          </AppView>
+        </Animated.View>
+      </View>
     </Modal>
   );
 }

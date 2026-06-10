@@ -23,11 +23,12 @@ export default function CartStackLayout() {
         }}
       />
       <Stack.Screen
-        name="track-order"
+        name="order-confirmation"
         options={{
           headerShown: false,
-          animation: 'slide_from_right',
+          animation: 'slide_from_bottom',
           gestureEnabled: true,
+          gestureDirection: 'vertical',
         }}
       />
     </Stack>

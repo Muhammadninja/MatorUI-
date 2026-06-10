@@ -1,36 +1,133 @@
+import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import { ArrowLeft, Camera, Check } from 'lucide-react-native';
-import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { Camera, Check } from 'lucide-react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView } from 'react-native';
 
-import ScreenShell from '@/components/screens-components/screen-shell';
+import AppImage from '@/components/shared/app-image';
+import { AppButton } from '@/components/shared/app-button';
+import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
 import AppTextField from '@/components/shared/app-text-field';
-import { AppPressableView, AppView } from '@/components/shared/app-view';
+import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useUserContext } from '@/contexts/user.context';
+import { uploadAvatar } from '@/services/avatar-service';
+import { triggerHaptic } from '@/utils/haptics';
 
 export default function EditProfileScreen() {
   const { tokens } = useThemeContext();
   const { profile, updateProfile } = useUserContext();
   const [firstName, setFirstName] = useState(profile?.firstName ?? '');
   const [lastName, setLastName] = useState(profile?.lastName ?? '');
-  const [username, setUsername] = useState(profile?.username ? `@${profile.username}` : '');
-  const [bio, setBio] = useState(profile?.bio ?? '');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatarUrl ?? null);
+  const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const uploadAbortRef = useRef<AbortController | null>(null);
 
-  async function handleSave() {
-    await updateProfile({
-      firstName,
-      lastName,
-      // strip leading '@' before saving
-      username: username.replace(/^@/, ''),
-      bio,
+  // Save is enabled when *anything* about the profile has changed — name
+  // edits or a freshly-picked avatar. Avoids letting the user "save" a
+  // form that matches the persisted state already.
+  const canSave =
+    firstName.trim().length > 0 ||
+    lastName.trim().length > 0 ||
+    avatarUrl !== (profile?.avatarUrl ?? null);
+
+  // Abort an in-flight upload if the user navigates away mid-upload —
+  // otherwise the response would land into a stale component.
+  useEffect(() => () => uploadAbortRef.current?.abort(), []);
+
+  const pickAvatar = async () => {
+    triggerHaptic('selection');
+    const perms = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perms.granted) {
+      Alert.alert(
+        'Permission needed',
+        'Allow photo access to update your profile picture.',
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.85,
     });
-    router.back();
-  }
+    if (result.canceled || !result.assets[0]) return;
+
+    const localUri = result.assets[0].uri;
+    // Optimistic preview — show the picked image instantly even though
+    // the upload is still pending. If the upload fails we roll back.
+    const previousUrl = avatarUrl;
+    setAvatarUrl(localUri);
+    setUploadingAvatar(true);
+
+    uploadAbortRef.current?.abort();
+    const controller = new AbortController();
+    uploadAbortRef.current = controller;
+
+    try {
+      const remoteUrl = await uploadAvatar(localUri, controller.signal);
+      setAvatarUrl(remoteUrl);
+    } catch (err) {
+      if (controller.signal.aborted) return;
+      setAvatarUrl(previousUrl);
+      Alert.alert('Upload failed', 'Could not upload your photo. Please try again.');
+    } finally {
+      if (uploadAbortRef.current === controller) {
+        uploadAbortRef.current = null;
+        setUploadingAvatar(false);
+      }
+    }
+  };
+
+  const handleSave = async () => {
+    if (saving || !canSave) return;
+    triggerHaptic('selection');
+    setSaving(true);
+    try {
+      await updateProfile({
+        firstName,
+        lastName,
+        avatarUrl,
+      });
+      triggerHaptic('success');
+      router.back();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const initials =
+    `${profile?.firstName?.[0] ?? ''}${profile?.lastName?.[0] ?? ''}`.toUpperCase() || 'YOU';
 
   return (
-    <ScreenShell>
+    <AppView flex={1} colorName="background">
+      <AppSettingsHeader
+        title="Edit Profile"
+        fallbackHref="/profile"
+        right={
+          <Pressable
+            onPress={handleSave}
+            disabled={!canSave || saving}
+            accessibilityRole="button"
+            accessibilityLabel="Save changes"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={({ pressed }) => ({
+              width: 36,
+              height: 36,
+              borderRadius: 999,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: tokens.brand,
+              opacity: !canSave || saving ? 0.4 : pressed ? 0.85 : 1,
+            })}
+          >
+            <Check size={16} strokeWidth={2.4} color={tokens.onBrand} />
+          </Pressable>
+        }
+      />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -38,99 +135,73 @@ export default function EditProfileScreen() {
       >
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 40 }}
+          contentContainerStyle={{ paddingTop: 8, paddingBottom: 40 }}
           keyboardShouldPersistTaps="handled"
         >
-          <AppView mt={14} gap={28}>
-            {/* Header */}
-            <AppView px={16}>
-              <AppView row align="center">
-                <AppView style={{ flex: 1, alignItems: 'flex-start' }}>
-                  <AppPressableView
-                    row
-                    align="center"
-                    androidRipple={false}
-                    onPress={() => router.back()}
-                  >
-                    <ArrowLeft size={20} strokeWidth={2.2} color={tokens.text} />
-                  </AppPressableView>
-                </AppView>
-
-                <AppText
-                  textVariant="title"
-                  family="heading"
-                  weight="bold"
-                  style={{ textAlign: 'center' }}
-                >
-                  Edit Profile
-                </AppText>
-
-                {/* Save button top-right */}
-                <AppView style={{ flex: 1, alignItems: 'flex-end' }}>
-                  <AppPressableView
-                    center
-                    rounded={36}
-                    androidRipple={false}
-                    onPress={handleSave}
-                    style={{
-                      width: 36,
-                      height: 36,
-                      backgroundColor: tokens.brand,
-                    }}
-                  >
-                    <Check size={16} strokeWidth={2.4} color={tokens.onBrand} />
-                  </AppPressableView>
-                </AppView>
-              </AppView>
-            </AppView>
-
-            {/* Avatar section */}
+          <AppView gap={28}>
+            {/* Avatar */}
             <AppView align="center" gap={10}>
               <AppView style={{ position: 'relative' }}>
-                {/* Avatar circle */}
                 <AppView
                   center
-                  rounded={36}
+                  rounded={999}
                   style={{
                     width: 100,
                     height: 100,
                     backgroundColor: tokens.backgroundSecondary,
                     borderWidth: 3,
                     borderColor: tokens.border,
+                    overflow: 'hidden',
                   }}
                 >
-                  <AppText textVariant="title" family="heading" weight="bold" colorName="text">
-                    MA
-                  </AppText>
+                  {avatarUrl ? (
+                    <AppImage
+                      source={{ uri: avatarUrl }}
+                      style={{ width: '100%', height: '100%' }}
+                    />
+                  ) : (
+                    <AppText
+                      textVariant="title"
+                      family="heading"
+                      weight="bold"
+                      colorName="text"
+                    >
+                      {initials}
+                    </AppText>
+                  )}
                 </AppView>
 
-                {/* Camera badge */}
-                <AppPressableView
-                  center
-                  rounded={36}
-                  androidRipple={false}
-                  pressedOpacity={0.75}
-                  style={{
+                <Pressable
+                  onPress={pickAvatar}
+                  disabled={uploadingAvatar}
+                  accessibilityRole="button"
+                  accessibilityLabel="Change profile photo"
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={({ pressed }) => ({
                     position: 'absolute',
                     bottom: 0,
                     right: 0,
                     width: 32,
                     height: 32,
+                    borderRadius: 999,
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     backgroundColor: tokens.brand,
                     borderWidth: 2,
                     borderColor: tokens.background,
-                  }}
+                    opacity: uploadingAvatar ? 0.6 : pressed ? 0.75 : 1,
+                  })}
                 >
                   <Camera size={15} strokeWidth={2.1} color={tokens.onBrand} />
-                </AppPressableView>
+                </Pressable>
               </AppView>
 
               <AppText textVariant="bodyXs" colorName="gray400">
-                Tap camera to update photo
+                {uploadingAvatar ? 'Uploading…' : 'Tap camera to update photo'}
               </AppText>
             </AppView>
 
-            {/* Form fields */}
+            {/* Form */}
             <AppView px={16} gap={16}>
               <AppTextField
                 label="First Name"
@@ -149,50 +220,21 @@ export default function EditProfileScreen() {
                 autoCapitalize="words"
                 autoCorrect={false}
               />
-
-              <AppTextField
-                label="Username"
-                placeholder="@username"
-                value={username}
-                onChangeText={setUsername}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-
-              <AppTextField
-                label="Bio"
-                placeholder="Tell us a little about yourself…"
-                value={bio}
-                onChangeText={setBio}
-                autoCapitalize="sentences"
-              />
             </AppView>
 
-            {/* Save button bottom */}
             <AppView px={16}>
-              <AppPressableView
-                center
-                rounded={16}
-                androidRipple={false}
+              <AppButton
+                title={saving ? 'Saving…' : 'Save Changes'}
+                kind="brand"
+                size="lg"
+                fullWidth
+                disabled={!canSave || saving}
                 onPress={handleSave}
-                style={{
-                  height: 52,
-                  backgroundColor: tokens.brand,
-                }}
-              >
-                <AppText
-                  textVariant="button"
-                  family="accent"
-                  weight="semibold"
-                  style={{ color: tokens.onBrand }}
-                >
-                  Save Changes
-                </AppText>
-              </AppPressableView>
+              />
             </AppView>
           </AppView>
         </ScrollView>
       </KeyboardAvoidingView>
-    </ScreenShell>
+    </AppView>
   );
 }

@@ -4,6 +4,7 @@ import { ScrollView } from 'react-native';
 import { AppChip } from '@/components/shared/app-chip/app-chip';
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
+import { triggerHaptic } from '@/utils/haptics';
 
 const QUICK_FILTERS = [
   'Trending now',
@@ -11,7 +12,7 @@ const QUICK_FILTERS = [
   'Under $20k',
   'SUV deals',
   'Nearby garages',
-  'AI picks',
+  'Recommended',
 ] as const;
 
 export function SearchQuickFilters() {
@@ -41,8 +42,15 @@ export function SearchQuickFilters() {
                 selected={isActive}
                 backgroundColorName={isActive ? 'secondary' : 'card'}
                 labelColorName={isActive ? 'onSecondary' : undefined}
-                onRemove={isActive ? () => setActiveFilter(null) : undefined}
-                removeIcon={{ name: 'xmark.circle.fill', colorName: 'white' }}
+                onRemove={
+                  isActive
+                    ? () => {
+                        triggerHaptic('selection');
+                        setActiveFilter(null);
+                      }
+                    : undefined
+                }
+                removeIcon={{ name: 'xmark.circle.fill', colorName: 'onSecondary' }}
                 style={
                   isActive
                     ? {
@@ -52,7 +60,10 @@ export function SearchQuickFilters() {
                     : { borderWidth: 1, borderColor: tokens.border }
                 }
                 contentStyle={isActive ? { opacity: 0.98 } : undefined}
-                onPress={() => setActiveFilter(filter)}
+                onPress={() => {
+                  triggerHaptic('selection');
+                  setActiveFilter(filter);
+                }}
               />
             );
           })}

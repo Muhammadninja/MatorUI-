@@ -199,6 +199,7 @@ export function CartProvider({ children }: PropsWithChildren) {
         priceLabel: incomingItem.priceLabel,
         badge: incomingItem.badge,
         status: incomingItem.status,
+        imageUrl: incomingItem.imageUrl,
       };
       void withOptimistic(
         incomingItem.id,

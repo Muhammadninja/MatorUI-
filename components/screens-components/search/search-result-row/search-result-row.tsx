@@ -1,21 +1,29 @@
-import { Platform } from 'react-native';
+import { useState } from 'react';
+import { Modal, Pressable, StyleSheet } from 'react-native';
 
+import AppImage from '@/components/shared/app-image';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
+import { useCartContext } from '@/contexts/cart.context';
 import { useLikesContext } from '@/contexts/likes.context';
 import { useThemeContext } from '@/contexts/theme.context';
+import { toastService } from '@/services/toast-service';
 import type { SearchResult } from '@/types/search';
 import { triggerHaptic } from '@/utils/haptics';
 
-import AccentTag from './accent-tag';
+import { RADIUS_SHEET } from '../radii';
+import AddToCartButton from './add-to-cart-button';
 import DeliveryRow from './delivery-row';
-import { pseudoRating, pseudoReviewCount } from './helpers';
 import HighlightedTitle from './highlighted-title';
 import LikeButton from './like-button';
 import PriceBlock from './price-block';
 import RatingRow from './rating-row';
+import { resolvePriceSignal } from './signal';
 import StatusLine from './status-line';
 import Thumbnail from './thumbnail';
 import { deriveCardVariant } from './variant';
+
+const ROW_IMAGE_SOURCE = require('@/assets/images/test-image.png');
+const PREVIEW_SIZE = 300;
 
 export type SearchResultRowProps = {
   result: SearchResult;
@@ -39,11 +47,24 @@ export default function SearchResultRow({
 }: SearchResultRowProps) {
   const { tokens, scheme } = useThemeContext();
   const isDark = scheme === 'dark';
-  const rating = pseudoRating(result.id);
-  const reviewCount = pseudoReviewCount(result.id);
   const variant = deriveCardVariant(result.id);
   const { isLiked, toggleLike } = useLikesContext();
+  const { addItem } = useCartContext();
   const liked = isLiked(result.id);
+  const [viewerVisible, setViewerVisible] = useState(false);
+
+  const handleAddToCart = () => {
+    addItem({
+      id: result.id,
+      title: result.title,
+      description: result.description,
+      price: result.price,
+      priceLabel: result.priceLabel,
+      badge: result.badge,
+      status: result.status,
+    });
+    toastService.success('Added to cart', { description: result.title });
+  };
 
   return (
     <AppPressableView
@@ -51,61 +72,106 @@ export default function SearchResultRow({
         triggerHaptic('selection');
         onPress(result);
       }}
+      onLongPress={() => {
+        triggerHaptic('selection');
+        setViewerVisible(true);
+      }}
       androidRipple
       accessibilityLabel={`Open ${result.title}`}
       style={{
-        position: 'relative',
-        borderRadius: 14,
         backgroundColor: isDark ? tokens.card : tokens.white,
-        borderWidth: 1,
-        borderColor: isDark ? tokens.border : tokens.gray100,
-        ...Platform.select({
-          ios: {
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 6 },
-            shadowOpacity: isDark ? 0.35 : 0.1,
-            shadowRadius: 14,
-          },
-          android: { elevation: 4 },
-          default: {},
-        }),
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: tokens.divider,
       }}
     >
-      <AppView row gap={14} align="stretch">
-        <Thumbnail
-          badge={result.badge}
-          alt={result.title}
-          isCheapest={isCheapest}
-        />
+      <AppView row gap={10}  align="stretch" flex={1}>
+        <Thumbnail alt={result.title} />
 
         <AppView
-          style={{
-            flex: 1,
-            paddingTop: 18,
-            paddingBottom: 14,
-            paddingRight: 14,
-            gap: 6,
-          }}
+          flex={1}
+          justify="space-between"
+          pb={12}
         >
           {/* Title row + heart LikeButton on the right. Title can grow up
            *  to 3 lines; LikeButton stays pinned to the top-right corner. */}
-          <AppView row align="flex-start" gap={8} style={{ flex: 1 }}>
-            <AppView style={{ flex: 1 }}>
+          <AppView row gap={30} align="flex-start">
+            <AppView mt={12} style={{ flex: 1 }}>
               <HighlightedTitle text={result.title} query={query} />
             </AppView>
             <LikeButton liked={liked} onToggle={() => toggleLike(result.id)} />
           </AppView>
 
-          {variant.accentTag ? <AccentTag tag={variant.accentTag} /> : null}
-          <PriceBlock priceLabel={result.priceLabel} price={result.price} />
-          <DeliveryRow delivery={variant.delivery} />
-          {result.status ? <StatusLine status={result.status} /> : null}
-
-          {/* Rating sits at the very bottom now — least-critical info,
-           *  least visual weight; lets the title own the top. */}
-          <RatingRow rating={rating} reviewCount={reviewCount} />
+          {/* Bottom-anchored cluster: stacked info on the left
+           *  (price → delivery → status → rating), AddToCartButton pinned
+           *  bottom-right. align="flex-end" aligns the button with the
+           *  bottom edge of the info column so it sits next to whichever
+           *  row is last (rating, status, or delivery). */}
+          <AppView row align="flex-end" gap={8}>
+            <AppView flex={1}>
+              <PriceBlock
+                priceLabel={result.priceLabel}
+                price={result.price}
+                signal={resolvePriceSignal({
+                  isCheapest,
+                  badge: result.badge,
+                  accentTagKind: result.accentTagKind,
+                  accentTagFallback: variant.accentTag,
+                })}
+              />
+              <DeliveryRow delivery={variant.delivery} />
+              {result.status ? <StatusLine status={result.status} /> : null}
+              {result.rating != null ? (
+                <RatingRow
+                  rating={result.rating}
+                  reviewCount={result.reviewCount ?? 0}
+                />
+              ) : null}
+            </AppView>
+            <AppView mr={8}>
+              <AddToCartButton onPress={handleAddToCart} />
+            </AppView>
+          </AppView>
         </AppView>
       </AppView>
+
+      <Modal
+        visible={viewerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewerVisible(false)}
+      >
+        {/* Backdrop closes the preview when tapped outside the card. */}
+        <Pressable
+          onPress={() => setViewerVisible(false)}
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {/* Stop propagation so taps on the image itself don't close. */}
+          <Pressable
+            onPress={(e) => e.stopPropagation?.()}
+            style={{
+              width: PREVIEW_SIZE,
+              height: PREVIEW_SIZE,
+              borderRadius: RADIUS_SHEET,
+              overflow: 'hidden',
+              backgroundColor: isDark ? tokens.card : tokens.white,
+            }}
+          >
+            <AppImage
+              source={ROW_IMAGE_SOURCE}
+              width="100%"
+              height="100%"
+              contentFit="cover"
+              placeholderColor="transparent"
+              alt={result.title}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </AppPressableView>
   );
 }

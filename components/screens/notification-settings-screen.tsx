@@ -1,16 +1,17 @@
-import { router } from 'expo-router';
-import { ArrowLeft, Bell, BellOff, Package, Percent, Star, Tag } from 'lucide-react-native';
+import { Bell, BellOff, Package, Percent, Star, Tag } from 'lucide-react-native';
 import { useState } from 'react';
+import { Switch } from 'react-native';
 
 import ProfileSectionCard from '@/components/screens-components/profile/profile-section-card';
-import ScreenShell from '@/components/screens-components/screen-shell';
 import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
+import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
-import { AppPressableView, AppView } from '@/components/shared/app-view';
+import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 
 export default function NotificationSettingsScreen() {
-  const { tokens } = useThemeContext();
+  const { tokens, scheme } = useThemeContext();
+  const isDark = scheme === 'dark';
 
   const [masterEnabled, setMasterEnabled] = useState(true);
   const [orderUpdates, setOrderUpdates] = useState(true);
@@ -18,13 +19,17 @@ export default function NotificationSettingsScreen() {
   const [priceAlerts, setPriceAlerts] = useState(true);
   const [newArrivals, setNewArrivals] = useState(true);
 
+  const activeCount = masterEnabled
+    ? [orderUpdates, promotions, priceAlerts, newArrivals].filter(Boolean).length
+    : 0;
+
   function iconBox(
     Icon: React.ComponentType<{ size: number; strokeWidth: number; color: string }>,
   ) {
     return (
       <AppView
         center
-        rounded={12}
+        rounded={8}
         style={{ width: 34, height: 34, backgroundColor: tokens.backgroundSecondary }}
       >
         <Icon size={16} strokeWidth={2.1} color={tokens.icon} />
@@ -33,60 +38,74 @@ export default function NotificationSettingsScreen() {
   }
 
   return (
-    <ScreenShell>
+    <AppView flex={1} colorName="background">
+      <AppSettingsHeader title="Notifications" fallbackHref="/profile" />
       <AppScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={{ paddingTop: 8, paddingBottom: 40 }}
       >
-        <AppView mt={14} gap={24}>
-          {/* Header */}
-          <AppView px={16} gap={14}>
-            <AppView row align="center">
-              <AppView style={{ flex: 1, alignItems: 'flex-start' }}>
-                <AppPressableView
-                  row
-                  align="center"
-                  androidRipple={false}
-                  onPress={() => router.back()}
+        <AppView gap={20}>
+          {/* Hero master toggle — distinguished from category cards via a
+           *  brand-tinted illustration and inline copy. Sets the visual
+           *  hierarchy: this switch governs everything below. */}
+          <AppView px={16}>
+            <AppView
+              rounded={20}
+              px={18}
+              py={18}
+              gap={14}
+              style={{
+                borderWidth: 1,
+                borderColor: masterEnabled ? `${tokens.brand}40` : tokens.border,
+                backgroundColor: isDark ? tokens.card : tokens.white,
+              }}
+            >
+              <AppView row align="center" gap={14}>
+                <AppView
+                  center
+                  rounded={999}
+                  style={{
+                    width: 52,
+                    height: 52,
+                    backgroundColor: masterEnabled
+                      ? `${tokens.brand}1F`
+                      : tokens.backgroundSecondary,
+                    borderWidth: 1,
+                    borderColor: masterEnabled ? `${tokens.brand}40` : tokens.border,
+                  }}
                 >
-                  <ArrowLeft size={20} strokeWidth={2.2} color={tokens.text} />
-                </AppPressableView>
+                  {masterEnabled ? (
+                    <Bell size={22} strokeWidth={2} color={tokens.brand} />
+                  ) : (
+                    <BellOff size={22} strokeWidth={2} color={tokens.gray400} />
+                  )}
+                </AppView>
+                <AppView gap={3} style={{ flex: 1 }}>
+                  <AppText textVariant="bodySemibold" weight="bold">
+                    Push notifications
+                  </AppText>
+                  <AppText textVariant="bodyXs" colorName="gray400">
+                    {masterEnabled
+                      ? `${activeCount} of 4 categories on`
+                      : 'Off — you won’t receive any alerts'}
+                  </AppText>
+                </AppView>
+                <Switch
+                  value={masterEnabled}
+                  onValueChange={setMasterEnabled}
+                  trackColor={{ false: tokens.border, true: tokens.brand }}
+                  thumbColor={tokens.white}
+                />
               </AppView>
-
-              <AppText
-                textVariant="title"
-                family="heading"
-                weight="bold"
-                style={{ textAlign: 'center' }}
-              >
-                Notifications
-              </AppText>
-
-              <AppView style={{ flex: 1 }} />
             </AppView>
+          </AppView>
 
+          <AppView px={16}>
             <AppText textVariant="bodySm" colorName="gray400">
-              Control which alerts you receive and how.
+              Choose which alerts reach you. Push must be on for these to fire.
             </AppText>
           </AppView>
 
-          {/* Master toggle */}
-          <ProfileSectionCard
-            title="Push Notifications"
-            items={[
-              {
-                key: 'master',
-                title: masterEnabled ? 'Enabled' : 'Disabled',
-                subtitle: 'Allow Matorui to send push notifications',
-                leading: iconBox(masterEnabled ? Bell : BellOff),
-                rightSwitchValue: masterEnabled,
-                onRightSwitchChange: setMasterEnabled,
-                titleColorName: 'text',
-              },
-            ]}
-          />
-
-          {/* Categories — disabled when master is off */}
           <ProfileSectionCard
             title="Categories"
             items={[
@@ -96,6 +115,7 @@ export default function NotificationSettingsScreen() {
                 subtitle: 'Shipping, delivery, and status changes',
                 leading: iconBox(Package),
                 rightSwitchValue: masterEnabled && orderUpdates,
+                onRightSwitchChange: masterEnabled ? setOrderUpdates : undefined,
               },
               {
                 key: 'promos',
@@ -104,7 +124,6 @@ export default function NotificationSettingsScreen() {
                 leading: iconBox(Percent),
                 rightSwitchValue: masterEnabled && promotions,
                 onRightSwitchChange: masterEnabled ? setPromotions : undefined,
-                titleColorName: 'text',
               },
               {
                 key: 'price-alerts',
@@ -113,7 +132,6 @@ export default function NotificationSettingsScreen() {
                 leading: iconBox(Tag),
                 rightSwitchValue: masterEnabled && priceAlerts,
                 onRightSwitchChange: masterEnabled ? setPriceAlerts : undefined,
-                titleColorName: 'text',
               },
               {
                 key: 'new-arrivals',
@@ -122,12 +140,11 @@ export default function NotificationSettingsScreen() {
                 leading: iconBox(Star),
                 rightSwitchValue: masterEnabled && newArrivals,
                 onRightSwitchChange: masterEnabled ? setNewArrivals : undefined,
-                titleColorName: 'text',
               },
             ]}
           />
         </AppView>
       </AppScrollView>
-    </ScreenShell>
+    </AppView>
   );
 }

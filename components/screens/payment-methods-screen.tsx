@@ -1,16 +1,21 @@
-import { ArrowLeft, FileText, Plus } from 'lucide-react-native';
-import { useRef, useState } from 'react';
+import { FileText, Plus } from 'lucide-react-native';
+import { useState } from 'react';
 import {
     ActionSheetIOS,
     Alert,
-    Animated,
     Dimensions,
     Platform,
     ScrollView,
     StyleSheet,
 } from 'react-native';
+import Animated, {
+    runOnJS,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
+} from 'react-native-reanimated';
 
-import { AppButton } from '@/components/shared/app-button';
+import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
 import AppTextField from '@/components/shared/app-text-field';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
@@ -25,8 +30,6 @@ import {
     isCardDraftValid,
     type CardDraft
 } from '@/utils/payment-methods';
-import { router } from 'expo-router';
-
 const CARD_H = 170;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -35,38 +38,40 @@ export default function PaymentMethodsScreen() {
   const [paymentCards, setPaymentCards] = useState([...INITIAL_PAYMENT_CARDS]);
   const [isAddingCard, setIsAddingCard] = useState(false);
   const [cardDraft, setCardDraft] = useState<CardDraft>(EMPTY_CARD_DRAFT);
-  const addCardAnimation = useRef(new Animated.Value(0)).current;
+  // Reanimated: shared value drives both panels via useAnimatedStyle on
+  // the UI thread. The previous Animated.Value + .interpolate() chain
+  // ran every interpolation on the JS thread, jostling React Query.
+  const addCardAnimation = useSharedValue(0);
 
   const isCardFormValid = isCardDraftValid(cardDraft);
-  const listScreenTranslateX = addCardAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -SCREEN_WIDTH * 0.2],
+
+  const listAnimatedStyle = useAnimatedStyle(() => {
+    const progress = addCardAnimation.value;
+    return {
+      transform: [{ translateX: -SCREEN_WIDTH * 0.2 * progress }],
+      opacity: 1 - progress,
+    };
   });
-  const listScreenOpacity = addCardAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 0],
-  });
-  const addCardScreenTranslateX = addCardAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [SCREEN_WIDTH, 0],
-  });
-  const addCardScreenOpacity = addCardAnimation.interpolate({
-    inputRange: [0, 0.6, 1],
-    outputRange: [0, 0.35, 1],
+
+  const addCardAnimatedStyle = useAnimatedStyle(() => {
+    const progress = addCardAnimation.value;
+    // Cubic-ish ramp on opacity so the incoming panel doesn't pop in.
+    const opacity = progress < 0.6 ? progress * (0.35 / 0.6) : 0.35 + (progress - 0.6) * (0.65 / 0.4);
+    return {
+      transform: [{ translateX: SCREEN_WIDTH * (1 - progress) }],
+      opacity,
+    };
   });
 
   function animateAddCardTransition(toValue: 0 | 1, onComplete?: () => void) {
-    Animated.spring(addCardAnimation, {
+    addCardAnimation.value = withSpring(
       toValue,
-      useNativeDriver: true,
-      damping: 18,
-      mass: 0.9,
-      stiffness: 180,
-    }).start(({ finished }) => {
-      if (finished) {
-        onComplete?.();
-      }
-    });
+      { damping: 18, mass: 0.9, stiffness: 180 },
+      (finished) => {
+        'worklet';
+        if (finished && onComplete) runOnJS(onComplete)();
+      },
+    );
   }
 
   function updateCardDraft(field: keyof CardDraft, value: string) {
@@ -165,38 +170,17 @@ export default function PaymentMethodsScreen() {
   function renderAddCardScreen() {
     return (
       <AppView flex={1} colorName="background">
-        <AppView
-          row
-          align="center"
-          gap={12}
-          px={16}
-          pt={60}
-          pb={16}
-          style={{ borderBottomWidth: 1, borderBottomColor: tokens.divider }}
-        >
-          <AppPressableView
-            center
-            rounded={36}
-            androidRipple={false}
-            pressedOpacity={0.6}
-            style={{ width: 38, height: 38, backgroundColor: tokens.backgroundSecondary }}
-            onPress={closeAddCardScreen}
-          >
-            <ArrowLeft size={18} strokeWidth={2.2} color={tokens.text} />
-          </AppPressableView>
-          <AppView gap={1} style={{ flex: 1 }}>
-            <AppText textVariant="h3" family="heading" weight="bold" colorName="text">
-              Add Card
-            </AppText>
+        <AppSettingsHeader
+          title="Add Card"
+          onBack={closeAddCardScreen}
+          backAccessibilityLabel="Cancel add card"
+        />
+        <AppView style={{ paddingTop: 8 }}>
+          <AppView  pb={4}>
             <AppText textVariant="bodyXs" colorName="gray400">
               Enter your card details securely and save only masked card data.
             </AppText>
           </AppView>
-          <AppPressableView androidRipple={false} onPress={closeAddCardScreen}>
-            <AppText textVariant="bodySm" weight="semibold" style={{ color: tokens.brand }}>
-              Close
-            </AppText>
-          </AppPressableView>
         </AppView>
 
         <AppKeyboardController
@@ -205,7 +189,7 @@ export default function PaymentMethodsScreen() {
           offset={120}
           kStyle={{ paddingBottom: 32 }}
         >
-          <AppView gap={14} pt={24}>
+          <AppView gap={14} pt={16}>
             <AppTextField
               label="Card Holder"
               placeholder="Full name on card"
@@ -271,7 +255,7 @@ export default function PaymentMethodsScreen() {
                 style={{
                   flex: 1,
                   height: 46,
-                  borderRadius: 14,
+                  borderRadius: 8,
                   borderWidth: 1,
                   borderColor: tokens.border,
                   backgroundColor: tokens.backgroundSecondary,
@@ -289,7 +273,7 @@ export default function PaymentMethodsScreen() {
                 style={{
                   flex: 1,
                   height: 46,
-                  borderRadius: 14,
+                  borderRadius: 8,
                   backgroundColor: tokens.brand,
                   opacity: isCardFormValid ? 1 : 0.5,
                 }}
@@ -312,48 +296,24 @@ export default function PaymentMethodsScreen() {
   return (
     <AppView flex={1} colorName="background" style={{ overflow: 'hidden' }}>
       <Animated.View
-        style={{
-          ...StyleSheet.absoluteFill,
-          width: '100%',
-          opacity: listScreenOpacity,
-          transform: [{ translateX: listScreenTranslateX }],
-        }}
+        style={[
+          StyleSheet.absoluteFill,
+          { width: '100%' },
+          listAnimatedStyle,
+        ]}
         pointerEvents={isAddingCard ? 'none' : 'auto'}
       >
         <AppView flex={1} colorName="background">
-          <AppView
-            row
-            align="center"
-            gap={12}
-            px={16}
-            pt={60}
-            pb={16}
-            style={{ borderBottomWidth: 1, borderBottomColor: tokens.divider }}
-          >
-            <AppPressableView
-              center
-              rounded={36}
-              androidRipple={false}
-              pressedOpacity={0.6}
-              style={{ width: 38, height: 38, backgroundColor: tokens.backgroundSecondary }}
-              onPress={() => router.back()}
-            >
-              <ArrowLeft size={18} strokeWidth={2.2} color={tokens.text} />
-            </AppPressableView>
-            <AppView gap={1}>
-              <AppText textVariant="h3" family="heading" weight="bold" colorName="text">
-                Payment Methods
-              </AppText>
-              <AppText textVariant="bodyXs" colorName="gray400">
-                Manage your cards and subscription
-              </AppText>
-            </AppView>
-          </AppView>
-
+          <AppSettingsHeader title="Payment Methods" fallbackHref="/profile" />
           <ScrollView
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 40 }}
+            contentContainerStyle={{ paddingTop: 8, paddingBottom: 40 }}
           >
+              <AppView px={16}>
+                <AppText textVariant="bodyXs" colorName="gray400">
+                  Manage your cards
+                </AppText>
+              </AppView>
               {/* Cards section */}
               <AppView px={16} mt={24} gap={14}>
                 <AppView row align="center" justify="space-between">
@@ -434,7 +394,7 @@ export default function PaymentMethodsScreen() {
                             family="heading"
                             weight="bold"
                             style={{
-                              color: '#fff',
+                              color: tokens.white,
                               letterSpacing: 1.5,
                               opacity: 0.95,
                               flex: 1,
@@ -497,7 +457,7 @@ export default function PaymentMethodsScreen() {
                             <AppText
                               textVariant="bodySm"
                               weight="semibold"
-                              style={{ color: '#fff' }}
+                              style={{ color: tokens.white }}
                             >
                               {card.holder}
                             </AppText>
@@ -512,7 +472,7 @@ export default function PaymentMethodsScreen() {
                             <AppText
                               textVariant="bodySm"
                               weight="semibold"
-                              style={{ color: '#fff' }}
+                              style={{ color: tokens.white }}
                             >
                               {card.expiry}
                             </AppText>
@@ -548,61 +508,6 @@ export default function PaymentMethodsScreen() {
 
               <AppView px={16} mt={32} gap={14}>
                 <AppText textVariant="subtitle" family="accent" weight="semibold" colorName="text">
-                  Subscription
-                </AppText>
-
-                <AppView
-                  rounded={20}
-                  px={18}
-                  py={16}
-                  gap={12}
-                  style={{
-                    borderWidth: 1,
-                    borderColor: tokens.border,
-                    backgroundColor: scheme === 'dark' ? tokens.card : tokens.white,
-                  }}
-                >
-                  <AppView row align="center" justify="space-between">
-                    <AppView gap={3}>
-                      <AppText textVariant="bodySemibold" weight="semibold" colorName="text">
-                        Premium Plan
-                      </AppText>
-                      <AppText textVariant="bodyXs" colorName="gray400">
-                        Billed monthly · Next renewal Jun 28
-                      </AppText>
-                    </AppView>
-                    <AppView px={10} py={5} rounded={36} style={{ backgroundColor: '#F5C51822' }}>
-                      <AppText textVariant="bodyXs" weight="semibold" style={{ color: '#C9960A' }}>
-                        Active
-                      </AppText>
-                    </AppView>
-                  </AppView>
-
-                  <AppView style={{ height: 1, backgroundColor: tokens.divider }} />
-
-                  <AppView row align="center" justify="space-between">
-                    <AppText textVariant="bodySm" colorName="gray400">
-                      Monthly price
-                    </AppText>
-                    <AppText textVariant="bodySemibold" weight="semibold" colorName="text">
-                      $14.99 / mo
-                    </AppText>
-                  </AppView>
-
-                  <AppButton
-                    title="Cancel Subscription"
-                    kind="secondary"
-                    variant="outline"
-                    size="sm"
-                    fullWidth
-                    style={{ borderColor: tokens.error }}
-                    textStyle={{ color: tokens.error }}
-                  />
-                </AppView>
-              </AppView>
-
-              <AppView px={16} mt={32} gap={14}>
-                <AppText textVariant="subtitle" family="accent" weight="semibold" colorName="text">
                   Terms & Conditions
                 </AppText>
 
@@ -625,10 +530,6 @@ export default function PaymentMethodsScreen() {
                     {
                       title: 'Card Security',
                       body: 'We do not store full card numbers. All payment data is processed through PCI-DSS compliant third-party providers.',
-                    },
-                    {
-                      title: 'Cancellation Policy',
-                      body: 'You may cancel your subscription at any time. Access continues until the end of the current billing period.',
                     },
                     {
                       title: 'Disputes & Refunds',
@@ -660,7 +561,7 @@ export default function PaymentMethodsScreen() {
                   <AppView style={{ height: 1, backgroundColor: tokens.divider }} />
 
                   <AppText textVariant="bodyXs" colorName="gray400" style={{ lineHeight: 17 }}>
-                    By adding a payment method or maintaining an active subscription, you agree to our{' '}
+                    By adding a payment method, you agree to our{' '}
                     <AppText
                       textVariant="bodyXs"
                       weight="semibold"
@@ -685,12 +586,11 @@ export default function PaymentMethodsScreen() {
       </Animated.View>
 
       <Animated.View
-        style={{
-          ...StyleSheet.absoluteFill,
-          width: '100%',
-          opacity: addCardScreenOpacity,
-          transform: [{ translateX: addCardScreenTranslateX }],
-        }}
+        style={[
+          StyleSheet.absoluteFill,
+          { width: '100%' },
+          addCardAnimatedStyle,
+        ]}
         pointerEvents={isAddingCard ? 'auto' : 'none'}
       >
         {renderAddCardScreen()}

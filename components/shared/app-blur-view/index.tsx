@@ -15,6 +15,8 @@ export type AppBlurViewProps = {
   intensity?: number;
   /** Children rendered on top of the blur (e.g. a screen header). */
   children?: ReactNode;
+  /** Custom tints for the blur view. */
+  tints?: any;
 };
 
 const FADE_STEPS = [0.9, 0.75, 0.6, 0.45, 0.3, 0.18, 0.08, 0.02];
@@ -24,6 +26,7 @@ export function AppBlurView({
   fadeHeight = 24,
   intensity = 80,
   children,
+  tints,
 }: AppBlurViewProps) {
   const insets = useSafeAreaInsets();
   const { scheme, tokens } = useThemeContext();
@@ -80,10 +83,14 @@ export function AppBlurView({
  * @param contentHeight Header content height (matches AppBlurView's prop)
  * @param peek Amount of content that should appear blurred under the header
  *             before being fully under the fade. Default 30, like ExploreScreen.
+ *             On Android the peek is forced to 0 because the BlurView falls
+ *             back to a solid theme-bg fill — content slid under it would
+ *             just be hidden, not visibly blurred.
  */
 export function useBlurHeaderInset(contentHeight = 60, peek = 30): number {
   const insets = useSafeAreaInsets();
-  return Math.max(0, insets.top + contentHeight - peek);
+  const effectivePeek = Platform.OS === 'android' ? Math.min(peek, 0) : peek;
+  return Math.max(0, insets.top + contentHeight - effectivePeek);
 }
 
 const styles = StyleSheet.create({

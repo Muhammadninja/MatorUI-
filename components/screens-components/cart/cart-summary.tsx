@@ -43,7 +43,7 @@ export default function CartSummary({
 
   return (
     <AppView
-      rounded={24}
+      rounded={16}
       px={16}
       py={16}
       gap={12}
@@ -63,7 +63,7 @@ export default function CartSummary({
             {unlocked ? 'Free shipping unlocked' : 'Free shipping'}
           </AppText>
           <AppText textVariant="bodyXs" colorName="gray400">
-            {unlocked ? 'Enjoy 🚚' : `Add ${formatCurrency(freeShippingRemaining)} more`}
+            {unlocked ? 'On us' : `Add ${formatCurrency(freeShippingRemaining)} more`}
           </AppText>
         </AppView>
         <AppView
@@ -87,23 +87,16 @@ export default function CartSummary({
 
       <AppView style={{ height: 1, backgroundColor: tokens.divider }} />
 
-      <SummaryRow label="Subtotal" value={formatCurrency(totals.subtotal)} />
-      {showDiscount ? (
-        <SummaryRow
-          label={`Discount${appliedPromo ? ` (${appliedPromo.code})` : ''}`}
-          value={`- ${formatCurrency(totals.discount)}`}
-          accentColor={tokens.success}
-        />
-      ) : null}
-      <SummaryRow label="Shipping" value={shippingLabel} />
-
-      <AppView style={{ height: 1, backgroundColor: tokens.divider, marginVertical: 4 }} />
-
-      <AppView row align="center" justify="space-between">
-        <AppText textVariant="bodySemibold">Total</AppText>
-        <AppText textVariant="h4" family="heading" weight="bold">
-          {formatCurrency(totals.total)}
-        </AppText>
+      <AppView gap={6}>
+        <SummaryRow label="Subtotal" value={formatCurrency(totals.subtotal)} />
+        {showDiscount ? (
+          <SummaryRow
+            label={`Discount${appliedPromo ? ` (${appliedPromo.code})` : ''}`}
+            value={`- ${formatCurrency(totals.discount)}`}
+            accentColor={tokens.success}
+          />
+        ) : null}
+        <SummaryRow label="Shipping" value={shippingLabel} />
       </AppView>
     </AppView>
   );

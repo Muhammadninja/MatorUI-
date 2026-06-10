@@ -1,9 +1,6 @@
-import MaskedView from '@react-native-masked-view/masked-view';
-import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Keyboard, Platform, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Keyboard } from 'react-native';
 
 import SearchCatalogue from '@/components/screens-components/search/search-catalogue';
 import SearchFiltersSheet from '@/components/screens-components/search/search-filters-sheet';
@@ -13,9 +10,10 @@ import SearchResults from '@/components/screens-components/search/search-results
 import SearchSuggestionsPanel from '@/components/screens-components/search/search-suggestions-panel';
 import SearchTopFeatured from '@/components/screens-components/search/search-top-featured';
 import SmartSearchBar from '@/components/screens-components/search/smart-search-bar';
+import AppBlurView, { useBlurHeaderInset } from '@/components/shared/app-blur-view';
 import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
 import { AppView } from '@/components/shared/app-view';
-import { useThemeContext } from '@/contexts/theme.context';
+import { useSearchUIContext } from '@/contexts/search-ui.context';
 import useRecentSearches from '@/hooks/use-recent-searches';
 import useSearch, { DEFAULT_FILTERS, hasActiveFilters } from '@/hooks/use-search';
 import useTypeahead from '@/hooks/use-typeahead';
@@ -23,25 +21,34 @@ import type { TypeaheadSuggestion } from '@/types/search';
 
 const SEARCH_BAR_HEIGHT = 52;
 const FADE_HEIGHT = 24;
-const FADE_STEPS = [0.9, 0.75, 0.6, 0.45, 0.3, 0.18, 0.08, 0.02];
 
 export default function ExploreScreen() {
-  const insets = useSafeAreaInsets();
-  const { scheme, tokens } = useThemeContext();
   const search = useSearch();
   const recents = useRecentSearches();
   const typeahead = useTypeahead(search.query);
   const isSearching = search.state !== 'idle';
   const [filtersVisible, setFiltersVisible] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
-  // Push content below the entire blur strip (safe area + bar + fade) so the
-  // quick-filter chips at the top of the scroll aren't obscured by the search.
-  const topOffset = insets.top + SEARCH_BAR_HEIGHT + FADE_HEIGHT;
-  // expo-blur on Android renders a translucent gray fallback (no real backdrop
-  // blur), which shows as an ugly gray shadow around the search bar. Fall back
-  // to a solid theme-bg fill on Android — the bottom fade gradient still works
-  // because the MaskedView mask is independent of the fill content.
-  const isAndroid = Platform.OS === 'android';
+  // Bumped on back-press so the SmartSearchBar's internal form remounts
+  // with an empty value (the form is not externally controlled).
+  const [formResetKey, setFormResetKey] = useState(0);
+  const { setSearchActive } = useSearchUIContext();
+
+  // Signal "search is active" to the parent tab layout so the tab bar
+  // can hide itself when the user has actually typed something OR
+  // results are showing. Focusing the empty bar alone does NOT hide it
+  // — that felt jumpy. Cleared on unmount so other tabs always see the
+  // tab bar regardless of what state the explore tab was last in.
+  const hasTypedQuery = search.query.trim().length > 0;
+  useEffect(() => {
+    setSearchActive(isSearching || hasTypedQuery);
+    return () => setSearchActive(false);
+  }, [isSearching, hasTypedQuery, setSearchActive]);
+  // peek = -FADE_HEIGHT → content paddingTop = insets.top + headerHeight
+  // + fadeHeight, i.e. the first scroll child starts BELOW the entire
+  // blur strip so the search bar never sits on top of the quick-filter
+  // chips.
+  const topOffset = useBlurHeaderInset(SEARCH_BAR_HEIGHT, -FADE_HEIGHT);
 
   const filtersActive = hasActiveFilters(search.filters);
   const clearFilters = useCallback(() => {
@@ -96,6 +103,19 @@ export default function ExploreScreen() {
     [typeahead],
   );
 
+  // Back-button handler: returns the screen to the idle landing.
+  // Clears the search hook's query (which moves state → 'idle'),
+  // dismisses keyboard + focus, and bumps the form-reset key so the
+  // SmartSearchBar's internal text field also empties.
+  const handleBackPress = useCallback(() => {
+    search.setQuery('');
+    Keyboard.dismiss();
+    setIsFocused(false);
+    setFormResetKey((k) => k + 1);
+  }, [search]);
+
+  const isSearchActive = isSearching || hasTypedQuery;
+
   // Show the suggestions panel only when the user is actively typing.
   // Empty input + focused → no panel at all (avoids the "second search
   // bar" feel of a card sitting under the bar with no content).
@@ -121,24 +141,25 @@ export default function ExploreScreen() {
       {isSearching ? (
         // SearchResults renders a virtualized list when state === 'success'.
         // It MUST live outside AppScrollView (virtualized-list-in-ScrollView
-        // breaks recycling). Empty/loading/error branches render plain views,
-        // so we wrap them with a top inset using a wrapping View.
-        <View style={{ flex: 1, paddingTop: topOffset }}>
-          <SearchResults
-            state={search.state}
-            results={search.results}
-            total={search.total}
-            durationMs={search.durationMs}
-            query={search.query}
-            error={search.error}
-            didYouMean={search.didYouMean}
-            hasActiveFilters={filtersActive}
-            onClearFilters={clearFilters}
-            onUseSuggestion={search.setQuery}
-            onEndReached={search.loadMore}
-            isLoadingMore={search.isLoadingMore}
-          />
-        </View>
+        // breaks recycling). The list itself extends to the top of the screen
+        // so rows scroll UNDER the blur header — topInset is applied as
+        // contentContainerStyle.paddingTop, not as a wrapping View.
+        <SearchResults
+          state={search.state}
+          results={search.results}
+          total={search.total}
+          durationMs={search.durationMs}
+          query={search.query}
+          error={search.error}
+          didYouMean={search.didYouMean}
+          hasActiveFilters={filtersActive}
+          onClearFilters={clearFilters}
+          onUseSuggestion={search.setQuery}
+          onEndReached={search.loadMore}
+          isLoadingMore={search.isLoadingMore}
+          topInset={topOffset}
+          onFilterPress={() => setFiltersVisible(true)}
+        />
       ) : (
         <AppScrollView
           showsVerticalScrollIndicator={false}
@@ -148,46 +169,25 @@ export default function ExploreScreen() {
         >
           <SearchQuickFilters />
           <SearchCatalogue />
+          {/* SearchPromoBanner currently returns null while the campaigns
+           *  backend is being wired (see component for the re-enable
+           *  contract). Render call left in place so the section drops
+           *  back into the layout automatically when it starts returning
+           *  content. */}
           <SearchPromoBanner />
           <SearchTopFeatured />
         </AppScrollView>
       )}
 
-      <MaskedView
-        style={[styles.blurContainer, { height: insets.top + SEARCH_BAR_HEIGHT + FADE_HEIGHT }]}
-        maskElement={
-          <View style={styles.maskWrapper}>
-            <View style={styles.maskSolid} />
-            <View style={styles.maskFade}>
-              {FADE_STEPS.map((opacity, i) => (
-                <View key={i} style={[styles.fadeBand, { opacity }]} />
-              ))}
-            </View>
-          </View>
-        }
-      >
-        {isAndroid ? (
-          <View style={[styles.blurFill, { backgroundColor: tokens.background }]} />
-        ) : (
-          <BlurView
-            tint={scheme === 'dark' ? 'dark' : 'light'}
-            intensity={80}
-            style={styles.blurFill}
-          />
-        )}
-      </MaskedView>
-
-      <View
-        pointerEvents="box-none"
-        style={[styles.searchBarOverlay, { paddingTop: insets.top }]}
-      >
+      <AppBlurView contentHeight={SEARCH_BAR_HEIGHT} fadeHeight={FADE_HEIGHT}>
         <SmartSearchBar
           onPress={search.setQuery}
           onNotificationPress={() => router.push('/notifications')}
           isSearching={isSearching}
-          onFilterPress={() => setFiltersVisible(true)}
-          hasActiveFilters={filtersActive}
           onFocusChange={handleFocusChange}
+          isSearchActive={isSearchActive}
+          onBackPress={handleBackPress}
+          formResetKey={formResetKey}
         />
         {showSuggestions ? (
           <SearchSuggestionsPanel
@@ -201,7 +201,7 @@ export default function ExploreScreen() {
             onClearRecents={recents.clear}
           />
         ) : null}
-      </View>
+      </AppBlurView>
 
       <SearchFiltersSheet
         visible={filtersVisible}
@@ -215,35 +215,3 @@ export default function ExploreScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  blurContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-  },
-  blurFill: {
-    flex: 1,
-  },
-  searchBarOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-  },
-  maskWrapper: {
-    flex: 1,
-  },
-  maskSolid: {
-    flex: 1,
-    backgroundColor: 'black',
-  },
-  maskFade: {
-    height: FADE_HEIGHT,
-    flexDirection: 'column',
-  },
-  fadeBand: {
-    flex: 1,
-    backgroundColor: 'black',
-  },
-});

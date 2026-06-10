@@ -1,0 +1,860 @@
+{
+  "contract_meta": {
+    "project": "Mator",
+    "domain": "mator.uz",
+    "version": "1.0.0",
+    "api_base_url": "https://api.mator.uz",
+    "cdn_base_url": "https://cdn.mator.uz",
+    "locale_default": "uz-UZ",
+    "currency_default": "UZS",
+    "timezone_default": "Asia/Tashkent",
+    "auth_scheme": "Bearer",
+    "client_platforms": ["ios", "android"],
+    "expo_runtime_version": "53.0.0",
+    "mobile_framework": "react-native + expo-router"
+  },
+  "flows": [
+    {
+      "screen_name": "AuthPhoneEntryScreen",
+      "api_endpoints": [
+        {
+          "method": "POST",
+          "url": "/v1/auth/phone/request-otp",
+          "description": "Send a 6-digit SMS OTP to the supplied Uzbek phone number via Eskiz/Playmobile aggregator. Server enforces 60s resend cooldown and 5/hour per-MSISDN ceiling."
+        },
+        {
+          "method": "POST",
+          "url": "/v1/auth/phone/check-availability",
+          "description": "Pre-flight check to tell the client whether this MSISDN already has an account (controls signup vs login copy on the next screen)."
+        }
+      ],
+      "request_payload": {
+        "phone_e164": "+998901234567",
+        "country_iso2": "UZ",
+        "channel": "sms",
+        "client": {
+          "platform": "ios",
+          "app_version": "1.0.0",
+          "build_number": 142,
+          "device_model": "iPhone15,3",
+          "os_version": "17.4.1",
+          "locale": "uz-UZ",
+          "install_id": "8c1a4f00-3d2e-4d6e-9a17-2b9e0d5d76aa"
+        },
+        "captcha_token": "03AGdBq25-mock-recaptcha-token-from-react-native-recaptcha"
+      },
+      "response_data": {
+        "request_id": "otp_01HXC3K9V6Q4N3KJ8M0YZB2W7T",
+        "phone_e164": "+998901234567",
+        "expires_at": "2026-06-11T14:32:00.000Z",
+        "resend_after_seconds": 60,
+        "otp_length": 6,
+        "delivery_channel": "sms",
+        "is_existing_user": true,
+        "next_screen": "AuthOtpVerifyScreen"
+      },
+      "native_integration_details": [
+        "expo-localization: read Localization.locale and Localization.timezone to fill client.locale / timezone headers.",
+        "expo-application: read Application.nativeApplicationVersion (app_version), Application.nativeBuildVersion (build_number), Application.getIosIdForVendorAsync()/Application.getAndroidId() for install_id seed.",
+        "expo-device: read Device.modelId (ios) / Device.modelName (android) for device_model and Device.osVersion.",
+        "react-native-otp-entry: 6-cell input wired to the response.otp_length value.",
+        "react-native-google-recaptcha-v2 (or expo-recaptcha-v3): produce captcha_token on Android release builds; web on iOS via WebView fallback.",
+        "Headers attached by api-client interceptor: X-Mator-Client-Platform, X-Mator-App-Version, X-Mator-Build, X-Mator-Install-Id, Accept-Language."
+      ]
+    },
+    {
+      "screen_name": "AuthOtpVerifyScreen",
+      "api_endpoints": [
+        {
+          "method": "POST",
+          "url": "/v1/auth/phone/verify-otp",
+          "description": "Exchange the 6-digit OTP for an access/refresh token pair. On success the response also indicates whether MyID verification is required before the user can transact."
+        },
+        {
+          "method": "POST",
+          "url": "/v1/auth/phone/resend-otp",
+          "description": "Resend OTP using the prior request_id. Subject to the same 60s/5-per-hour ceiling enforced server-side."
+        }
+      ],
+      "request_payload": {
+        "request_id": "otp_01HXC3K9V6Q4N3KJ8M0YZB2W7T",
+        "phone_e164": "+998901234567",
+        "otp_code": "483917",
+        "device": {
+          "install_id": "8c1a4f00-3d2e-4d6e-9a17-2b9e0d5d76aa",
+          "expo_push_token": "ExponentPushToken[xY9-aB3cD2eF4gH5iJ6kL7mN8oP9qR0sT1u]",
+          "fcm_token": "fGz6oM9aT2y:APA91bF9KqM4nWzN0oP1qR2sT3uV4wX5yZ6aB7cD8eF9gH0i",
+          "apns_token": "740f4707bebcf74f9b7c25d48e3358945f6aa01da5ddb387462c7eaf61bb78ad",
+          "platform": "ios"
+        }
+      },
+      "response_data": {
+        "user": {
+          "id": "9a8e1d2c-4b7f-4d3e-8c2a-1f0e2b6c9d4a",
+          "phone_e164": "+998901234567",
+          "display_name": null,
+          "avatar_url": null,
+          "myid_status": "not_verified",
+          "transaction_limit_uzs": 0,
+          "created_at": "2026-06-11T14:30:11.412Z"
+        },
+        "tokens": {
+          "access_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6Im1hdG9yLWtleS0xIn0.eyJzdWIiOiI5YThlMWQyYy00YjdmLTRkM2UtOGMyYS0xZjBlMmI2YzlkNGEifQ.signature",
+          "access_token_expires_at": "2026-06-11T15:30:11.000Z",
+          "refresh_token": "rt_01HXC3KAB7P5N4LK9N1ZAC3X8U",
+          "refresh_token_expires_at": "2026-09-09T14:30:11.000Z",
+          "token_type": "Bearer"
+        },
+        "device_binding": {
+          "device_id": "dev_01HXC3KB9R6Q5M4LK0N1AB2X9V",
+          "expo_push_token_registered": true
+        },
+        "requires_myid_verification": true,
+        "next_screen": "AuthMyIdConsentScreen"
+      },
+      "native_integration_details": [
+        "expo-notifications: const { data: expoPushToken } = await Notifications.getExpoPushTokenAsync({ projectId: Constants.expoConfig.extra.eas.projectId }); send the raw string in expo_push_token.",
+        "expo-notifications: getDevicePushTokenAsync() returns the native APNs/FCM token — send via fcm_token / apns_token for direct-provider fallback.",
+        "expo-secure-store: write access_token + refresh_token under keys 'mator.access' / 'mator.refresh' with WHEN_UNLOCKED_THIS_DEVICE_ONLY.",
+        "@react-native-async-storage/async-storage: cache user payload at key 'mator.user.cache' for cold-start UI before refresh.",
+        "expo-router: router.replace(response.next_screen === 'AuthMyIdConsentScreen' ? '/(auth)/myid-consent' : '/(tabs)') based on requires_myid_verification.",
+        "API client: on 401, call POST /v1/auth/token/refresh with refresh_token; on 403 myid_required, redirect to /(auth)/myid-consent."
+      ]
+    },
+    {
+      "screen_name": "AuthMyIdVerificationScreen",
+      "api_endpoints": [
+        {
+          "method": "POST",
+          "url": "/v1/auth/myid/initiate",
+          "description": "Create a MyID verification session and return the OAuth2 authorize URL (myid.uz) the client must open in a WebView/AuthSession. Includes state and PKCE challenge."
+        },
+        {
+          "method": "POST",
+          "url": "/v1/auth/myid/callback",
+          "description": "Backend exchanges the MyID authorization code for an identity payload (passport, PINFL, biometric verdict) and links it to the current Mator user."
+        },
+        {
+          "method": "GET",
+          "url": "/v1/auth/myid/status",
+          "description": "Poll-able status used by the client while the WebView is open and again on resume."
+        }
+      ],
+      "request_payload": {
+        "initiate": {
+          "user_id": "9a8e1d2c-4b7f-4d3e-8c2a-1f0e2b6c9d4a",
+          "redirect_uri": "mator://auth/myid/callback",
+          "scopes": ["passport_data", "pinfl", "address", "biometric_verdict"],
+          "ui_locale": "uz"
+        },
+        "callback": {
+          "session_id": "myid_sess_01HXC3KCV6Q4N3KJ8M0YZB2W7T",
+          "code": "myid_auth_code_4F8a2BcD9eGhJkLmNpQrStUvWxYz",
+          "state": "state_01HXC3KCW6P5M4LK0N1AB2X9V",
+          "code_verifier": "ZyXwVuTsRqPoNmLkJiHgFeDcBa9876543210ABCDEFGHIJKLMNOP"
+        }
+      },
+      "response_data": {
+        "initiate_response": {
+          "session_id": "myid_sess_01HXC3KCV6Q4N3KJ8M0YZB2W7T",
+          "authorize_url": "https://myid.uz/oauth2/authorize?client_id=mator-prod&response_type=code&redirect_uri=mator%3A%2F%2Fauth%2Fmyid%2Fcallback&scope=passport_data+pinfl+address+biometric_verdict&state=state_01HXC3KCW6P5M4LK0N1AB2X9V&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256&ui_locales=uz",
+          "expires_at": "2026-06-11T14:45:00.000Z"
+        },
+        "callback_response": {
+          "verification_id": "myid_ver_01HXC3KE4R6Q5M4LK0N1AB2X9V",
+          "status": "verified",
+          "verified_at": "2026-06-11T14:38:22.114Z",
+          "identity": {
+            "pinfl": "30101950220011",
+            "passport_serial": "AA",
+            "passport_number": "1234567",
+            "first_name": "Akmal",
+            "last_name": "Karimov",
+            "middle_name": "Bekzodovich",
+            "date_of_birth": "1995-01-01",
+            "gender": "male",
+            "citizenship_iso3": "UZB",
+            "address_region": "Toshkent shahri",
+            "address_district": "Yunusobod tumani",
+            "address_street": "Amir Temur ko'chasi 12, kv. 45",
+            "biometric_match_score": 0.973
+          },
+          "transaction_limit_uzs": 50000000,
+          "next_screen": "GarageListScreen"
+        },
+        "status_response": {
+          "session_id": "myid_sess_01HXC3KCV6Q4N3KJ8M0YZB2W7T",
+          "state": "verified",
+          "polling_interval_ms": 2000
+        }
+      },
+      "native_integration_details": [
+        "expo-auth-session: AuthSession.useAuthRequest({ clientId: 'mator-prod', redirectUri: 'mator://auth/myid/callback', scopes, responseType: 'code', usePKCE: true }) — proxy.startAsync(authorize_url) to launch the system WebView.",
+        "Universal links / deep links: configure scheme 'mator' in app.json (expo.scheme = 'mator') and iOS associatedDomains 'applinks:mator.uz', Android intentFilters for https://mator.uz/auth/myid.",
+        "expo-web-browser: WebBrowser.openAuthSessionAsync(authorize_url, redirectUri) on the path that closes the in-app browser as soon as the redirect fires.",
+        "expo-crypto: derive PKCE code_verifier and SHA-256 code_challenge via Crypto.digestStringAsync(SHA256, verifier, { encoding: BASE64 }) — only the verifier is sent on callback exchange.",
+        "expo-linking: Linking.addEventListener('url', ({ url }) => handleMyIdCallback(url)) to catch the redirect when the user returns from MyID.",
+        "react-native-app-state: useAppState() to retry GET /v1/auth/myid/status when foregrounded mid-flow."
+      ]
+    },
+    {
+      "screen_name": "GarageListScreen",
+      "api_endpoints": [
+        {
+          "method": "GET",
+          "url": "/v1/garage/vehicles",
+          "description": "List all vehicles for the signed-in user, ordered by is_primary DESC, created_at DESC."
+        },
+        {
+          "method": "POST",
+          "url": "/v1/garage/vehicles",
+          "description": "Create a new vehicle from the 3-step wizard (make/model/year + trim/engine + registration)."
+        },
+        {
+          "method": "PATCH",
+          "url": "/v1/garage/vehicles/{vehicle_id}",
+          "description": "Update mileage, nickname, primary flag, or registration data."
+        },
+        {
+          "method": "DELETE",
+          "url": "/v1/garage/vehicles/{vehicle_id}",
+          "description": "Soft-delete a vehicle (retained for compatibility history)."
+        }
+      ],
+      "request_payload": {
+        "list_query_params": {
+          "include_deleted": false,
+          "include_3d": true
+        },
+        "create_payload": {
+          "make_id": "make_chevrolet",
+          "model_id": "model_chevrolet_cobalt",
+          "year": 2019,
+          "trim_id": "trim_chevrolet_cobalt_ls_at",
+          "engine_id": "engine_b15d2_1_5l_petrol",
+          "transmission": "automatic",
+          "drivetrain": "fwd",
+          "color_hex": "#1F2A37",
+          "vin": "KL1MJ6CA8KB123456",
+          "license_plate": "01A123BC",
+          "registration_region_code": "01",
+          "mileage_km": 67420,
+          "nickname": "Mening Cobaltim",
+          "is_primary": true,
+          "fuel_type": "petrol"
+        }
+      },
+      "response_data": {
+        "vehicles": [
+          {
+            "id": "veh_01HXC3KF6S7T4N4LK0N1AB2X9V",
+            "user_id": "9a8e1d2c-4b7f-4d3e-8c2a-1f0e2b6c9d4a",
+            "is_primary": true,
+            "nickname": "Mening Cobaltim",
+            "make": { "id": "make_chevrolet", "name": "Chevrolet", "logo_url": "https://cdn.mator.uz/brands/chevrolet.svg" },
+            "model": { "id": "model_chevrolet_cobalt", "name": "Cobalt" },
+            "year": 2019,
+            "trim": { "id": "trim_chevrolet_cobalt_ls_at", "name": "LS AT" },
+            "engine": { "id": "engine_b15d2_1_5l_petrol", "name": "B15D2 1.5L", "displacement_cc": 1485, "fuel_type": "petrol" },
+            "transmission": "automatic",
+            "drivetrain": "fwd",
+            "color_hex": "#1F2A37",
+            "vin": "KL1MJ6CA8KB123456",
+            "license_plate": "01A123BC",
+            "mileage_km": 67420,
+            "model_3d": {
+              "glb_url": "https://cdn.mator.uz/3d/chevrolet/cobalt/2019/ls/model_v3.glb",
+              "ktx2_textures_url": "https://cdn.mator.uz/3d/chevrolet/cobalt/2019/ls/textures_ktx2.zip",
+              "tuning_variants": [
+                { "id": "tuning_stock", "name": "Stock", "thumbnail_url": "https://cdn.mator.uz/3d/chevrolet/cobalt/2019/ls/thumbs/stock.webp" },
+                { "id": "tuning_sport", "name": "Sport Pack", "thumbnail_url": "https://cdn.mator.uz/3d/chevrolet/cobalt/2019/ls/thumbs/sport.webp" },
+                { "id": "tuning_offroad", "name": "Offroad Pack", "thumbnail_url": "https://cdn.mator.uz/3d/chevrolet/cobalt/2019/ls/thumbs/offroad.webp" }
+              ],
+              "version": 3,
+              "byte_size": 18643217,
+              "checksum_sha256": "a1f4c9d7b2e0f8a6c5d3e2b1a0f9e8d7c6b5a4938271605142331f0e9d8c7b6a"
+            },
+            "created_at": "2026-06-11T14:40:55.220Z",
+            "updated_at": "2026-06-11T14:40:55.220Z"
+          }
+        ],
+        "total": 1
+      },
+      "native_integration_details": [
+        "expo-gl + three / @react-three/fiber-native: load model_3d.glb_url through GLTFLoader; cache via expo-file-system FileSystem.downloadAsync to documentDirectory + 'models/' + checksum_sha256 + '.glb' for offline reuse.",
+        "expo-file-system: FileSystem.getInfoAsync(localPath) gates re-download; checksum_sha256 validated against FileSystem.readAsStringAsync hashing via expo-crypto.",
+        "react-native-mmkv: store the active vehicle_id at 'mator.garage.primary_id' for synchronous read on cold start (used by AI Advisor compatibility filters).",
+        "@tanstack/react-query: queryKey ['garage','list'] invalidated on create/patch/delete via queryClient.invalidateQueries.",
+        "expo-image: render brand logo via AppImage source={ uri: vehicle.make.logo_url } with cachePolicy='memory-disk'.",
+        "Pre-warm queue: kick off prefetch of model_3d.glb_url on first GarageList render so VehicleDetail opens with a hot cache."
+      ]
+    },
+    {
+      "screen_name": "MapMastersSearchScreen",
+      "api_endpoints": [
+        {
+          "method": "GET",
+          "url": "/v1/masters/nearby",
+          "description": "Return mechanics (masters) within a radius of the user location, ordered by distance ascending. Supports filtering by specialization, rating, vehicle make compatibility, and open-now."
+        },
+        {
+          "method": "GET",
+          "url": "/v1/sto/nearby",
+          "description": "Return service stations (STO) within radius. Same filter contract as /masters/nearby plus a 'service_types' filter."
+        },
+        {
+          "method": "GET",
+          "url": "/v1/masters/{master_id}",
+          "description": "Full master profile: portfolio, certifications, reviews summary, working hours, services with UZS pricing."
+        },
+        {
+          "method": "POST",
+          "url": "/v1/masters/{master_id}/bookings",
+          "description": "Create a booking slot. Returns a hold token valid for 5 minutes pending checkout."
+        }
+      ],
+      "request_payload": {
+        "nearby_query_params": {
+          "center_lat": 41.311081,
+          "center_lng": 69.240562,
+          "radius_m": 5000,
+          "viewport_min_lat": 41.270000,
+          "viewport_min_lng": 69.180000,
+          "viewport_max_lat": 41.360000,
+          "viewport_max_lng": 69.310000,
+          "specialization": ["engine", "transmission", "electrical"],
+          "vehicle_make_id": "make_chevrolet",
+          "vehicle_model_id": "model_chevrolet_cobalt",
+          "min_rating": 4.0,
+          "open_now": true,
+          "limit": 50,
+          "cursor": null
+        },
+        "booking_payload": {
+          "vehicle_id": "veh_01HXC3KF6S7T4N4LK0N1AB2X9V",
+          "service_ids": ["svc_diag_full", "svc_oil_change"],
+          "scheduled_at": "2026-06-12T09:00:00+05:00",
+          "notes": "Suvuq holatda dvigatel sekin yuriadi.",
+          "contact_phone_e164": "+998901234567"
+        }
+      },
+      "response_data": {
+        "nearby_response": {
+          "results": [
+            {
+              "id": "master_01HXC3KG7T8U5O5LK0N1AB2X9V",
+              "type": "master",
+              "display_name": "Bobur Toshpo'latov",
+              "shop_name": "Bobur Auto Servis",
+              "avatar_url": "https://cdn.mator.uz/masters/bobur/avatar.jpg",
+              "rating_avg": 4.82,
+              "rating_count": 312,
+              "specializations": ["engine", "transmission"],
+              "supported_makes": ["make_chevrolet", "make_daewoo", "make_kia"],
+              "geo": {
+                "lat": 41.314211,
+                "lng": 69.247885,
+                "accuracy_m": 8,
+                "geohash": "tzevvtjhx"
+              },
+              "distance_m": 1247,
+              "address_text": "Toshkent sh., Yunusobod tumani, Amir Temur ko'chasi 24",
+              "is_open_now": true,
+              "next_open_at": null,
+              "price_floor_uzs": 80000,
+              "price_ceiling_uzs": 2500000,
+              "badge": "verified"
+            },
+            {
+              "id": "sto_01HXC3KG9V0W6P6LK0N1AB2X9V",
+              "type": "sto",
+              "display_name": "Avtotex STO",
+              "avatar_url": "https://cdn.mator.uz/sto/avtotex/logo.jpg",
+              "rating_avg": 4.61,
+              "rating_count": 188,
+              "specializations": ["body", "paint", "electrical"],
+              "supported_makes": ["make_chevrolet", "make_ravon", "make_toyota"],
+              "geo": {
+                "lat": 41.302450,
+                "lng": 69.231200,
+                "accuracy_m": 5,
+                "geohash": "tzeu4rjyk"
+              },
+              "distance_m": 1842,
+              "address_text": "Toshkent sh., Chilonzor tumani, Bunyodkor shoh ko'chasi 18",
+              "is_open_now": true,
+              "next_open_at": null,
+              "price_floor_uzs": 150000,
+              "price_ceiling_uzs": 8500000,
+              "badge": "premium"
+            }
+          ],
+          "cluster_hints": [
+            { "lat": 41.318000, "lng": 69.255000, "count": 14, "cluster_id": "cluster_yunusobod_n_01" }
+          ],
+          "next_cursor": "cur_01HXC3KH2X1Y7Q7LK0N1AB2X9V",
+          "total": 27,
+          "query_duration_ms": 84
+        },
+        "master_detail_response": {
+          "id": "master_01HXC3KG7T8U5O5LK0N1AB2X9V",
+          "shop_name": "Bobur Auto Servis",
+          "display_name": "Bobur Toshpo'latov",
+          "bio": "10 yillik tajriba. Chevrolet va Daewoo bo'yicha mutaxassis.",
+          "rating_avg": 4.82,
+          "rating_count": 312,
+          "certifications": [
+            { "id": "cert_uz_mech_lvl3", "name": "O'zbekiston Avto-mexanika sertifikati, 3-daraja", "issued_at": "2022-03-14" }
+          ],
+          "portfolio": [
+            { "id": "p1", "image_url": "https://cdn.mator.uz/masters/bobur/portfolio/p1.jpg" },
+            { "id": "p2", "image_url": "https://cdn.mator.uz/masters/bobur/portfolio/p2.jpg" }
+          ],
+          "services": [
+            { "id": "svc_diag_full", "name": "To'liq diagnostika", "duration_min": 60, "price_uzs": 150000 },
+            { "id": "svc_oil_change", "name": "Yog' almashtirish", "duration_min": 30, "price_uzs": 90000 }
+          ],
+          "working_hours": [
+            { "weekday": 1, "open": "09:00", "close": "20:00" },
+            { "weekday": 2, "open": "09:00", "close": "20:00" },
+            { "weekday": 3, "open": "09:00", "close": "20:00" },
+            { "weekday": 4, "open": "09:00", "close": "20:00" },
+            { "weekday": 5, "open": "09:00", "close": "20:00" },
+            { "weekday": 6, "open": "10:00", "close": "18:00" },
+            { "weekday": 0, "open": null, "close": null }
+          ],
+          "contact": {
+            "phone_e164": "+998901112233",
+            "telegram_username": "@boburautoservis",
+            "website_url": null
+          },
+          "geo": { "lat": 41.314211, "lng": 69.247885, "address_text": "Toshkent sh., Yunusobod tumani, Amir Temur ko'chasi 24" }
+        },
+        "booking_response": {
+          "booking_id": "bk_01HXC3KJ4Z2A8R8LK0N1AB2X9V",
+          "status": "hold",
+          "hold_expires_at": "2026-06-11T14:50:00.000Z",
+          "total_uzs": 240000,
+          "next_screen": "CheckoutScreen"
+        }
+      },
+      "native_integration_details": [
+        "react-native-maps: <MapView provider={PROVIDER_GOOGLE} region={{ latitude: center_lat, longitude: center_lng, latitudeDelta: 0.04, longitudeDelta: 0.04 }} onRegionChangeComplete={debounced refetch with new viewport_min/max bounds}.",
+        "react-native-maps Marker: marker per result.id with coordinate={{ latitude: result.geo.lat, longitude: result.geo.lng }}; pick custom <Marker.Image> per result.type (master vs sto).",
+        "react-native-map-clustering OR react-native-maps Marker tracksViewChanges=false: render cluster_hints as soft markers labelled with count to reduce DOM weight.",
+        "expo-location: Location.requestForegroundPermissionsAsync then Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }) to seed center_lat/center_lng on mount.",
+        "expo-location: Location.watchPositionAsync only while the screen is focused (useIsFocused) to avoid battery drain.",
+        "@react-navigation deep-link param: routes to '/(tabs)/(explore)/master-detail/[id]' carry the master_id; viewport state stashed in search-ui.context for back-restoration.",
+        "expo-linking: tap on contact.phone_e164 → Linking.openURL('tel:' + phone); tap Telegram → Linking.openURL('https://t.me/' + telegram_username.replace('@',''))."
+      ]
+    },
+    {
+      "screen_name": "PartsCatalogueScreen",
+      "api_endpoints": [
+        {
+          "method": "GET",
+          "url": "/v1/catalog/parts",
+          "description": "Faceted catalog list. Server-side filtering by vehicle_id projects a per-row compatibility flag so the UI can render 'Fits your car' badges without a second roundtrip."
+        },
+        {
+          "method": "GET",
+          "url": "/v1/catalog/parts/{part_id}",
+          "description": "Full part detail: media, specs, OEM cross-references, seller offers ranked by price + ETA."
+        },
+        {
+          "method": "GET",
+          "url": "/v1/catalog/parts/{part_id}/compatibility",
+          "description": "Explicit compatibility matrix for the given part against vehicle_id; returns trims/engines/years that match and a confidence rating."
+        }
+      ],
+      "request_payload": {
+        "list_query_params": {
+          "vehicle_id": "veh_01HXC3KF6S7T4N4LK0N1AB2X9V",
+          "category_id": "cat_engine_belts",
+          "search": "remen generator",
+          "min_price_uzs": 100000,
+          "max_price_uzs": 2000000,
+          "brand_ids": ["brand_gates", "brand_dayco"],
+          "condition": "new",
+          "in_stock_only": true,
+          "delivery_region_code": "01",
+          "sort_by": "price_asc",
+          "page": 1,
+          "page_size": 20
+        }
+      },
+      "response_data": {
+        "list_response": {
+          "items": [
+            {
+              "id": "part_01HXC3KK5B3C9S9LK0N1AB2X9V",
+              "title": "Cobalt Remen Generator Xitoy Original",
+              "brand": { "id": "brand_gates", "name": "Gates" },
+              "category": { "id": "cat_engine_belts", "name": "Dvigatel kamarlari" },
+              "oem_numbers": ["96440756", "55562234"],
+              "price_uzs": 185000,
+              "price_label": "UZS 185 000",
+              "currency": "UZS",
+              "in_stock": true,
+              "stock_qty": 47,
+              "delivery_eta_days_min": 1,
+              "delivery_eta_days_max": 2,
+              "compatibility": {
+                "status": "fits",
+                "confidence": 0.97,
+                "notes": "2019 Chevrolet Cobalt 1.5L B15D2 uchun mos."
+              },
+              "images": [
+                "https://cdn.mator.uz/parts/01HXC3KK5B/main.webp",
+                "https://cdn.mator.uz/parts/01HXC3KK5B/02.webp"
+              ],
+              "seller": { "id": "seller_avtomir", "name": "Avtomir TM", "rating_avg": 4.7 }
+            }
+          ],
+          "facets": {
+            "brands": [
+              { "id": "brand_gates", "name": "Gates", "count": 12 },
+              { "id": "brand_dayco", "name": "Dayco", "count": 6 }
+            ],
+            "price_range_uzs": { "min": 95000, "max": 1850000 },
+            "compatibility": { "fits": 14, "maybe": 3, "does_not_fit": 81 }
+          },
+          "page": 1,
+          "page_size": 20,
+          "total": 18,
+          "next_page": null
+        },
+        "compatibility_response": {
+          "part_id": "part_01HXC3KK5B3C9S9LK0N1AB2X9V",
+          "vehicle_id": "veh_01HXC3KF6S7T4N4LK0N1AB2X9V",
+          "status": "fits",
+          "confidence": 0.97,
+          "matched_trims": [
+            { "trim_id": "trim_chevrolet_cobalt_ls_at", "years": [2018, 2019, 2020, 2021] },
+            { "trim_id": "trim_chevrolet_cobalt_lt_at", "years": [2019, 2020, 2021] }
+          ],
+          "matched_engines": ["engine_b15d2_1_5l_petrol"],
+          "source": "manufacturer_oem_mapping"
+        }
+      },
+      "native_integration_details": [
+        "@tanstack/react-query: useInfiniteQuery with queryKey ['catalog', vehicle_id, filtersHash], getNextPageParam = lastPage.next_page.",
+        "expo-image: prefetch items[].images[0] for the visible window via Image.prefetch on FlashList onViewableItemsChanged.",
+        "react-native-mmkv: read 'mator.garage.primary_id' to auto-populate vehicle_id filter; the absence of it disables the 'Fits your car' chip.",
+        "expo-haptics: Haptics.selectionAsync on filter chip toggle and Haptics.notificationAsync(Success) when the 'fits' badge is tapped to add to cart.",
+        "shopify/flash-list FlashList: estimatedItemSize=320, keyExtractor=id, disableAutoLayout for perf on the long catalog list."
+      ]
+    },
+    {
+      "screen_name": "AiAdvisorChatScreen",
+      "api_endpoints": [
+        {
+          "method": "POST",
+          "url": "/v1/ai/sessions",
+          "description": "Create a chat session bound to a vehicle context. The session_id is what the UI persists across cold starts."
+        },
+        {
+          "method": "POST",
+          "url": "/v1/ai/sessions/{session_id}/messages",
+          "description": "Send a user message; server streams assistant tokens via SSE. Non-streaming mode returns the full message object."
+        },
+        {
+          "method": "GET",
+          "url": "/v1/ai/sessions/{session_id}",
+          "description": "Restore the message log on cold start."
+        }
+      ],
+      "request_payload": {
+        "create_session": {
+          "vehicle_id": "veh_01HXC3KF6S7T4N4LK0N1AB2X9V",
+          "locale": "uz-UZ",
+          "entry_point": "explore_top_bar"
+        },
+        "send_message": {
+          "client_message_id": "cm_01HXC3KL6D5E0T0LK0N1AB2X9V",
+          "role": "user",
+          "content": "Mening Cobaltimda dvigatel sovuq holatda titrayapti. Sabab nima bo'lishi mumkin?",
+          "attachments": [
+            { "type": "image", "url": "https://uploads.mator.uz/u/9a8e1d2c/2026-06-11/engine-photo.jpg", "mime": "image/jpeg" }
+          ],
+          "stream": true
+        }
+      },
+      "response_data": {
+        "create_session_response": {
+          "session_id": "ai_01HXC3KM7E6F1U1LK0N1AB2X9V",
+          "vehicle_context": {
+            "vehicle_id": "veh_01HXC3KF6S7T4N4LK0N1AB2X9V",
+            "make": "Chevrolet",
+            "model": "Cobalt",
+            "year": 2019,
+            "engine": "B15D2 1.5L petrol"
+          },
+          "created_at": "2026-06-11T14:42:30.000Z"
+        },
+        "message_response": {
+          "message_id": "msg_01HXC3KN8F7G2V2LK0N1AB2X9V",
+          "role": "assistant",
+          "content": "Sovuq holatda titrash ko'pincha quyidagilardan biri sabab bo'ladi: 1) Sham (svecha) yoki ularning ulangichlari eskirgan. 2) Yonilg'i forsunkalari iflos. 3) Yonilg'i bosimi past. Birinchi qadam — diagnostika qilib OBD-II kodlarini tekshirish. Sizning 2019 Chevrolet Cobalt B15D2 uchun mos shamlar va forsunka tozalagichlarni katalogda topishingiz mumkin.",
+          "structured": {
+            "suggested_parts": [
+              { "part_id": "part_01HXC3KK5B3C9S9LK0N1AB2X9V", "title": "Iridium spark plug NGK", "price_uzs": 75000 },
+              { "part_id": "part_01HXC3KP9G8H3W3LK0N1AB2X9V", "title": "Forsunka tozalagich Wynn's", "price_uzs": 45000 }
+            ],
+            "suggested_services": [
+              { "service_id": "svc_diag_full", "name": "To'liq diagnostika", "price_uzs": 150000 }
+            ],
+            "confidence": 0.78,
+            "disclaimer": "AI maslahati. Aniq tashxis uchun mexanikaga murojaat qiling."
+          },
+          "stream_chunks_token_count": 142,
+          "created_at": "2026-06-11T14:42:33.812Z"
+        },
+        "session_restore_response": {
+          "session_id": "ai_01HXC3KM7E6F1U1LK0N1AB2X9V",
+          "messages": [
+            { "message_id": "msg_01HXC3KM9X0Y4Z4LK0N1AB2X9V", "role": "user", "content": "Mening Cobaltimda dvigatel sovuq holatda titrayapti...", "created_at": "2026-06-11T14:42:31.000Z" },
+            { "message_id": "msg_01HXC3KN8F7G2V2LK0N1AB2X9V", "role": "assistant", "content": "Sovuq holatda titrash...", "created_at": "2026-06-11T14:42:33.812Z" }
+          ]
+        }
+      },
+      "native_integration_details": [
+        "react-native-sse OR react-native-event-source: open EventSource(`${API}/v1/ai/sessions/${id}/messages`, { headers: { Authorization, Accept: 'text/event-stream' } }) and append chunks to message buffer.",
+        "expo-image-picker: ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.85 }) -> upload to /v1/uploads -> attach returned url in attachments[].",
+        "expo-haptics: Haptics.impactAsync(Light) on first streamed token, Haptics.notificationAsync(Success) on stream end.",
+        "@tanstack/react-query: queryKey ['ai','session',id]; on createSession success, prefetch session_restore_response so cold-start is instant.",
+        "ai-chat-composer.tsx: bind vehicle_context.engine into the composer hint chip 'Asking about: Chevrolet Cobalt 2019 (B15D2 1.5L)'; if no vehicle_id, render the picker sheet first.",
+        "Background-safe: SSE connection closed via EventSource.close() on AppState change to 'background'; reopens on focus and resumes via Last-Event-ID header."
+      ]
+    },
+    {
+      "screen_name": "CheckoutScreen",
+      "api_endpoints": [
+        {
+          "method": "POST",
+          "url": "/v1/orders",
+          "description": "Create an order from a cart snapshot. Server validates stock, computes UZS totals (subtotal + delivery + service fee), and returns an order in 'pending_payment'."
+        },
+        {
+          "method": "POST",
+          "url": "/v1/payments/payme/invoices",
+          "description": "Create a Payme invoice for the order and return the deep-link URL the client opens. Server holds the order in 'pending_payment' until Payme posts the result to the merchant webhook."
+        },
+        {
+          "method": "POST",
+          "url": "/v1/payments/click/invoices",
+          "description": "Same contract for Click. Returns the click:// deep link plus a fallback https://my.click.uz URL for browser/WebView."
+        },
+        {
+          "method": "GET",
+          "url": "/v1/payments/{payment_id}",
+          "description": "Polling endpoint. The client polls after returning from the payment app to confirm status."
+        },
+        {
+          "method": "GET",
+          "url": "/v1/orders/{order_id}",
+          "description": "Source of truth for order status. Updated by the payment provider webhook."
+        }
+      ],
+      "request_payload": {
+        "create_order": {
+          "cart_snapshot": {
+            "items": [
+              { "part_id": "part_01HXC3KK5B3C9S9LK0N1AB2X9V", "qty": 1, "price_uzs": 185000 },
+              { "service_id": "svc_diag_full", "master_id": "master_01HXC3KG7T8U5O5LK0N1AB2X9V", "scheduled_at": "2026-06-12T09:00:00+05:00", "price_uzs": 150000 }
+            ],
+            "delivery_address_id": "addr_01HXC3KQ4J3K5X5LK0N1AB2X9V",
+            "delivery_method": "courier",
+            "promo_code": null
+          },
+          "vehicle_id": "veh_01HXC3KF6S7T4N4LK0N1AB2X9V",
+          "contact_phone_e164": "+998901234567"
+        },
+        "payme_invoice": {
+          "order_id": "ord_01HXC3KR5L4M6Y6LK0N1AB2X9V",
+          "return_url": "mator://payments/payme/return"
+        },
+        "click_invoice": {
+          "order_id": "ord_01HXC3KR5L4M6Y6LK0N1AB2X9V",
+          "return_url": "mator://payments/click/return"
+        }
+      },
+      "response_data": {
+        "create_order_response": {
+          "order_id": "ord_01HXC3KR5L4M6Y6LK0N1AB2X9V",
+          "status": "pending_payment",
+          "subtotal_uzs": 335000,
+          "delivery_uzs": 25000,
+          "service_fee_uzs": 5000,
+          "discount_uzs": 0,
+          "total_uzs": 365000,
+          "currency": "UZS",
+          "items": [
+            { "part_id": "part_01HXC3KK5B3C9S9LK0N1AB2X9V", "title": "Cobalt Remen Generator Xitoy Original", "qty": 1, "price_uzs": 185000, "line_total_uzs": 185000 },
+            { "service_id": "svc_diag_full", "title": "To'liq diagnostika — Bobur Auto Servis", "qty": 1, "price_uzs": 150000, "line_total_uzs": 150000 }
+          ],
+          "expires_at": "2026-06-11T15:00:00.000Z"
+        },
+        "payme_invoice_response": {
+          "payment_id": "pay_01HXC3KS6M5N7Z7LK0N1AB2X9V",
+          "provider": "payme",
+          "amount_tiyin": 36500000,
+          "amount_uzs": 365000,
+          "deep_link": "payme://merchant/01HXC3KR5L4M6Y6LK0N1AB2X9V?amount=36500000",
+          "https_fallback": "https://checkout.paycom.uz/c01HXC3KR5L4M6Y6LK0N1AB2X9V",
+          "expires_at": "2026-06-11T15:00:00.000Z"
+        },
+        "click_invoice_response": {
+          "payment_id": "pay_01HXC3KT7N6O8A8LK0N1AB2X9V",
+          "provider": "click",
+          "amount_uzs": 365000,
+          "deep_link": "click://services/pay?service_id=12345&merchant_id=67890&amount=365000&transaction_param=ord_01HXC3KR5L4M6Y6LK0N1AB2X9V&return_url=mator%3A%2F%2Fpayments%2Fclick%2Freturn",
+          "https_fallback": "https://my.click.uz/services/pay?service_id=12345&merchant_id=67890&amount=365000&transaction_param=ord_01HXC3KR5L4M6Y6LK0N1AB2X9V",
+          "expires_at": "2026-06-11T15:00:00.000Z"
+        },
+        "payment_status_response": {
+          "payment_id": "pay_01HXC3KS6M5N7Z7LK0N1AB2X9V",
+          "provider": "payme",
+          "status": "paid",
+          "paid_at": "2026-06-11T14:48:12.330Z",
+          "provider_transaction_id": "62b3e9a1f0e9d8c7b6a59483",
+          "order": {
+            "order_id": "ord_01HXC3KR5L4M6Y6LK0N1AB2X9V",
+            "status": "paid",
+            "next_screen": "OrderConfirmationScreen"
+          }
+        }
+      },
+      "native_integration_details": [
+        "expo-linking: const supported = await Linking.canOpenURL(deep_link); if (supported) Linking.openURL(deep_link); else Linking.openURL(https_fallback) — pattern reused for both payme:// and click://.",
+        "expo-web-browser: WebBrowser.openBrowserAsync(https_fallback, { presentationStyle: 'pageSheet' }) for the fallback on iOS so the user can come back via swipe-down.",
+        "expo-router: register catch-all handler at app/payments/payme/return.tsx and app/payments/click/return.tsx that read the return URL params and call GET /v1/payments/{payment_id}.",
+        "react-native-app-state: on AppState 'active' after a foreground hop to the payment app, refetch GET /v1/orders/{order_id} every 2s (max 30s) until status leaves 'pending_payment'.",
+        "expo-secure-store: never store raw card data; only the payment_id is persisted at key 'mator.payment.last_id' for cold-start recovery.",
+        "expo-notifications: backend will also push a 'payment_paid' data-only notification so the client can short-circuit polling even when AppState wakes late."
+      ]
+    },
+    {
+      "screen_name": "PushNotificationRouter",
+      "api_endpoints": [
+        {
+          "method": "POST",
+          "url": "/v1/devices/register",
+          "description": "Bind the Expo push token (and native FCM/APNs tokens) to the signed-in user + device fingerprint. Re-called on token refresh."
+        },
+        {
+          "method": "DELETE",
+          "url": "/v1/devices/{device_id}",
+          "description": "Unbind on sign-out so the user no longer receives this device's notifications."
+        },
+        {
+          "method": "PATCH",
+          "url": "/v1/notifications/preferences",
+          "description": "Update per-topic toggles (orders, ai_replies, master_messages, marketing)."
+        },
+        {
+          "method": "GET",
+          "url": "/v1/notifications",
+          "description": "In-app inbox list, used by NotificationsScreen as the source of truth — push payloads are routing hints, not the storage layer."
+        },
+        {
+          "method": "POST",
+          "url": "/v1/notifications/{notification_id}/read",
+          "description": "Mark a notification as read."
+        }
+      ],
+      "request_payload": {
+        "register_device": {
+          "expo_push_token": "ExponentPushToken[xY9-aB3cD2eF4gH5iJ6kL7mN8oP9qR0sT1u]",
+          "native_token": {
+            "platform": "ios",
+            "apns_token": "740f4707bebcf74f9b7c25d48e3358945f6aa01da5ddb387462c7eaf61bb78ad"
+          },
+          "device": {
+            "install_id": "8c1a4f00-3d2e-4d6e-9a17-2b9e0d5d76aa",
+            "platform": "ios",
+            "os_version": "17.4.1",
+            "app_version": "1.0.0",
+            "device_model": "iPhone15,3"
+          },
+          "permissions_granted": true,
+          "locale": "uz-UZ",
+          "timezone": "Asia/Tashkent"
+        },
+        "preferences_update": {
+          "topics": {
+            "orders": true,
+            "payments": true,
+            "ai_replies": true,
+            "master_messages": true,
+            "marketing": false
+          },
+          "quiet_hours": { "start": "22:00", "end": "08:00" }
+        }
+      },
+      "response_data": {
+        "register_device_response": {
+          "device_id": "dev_01HXC3KU8O7P9B9LK0N1AB2X9V",
+          "registered_at": "2026-06-11T14:31:01.000Z",
+          "topics_subscribed": ["orders", "payments", "ai_replies", "master_messages"]
+        },
+        "outbound_push_envelope": {
+          "to": "ExponentPushToken[xY9-aB3cD2eF4gH5iJ6kL7mN8oP9qR0sT1u]",
+          "title": "To'lov qabul qilindi",
+          "body": "365 000 so'mlik buyurtmangiz to'landi.",
+          "sound": "default",
+          "channelId": "orders",
+          "priority": "high",
+          "ttl": 3600,
+          "categoryId": "order_paid",
+          "badge": 1,
+          "data": {
+            "type": "order_paid",
+            "version": 1,
+            "order_id": "ord_01HXC3KR5L4M6Y6LK0N1AB2X9V",
+            "payment_id": "pay_01HXC3KS6M5N7Z7LK0N1AB2X9V",
+            "deeplink_path": "/(tabs)/(cart)/order-confirmation",
+            "deeplink_params": { "orderId": "ord_01HXC3KR5L4M6Y6LK0N1AB2X9V" }
+          }
+        },
+        "routing_matrix": [
+          { "data.type": "order_paid", "expo_router_path": "/(tabs)/(cart)/order-confirmation", "params": ["orderId"] },
+          { "data.type": "order_status_changed", "expo_router_path": "/(tabs)/(cart)/track-order", "params": ["orderId", "status"] },
+          { "data.type": "ai_reply", "expo_router_path": "/(tabs)/(explore)/ai-chat", "params": ["sessionId"] },
+          { "data.type": "master_message", "expo_router_path": "/(tabs)/(explore)/master-detail/[id]", "params": ["id", "threadId"] },
+          { "data.type": "myid_verified", "expo_router_path": "/(auth)/identity-complete", "params": [] },
+          { "data.type": "marketing", "expo_router_path": "/(tabs)/(explore)", "params": ["campaignId"] }
+        ],
+        "inbox_response": {
+          "items": [
+            {
+              "id": "ntf_01HXC3KV9P8Q0C0LK0N1AB2X9V",
+              "type": "order_paid",
+              "title": "To'lov qabul qilindi",
+              "body": "365 000 so'mlik buyurtmangiz to'landi.",
+              "read_at": null,
+              "created_at": "2026-06-11T14:48:13.000Z",
+              "data": {
+                "order_id": "ord_01HXC3KR5L4M6Y6LK0N1AB2X9V",
+                "deeplink_path": "/(tabs)/(cart)/order-confirmation",
+                "deeplink_params": { "orderId": "ord_01HXC3KR5L4M6Y6LK0N1AB2X9V" }
+              }
+            }
+          ],
+          "unread_count": 1,
+          "next_cursor": null
+        }
+      },
+      "native_integration_details": [
+        "expo-notifications: Notifications.setNotificationHandler({ handleNotification: async () => ({ shouldShowBanner: true, shouldPlaySound: true, shouldSetBadge: true }) }) registered at app/_layout.tsx top-level.",
+        "expo-notifications: const token = (await Notifications.getExpoPushTokenAsync({ projectId: Constants.expoConfig.extra.eas.projectId })).data — send via /v1/devices/register at first-launch and on Notifications.addPushTokenListener (token refresh).",
+        "Android channels: Notifications.setNotificationChannelAsync('orders', { name: 'Buyurtmalar', importance: AndroidImportance.HIGH, sound: 'default' }) and an 'ai_replies' channel with importance DEFAULT.",
+        "iOS categories: Notifications.setNotificationCategoryAsync('order_paid', [{ identifier: 'view', buttonTitle: 'Ko\\'rish', options: { opensAppToForeground: true } }]).",
+        "Background data-only: Notifications.addNotificationReceivedListener for foreground; Notifications.addNotificationResponseReceivedListener for tap (works for background AND killed when Notifications.getLastNotificationResponseAsync() is also checked on cold start).",
+        "expo-router deep linking: const path = routing_matrix.find(r => r.type === data.type).expo_router_path; router.push({ pathname: path, params: pick(data, r.params) }) — use routing_matrix as the single source of truth so backend can extend without a client release.",
+        "Cold-start guard: in app/_layout.tsx run const last = await Notifications.getLastNotificationResponseAsync(); if present and not yet processed (compare data.notification_id against MMKV 'mator.push.last_handled'), route once on mount.",
+        "Permissions: Notifications.requestPermissionsAsync({ ios: { allowAlert: true, allowBadge: true, allowSound: true, allowAnnouncements: false } }) deferred to after the first sign-in success (not on cold start) to avoid burning the prompt."
+      ]
+    }
+  ]
+}

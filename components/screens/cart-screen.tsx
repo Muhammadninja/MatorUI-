@@ -1,27 +1,32 @@
 import { router } from 'expo-router';
 import { Truck } from 'lucide-react-native';
-import { useState } from 'react';
+import { useMemo } from 'react';
+import { StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import CartBuyAgainSection from '@/components/screens-components/cart/cart-buy-again-section';
 import CartEmptyState from '@/components/screens-components/cart/cart-empty-state';
 import CartItemsSection from '@/components/screens-components/cart/cart-items-section';
-import CartListsSection from '@/components/screens-components/cart/cart-lists-section';
-import CartSectionTabs, {
-    type CartSection,
-} from '@/components/screens-components/cart/cart-section-tabs';
 import CartSummary from '@/components/screens-components/cart/cart-summary';
 import { AppButton } from '@/components/shared/app-button';
+import { AppIconButton } from '@/components/shared/app-icon-button';
 import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
 import { AppText } from '@/components/shared/app-text';
-import { AppPressableView, AppView } from '@/components/shared/app-view';
+import { AppView } from '@/components/shared/app-view';
 import { useCartContext } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useAuthGuard } from '@/guards';
+import { useOrders } from '@/hooks/use-orders';
+import type { OrderListStatus } from '@/services/orders-service';
 import { triggerHaptic } from '@/utils/haptics';
 
-// Mocked while the orders backend isn't wired; track-order screen also uses mock data.
-const MOCK_AWAITING_ORDERS: number = 2;
+// Statuses that map to "a delivery is in motion" — these are the ones
+// the cart's truck icon should jump straight to. Anything terminal
+// (Delivered / Cancelled) is intentionally excluded.
+const IN_TRANSIT_STATUSES = new Set<OrderListStatus>([
+  'In Transit',
+  'Out for delivery',
+  'Processing',
+]);
 
 export default function CartScreen() {
   const {
@@ -37,10 +42,9 @@ export default function CartScreen() {
     removeItem,
     formatCurrency,
   } = useCartContext();
-  const { tokens, scheme } = useThemeContext();
+  const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
   const { requireAuth } = useAuthGuard();
-  const [section, setSection] = useState<CartSection>('cart');
 
   const handleProceedToCheckout = requireAuth(() => router.push('/checkout'), {
     title: 'Sign in to check out',
@@ -49,125 +53,90 @@ export default function CartScreen() {
     redirectTo: '/checkout',
   });
 
+  // Resolve the most recent in-transit order so the truck icon jumps
+  // straight to its tracking screen. Falls back to the order list when
+  // nothing is currently in motion.
+  const ordersPage = useOrders();
+  const activeOrderId = useMemo(() => {
+    const rows = ordersPage.page?.items ?? [];
+    return rows.find((o) => IN_TRANSIT_STATUSES.has(o.status))?.id ?? null;
+  }, [ordersPage.page]);
+
   const handleTrackOrder = () => {
     triggerHaptic('selection');
-    router.push('/track-order');
+    if (activeOrderId) {
+      router.push(`/track-order?orderId=${encodeURIComponent(activeOrderId)}`);
+      return;
+    }
+    // No in-flight delivery — fall back to the order list so the user
+    // still has somewhere meaningful to land.
+    router.push('/order-history');
   };
 
   const hasItems = items.length > 0;
-  const showBottomBar = section === 'cart' && hasItems;
-  const awaitingOrders = MOCK_AWAITING_ORDERS;
+  const showBottomBar = hasItems;
 
   return (
     <AppView flex={1} colorName="background">
       <AppView
         px={16}
-        pb={16}
-        gap={16}
+        pb={12}
         style={{
           paddingTop: insets.top + 12,
-          borderBottomWidth: 0.5,
-          borderBottomColor: tokens.gray400,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: tokens.divider,
         }}
       >
         <AppView row align="center" justify="space-between" gap={12}>
           <AppView gap={2} style={{ flex: 1 }}>
-            <AppText textVariant="bodyXs" colorName="gray400">
-              {hasItems
-                ? `Total · ${itemCount} item${itemCount === 1 ? '' : 's'}`
-                : 'Total'}
-            </AppText>
             <AppText textVariant="h3" family="heading" weight="bold">
-              {formatCurrency(totals.total)}
+              Cart
             </AppText>
-          </AppView>
-          <AppView style={{ position: 'relative' }}>
-            <AppPressableView
-              center
-              rounded={36}
-              onPress={handleTrackOrder}
-              androidRipple
-              accessibilityLabel={
-                awaitingOrders > 0
-                  ? `Track ${awaitingOrders} order${awaitingOrders === 1 ? '' : 's'} awaiting`
-                  : 'Track orders'
-              }
-              style={{
-                width: 36,
-                height: 36,
-                borderWidth: 1,
-                borderColor: tokens.border,
-                backgroundColor: scheme === 'dark' ? tokens.card : tokens.white,
-              }}
-            >
-              <Truck size={18} strokeWidth={2.2} color={tokens.text} />
-            </AppPressableView>
-            {awaitingOrders > 0 ? (
-              <AppView
-                center
-                rounded={36}
-                style={{
-                  position: 'absolute',
-                  top: -6,
-                  right: -6,
-                  minWidth: 18,
-                  height: 18,
-                  paddingHorizontal: 5,
-                  backgroundColor: scheme === 'dark' ? tokens.white : tokens.black,
-                }}
-              >
-                <AppText
-                  textVariant="bodyXs"
-                  weight="bold"
-                  style={{ color: scheme === 'dark' ? tokens.black : tokens.white }}
-                >
-                  {awaitingOrders > 99 ? '99+' : String(awaitingOrders)}
-                </AppText>
-              </AppView>
+            {hasItems ? (
+              <AppText textVariant="bodyXs" colorName="gray400">
+                {itemCount} item{itemCount === 1 ? '' : 's'}
+              </AppText>
             ) : null}
           </AppView>
+          <AppIconButton
+            Icon={Truck}
+            onPress={handleTrackOrder}
+            accessibilityLabel="Track orders"
+            backgroundColorName="card"
+            borderColorName="border"
+            colorName="text"
+          />
         </AppView>
-
-        <AppView
-          style={{ height: 0.5, backgroundColor: tokens.gray400, marginHorizontal: -16 }}
-        />
-
-        <CartSectionTabs active={section} onChange={setSection} />
       </AppView>
 
       <AppView flex={1} px={16}>
         <AppScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: showBottomBar ? 120 : 24, paddingTop: 12 }}
+          contentContainerStyle={{
+            paddingBottom: showBottomBar ? 120 : 24,
+            paddingTop: 12,
+            flexGrow: 1,
+          }}
         >
-          {section === 'cart' ? (
-            !isHydrated ? (
-              // Render nothing — the persisted cart hasn't been read yet, so
-              // showing the empty state here would flash an incorrect view.
-              null
-            ) : hasItems ? (
-              <AppView gap={12}>
-                <CartItemsSection
-                  items={items}
-                  onIncrement={incrementItem}
-                  onDecrement={decrementItem}
-                  onRemove={removeItem}
-                />
-                <CartSummary
-                  totals={totals}
-                  appliedPromo={appliedPromo}
-                  freeShippingThreshold={freeShippingThreshold}
-                  freeShippingRemaining={freeShippingRemaining}
-                  formatCurrency={formatCurrency}
-                />
-              </AppView>
-            ) : (
-              <CartEmptyState />
-            )
-          ) : null}
-
-          {section === 'lists' ? <CartListsSection /> : null}
-          {section === 'buy-again' ? <CartBuyAgainSection /> : null}
+          {!isHydrated ? null : hasItems ? (
+            <AppView gap={12}>
+              <CartItemsSection
+                items={items}
+                onIncrement={incrementItem}
+                onDecrement={decrementItem}
+                onRemove={removeItem}
+              />
+              <CartSummary
+                totals={totals}
+                appliedPromo={appliedPromo}
+                freeShippingThreshold={freeShippingThreshold}
+                freeShippingRemaining={freeShippingRemaining}
+                formatCurrency={formatCurrency}
+              />
+            </AppView>
+          ) : (
+            <CartEmptyState />
+          )}
         </AppScrollView>
       </AppView>
 
@@ -176,11 +145,11 @@ export default function CartScreen() {
           px={16}
           py={12}
           style={{
-            paddingBottom: Math.max(insets.bottom, 24)
+            paddingBottom: Math.max(insets.bottom, 24),
           }}
         >
           <AppButton
-            title="Checkout"
+            title={`Checkout · ${formatCurrency(totals.total)}`}
             kind="brand"
             weight="bold"
             size="md"

@@ -22,6 +22,10 @@ export type Toast = Required<Pick<ToastInput, 'id' | 'kind' | 'title' | 'duratio
 type ToastListener = (toasts: readonly Toast[]) => void;
 
 const DEFAULT_DURATION = 3500;
+/** Hard cap on simultaneous toasts. Beyond this, the oldest is dropped
+ *  from the queue when a new one comes in. Prevents a stream of
+ *  add-to-cart confirmations from blanketing the screen. */
+const MAX_TOASTS = 3;
 
 /**
  * Singleton bus for app-wide toasts. Designed to be callable from anywhere
@@ -63,6 +67,11 @@ class ToastService {
       ];
     } else {
       this.toasts = [...this.toasts, toast];
+    }
+    // Enforce the visible-stack cap. Without this, rapid-fire callers
+    // (e.g. tapping "Add to cart" 20 times) blanket the screen.
+    if (this.toasts.length > MAX_TOASTS) {
+      this.toasts = this.toasts.slice(-MAX_TOASTS);
     }
     this.emit();
     return id;

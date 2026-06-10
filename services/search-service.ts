@@ -1,5 +1,6 @@
 import { getCatalogMockItems, type CatalogItem } from '@/services/catalog-service';
 import type {
+  AccentTagKind,
   PriceBucket,
   RatingBucket,
   SearchFilters,
@@ -49,6 +50,17 @@ const MOCK_TYPEAHEAD_LATENCY_MS = 80;
 // will receive a sensible default (e.g. 20) from the backend.
 const DEFAULT_PAGE_SIZE = 2;
 
+/** Slots for the mock accent-tag derivation. Mirrors the rotation that
+ *  used to live in `variant.ts` so the mock transport "looks like" the
+ *  future HTTP transport. Once the backend ships `accentTagKind`, this
+ *  whole table goes away. */
+const MOCK_ACCENT_KINDS: (AccentTagKind | null)[] = [
+  'lowest_price',
+  'bestseller',
+  null,
+  null,
+];
+
 function catalogToResult(item: CatalogItem, score: number): SearchResult {
   // Deterministic pseudo-rating + review count so the mock returns
   // consistent UI values without server data. Same formula as the
@@ -56,6 +68,8 @@ function catalogToResult(item: CatalogItem, score: number): SearchResult {
   const h = hashCode(item.id);
   const rating = 3.8 + (h % 12) / 10;
   const reviewCount = 50 + (hashCode(item.id + ':r') % 5000);
+  const accentTagKind =
+    MOCK_ACCENT_KINDS[(h * 7) % MOCK_ACCENT_KINDS.length] ?? undefined;
   return {
     id: item.id,
     title: item.title,
@@ -65,6 +79,7 @@ function catalogToResult(item: CatalogItem, score: number): SearchResult {
     priceCents: parsePriceToCents(item.price),
     category: item.category,
     badge: item.badge,
+    accentTagKind,
     status: item.status,
     rating,
     reviewCount,
@@ -283,51 +298,37 @@ function makeRequestId(): string {
 }
 
 // ── HTTP stub (uncomment + drop in the singleton when wiring) ────────
-
-// export class HttpSearchTransport implements SearchTransport {
-//   constructor(
-//     private baseUrl: string,
-//     private getAuthToken: () => Promise<string | null>,
-//   ) {}
 //
-//   async search(req: SearchRequest): Promise<SearchResponse> {
-//     const token = await this.getAuthToken();
-//     const res = await fetch(`${this.baseUrl}/api/v1/search`, {
-//       method: 'POST',
-//       signal: req.signal,
-//       headers: {
-//         'Content-Type': 'application/json',
-//         ...(token ? { Authorization: `Bearer ${token}` } : {}),
-//         ...(req.requestId ? { 'X-Request-Id': req.requestId } : {}),
-//       },
-//       body: JSON.stringify({
-//         query: req.query,
-//         limit: req.limit,
-//         pageToken: req.pageToken,
-//         filters: req.filters,
-//         sortBy: req.sortBy,
-//         locale: req.locale,
-//         userId: req.userId,
-//         abVariant: req.abVariant,
-//       }),
-//     });
-//     if (!res.ok) {
-//       const message = await res.text().catch(() => res.statusText);
-//       throw new Error(`Search API ${res.status}: ${message}`);
-//     }
-//     return res.json() as Promise<SearchResponse>;
-//   }
+// Response contract notes for the backend team:
+//   - Each SearchResult MAY carry `accentTagKind` (enum: 'lowest_price'
+//     | 'bestseller'). When absent, the client falls
+//     back to its mock hash-derivation. Once production reliably emits
+//     it, the fallback in `variant.ts` can be removed.
+//   - `badge` stays as a free-text editorial string ("Top" / "New" /
+//     "Hot pick"). Localize server-side; the client renders verbatim.
+//   - `isCheapest` is NOT a server concern — it's derived client-side
+//     per visible page (it's a UI affordance, not a product attribute).
 //
-//   async typeahead(req: TypeaheadRequest): Promise<TypeaheadResponse> {
-//     const token = await this.getAuthToken();
-//     const url = `${this.baseUrl}/api/v1/typeahead?q=${encodeURIComponent(req.prefix)}&limit=${req.limit ?? 6}`;
-//     const res = await fetch(url, {
-//       signal: req.signal,
-//       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-//     });
-//     if (!res.ok) throw new Error(`Typeahead API ${res.status}`);
-//     return res.json() as Promise<TypeaheadResponse>;
-//   }
-// }
+// See `text/07-search-row-signals-and-api.md` for the full design.
 
-export const searchTransport: SearchTransport = new MockSearchTransport();
+import { shouldUseHttpTransport } from '@/config/api';
+import { apiClient } from '@/services/api-client';
+
+export class HttpSearchTransport implements SearchTransport {
+  search(req: SearchRequest): Promise<SearchResponse> {
+    const { signal, requestId, ...body } = req;
+    return apiClient.post<SearchResponse>('/api/v1/search', body, {
+      signal,
+      headers: requestId ? { 'X-Request-Id': requestId } : undefined,
+    });
+  }
+
+  typeahead(req: TypeaheadRequest): Promise<TypeaheadResponse> {
+    const path = `/api/v1/typeahead?q=${encodeURIComponent(req.prefix)}&limit=${req.limit ?? 6}`;
+    return apiClient.get<TypeaheadResponse>(path, { signal: req.signal });
+  }
+}
+
+export const searchTransport: SearchTransport = shouldUseHttpTransport()
+  ? new HttpSearchTransport()
+  : new MockSearchTransport();

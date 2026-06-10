@@ -1,8 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Eye, EyeOff } from 'lucide-react-native';
+import { Apple, ArrowLeft, Globe, Eye, EyeOff } from 'lucide-react-native';
+import type { ComponentType } from 'react';
 import { useMemo, useState } from 'react';
 
-import AppBlurView, { useBlurHeaderInset } from '@/components/shared/app-blur-view';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppButton } from '@/components/shared/app-button';
 import { AppText } from '@/components/shared/app-text';
 import AppTextField from '@/components/shared/app-text-field';
@@ -13,7 +14,6 @@ import { useUserContext } from '@/contexts/user.context';
 import { useToast } from '@/hooks/use-toast';
 import { triggerHaptic } from '@/utils/haptics';
 
-const HEADER_HEIGHT = 56;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export type AuthMode = 'login' | 'signup';
@@ -26,11 +26,11 @@ type FieldErrors = Partial<Record<'name' | 'email' | 'password' | 'confirm', str
 
 export default function AuthScreen({ mode }: AuthScreenProps) {
   const { tokens, scheme } = useThemeContext();
-  const { signInWithMock } = useUserContext();
+  const { signIn, signUp } = useUserContext();
   const toast = useToast();
   // peek=0 so the first content row sits flush below the header instead of
   // scrolling underneath — this screen is short and doesn't need the peek effect.
-  const topInset = useBlurHeaderInset(HEADER_HEIGHT, 0);
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ next?: string }>();
 
   const [name, setName] = useState('');
@@ -68,7 +68,7 @@ export default function AuthScreen({ mode }: AuthScreenProps) {
     return Object.keys(next).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (submitting) return;
     if (!validate()) {
       triggerHaptic('error');
@@ -76,11 +76,20 @@ export default function AuthScreen({ mode }: AuthScreenProps) {
     }
     triggerHaptic('selection');
     setSubmitting(true);
-    setTimeout(() => {
-      signInWithMock();
+    try {
+      if (isSignup) {
+        // Split "Full Name" into first / last on first whitespace. Backend
+        // doesn't get the raw name — keeps the contract clean.
+        const trimmed = name.trim();
+        const sep = trimmed.indexOf(' ');
+        const firstName = sep === -1 ? trimmed : trimmed.slice(0, sep);
+        const lastName = sep === -1 ? '' : trimmed.slice(sep + 1).trim();
+        await signUp({ email: email.trim(), password, firstName, lastName });
+      } else {
+        await signIn({ email: email.trim(), password });
+      }
       triggerHaptic('success');
       toast.success(isSignup ? 'Welcome aboard' : 'Welcome back');
-      setSubmitting(false);
       const next = params.next;
       if (typeof next === 'string' && next.startsWith('/')) {
         router.replace(next as never);
@@ -89,7 +98,15 @@ export default function AuthScreen({ mode }: AuthScreenProps) {
       } else {
         router.replace('/explore');
       }
-    }, 900);
+    } catch (err) {
+      triggerHaptic('error');
+      toast.danger(
+        isSignup ? 'Could not create your account' : 'Could not sign you in',
+        { description: err instanceof Error ? err.message : undefined },
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleSocial = (provider: 'apple' | 'google') => {
@@ -113,13 +130,47 @@ export default function AuthScreen({ mode }: AuthScreenProps) {
 
   return (
     <AppView flex={1} colorName="background">
+      {/* In-flow header (replaces the AppBlurView overlay). Sits above
+       *  the scroll/keyboard controller so content doesn't pass under it. */}
+      <AppView
+        colorName="background"
+        style={{
+          paddingTop: insets.top,
+          borderBottomWidth: 1,
+          borderBottomColor: tokens.divider,
+        }}
+      >
+        <AppView row align="center" justify="space-between" px={16} pt={8} pb={12}>
+          <AppPressableView
+            center
+            rounded={36}
+            onPress={handleClose}
+            androidRipple
+            accessibilityLabel="Close"
+            style={{
+              width: 36,
+              height: 36,
+              borderWidth: 1,
+              borderColor: tokens.border,
+              backgroundColor: scheme === 'dark' ? tokens.card : tokens.white,
+            }}
+          >
+            <ArrowLeft size={18} strokeWidth={2.2} color={tokens.text} />
+          </AppPressableView>
+          <AppText textVariant="bodySm" weight="semibold">
+            {isSignup ? 'Sign up' : 'Log in'}
+          </AppText>
+          <AppView style={{ width: 36 }} />
+        </AppView>
+      </AppView>
+
       <AppKeyboardController
         showToolbar={false}
         offset={isSignup ? 220 : 140}
         horizontalPadding={20}
         fillContainer
         kStyle={{
-          paddingTop: topInset + 8,
+          paddingTop: 8,
           paddingBottom: 24,
           gap: isSignup ? 12 : 18,
         }}
@@ -143,19 +194,19 @@ export default function AuthScreen({ mode }: AuthScreenProps) {
         {/* Social — side-by-side on signup to save vertical space */}
         {isSignup ? (
           <AppView row gap={8}>
-            <SocialButton label="Apple" glyph="" compact onPress={() => handleSocial('apple')} />
-            <SocialButton label="Google" glyph="G" compact onPress={() => handleSocial('google')} />
+            <SocialButton label="Apple" Icon={Apple} compact onPress={() => handleSocial('apple')} />
+            <SocialButton label="Google" Icon={Globe} compact onPress={() => handleSocial('google')} />
           </AppView>
         ) : (
           <AppView gap={10}>
             <SocialButton
               label="Continue with Apple"
-              glyph=""
+              Icon={Apple}
               onPress={() => handleSocial('apple')}
             />
             <SocialButton
               label="Continue with Google"
-              glyph="G"
+              Icon={Globe}
               onPress={() => handleSocial('google')}
             />
           </AppView>
@@ -303,69 +354,44 @@ export default function AuthScreen({ mode }: AuthScreenProps) {
         </AppView>
       </AppKeyboardController>
 
-      <AppBlurView contentHeight={HEADER_HEIGHT}>
-        <AppView row align="center" justify="space-between" px={16} pt={8} pb={12}>
-          <AppPressableView
-            center
-            rounded={36}
-            onPress={handleClose}
-            androidRipple
-            accessibilityLabel="Close"
-            style={{
-              width: 36,
-              height: 36,
-              borderWidth: 1,
-              borderColor: tokens.border,
-              backgroundColor: scheme === 'dark' ? tokens.card : tokens.white,
-            }}
-          >
-            <ArrowLeft size={18} strokeWidth={2.2} color={tokens.text} />
-          </AppPressableView>
-          <AppText textVariant="bodySm" weight="semibold">
-            {isSignup ? 'Sign up' : 'Log in'}
-          </AppText>
-          <AppView style={{ width: 36 }} />
-        </AppView>
-      </AppBlurView>
     </AppView>
   );
 }
 
 function SocialButton({
   label,
-  glyph,
+  Icon,
   compact,
   onPress,
 }: {
   label: string;
-  glyph: string;
+  Icon: ComponentType<{ size?: number; strokeWidth?: number; color?: string }>;
   compact?: boolean;
   onPress: () => void;
 }) {
   const { tokens, scheme } = useThemeContext();
+  const isDark = scheme === 'dark';
   return (
     <AppPressableView
       onPress={onPress}
+      row
+      align="center"
+      justify="center"
+      gap={10}
       androidRipple
       style={{
         flex: compact ? 1 : undefined,
         borderRadius: 14,
         borderWidth: 1,
         borderColor: tokens.border,
-        paddingVertical: compact ? 10 : 14,
-        backgroundColor: scheme === 'dark' ? tokens.gray200 : tokens.gray100,
+        paddingVertical: compact ? 12 : 14,
+        backgroundColor: isDark ? tokens.card : tokens.white,
       }}
     >
-      <AppView row align="center" justify="center" gap={8}>
-        {glyph ? (
-          <AppText weight="bold" style={{ color: tokens.text }}>
-            {glyph}
-          </AppText>
-        ) : null}
-        <AppText weight="semibold" style={{ color: tokens.text }}>
-          {label}
-        </AppText>
-      </AppView>
+      <Icon size={17} strokeWidth={2.2} color={tokens.text} />
+      <AppText weight="semibold" style={{ color: tokens.text }}>
+        {label}
+      </AppText>
     </AppPressableView>
   );
 }

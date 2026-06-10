@@ -8,14 +8,23 @@ export type ResultsLoadingProps = {
   query: string;
 };
 
-/** Initial loading state: a label plus a stack of shimmer skeleton rows. */
+/** Initial loading state: a label plus a stack of shimmer skeleton rows.
+ *
+ *  Padding matches the success list — `paddingHorizontal: 0` so the
+ *  skeleton cards sit edge-to-edge, identical to the real rows. The
+ *  only horizontal padding belongs to the "Searching for…" label,
+ *  which sits inside the regular text gutter. */
 export default function ResultsLoading({ query }: ResultsLoadingProps) {
   return (
-    <AppView gap={10} px={16}>
-      <AppText textVariant="bodyXs" colorName="gray400">
+    <AppView gap={10}>
+      <AppText
+        textVariant="bodyXs"
+        colorName="gray400"
+        style={{ paddingHorizontal: 16 }}
+      >
         Searching for “{query.trim()}”…
       </AppText>
-      <AppView gap={14}>
+      <AppView gap={16}>
         {Array.from({ length: SKELETON_ROWS }).map((_, i) => (
           <SearchResultSkeleton key={i} />
         ))}

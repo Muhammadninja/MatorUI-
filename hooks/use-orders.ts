@@ -1,0 +1,249 @@
+/**
+ * Orders React glue — all read hooks back React Query, mutations stay
+ * imperative for now (createOrder side-effects: cart clear, navigation).
+ */
+import { useCallback, useMemo, useState } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+
+import {
+  ordersTransport,
+  type OrderListRequest,
+  type ShippingQuoteRequest,
+} from '@/services/orders-api';
+import type {
+  Address,
+  CreateOrderInput,
+  CreateOrderResult,
+  OrderDetail,
+  OrderListPage,
+  PaymentMethod,
+  ShippingOption,
+} from '@/services/orders-service';
+
+// ── Query keys ─────────────────────────────────────────────────────────
+
+export const ordersQueryKeys = {
+  list: (req: OrderListRequest) =>
+    ['orders', 'list', req.page, req.pageSize, req.status] as const,
+  detail: (id: string) => ['orders', 'detail', id] as const,
+  addresses: () => ['account', 'addresses'] as const,
+  paymentMethods: () => ['account', 'payment-methods'] as const,
+  shippingQuote: (req: ShippingQuoteRequest) =>
+    ['shipping', 'quote', req.addressId, req.subtotal] as const,
+};
+
+// ── useOrders (list) ───────────────────────────────────────────────────
+
+export type OrderListState = 'idle' | 'loading' | 'success' | 'empty' | 'error';
+
+export type UseOrdersValue = {
+  state: OrderListState;
+  page: OrderListPage | null;
+  error: string | null;
+  refresh: () => void;
+};
+
+const DEFAULT_LIST_REQUEST: OrderListRequest = { page: 1, pageSize: 20 };
+
+export function useOrders(request: OrderListRequest = DEFAULT_LIST_REQUEST): UseOrdersValue {
+  const query = useQuery({
+    queryKey: ordersQueryKeys.list(request),
+    queryFn: ({ signal }) => ordersTransport.listOrders(request, signal),
+  });
+
+  return useMemo<UseOrdersValue>(() => {
+    let state: OrderListState;
+    if (query.isPending) state = 'loading';
+    else if (query.isError) state = 'error';
+    else if ((query.data?.items.length ?? 0) === 0) state = 'empty';
+    else state = 'success';
+
+    return {
+      state,
+      page: query.data ?? null,
+      error: query.error instanceof Error ? query.error.message : null,
+      refresh: () => {
+        void query.refetch();
+      },
+    };
+  }, [query]);
+}
+
+// ── useOrder (detail) ──────────────────────────────────────────────────
+
+export type OrderDetailState = 'idle' | 'loading' | 'success' | 'not_found' | 'error';
+
+export type UseOrderValue = {
+  state: OrderDetailState;
+  order: OrderDetail | null;
+  error: string | null;
+  refresh: () => void;
+};
+
+export function useOrder(orderId: string | null | undefined): UseOrderValue {
+  const query = useQuery({
+    queryKey: orderId ? ordersQueryKeys.detail(orderId) : ['orders', 'detail', 'disabled'],
+    queryFn: ({ signal }) => ordersTransport.getOrder(orderId as string, signal),
+    enabled: !!orderId,
+  });
+
+  return useMemo<UseOrderValue>(() => {
+    let state: OrderDetailState;
+    if (!orderId) state = 'idle';
+    else if (query.isPending) state = 'loading';
+    else if (query.isError) state = 'error';
+    else if (!query.data) state = 'not_found';
+    else state = 'success';
+
+    return {
+      state,
+      order: query.data ?? null,
+      error: query.error instanceof Error ? query.error.message : null,
+      refresh: () => {
+        void query.refetch();
+      },
+    };
+  }, [orderId, query]);
+}
+
+// ── useCreateOrder (mutation) ──────────────────────────────────────────
+
+export type CreateOrderPhase = 'idle' | 'placing' | 'success' | 'error';
+
+export type UseCreateOrderValue = {
+  phase: CreateOrderPhase;
+  error: string | null;
+  result: CreateOrderResult | null;
+  placeOrder: (input: CreateOrderInput) => Promise<CreateOrderResult | null>;
+  reset: () => void;
+};
+
+export function useCreateOrder(): UseCreateOrderValue {
+  const [result, setResult] = useState<CreateOrderResult | null>(null);
+
+  const mutation = useMutation({
+    mutationFn: (input: CreateOrderInput) => ordersTransport.createOrder(input),
+    onSuccess: (r) => setResult(r),
+  });
+
+  const phase: CreateOrderPhase = mutation.isPending
+    ? 'placing'
+    : mutation.isError
+      ? 'error'
+      : mutation.isSuccess
+        ? 'success'
+        : 'idle';
+
+  const placeOrder = useCallback(
+    async (input: CreateOrderInput): Promise<CreateOrderResult | null> => {
+      try {
+        return await mutation.mutateAsync(input);
+      } catch {
+        return null;
+      }
+    },
+    [mutation],
+  );
+
+  const reset = useCallback(() => {
+    mutation.reset();
+    setResult(null);
+  }, [mutation]);
+
+  return useMemo<UseCreateOrderValue>(
+    () => ({
+      phase,
+      error: mutation.error instanceof Error ? mutation.error.message : null,
+      result,
+      placeOrder,
+      reset,
+    }),
+    [phase, mutation.error, result, placeOrder, reset],
+  );
+}
+
+// ── useAddresses / usePaymentMethods (read-only collections) ───────────
+
+type CollectionState = 'idle' | 'loading' | 'success' | 'error';
+
+export type CollectionValue<T> = {
+  state: CollectionState;
+  items: T[];
+  error: string | null;
+  refresh: () => void;
+};
+
+export function useAddresses(): CollectionValue<Address> {
+  const query = useQuery({
+    queryKey: ordersQueryKeys.addresses(),
+    queryFn: ({ signal }) => ordersTransport.listAddresses(signal),
+  });
+
+  return useMemo<CollectionValue<Address>>(
+    () => ({
+      state: query.isPending ? 'loading' : query.isError ? 'error' : 'success',
+      items: query.data ?? [],
+      error: query.error instanceof Error ? query.error.message : null,
+      refresh: () => {
+        void query.refetch();
+      },
+    }),
+    [query],
+  );
+}
+
+export function usePaymentMethods(): CollectionValue<PaymentMethod> {
+  const query = useQuery({
+    queryKey: ordersQueryKeys.paymentMethods(),
+    queryFn: ({ signal }) => ordersTransport.listPaymentMethods(signal),
+  });
+
+  return useMemo<CollectionValue<PaymentMethod>>(
+    () => ({
+      state: query.isPending ? 'loading' : query.isError ? 'error' : 'success',
+      items: query.data ?? [],
+      error: query.error instanceof Error ? query.error.message : null,
+      refresh: () => {
+        void query.refetch();
+      },
+    }),
+    [query],
+  );
+}
+
+// ── useShippingQuote (depends on subtotal + address) ───────────────────
+
+export type UseShippingQuoteValue = {
+  state: CollectionState;
+  options: ShippingOption[];
+  error: string | null;
+  refresh: () => void;
+};
+
+export function useShippingQuote(request: ShippingQuoteRequest | null): UseShippingQuoteValue {
+  const query = useQuery({
+    queryKey: request
+      ? ordersQueryKeys.shippingQuote(request)
+      : ['shipping', 'quote', 'disabled'],
+    queryFn: ({ signal }) => ordersTransport.getShippingQuote(request as ShippingQuoteRequest, signal),
+    enabled: !!request,
+  });
+
+  return useMemo<UseShippingQuoteValue>(
+    () => ({
+      state: !request
+        ? 'idle'
+        : query.isPending
+          ? 'loading'
+          : query.isError
+            ? 'error'
+            : 'success',
+      options: query.data ?? [],
+      error: query.error instanceof Error ? query.error.message : null,
+      refresh: () => {
+        void query.refetch();
+      },
+    }),
+    [request, query],
+  );
+}

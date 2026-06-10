@@ -40,6 +40,10 @@ export type TopFeaturedItem = {
   brand: string;
   color: string;
   condition: string;
+  /** Product image URLs. Optional so the contract is ready before the
+   *  backend ships URLs; UI falls back to a placeholder when absent or
+   *  empty. */
+  images?: string[];
 };
 
 export type TopFeaturedFilterOptionPayload = {
@@ -60,6 +64,9 @@ export type TopFeaturedListRequest = {
   filters: Partial<Record<TopFeaturedFilterKey, string>>;
   search?: string | null;
   sortBy?: 'featured' | 'newest' | 'price_asc' | 'price_desc';
+  /** Cancellation token. Mock transport honors it by aborting the
+   *  simulated delay; HTTP transport must pass it to fetch(). */
+  signal?: AbortSignal;
 };
 
 export type TopFeaturedListResponse = {
@@ -181,4 +188,85 @@ export function getTopFeaturedMockResponse(filters: TopFeaturedFilters): TopFeat
       })),
     })),
   };
+}
+
+// ── API Functions (replace mock calls when backend is ready) ─────────
+
+const API_BASE = '/api/v1/top-featured';
+const MOCK_LATENCY_MS = 320;
+
+/** Same delay helper pattern as the catalog service — promise that
+ *  resolves after `ms` ms but rejects with AbortError if `signal` aborts
+ *  in the interim. Mirrors what real fetch() does so loading + abort
+ *  paths are testable against the mock. */
+function delay(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(resolve, ms);
+    if (signal) {
+      const onAbort = () => {
+        clearTimeout(t);
+        reject(new DOMException('Aborted', 'AbortError'));
+      };
+      if (signal.aborted) onAbort();
+      else signal.addEventListener('abort', onAbort, { once: true });
+    }
+  });
+}
+
+// ── Transport ────────────────────────────────────────────────────────
+
+import { shouldUseHttpTransport } from '@/config/api';
+import { apiClient } from '@/services/api-client';
+
+export interface TopFeaturedTransport {
+  list(request: TopFeaturedListRequest): Promise<TopFeaturedListResponse>;
+}
+
+class MockTopFeaturedTransport implements TopFeaturedTransport {
+  async list(request: TopFeaturedListRequest): Promise<TopFeaturedListResponse> {
+    await delay(MOCK_LATENCY_MS, request.signal);
+    // Reuse the filter math from getTopFeaturedMockResponse, but build
+    // it from the request directly (not from a TopFeaturedFilters map)
+    // so the contract aligns with how HTTP will hand us the request.
+    const items = getTopFeaturedMockItems().filter((item) => {
+      return Object.entries(request.filters).every(([key, value]) => {
+        if (!value) return true;
+        return item[key as TopFeaturedFilterKey] === value;
+      });
+    });
+    return {
+      items,
+      total: items.length,
+      page: request.page,
+      pageSize: request.pageSize,
+      snapshotVersion: 'mock-snapshot-v1',
+      socketChannel: TOP_FEATURED_SOCKET_CHANNEL,
+      availableFilters: TOP_FEATURED_FILTER_GROUPS.map((group) => ({
+        key: group.key,
+        title: group.title,
+        options: group.options.map((option) => ({
+          value: option,
+          label: option,
+        })),
+      })),
+    };
+  }
+}
+
+class HttpTopFeaturedTransport implements TopFeaturedTransport {
+  list(request: TopFeaturedListRequest): Promise<TopFeaturedListResponse> {
+    const { signal, ...body } = request;
+    return apiClient.post<TopFeaturedListResponse>(`${API_BASE}/list`, body, { signal });
+  }
+}
+
+export const topFeaturedTransport: TopFeaturedTransport = shouldUseHttpTransport()
+  ? new HttpTopFeaturedTransport()
+  : new MockTopFeaturedTransport();
+
+// Back-compat facade — existing callers keep working.
+export function fetchTopFeaturedList(
+  request: TopFeaturedListRequest,
+): Promise<TopFeaturedListResponse> {
+  return topFeaturedTransport.list(request);
 }

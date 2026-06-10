@@ -12,7 +12,9 @@ type ProfileSectionCardProps = {
   items: ProfileSectionItem[];
 };
 
-const SECTION_RADIUS = 24;
+// Locked to the screen-wide radius scale (16 / 8 / full). Matches the
+// hero card, payment carousel, and guest welcome.
+const SECTION_RADIUS = 16;
 
 export default function ProfileSectionCard({ title, subtitle, items }: ProfileSectionCardProps) {
   return (

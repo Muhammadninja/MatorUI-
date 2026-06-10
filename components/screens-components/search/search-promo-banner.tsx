@@ -1,62 +1,162 @@
+import { router } from 'expo-router';
+import { ArrowUpRight, Sparkles, Tag } from 'lucide-react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
+
+import AppImage from '@/components/shared/app-image';
+import { AppText } from '@/components/shared/app-text';
+import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
-import { AppButton } from '../../shared/app-button';
-import { AppText } from '../../shared/app-text';
-import { AppView } from '../../shared/app-view';
+import { triggerHaptic } from '@/utils/haptics';
+
+/**
+ * Promo / campaign banner slot on the explore landing.
+ *
+ * Mock data while the campaigns backend is being wired — when the
+ * `usePromoCampaigns()` hook lands, swap the constant below for a call
+ * to it and pull every field (`headline`, `body`, `imageUrl`, `href`,
+ * `accentLabel`) from the live response.
+ */
+const MOCK_CAMPAIGN = {
+  accentLabel: 'Limited drop',
+  headline: 'Save up to 28% on suspension upgrades',
+  body: 'Curated KW, Bilstein, and Öhlins kits ready for your build — free shipping over $500.',
+  ctaLabel: 'Shop the deals',
+  imageSeed: 'matorui-suspension-promo',
+  href: '/item-detail/mator-elite',
+};
 
 export default function SearchPromoBanner() {
-  const { scheme, tokens } = useThemeContext();
+  const { tokens, scheme } = useThemeContext();
+  const isDark = scheme === 'dark';
+
+  const handlePress = () => {
+    triggerHaptic('selection');
+    router.push(MOCK_CAMPAIGN.href as never);
+  };
 
   return (
-    <AppView mt={18} px={16}>
-      <AppView
-        rounded={28}
-        px={18}
-        py={18}
-        gap={14}
-        style={{
-          backgroundColor: scheme === 'dark' ? tokens.backgroundSecondary : tokens.gray100,
+    <AppView px={16} pt={16}>
+      <Pressable
+        onPress={handlePress}
+        accessibilityRole="button"
+        accessibilityLabel={`${MOCK_CAMPAIGN.headline}. ${MOCK_CAMPAIGN.ctaLabel}.`}
+        style={({ pressed }) => ({
+          borderRadius: 20,
+          overflow: 'hidden',
           borderWidth: 1,
-          borderColor: scheme === 'dark' ? tokens.gray400 : tokens.gray200,
-        }}
+          borderColor: tokens.border,
+          backgroundColor: tokens.card,
+          transform: [{ scale: pressed ? 0.985 : 1 }],
+          opacity: pressed ? 0.95 : 1,
+          ...Platform.select({
+            ios: {
+              shadowColor: '#000000',
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: isDark ? 0.28 : 0.08,
+              shadowRadius: 18,
+            },
+            android: { elevation: 6 },
+          }),
+        })}
       >
-        <AppView row align="center" justify="space-between" gap={12}>
-          <AppView px={10} py={6} rounded={36} style={{ backgroundColor: tokens.secondary }}>
-            <AppText textVariant="bodyXs" weight="semibold" colorName="onSecondary">
-              Advertisement
-            </AppText>
-          </AppView>
-          <AppText textVariant="bodyXs" colorName="gray400">
-            Sponsored placement
-          </AppText>
-        </AppView>
+        <View style={{ flexDirection: 'row', height: 148 }}>
+          {/* Imagery — uses the picsum seed for variety until real
+           *  campaign artwork lands. Absolute fill so it follows the
+           *  row height instead of pushing it to the source's intrinsic
+           *  dimensions. */}
+          <View style={{ width: 124, position: 'relative' }}>
+            <AppImage
+              source={{
+                uri: `https://picsum.photos/seed/${MOCK_CAMPAIGN.imageSeed}/320/360`,
+              }}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              alt={MOCK_CAMPAIGN.headline}
+            />
+            {/* Brand tint overlay keeps the imagery feeling like a
+             *  controlled marketing surface rather than stock photo. */}
+            <View
+              pointerEvents="none"
+              style={[
+                StyleSheet.absoluteFill,
+                { backgroundColor: `${tokens.brand}1F` },
+              ]}
+            />
+          </View>
 
-        <AppView row align="center" justify="space-between" gap={14}>
-          <AppView gap={6} style={{ flex: 1 }}>
-            <AppText textVariant="title" family="heading">
-              Summer Upgrade Deals
-            </AppText>
-            <AppText textVariant="bodySm" colorName="gray400">
-              Reserve this area for campaign banners, promos, or marketplace ads.
-            </AppText>
-          </AppView>
+          <View style={{ flex: 1, paddingVertical: 14, paddingHorizontal: 14, gap: 8 }}>
+            <View
+              style={{
+                alignSelf: 'flex-start',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                paddingHorizontal: 8,
+                paddingVertical: 4,
+                borderRadius: 999,
+                backgroundColor: `${tokens.brand}1F`,
+                borderWidth: 1,
+                borderColor: `${tokens.brand}40`,
+              }}
+            >
+              <Sparkles size={10} strokeWidth={2.4} color={tokens.brand} />
+              <AppText
+                textVariant="caption"
+                weight="bold"
+                style={{
+                  color: tokens.brand,
+                  letterSpacing: 0.4,
+                  lineHeight: 12,
+                  includeFontPadding: false,
+                }}
+              >
+                {MOCK_CAMPAIGN.accentLabel}
+              </AppText>
+            </View>
 
-          <AppView
-            rounded={20}
-            style={{
-              width: 84,
-              height: 84,
-              backgroundColor: scheme === 'dark' ? tokens.card : tokens.white,
-              borderWidth: 1,
-              borderColor: tokens.border,
-            }}
-          />
-        </AppView>
+            <AppText
+              textVariant="bodySemibold"
+              family="heading"
+              weight="bold"
+              numberOfLines={2}
+              style={{ lineHeight: 20 }}
+            >
+              {MOCK_CAMPAIGN.headline}
+            </AppText>
+            <AppText
+              textVariant="bodyXs"
+              colorName="gray400"
+              numberOfLines={1}
+              style={{ lineHeight: 16 }}
+            >
+              {MOCK_CAMPAIGN.body}
+            </AppText>
 
-        <AppView row gap={10}>
-          <AppButton title="Explore" kind="secondary" size="sm" />
-          <AppButton title="Learn more" variant="outline" kind="secondary" size="sm" />
-        </AppView>
-      </AppView>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                marginTop: 2,
+              }}
+            >
+              <Tag size={11} strokeWidth={2.4} color={tokens.brand} />
+              <AppText
+                textVariant="caption"
+                weight="semibold"
+                style={{
+                  color: tokens.brand,
+                  lineHeight: 14,
+                  includeFontPadding: false,
+                }}
+              >
+                {MOCK_CAMPAIGN.ctaLabel}
+              </AppText>
+              <ArrowUpRight size={11} strokeWidth={2.4} color={tokens.brand} />
+            </View>
+          </View>
+        </View>
+      </Pressable>
     </AppView>
   );
 }

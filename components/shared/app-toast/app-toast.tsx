@@ -1,4 +1,4 @@
-import { CheckCircle2, Info, XCircle } from 'lucide-react-native';
+import { CheckCircle2, Info, X, XCircle } from 'lucide-react-native';
 import { memo, useEffect, useMemo, useRef } from 'react';
 import { Animated, Easing, Platform, Pressable, StyleSheet, View } from 'react-native';
 
@@ -152,6 +152,22 @@ function AppToastImpl({ toast, onDismiss }: AppToastProps) {
               </AppText>
             </Pressable>
           ) : null}
+
+          {/* Explicit dismiss control. The whole card is also tappable to
+           *  dismiss (outer Pressable), but the X gives users a clear
+           *  affordance — important when toasts stack and tapping the
+           *  card body might feel ambiguous. */}
+          <Pressable
+            onPress={handleDismiss}
+            hitSlop={8}
+            accessibilityLabel="Dismiss"
+            style={({ pressed }) => [
+              styles.dismissButton,
+              { opacity: pressed ? 0.5 : 1 },
+            ]}
+          >
+            <X size={16} strokeWidth={2.4} color={tokens.gray400} />
+          </Pressable>
         </AppView>
       </Pressable>
     </Animated.View>
@@ -185,5 +201,11 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 999,
     borderWidth: 1,
+  },
+  dismissButton: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

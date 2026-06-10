@@ -1,76 +1,67 @@
 /**
- * UserContext — profile data layer.
+ * UserContext — auth + profile data layer.
  *
- * Replace the `MOCK_PROFILE` constant and the stub implementations of
- * `refreshProfile` / `updateProfile` with real API calls once the backend
- * endpoints are available. All consumers already handle `isLoading` and
- * `error` states so the UI will respond automatically.
+ * On mount: hydrates any persisted session from SecureStore, populates
+ * the in-memory cache that `getAuthToken()` reads, then fetches `/me`
+ * if a token is present.
  *
- * Expected API contract (see search-api-spec.txt for search endpoints):
- *   GET  /api/v1/me               → UserProfile
- *   PATCH /api/v1/me              → UserProfile  (partial update)
+ * Sign in / sign up go through `authTransport`; the resulting access +
+ * refresh tokens are stored in SecureStore so subsequent app launches
+ * skip the auth screens.
+ *
+ * 401 hook: any HTTP transport that gets a 401 invokes the registered
+ * handler, which attempts a single refresh; on refresh failure the user
+ * is signed out and routed to /auth.
  */
 
+import { router } from 'expo-router';
 import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
   type PropsWithChildren,
 } from 'react';
 
+import { setUnauthorizedHandler } from '@/services/api-client';
+import {
+  authTransport,
+  type SignInInput,
+  type SignUpInput,
+  type UserSummary,
+} from '@/services/auth-api';
+import {
+  clearAuthSession,
+  loadAuthSession,
+  saveAuthSession,
+  setCurrentSession,
+  getCurrentSession,
+  type AuthSession,
+} from '@/services/auth-storage';
+import { userTransport } from '@/services/user-api';
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type UserProfile = {
-  /** UUID from the backend */
-  id: string;
-  firstName: string;
-  lastName: string;
-  /** @example "m.abdullaev" */
-  username: string;
-  email: string;
-  /** Optional short bio shown on profile */
-  bio?: string;
-  /** Fully-qualified URL to the avatar image, or null if none */
-  avatarUrl?: string | null;
-  isPremium: boolean;
-  /** ISO 8601 date string */
-  memberSince: string;
-};
+export type UserProfile = UserSummary;
 
 type UserContextValue = {
   profile: UserProfile | null;
   isAuthenticated: boolean;
   /** Stable opaque ID assigned to unauthenticated sessions for support / analytics. */
   guestId: string;
+  /** True during the initial cold-boot hydrate from SecureStore + /me fetch. */
+  isHydrating: boolean;
+  /** True during a sign-in / sign-up / refresh-profile in-flight call. */
   isLoading: boolean;
   error: string | null;
-  /** Re-fetch the profile from the API */
   refreshProfile: () => Promise<void>;
-  /**
-   * Apply a partial update to the profile.
-   * Optimistically updates local state; rolls back on failure.
-   */
   updateProfile: (patch: Partial<Omit<UserProfile, 'id' | 'memberSince'>>) => Promise<void>;
-  /** Dev-only helpers to flip between guest and signed-in until real auth lands. */
-  signInWithMock: () => void;
-  signOut: () => void;
-};
-
-// ─── Mock data (remove when real API is wired) ───────────────────────────────
-
-const MOCK_PROFILE: UserProfile = {
-  id: 'usr_mock_001',
-  firstName: 'Muhammad',
-  lastName: 'Abdullaev',
-  username: 'm.abdullaev',
-  email: 'muhammad@example.com',
-  bio: 'Car enthusiast and performance parts collector.',
-  avatarUrl: null,
-  isPremium: true,
-  memberSince: '2024-03-15T00:00:00Z',
+  signIn: (input: SignInInput) => Promise<void>;
+  signUp: (input: SignUpInput) => Promise<void>;
+  signOut: () => Promise<void>;
 };
 
 // ─── Context ─────────────────────────────────────────────────────────────────
@@ -88,32 +79,74 @@ function makeGuestId(): string {
 }
 
 export function UserProvider({ children }: PropsWithChildren) {
-  // Default to guest. Flip to MOCK_PROFILE via signInWithMock() during dev,
-  // or wire real auth into setProfile when the backend is ready.
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [isHydrating, setIsHydrating] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Stable for the lifetime of the provider; persists across re-renders.
   const guestIdRef = useRef<string>(makeGuestId());
 
-  const signInWithMock = useCallback(() => {
-    setProfile(MOCK_PROFILE);
+  // Atomically swap the persisted session: SecureStore + in-memory cache.
+  const persistSession = useCallback(async (session: AuthSession | null) => {
+    setCurrentSession(session);
+    if (session) await saveAuthSession(session);
+    else await clearAuthSession();
   }, []);
 
-  const signOut = useCallback(() => {
+  const signOut = useCallback(async () => {
+    const existing = getCurrentSession();
     setProfile(null);
-  }, []);
+    await persistSession(null);
+    // Best-effort revocation — don't block the sign-out UX on it.
+    if (existing) {
+      authTransport.signOut(existing.refreshToken).catch(() => undefined);
+    }
+  }, [persistSession]);
+
+  const signIn = useCallback(
+    async (input: SignInInput) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const result = await authTransport.signIn(input);
+        await persistSession(result.session);
+        setProfile(result.user);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Sign-in failed.');
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [persistSession],
+  );
+
+  const signUp = useCallback(
+    async (input: SignUpInput) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const result = await authTransport.signUp(input);
+        await persistSession(result.session);
+        setProfile(result.user);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Sign-up failed.');
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [persistSession],
+  );
 
   const refreshProfile = useCallback(async () => {
+    if (!getCurrentSession()) return;
     setIsLoading(true);
     setError(null);
     try {
-      // TODO: replace with real API call
-      // const data = await apiClient.get<UserProfile>('/api/v1/me');
-      // setProfile(data);
-      await Promise.resolve(); // no-op until API is ready
+      const me = await userTransport.getMe();
+      setProfile(me);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load profile');
+      setError(err instanceof Error ? err.message : 'Failed to load profile.');
     } finally {
       setIsLoading(false);
     }
@@ -126,31 +159,105 @@ export function UserProvider({ children }: PropsWithChildren) {
       // Optimistic update
       setProfile((prev) => (prev ? { ...prev, ...patch } : prev));
       try {
-        // TODO: replace with real API call
-        // await apiClient.patch('/api/v1/me', patch);
-        await Promise.resolve(); // no-op until API is ready
+        const updated = await userTransport.updateMe(patch);
+        setProfile(updated);
       } catch (err) {
-        // Roll back on failure
         setProfile(previous);
-        setError(err instanceof Error ? err.message : 'Failed to update profile');
+        setError(err instanceof Error ? err.message : 'Failed to update profile.');
+        throw err;
       }
     },
     [profile],
   );
+
+  // ── Hydration on mount ──────────────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const session = await loadAuthSession();
+      if (cancelled) return;
+      setCurrentSession(session);
+      if (session) {
+        try {
+          const me = await userTransport.getMe();
+          if (!cancelled) setProfile(me);
+        } catch {
+          // If `/me` fails on cold boot (network, expired token), drop
+          // the session — the user lands on the guest experience and
+          // can sign in again.
+          if (!cancelled) {
+            await persistSession(null);
+          }
+        }
+      }
+      if (!cancelled) setIsHydrating(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [persistSession]);
+
+  // ── 401 handler wired into apiClient ─────────────────────────────────
+  //
+  // Attempts ONE refresh against the current refresh token. On failure
+  // signs the user out and routes to /sign-in. Concurrent 401s during
+  // the refresh are coalesced via the `refreshInFlight` ref.
+  const refreshInFlightRef = useRef<Promise<boolean> | null>(null);
+  useEffect(() => {
+    const handler = async () => {
+      if (refreshInFlightRef.current) {
+        await refreshInFlightRef.current;
+        return;
+      }
+      const session = getCurrentSession();
+      if (!session) return;
+      const work = (async () => {
+        const result = await authTransport.refresh(session.refreshToken).catch(() => null);
+        if (!result) {
+          await signOut();
+          router.replace('/sign-in');
+          return false;
+        }
+        await persistSession(result.session);
+        setProfile(result.user);
+        return true;
+      })();
+      refreshInFlightRef.current = work;
+      try {
+        await work;
+      } finally {
+        refreshInFlightRef.current = null;
+      }
+    };
+    setUnauthorizedHandler(handler);
+    return () => setUnauthorizedHandler(null);
+  }, [persistSession, signOut]);
 
   const value = useMemo<UserContextValue>(
     () => ({
       profile,
       isAuthenticated: profile !== null,
       guestId: guestIdRef.current,
+      isHydrating,
       isLoading,
       error,
       refreshProfile,
       updateProfile,
-      signInWithMock,
+      signIn,
+      signUp,
       signOut,
     }),
-    [profile, isLoading, error, refreshProfile, updateProfile, signInWithMock, signOut],
+    [
+      profile,
+      isHydrating,
+      isLoading,
+      error,
+      refreshProfile,
+      updateProfile,
+      signIn,
+      signUp,
+      signOut,
+    ],
   );
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;

@@ -1,23 +1,28 @@
 import type { ViewStyle } from 'react-native';
 
+import { resolveSpace, type SpacingKey } from '@/themes';
+
+/** Either a token-scale key like `"md"` or a raw pixel number for one-offs. */
+export type SpaceValue = number | SpacingKey;
+
 export type SpacingProps = {
-  p?: number;
-  px?: number;
-  py?: number;
-  pt?: number;
-  pb?: number;
-  pl?: number;
-  pr?: number;
-  m?: number;
-  mx?: number;
-  my?: number;
-  mt?: number;
-  mb?: number;
-  ml?: number;
-  mr?: number;
-  gap?: number;
-  rowGap?: number;
-  columnGap?: number;
+  p?: SpaceValue;
+  px?: SpaceValue;
+  py?: SpaceValue;
+  pt?: SpaceValue;
+  pb?: SpaceValue;
+  pl?: SpaceValue;
+  pr?: SpaceValue;
+  m?: SpaceValue;
+  mx?: SpaceValue;
+  my?: SpaceValue;
+  mt?: SpaceValue;
+  mb?: SpaceValue;
+  ml?: SpaceValue;
+  mr?: SpaceValue;
+  gap?: SpaceValue;
+  rowGap?: SpaceValue;
+  columnGap?: SpaceValue;
 };
 
 export type FlexboxProps = {
@@ -49,26 +54,44 @@ export type BorderProps = {
 };
 
 export function composeSpacing(s: SpacingProps): ViewStyle {
+  const p = resolveSpace(s.p);
+  const px = resolveSpace(s.px);
+  const py = resolveSpace(s.py);
+  const pt = resolveSpace(s.pt);
+  const pb = resolveSpace(s.pb);
+  const pl = resolveSpace(s.pl);
+  const pr = resolveSpace(s.pr);
+  const m = resolveSpace(s.m);
+  const mx = resolveSpace(s.mx);
+  const my = resolveSpace(s.my);
+  const mt = resolveSpace(s.mt);
+  const mb = resolveSpace(s.mb);
+  const ml = resolveSpace(s.ml);
+  const mr = resolveSpace(s.mr);
+  const gap = resolveSpace(s.gap);
+  const rowGap = resolveSpace(s.rowGap);
+  const columnGap = resolveSpace(s.columnGap);
+
   return {
-    ...(s.p != null ? { padding: s.p } : null),
-    ...(s.px != null ? { paddingHorizontal: s.px } : null),
-    ...(s.py != null ? { paddingVertical: s.py } : null),
-    ...(s.pt != null ? { paddingTop: s.pt } : null),
-    ...(s.pb != null ? { paddingBottom: s.pb } : null),
-    ...(s.pl != null ? { paddingLeft: s.pl } : null),
-    ...(s.pr != null ? { paddingRight: s.pr } : null),
+    ...(p != null ? { padding: p } : null),
+    ...(px != null ? { paddingHorizontal: px } : null),
+    ...(py != null ? { paddingVertical: py } : null),
+    ...(pt != null ? { paddingTop: pt } : null),
+    ...(pb != null ? { paddingBottom: pb } : null),
+    ...(pl != null ? { paddingLeft: pl } : null),
+    ...(pr != null ? { paddingRight: pr } : null),
 
-    ...(s.m != null ? { margin: s.m } : null),
-    ...(s.mx != null ? { marginHorizontal: s.mx } : null),
-    ...(s.my != null ? { marginVertical: s.my } : null),
-    ...(s.mt != null ? { marginTop: s.mt } : null),
-    ...(s.mb != null ? { marginBottom: s.mb } : null),
-    ...(s.ml != null ? { marginLeft: s.ml } : null),
-    ...(s.mr != null ? { marginRight: s.mr } : null),
+    ...(m != null ? { margin: m } : null),
+    ...(mx != null ? { marginHorizontal: mx } : null),
+    ...(my != null ? { marginVertical: my } : null),
+    ...(mt != null ? { marginTop: mt } : null),
+    ...(mb != null ? { marginBottom: mb } : null),
+    ...(ml != null ? { marginLeft: ml } : null),
+    ...(mr != null ? { marginRight: mr } : null),
 
-    ...(s.gap != null ? ({ gap: s.gap } as any) : null),
-    ...(s.rowGap != null ? ({ rowGap: s.rowGap } as any) : null),
-    ...(s.columnGap != null ? ({ columnGap: s.columnGap } as any) : null),
+    ...(gap != null ? ({ gap } as any) : null),
+    ...(rowGap != null ? ({ rowGap } as any) : null),
+    ...(columnGap != null ? ({ columnGap } as any) : null),
   };
 }
 

@@ -6,12 +6,18 @@ import type { Vehicle, VehicleInput, VehiclePatch } from '@/services/garage-serv
  * instance into the GarageService constructor.
  */
 export interface GarageTransport {
-  list(): Promise<Vehicle[]>;
-  get(id: string): Promise<Vehicle | null>;
-  create(input: VehicleInput): Promise<Vehicle>;
-  update(id: string, patch: VehiclePatch): Promise<Vehicle>;
-  remove(id: string): Promise<void>;
-  setPrimary(id: string): Promise<Vehicle[]>;
+  /** Reads accept a cancellation token. HTTP transport passes it to fetch();
+   *  mock honors it by aborting the simulated delay. */
+  list(signal?: AbortSignal): Promise<Vehicle[]>;
+  get(id: string, signal?: AbortSignal): Promise<Vehicle | null>;
+  /** Mutations also accept a signal so callers CAN cancel slow uploads
+   *  mid-flight, but the service layer never aborts mutations on its own —
+   *  by the time `create`/`update`/etc. is in flight the server may have
+   *  already committed, and silently aborting locally would mask that. */
+  create(input: VehicleInput, signal?: AbortSignal): Promise<Vehicle>;
+  update(id: string, patch: VehiclePatch, signal?: AbortSignal): Promise<Vehicle>;
+  remove(id: string, signal?: AbortSignal): Promise<void>;
+  setPrimary(id: string, signal?: AbortSignal): Promise<Vehicle[]>;
 }
 
 // ── Mock transport ───────────────────────────────────────────────────
@@ -45,12 +51,27 @@ const SEED_VEHICLES: Vehicle[] = [
   },
 ];
 
-/** Simulated network latency in ms. Set to 0 to make mocks resolve synchronously-ish. */
-const MOCK_LATENCY_MS = 0;
+/** Simulated network latency in ms. Tuned so the loading state in the
+ *  hook is visually testable without making dev painful. Set to 0 for
+ *  synchronous-ish mocks in unit tests. */
+const MOCK_LATENCY_MS = 250;
 
-function delay(ms: number): Promise<void> {
+/** Delay that respects an AbortSignal. Mirrors the catalog + top-featured
+ *  delay() helpers — same shape so abort behavior is identical across
+ *  every mock transport in the app. */
+function delay(ms: number, signal?: AbortSignal): Promise<void> {
   if (ms <= 0) return Promise.resolve();
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(resolve, ms);
+    if (signal) {
+      const onAbort = () => {
+        clearTimeout(t);
+        reject(new DOMException('Aborted', 'AbortError'));
+      };
+      if (signal.aborted) onAbort();
+      else signal.addEventListener('abort', onAbort, { once: true });
+    }
+  });
 }
 
 function makeId(): string {
@@ -65,18 +86,18 @@ export class MockGarageTransport implements GarageTransport {
     this.vehicles = [...seed];
   }
 
-  async list(): Promise<Vehicle[]> {
-    await delay(MOCK_LATENCY_MS);
+  async list(signal?: AbortSignal): Promise<Vehicle[]> {
+    await delay(MOCK_LATENCY_MS, signal);
     return [...this.vehicles];
   }
 
-  async get(id: string): Promise<Vehicle | null> {
-    await delay(MOCK_LATENCY_MS);
+  async get(id: string, signal?: AbortSignal): Promise<Vehicle | null> {
+    await delay(MOCK_LATENCY_MS, signal);
     return this.vehicles.find((v) => v.id === id) ?? null;
   }
 
-  async create(input: VehicleInput): Promise<Vehicle> {
-    await delay(MOCK_LATENCY_MS);
+  async create(input: VehicleInput, signal?: AbortSignal): Promise<Vehicle> {
+    await delay(MOCK_LATENCY_MS, signal);
     const shouldBePrimary = input.setAsPrimary || this.vehicles.length === 0;
     const created: Vehicle = {
       id: makeId(),
@@ -98,8 +119,8 @@ export class MockGarageTransport implements GarageTransport {
     return created;
   }
 
-  async update(id: string, patch: VehiclePatch): Promise<Vehicle> {
-    await delay(MOCK_LATENCY_MS);
+  async update(id: string, patch: VehiclePatch, signal?: AbortSignal): Promise<Vehicle> {
+    await delay(MOCK_LATENCY_MS, signal);
     let updated: Vehicle | undefined;
     this.vehicles = this.vehicles.map((v) => {
       if (v.id !== id) return v;
@@ -110,8 +131,8 @@ export class MockGarageTransport implements GarageTransport {
     return updated;
   }
 
-  async remove(id: string): Promise<void> {
-    await delay(MOCK_LATENCY_MS);
+  async remove(id: string, signal?: AbortSignal): Promise<void> {
+    await delay(MOCK_LATENCY_MS, signal);
     const wasPrimary = this.vehicles.find((v) => v.id === id)?.isPrimary ?? false;
     this.vehicles = this.vehicles.filter((v) => v.id !== id);
     if (wasPrimary && this.vehicles.length > 0) {
@@ -119,8 +140,8 @@ export class MockGarageTransport implements GarageTransport {
     }
   }
 
-  async setPrimary(id: string): Promise<Vehicle[]> {
-    await delay(MOCK_LATENCY_MS);
+  async setPrimary(id: string, signal?: AbortSignal): Promise<Vehicle[]> {
+    await delay(MOCK_LATENCY_MS, signal);
     if (!this.vehicles.some((v) => v.id === id)) {
       throw new Error(`Vehicle ${id} not found`);
     }
@@ -131,75 +152,64 @@ export class MockGarageTransport implements GarageTransport {
   }
 }
 
-// ── HTTP transport (stub for backend wiring) ─────────────────────────
+// ── HTTP transport ───────────────────────────────────────────────────
+
+import { apiClient, ApiError } from '@/services/api-client';
 
 /**
- * Drop-in HTTP transport. Uncomment + plug in the auth header strategy
- * (`Authorization: Bearer <token>` from the auth context) and the API
- * base URL via env (e.g. EXPO_PUBLIC_API_BASE_URL). Then swap the
- * MockGarageTransport for HttpGarageTransport in services/garage-service.ts.
+ * Real HTTP transport. Routes every call through the unified `apiClient`
+ * which handles auth/timeout/retry/401 centrally.
  */
-// export class HttpGarageTransport implements GarageTransport {
-//   constructor(private baseUrl: string, private getAuthToken: () => Promise<string | null>) {}
-//
-//   private async request<T>(path: string, init?: RequestInit): Promise<T> {
-//     const token = await this.getAuthToken();
-//     const res = await fetch(`${this.baseUrl}${path}`, {
-//       ...init,
-//       headers: {
-//         'Content-Type': 'application/json',
-//         ...(token ? { Authorization: `Bearer ${token}` } : {}),
-//         ...init?.headers,
-//       },
-//     });
-//     if (!res.ok) {
-//       const message = await res.text().catch(() => res.statusText);
-//       throw new Error(`Garage API ${res.status}: ${message}`);
-//     }
-//     if (res.status === 204) return undefined as T;
-//     return res.json() as Promise<T>;
-//   }
-//
-//   async list() {
-//     const data = await this.request<{ vehicles: Vehicle[] }>('/garage/vehicles');
-//     return data.vehicles;
-//   }
-//
-//   async get(id: string) {
-//     try {
-//       const data = await this.request<{ vehicle: Vehicle }>(`/garage/vehicles/${id}`);
-//       return data.vehicle;
-//     } catch (e) {
-//       if (e instanceof Error && e.message.startsWith('Garage API 404')) return null;
-//       throw e;
-//     }
-//   }
-//
-//   async create(input: VehicleInput) {
-//     const data = await this.request<{ vehicle: Vehicle }>('/garage/vehicles', {
-//       method: 'POST',
-//       body: JSON.stringify(input),
-//     });
-//     return data.vehicle;
-//   }
-//
-//   async update(id: string, patch: VehiclePatch) {
-//     const data = await this.request<{ vehicle: Vehicle }>(`/garage/vehicles/${id}`, {
-//       method: 'PATCH',
-//       body: JSON.stringify(patch),
-//     });
-//     return data.vehicle;
-//   }
-//
-//   async remove(id: string) {
-//     await this.request<void>(`/garage/vehicles/${id}`, { method: 'DELETE' });
-//   }
-//
-//   async setPrimary(id: string) {
-//     const data = await this.request<{ vehicles: Vehicle[] }>(
-//       `/garage/vehicles/${id}/set-primary`,
-//       { method: 'POST' },
-//     );
-//     return data.vehicles;
-//   }
-// }
+export class HttpGarageTransport implements GarageTransport {
+  async list(signal?: AbortSignal): Promise<Vehicle[]> {
+    const { vehicles } = await apiClient.get<{ vehicles: Vehicle[] }>(
+      '/garage/vehicles',
+      { signal },
+    );
+    return vehicles;
+  }
+
+  async get(id: string, signal?: AbortSignal): Promise<Vehicle | null> {
+    try {
+      const { vehicle } = await apiClient.get<{ vehicle: Vehicle }>(
+        `/garage/vehicles/${id}`,
+        { signal },
+      );
+      return vehicle;
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) return null;
+      throw err;
+    }
+  }
+
+  async create(input: VehicleInput, signal?: AbortSignal): Promise<Vehicle> {
+    const { vehicle } = await apiClient.post<{ vehicle: Vehicle }>(
+      '/garage/vehicles',
+      input,
+      { signal },
+    );
+    return vehicle;
+  }
+
+  async update(id: string, patch: VehiclePatch, signal?: AbortSignal): Promise<Vehicle> {
+    const { vehicle } = await apiClient.patch<{ vehicle: Vehicle }>(
+      `/garage/vehicles/${id}`,
+      patch,
+      { signal },
+    );
+    return vehicle;
+  }
+
+  async remove(id: string, signal?: AbortSignal): Promise<void> {
+    await apiClient.delete(`/garage/vehicles/${id}`, { signal });
+  }
+
+  async setPrimary(id: string, signal?: AbortSignal): Promise<Vehicle[]> {
+    const { vehicles } = await apiClient.post<{ vehicles: Vehicle[] }>(
+      `/garage/vehicles/${id}/set-primary`,
+      undefined,
+      { signal },
+    );
+    return vehicles;
+  }
+}
