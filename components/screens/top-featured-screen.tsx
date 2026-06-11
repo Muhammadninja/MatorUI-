@@ -1,6 +1,6 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { PackageOpen, SlidersHorizontal, Trash2, X } from 'lucide-react-native';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable } from 'react-native';
 
 import SearchPartCard from '@/components/screens-components/search/search-part-card';
@@ -24,14 +24,38 @@ import { triggerHaptic } from '@/utils/haptics';
 export default function TopFeaturedScreen() {
   const { tokens, scheme } = useThemeContext();
   const isDark = scheme === 'dark';
+  // When the user arrives from the explore-screen brand chip via the
+  // "View all" link, the brand comes through as a route param and we
+  // treat it as locked context: it stays in the filter state across
+  // clears, the Model row is suppressed (we already know the car they
+  // picked), and the filter-count badge ignores it.
+  const params = useLocalSearchParams<{ brand?: string }>();
+  const lockedBrand = typeof params.brand === 'string' && params.brand.length > 0
+    ? params.brand
+    : null;
+
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
-  const [selectedFilters, setSelectedFilters] = useState<TopFeaturedFilters>(
-    DEFAULT_TOP_FEATURED_FILTERS,
+  // Initial filter snapshot: blank when a brand is locked (only the
+  // brand is set, so the user sees an unfiltered list within that
+  // brand) — otherwise fall back to the app-wide defaults.
+  const initialFilters = useMemo<TopFeaturedFilters>(
+    () =>
+      lockedBrand
+        ? { Model: '', Brand: lockedBrand, Color: '', Condition: '' }
+        : { ...DEFAULT_TOP_FEATURED_FILTERS },
+    [lockedBrand],
   );
+  const [selectedFilters, setSelectedFilters] = useState<TopFeaturedFilters>(initialFilters);
   const featuredResponse = getTopFeaturedMockResponse(selectedFilters);
   const featuredItems = featuredResponse.items;
-  const selectedFilterCount = Object.values(selectedFilters).filter(Boolean).length;
-  const selectedFilterEntries = getSelectedTopFeaturedFilterEntries(selectedFilters);
+  // Count of filters the user actively chose — locked brand is implicit
+  // context, not a "selected filter" the user can clear.
+  const selectedFilterCount = (Object.entries(selectedFilters) as Array<
+    [TopFeaturedFilterTitle, string]
+  >).filter(([title, value]) => Boolean(value) && !(lockedBrand && title === 'Brand')).length;
+  const selectedFilterEntries = getSelectedTopFeaturedFilterEntries(selectedFilters).filter(
+    ([title]) => !(lockedBrand && title === 'Brand'),
+  );
 
   const handleFilterSelect = (groupTitle: TopFeaturedFilterTitle, option: string) => {
     triggerHaptic('selection');
@@ -43,7 +67,11 @@ export default function TopFeaturedScreen() {
 
   const handleClearFilters = () => {
     triggerHaptic('selection');
-    setSelectedFilters({ ...DEFAULT_TOP_FEATURED_FILTERS });
+    setSelectedFilters(
+      lockedBrand
+        ? { Model: '', Brand: lockedBrand, Color: '', Condition: '' }
+        : { ...DEFAULT_TOP_FEATURED_FILTERS },
+    );
   };
 
   return (
@@ -199,6 +227,12 @@ export default function TopFeaturedScreen() {
                         kind="primary"
                         variant="solid"
                         selected
+                        // Light mode chosen-filter pills read as black bg
+                        // + white text for high-contrast confirmation;
+                        // dark mode keeps the default primary tint
+                        // which already pops on dark surfaces.
+                        backgroundColorName={isDark ? undefined : 'black'}
+                        labelColorName={isDark ? undefined : 'white'}
                         haptics="selection"
                         onPress={() => handleFilterSelect(groupTitle, value)}
                       />
@@ -206,7 +240,13 @@ export default function TopFeaturedScreen() {
                   </AppView>
                 ) : null}
 
-                {TOP_FEATURED_FILTER_GROUPS.map((group) => (
+                {TOP_FEATURED_FILTER_GROUPS.filter(
+                  // Locked-brand context: hide Model and Color groups —
+                  // the user already picked their car via the explore
+                  // chip, so body style and exterior color aren't useful
+                  // filtering dimensions on this surface.
+                  (g) => !(lockedBrand && (g.key === 'model' || g.key === 'color')),
+                ).map((group) => (
                   <AppView key={group.title} gap={8}>
                     <AppText
                       textVariant="bodyXs"
@@ -228,6 +268,11 @@ export default function TopFeaturedScreen() {
                             variant={isSelected ? 'solid' : 'outline'}
                             selected={isSelected}
                             borderColorName="border"
+                            // See note on the selected-pills row above:
+                            // light-mode chosen option = black/white for
+                            // contrast; dark-mode keeps the default tint.
+                            backgroundColorName={isSelected && !isDark ? 'black' : undefined}
+                            labelColorName={isSelected && !isDark ? 'white' : undefined}
                             haptics="selection"
                             onPress={() => handleFilterSelect(group.title, option)}
                           />

@@ -156,24 +156,24 @@ export class MockCartTransport implements CartTransport {
  * `cartTransport` below for an instance of this.
  *
  * Suggested REST surface (mirrors the interface 1:1):
- *   GET    /api/v1/cart                        → CartSnapshot
- *   POST   /api/v1/cart/items                  → CartItem        (body: AddItemInput)
- *   PATCH  /api/v1/cart/items/:itemId          → CartItem        (body: { quantity })
- *   DELETE /api/v1/cart/items/:itemId          → 204
- *   POST   /api/v1/cart/clear                  → 204
- *   POST   /api/v1/cart/promo                  → PromoResult     (body: { code })
- *   DELETE /api/v1/cart/promo                  → 204
+ *   GET    /v1/cart                        → CartSnapshot
+ *   POST   /v1/cart/items                  → CartItem        (body: AddItemInput)
+ *   PATCH  /v1/cart/items/:itemId          → CartItem        (body: { quantity })
+ *   DELETE /v1/cart/items/:itemId          → 204
+ *   POST   /v1/cart/clear                  → 204
+ *   POST   /v1/cart/promo                  → PromoResult     (body: { code })
+ *   DELETE /v1/cart/promo                  → 204
  */
 import { shouldUseHttpTransport } from '@/config/api';
 import { apiClient } from '@/services/api-client';
 
 export class HttpCartTransport implements CartTransport {
   fetch(): Promise<CartSnapshot> {
-    return apiClient.get<CartSnapshot>('/api/v1/cart');
+    return apiClient.get<CartSnapshot>('/v1/cart');
   }
 
   async addItem(input: AddItemInput): Promise<CartItem> {
-    const { item } = await apiClient.post<{ item: CartItem }>('/api/v1/cart/items', input);
+    const { item } = await apiClient.post<{ item: CartItem }>('/v1/cart/items', input);
     return item;
   }
 
@@ -183,26 +183,26 @@ export class HttpCartTransport implements CartTransport {
       return null;
     }
     const { item } = await apiClient.patch<{ item: CartItem }>(
-      `/api/v1/cart/items/${encodeURIComponent(itemId)}`,
+      `/v1/cart/items/${encodeURIComponent(itemId)}`,
       { quantity },
     );
     return item;
   }
 
   async removeItem(itemId: string): Promise<void> {
-    await apiClient.delete(`/api/v1/cart/items/${encodeURIComponent(itemId)}`);
+    await apiClient.delete(`/v1/cart/items/${encodeURIComponent(itemId)}`);
   }
 
   async clear(): Promise<void> {
-    await apiClient.post('/api/v1/cart/clear');
+    await apiClient.post('/v1/cart/clear');
   }
 
   applyPromo(code: string): Promise<PromoResult> {
-    return apiClient.post<PromoResult>('/api/v1/cart/promo', { code });
+    return apiClient.post<PromoResult>('/v1/cart/promo', { code });
   }
 
   async removePromo(): Promise<void> {
-    await apiClient.delete('/api/v1/cart/promo');
+    await apiClient.delete('/v1/cart/promo');
   }
 }
 

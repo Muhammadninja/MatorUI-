@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useSearchVehicleContext } from '@/contexts/active-vehicle.context';
 import { searchTransport } from '@/services/search-service';
 import type {
   PriceBucket,
@@ -113,6 +114,16 @@ export function useSearch(): UseSearchValue {
   const abortRef = useRef<AbortController | null>(null);
   const liveQueryRef = useRef<string>('');
 
+  // Active-vehicle context auto-attached to every outgoing search.
+  // Read through a ref so the run() / loadMore() closures always see
+  // the latest scope without re-binding (and without retriggering
+  // searches just because the vehicle changed under an empty query).
+  const vehicleContext = useSearchVehicleContext();
+  const vehicleContextRef = useRef(vehicleContext);
+  useEffect(() => {
+    vehicleContextRef.current = vehicleContext;
+  }, [vehicleContext]);
+
   // Keep latest derived values in refs so closures (debounced runner,
   // loadMore) never capture stale values.
   const filtersRef = useRef(filters);
@@ -172,6 +183,7 @@ export function useSearch(): UseSearchValue {
         filters: filtersRef.current,
         sortBy: sortByRef.current,
         requestId: reqId,
+        vehicleContext: vehicleContextRef.current,
         signal: controller.signal,
       });
 
@@ -226,6 +238,7 @@ export function useSearch(): UseSearchValue {
         filters: filtersRef.current,
         sortBy: sortByRef.current,
         requestId: reqId,
+        vehicleContext: vehicleContextRef.current,
         signal: controller.signal,
       });
 

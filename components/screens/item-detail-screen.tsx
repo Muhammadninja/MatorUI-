@@ -67,6 +67,7 @@ export default function ItemDetailScreen() {
   const priceLabel = catalogDetail?.item.priceLabel ?? params.priceLabel ?? 'Starting at';
   const badge = catalogDetail?.item.badge ?? topFeaturedDetail?.badge ?? params.badge;
   const status = catalogDetail?.item.status ?? topFeaturedDetail?.status ?? params.status;
+  const oem = catalogDetail?.item.oem ?? topFeaturedDetail?.oem;
   const specs = catalogDetail?.item.specs ?? FALLBACK_SPECS;
   const features = catalogDetail?.item.features ?? FALLBACK_FEATURES;
 
@@ -201,6 +202,19 @@ export default function ItemDetailScreen() {
                 {price}
               </AppText>
             </AppView>
+            {oem ? (
+              <AppView
+                rounded={8}
+                px={10}
+                py={6}
+                mt={4}
+                style={{ alignSelf: 'flex-start', backgroundColor: tokens.gray100 }}
+              >
+                <AppText textVariant="bodyXs" colorName="gray400">
+                  OEM {oem}
+                </AppText>
+              </AppView>
+            ) : null}
           </AppView>
 
           {/* Specs grid */}

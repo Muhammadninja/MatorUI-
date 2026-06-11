@@ -29,12 +29,41 @@ Recommended query params from frontend:
 
 Current default query payload example:
 - query: ""
-- quickFilter: "Trending now"
+- quickFilter: null
 - page: 1
 - pageSize: 10
 - includeCatalogue: true
 - includePromotions: true
 - includeTopFeatured: true
+
+Quick-filter semantics:
+- Chips represent the most popular car brands in Uzbekistan (UZ market).
+- Tapping a chip does NOT navigate to the full search-results screen.
+  Instead, the explore landing collapses into a focused brand view:
+    - Catalogue section: HIDDEN
+    - Promo banner: HIDDEN
+    - Top Featured: re-fetched with filters: { brand: "<Brand>" } and
+      its section title changes from "Top Featured" to
+      "Results for <Brand>" — the Top Featured framing is intentionally
+      dropped so the section reads as branded search results
+  The same 2-column "half card" grid is reused — no new card layout.
+- Backend should ensure the Top Featured endpoint accepts a `brand`
+  filter and returns the same TopFeaturedItem shape. Today the frontend
+  passes it via the existing `filters` map in TopFeaturedListRequest
+  (no schema change required).
+- Tapping the active chip's clear-X clears the brand and re-expands the
+  page to its default layout (catalogue + promo + unfiltered Top
+  Featured all return).
+- The typed search bar drives a completely independent flow (the full
+  results screen via useSearch). It is intentional that the chip row
+  does not also push into the search bar — chips and free-text are two
+  parallel discovery paths on the same screen.
+- No chip is selected by default. The landing render should show the
+  full (unfiltered) catalogue + top-featured.
+- Backend may add `kind: "brand" | "segment" | "intent"` to
+  SearchQuickFilterItem if the row later mixes brands with curated
+  buckets (e.g. "New this week"). For now all items are implicitly
+  brands.
 
 Aggregated response fields expected by frontend:
 - requestId: string
@@ -53,22 +82,57 @@ Smart search header actions that backend may support:
 - image search trigger result payload (if supported later)
 - notification badge/count payload (optional)
 
-SearchQuickFilterItem fields:
-- id: string
-- label: string
-- slug: string
-- selected?: boolean
-- icon?: string
-- count?: number
-- query?: string
+SearchQuickFilterItem fields (canonical contract — frontend types live in
+`services/quick-filters-service.ts`):
+- id: string                                  // stable, used as React key
+- label: string                               // backend-localized, render as-is
+- slug: string                                // url-safe, used in route params
+- kind: 'brand' | 'segment' | 'intent'        // see "kind semantics" below
+- count?: number                              // inventory count (optional)
+- iconUrl?: string                            // brand logo (optional)
 
-Current quick filter labels in UI:
-- Trending now
-- Electric cars
-- Under $20k
-- SUV deals
-- Nearby garages
-- AI picks
+Dedicated quick-filter endpoint (preferred over inlining in /search/home):
+- GET /api/v1/search/quick-filters?locale=uz&limit=8
+- Response:
+    {
+      "items": SearchQuickFilterItem[],
+      "snapshotVersion": "<monotonic-string>"
+    }
+- The frontend hits this endpoint via `useQuickFilters()` (see
+  hooks/use-quick-filters.ts). It auto-falls-back to a hardcoded seed
+  when the API is loading / errors / returns zero items so the chip row
+  never blanks out — backend can ship the endpoint independently.
+
+Recommended backend query (PG/MySQL pseudo-SQL):
+    SELECT brand AS label,
+           LOWER(REPLACE(brand, ' ', '-')) AS slug,
+           COUNT(*) AS count
+    FROM parts
+    WHERE in_stock = true
+    GROUP BY brand
+    ORDER BY count DESC
+    LIMIT :limit;
+  Each row becomes one SearchQuickFilterItem with kind='brand'. New
+  brands (e.g. a Hyundai transmission lands in `parts`) surface
+  automatically on the next chip-row fetch — no app release needed.
+
+Kind semantics:
+- brand   — filter chip representing a car brand (today's only kind).
+            Tap behavior: explore landing hides the catalogue + promo
+            banner and re-skins the Top Featured section as
+            "Results for <Label>" with `filters: { brand: <Label> }`.
+- segment — future curated bucket ("New this week", "Under $5k").
+            Backend decides selection criteria; frontend just renders.
+- intent  — future "what are you trying to do" chip (e.g. "Find a
+            mechanic near me"). Routes elsewhere on tap.
+
+Initial seed list (UZ top-selling brands, popularity order — used as
+the bundled fallback before the endpoint ships):
+- Cobalt    (~1240 in stock — illustrative)
+- BYD       (~882)
+- Lacetti   (~614)
+- Tracker   (~503)
+- Leapmotor (~297)
 
 SearchCatalogueItem fields:
 - id: string

@@ -91,6 +91,7 @@ export default function SearchCatalogue() {
                   description={card.description}
                   price={card.price}
                   priceLabel={card.priceLabel}
+                  oem={card.oem}
                   image={card.images[0]}
                   imageSource={FALLBACK_IMAGE}
                   style={{ width: CARD_WIDTH }}

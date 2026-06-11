@@ -266,12 +266,12 @@ export class MockOrdersTransport implements OrdersTransport {
  * Drop-in HTTP transport — fill in the `request` method with the
  * auth-header strategy from UserContext + env base URL.
  *
- *   GET    /api/v1/orders?page=&pageSize=&status=     → OrderListPage
- *   GET    /api/v1/orders/:orderId                    → OrderDetail
- *   POST   /api/v1/orders                              → CreateOrderResult
- *   GET    /api/v1/account/addresses                   → Address[]
- *   GET    /api/v1/account/payment-methods             → PaymentMethod[]
- *   POST   /api/v1/shipping/quote                      → ShippingOption[]
+ *   GET    /v1/orders?page=&pageSize=&status=     → OrderListPage
+ *   GET    /v1/orders/:orderId                    → OrderDetail
+ *   POST   /v1/orders                              → CreateOrderResult
+ *   GET    /v1/account/addresses                   → Address[]
+ *   GET    /v1/account/payment-methods             → PaymentMethod[]
+ *   POST   /v1/shipping/quote                      → ShippingOption[]
  */
 import { shouldUseHttpTransport } from '@/config/api';
 import { apiClient } from '@/services/api-client';
@@ -282,36 +282,36 @@ export class HttpOrdersTransport implements OrdersTransport {
     if (req.page) qs.set('page', String(req.page));
     if (req.pageSize) qs.set('pageSize', String(req.pageSize));
     if (req.status) qs.set('status', req.status);
-    return apiClient.get<OrderListPage>(`/api/v1/orders?${qs.toString()}`, { signal });
+    return apiClient.get<OrderListPage>(`/v1/orders?${qs.toString()}`, { signal });
   }
 
   getOrder(orderId: string, signal?: AbortSignal): Promise<OrderDetail> {
     return apiClient.get<OrderDetail>(
-      `/api/v1/orders/${encodeURIComponent(orderId)}`,
+      `/v1/orders/${encodeURIComponent(orderId)}`,
       { signal },
     );
   }
 
   createOrder(input: CreateOrderInput, signal?: AbortSignal): Promise<CreateOrderResult> {
-    return apiClient.post<CreateOrderResult>('/api/v1/orders', input, { signal });
+    return apiClient.post<CreateOrderResult>('/v1/orders', input, { signal });
   }
 
   // Address + payment endpoints — wired but NOT exercised until the
   // payment/address screens are migrated off their local-state mocks
   // (intentionally the last step of the API rollout per the project plan).
   listAddresses(signal?: AbortSignal): Promise<Address[]> {
-    return apiClient.get<Address[]>('/api/v1/account/addresses', { signal });
+    return apiClient.get<Address[]>('/v1/account/addresses', { signal });
   }
 
   listPaymentMethods(signal?: AbortSignal): Promise<PaymentMethod[]> {
-    return apiClient.get<PaymentMethod[]>('/api/v1/account/payment-methods', { signal });
+    return apiClient.get<PaymentMethod[]>('/v1/account/payment-methods', { signal });
   }
 
   getShippingQuote(
     req: ShippingQuoteRequest,
     signal?: AbortSignal,
   ): Promise<ShippingOption[]> {
-    return apiClient.post<ShippingOption[]>('/api/v1/shipping/quote', req, { signal });
+    return apiClient.post<ShippingOption[]>('/v1/shipping/quote', req, { signal });
   }
 }
 

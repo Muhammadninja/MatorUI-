@@ -36,7 +36,7 @@ export interface ChatTransport {
   submitFeedback(input: AiChatFeedbackInput): Promise<void>;
 }
 
-export const AI_CHAT_API_BASE_PATH = '/api/v1/chatbot';
+export const AI_CHAT_API_BASE_PATH = '/v1/chatbot';
 
 // ── Internal helpers ─────────────────────────────────────────────────
 

@@ -11,29 +11,51 @@ import { AppPressableView, AppView } from '../../shared/app-view';
 import SearchPartCard from './search-part-card';
 import SearchTopFeaturedSkeleton from './search-top-featured-skeleton';
 
+export type SearchTopFeaturedProps = {
+  /**
+   * When set, the grid is filtered to this brand and the section
+   * re-skins as a results block: the "Top Featured" header is replaced
+   * with "Results for <brand>". Driven by the quick-filter chip
+   * selection on the explore landing — null/undefined renders the full
+   * (unfiltered) Top Featured grid as before.
+   */
+  brand?: string | null;
+};
+
 /**
  * Top Featured grid on the explore landing. Consumes
  * `useTopFeaturedList` with empty default filters and renders the four
  * UI states: idle/loading → skeleton, error → retry, empty →
  * placeholder, success → 2-column card grid.
  */
-export default function SearchTopFeatured() {
+export default function SearchTopFeatured({ brand }: SearchTopFeaturedProps = {}) {
   const { tokens } = useThemeContext();
   const { state, items, error, refresh } = useTopFeaturedList({
     page: 1,
     pageSize: 6,
-    filters: {},
+    filters: brand ? { brand } : {},
   });
 
   return (
     <AppView mt={18} gap={16}>
       <AppView px={16} row align="center" justify="space-between" gap={12}>
         <AppText textVariant="title" family="heading" weight="bold">
-          Top Featured
+          {brand ? `Results for ${brand}` : 'Top Featured'}
         </AppText>
         <AppPressableView
           androidRipple={false}
-          onPress={() => router.push('/top-featured')}
+          onPress={() =>
+            // When a brand chip is active on the explore landing, pass
+            // it through as a route param so the View All page opens
+            // with that brand locked in (and its Model filter row
+            // hidden — the user already picked the car, no need to
+            // also pick a body style).
+            router.push(
+              brand
+                ? { pathname: '/top-featured', params: { brand } }
+                : '/top-featured',
+            )
+          }
           accessibilityLabel="View all top featured items"
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
@@ -70,7 +92,7 @@ export default function SearchTopFeatured() {
             colorName="gray400"
             style={{ textAlign: 'center' }}
           >
-            Nothing featured right now.
+            {brand ? `No results for ${brand} yet.` : 'Nothing featured right now.'}
           </AppText>
         </AppView>
       ) : (
@@ -85,6 +107,7 @@ export default function SearchTopFeatured() {
                 title={item.title}
                 description={item.description}
                 price={item.price}
+                oem={item.oem}
                 image={item.images?.[0]}
                 compact
                 style={{ width: '48%' }}

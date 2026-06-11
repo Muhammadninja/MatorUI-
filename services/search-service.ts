@@ -14,7 +14,7 @@ import type {
 /**
  * Universal search across the marketplace.
  *
- * Tomorrow this hits `GET /api/v1/search?q=…&pageToken=…&filters=…`
+ * Tomorrow this hits `GET /v1/search?q=…&pageToken=…&filters=…`
  * (or whatever the backend defines). Today it runs in-process over the
  * catalog mock — but already supports the full smart-search surface:
  * filters server-side, facet counts, did-you-mean, pagination tokens,
@@ -317,14 +317,14 @@ import { apiClient } from '@/services/api-client';
 export class HttpSearchTransport implements SearchTransport {
   search(req: SearchRequest): Promise<SearchResponse> {
     const { signal, requestId, ...body } = req;
-    return apiClient.post<SearchResponse>('/api/v1/search', body, {
+    return apiClient.post<SearchResponse>('/v1/search', body, {
       signal,
       headers: requestId ? { 'X-Request-Id': requestId } : undefined,
     });
   }
 
   typeahead(req: TypeaheadRequest): Promise<TypeaheadResponse> {
-    const path = `/api/v1/typeahead?q=${encodeURIComponent(req.prefix)}&limit=${req.limit ?? 6}`;
+    const path = `/v1/typeahead?q=${encodeURIComponent(req.prefix)}&limit=${req.limit ?? 6}`;
     return apiClient.get<TypeaheadResponse>(path, { signal: req.signal });
   }
 }

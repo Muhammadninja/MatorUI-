@@ -44,6 +44,7 @@ function buildInitialValues(editing?: Vehicle): VehicleFieldValues {
     nickname: editing?.nickname ?? '',
     mileage: editing?.mileage !== undefined ? String(editing.mileage) : '',
     plate: editing?.plate ?? '',
+    vin: editing?.vin ?? '',
   };
 }
 
@@ -112,6 +113,7 @@ export function AddVehicleWizard({ editing, onSubmit, onCancel }: AddVehicleWiza
           trim: values.trim.trim() || undefined,
           nickname: values.nickname.trim() || undefined,
           plate: values.plate.trim() || undefined,
+          vin: values.vin.trim() || undefined,
           mileage: mileageNumber,
           color,
         },

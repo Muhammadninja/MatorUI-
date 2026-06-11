@@ -1,41 +1,57 @@
-import { useState } from 'react';
+import { useMemo } from 'react';
 import { ScrollView } from 'react-native';
 
 import { AppChip } from '@/components/shared/app-chip/app-chip';
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
+import useQuickFilters from '@/hooks/use-quick-filters';
 import { triggerHaptic } from '@/utils/haptics';
 
-const QUICK_FILTERS = [
-  'Trending now',
-  'Electric cars',
-  'Under $20k',
-  'SUV deals',
-  'Nearby garages',
-  'Recommended',
-] as const;
+export type SearchQuickFiltersProps = {
+  /**
+   * The currently selected brand label (null = no chip active). This
+   * component is fully controlled — the parent owns the selection state
+   * so it can render an inline brand-parts section beside the row.
+   */
+  selected?: string | null;
+  /**
+   * Fires when a chip is tapped (label) or the active chip's clear-X is
+   * pressed (null). The parent renders an inline brand-parts section
+   * based on this value; the chip row stays purely presentational and
+   * never reaches into search/state on its own.
+   */
+  onChange?: (filter: string | null) => void;
+};
 
-export function SearchQuickFilters() {
-  const [activeFilter, setActiveFilter] = useState<(typeof QUICK_FILTERS)[number] | null>(
-    'Trending now',
-  );
+export function SearchQuickFilters({ selected, onChange }: SearchQuickFiltersProps) {
   const { scheme, tokens } = useThemeContext();
+  // Backed by `useQuickFilters` so the chip row reflects whatever the
+  // backend says is "popular this week". The hook guarantees a
+  // non-empty `items` array (falls back to the bundled seed when the
+  // API is loading / erroring / empty) so the row never blanks out.
+  const { items } = useQuickFilters();
+
+  const activeLabel = useMemo<string | null>(() => {
+    if (!selected) return null;
+    const s = selected.toLowerCase();
+    return items.find((f) => f.label.toLowerCase() === s)?.label ?? null;
+  }, [selected, items]);
 
   return (
-      <AppView gap={12} px={8}>
+    <AppView gap={12} px={8}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ paddingRight: 20 }}
       >
         <AppView row gap={10}>
-          {QUICK_FILTERS.map((filter) => {
-            const isActive = activeFilter === filter;
+          {items.map((filter) => {
+            const isActive = activeLabel === filter.label;
 
             return (
               <AppChip
-                key={filter}
-                label={filter}
+                key={filter.id}
+                label={filter.label}
                 size="md"
                 kind={isActive ? 'secondary' : 'neutral'}
                 variant="solid"
@@ -46,7 +62,7 @@ export function SearchQuickFilters() {
                   isActive
                     ? () => {
                         triggerHaptic('selection');
-                        setActiveFilter(null);
+                        onChange?.(null);
                       }
                     : undefined
                 }
@@ -61,8 +77,9 @@ export function SearchQuickFilters() {
                 }
                 contentStyle={isActive ? { opacity: 0.98 } : undefined}
                 onPress={() => {
+                  if (isActive) return;
                   triggerHaptic('selection');
-                  setActiveFilter(filter);
+                  onChange?.(filter.label);
                 }}
               />
             );

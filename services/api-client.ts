@@ -20,8 +20,8 @@
  *      can `instanceof ApiError` and surface user-friendly toasts.
  *
  * Usage:
- *   const order = await apiClient.get<Order>('/api/v1/orders/123');
- *   await apiClient.post('/api/v1/cart/items', { id, qty });
+ *   const order = await apiClient.get<Order>('/v1/orders/123');
+ *   await apiClient.post('/v1/cart/items', { id, qty });
  */
 
 import { getApiBaseUrl, getAuthToken } from '@/config/api';

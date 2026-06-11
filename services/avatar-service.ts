@@ -8,7 +8,7 @@
  *
  * Wire to real API:
  *   1. Implement `HttpAvatarTransport` (commented stub below) against the
- *      backend's `POST /api/v1/me/avatar` (multipart/form-data).
+ *      backend's `POST /v1/me/avatar` (multipart/form-data).
  *   2. Replace `avatarTransport` export with the HTTP impl.
  *   3. Nothing in the UI changes — callers go through `uploadAvatar()`.
  */
@@ -75,7 +75,7 @@ export class HttpAvatarTransport implements AvatarTransport {
       type: 'image/jpeg',
     } as unknown as Blob);
 
-    const res = await fetch(`${baseUrl}/api/v1/me/avatar`, {
+    const res = await fetch(`${baseUrl}/v1/me/avatar`, {
       method: 'POST',
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       body: form,

@@ -855,6 +855,400 @@
         "Cold-start guard: in app/_layout.tsx run const last = await Notifications.getLastNotificationResponseAsync(); if present and not yet processed (compare data.notification_id against MMKV 'mator.push.last_handled'), route once on mount.",
         "Permissions: Notifications.requestPermissionsAsync({ ios: { allowAlert: true, allowBadge: true, allowSound: true, allowAnnouncements: false } }) deferred to after the first sign-in success (not on cold start) to avoid burning the prompt."
       ]
+    },
+    {
+      "screen_name": "ExploreSearchScreen",
+      "api_endpoints": [
+        {
+          "method": "POST",
+          "url": "/v1/search",
+          "description": "Universal parts + content search. Server receives the full query envelope (free-text + filter set + vehicle context) and returns ranked results with facet counts the explore screen renders as quick-filter pills."
+        },
+        {
+          "method": "GET",
+          "url": "/v1/typeahead",
+          "description": "Lightweight prefix suggestions used by the smart-search bar. Query params: q (string), limit (default 6)."
+        }
+      ],
+      "request_payload": {
+        "search": {
+          "query": "remen generator",
+          "limit": 20,
+          "pageToken": null,
+          "filters": {
+            "categories": ["cat_engine_belts"],
+            "price": "any",
+            "minRating": "any"
+          },
+          "sortBy": "relevance",
+          "requestId": "cli_lwxqkv7_a8b3c1d2",
+          "locale": "uz-UZ",
+          "vehicleContext": {
+            "brand": "Chevrolet",
+            "model": "Cobalt",
+            "vehicle_generation": "Position 2",
+            "engine_type": "1.5L Turbo (B15D2)",
+            "oem_catalog_scope": "gm-uz-b15d2-turbo"
+          }
+        },
+        "typeahead_query_params": {
+          "q": "remen",
+          "limit": 6
+        }
+      },
+      "response_data": {
+        "search_response": {
+          "requestId": "cli_lwxqkv7_a8b3c1d2",
+          "results": [
+            {
+              "id": "part_01HXC3KK5B3C9S9LK0N1AB2X9V",
+              "title": "Cobalt Remen Generator Xitoy Original",
+              "price": "UZS 185 000",
+              "category": "Dvigatel kamarlari"
+            }
+          ],
+          "total": 18,
+          "durationMs": 84,
+          "nextPageToken": null,
+          "facetCounts": {
+            "categories": { "Dvigatel kamarlari": 12, "Generator": 6 },
+            "price": { "under_200k": 8, "200k_to_500k": 7 },
+            "minRating": { "4plus": 14 }
+          },
+          "appliedFilters": {
+            "categories": ["cat_engine_belts"],
+            "price": "any",
+            "minRating": "any"
+          },
+          "didYouMean": null,
+          "suggestedCategories": ["Dvigatel kamarlari", "Generator"]
+        },
+        "typeahead_response": {
+          "suggestions": [
+            { "text": "remen generator", "type": "query" },
+            { "text": "Cobalt Remen Generator Xitoy Original", "type": "product", "deeplink": "/(tabs)/(explore)/item-detail/part_01HXC3KK5B3C9S9LK0N1AB2X9V" }
+          ]
+        }
+      },
+      "native_integration_details": [
+        "Frontend transport: services/search-service.ts (HttpSearchTransport).",
+        "Vehicle context auto-attached by `useSearch()` via the `ActiveVehicleProvider` — pull from `useSearchVehicleContext()` and never let the screen-layer forget to forward it.",
+        "Backend treats `vehicleContext` as request-scoping (NOT a filter) — results are still ranked across the full corpus, but matching parts get a relevance boost AND a per-row `compatibility.status: 'fits'` projection."
+      ]
+    },
+    {
+      "screen_name": "ExploreQuickFiltersStrip",
+      "api_endpoints": [
+        {
+          "method": "GET",
+          "url": "/v1/search/quick-filters",
+          "description": "Returns the horizontal-scrolling chip row on the explore landing — UZ-market brand chips by default, ordered by inventory count. Frontend hot-caches and falls back to a hardcoded seed list while the request is in flight."
+        }
+      ],
+      "request_payload": {
+        "query_params": {
+          "locale": "uz",
+          "limit": 8
+        }
+      },
+      "response_data": {
+        "response": {
+          "items": [
+            { "id": "qf-cobalt",   "label": "Cobalt",    "slug": "cobalt",    "kind": "brand", "count": 1240, "iconUrl": "https://cdn.mator.uz/brands/chevrolet.svg" },
+            { "id": "qf-byd",      "label": "BYD",       "slug": "byd",       "kind": "brand", "count": 882,  "iconUrl": "https://cdn.mator.uz/brands/byd.svg" },
+            { "id": "qf-lacetti",  "label": "Lacetti",   "slug": "lacetti",   "kind": "brand", "count": 614 },
+            { "id": "qf-tracker",  "label": "Tracker",   "slug": "tracker",   "kind": "brand", "count": 503 },
+            { "id": "qf-leapmotor","label": "Leapmotor", "slug": "leapmotor", "kind": "brand", "count": 297 }
+          ],
+          "snapshotVersion": "qf-2026-06-11-v1"
+        }
+      },
+      "native_integration_details": [
+        "Frontend transport: services/quick-filters-service.ts (HttpQuickFiltersTransport).",
+        "Hook: hooks/use-quick-filters.ts — always returns a non-empty `items` array (seed fallback during loading/error).",
+        "Backend recommended query (PG): SELECT brand AS label, LOWER(REPLACE(brand,' ','-')) AS slug, COUNT(*) AS count FROM parts WHERE in_stock = true GROUP BY brand ORDER BY count DESC LIMIT :limit;",
+        "Kind discriminator reserved as 'brand' | 'segment' | 'intent' — backend can later mix curated buckets ('New this week') with brand chips without a contract change."
+      ]
+    },
+    {
+      "screen_name": "TopFeaturedScreen",
+      "api_endpoints": [
+        {
+          "method": "POST",
+          "url": "/v1/top-featured/list",
+          "description": "Returns the curated Top Featured grid + available filter facets. Used by both the explore-landing preview and the dedicated /top-featured screen. Brand chip on explore narrows scope via `filters.brand`."
+        }
+      ],
+      "request_payload": {
+        "body": {
+          "page": 1,
+          "pageSize": 24,
+          "sortBy": "featured",
+          "search": null,
+          "filters": {
+            "model": "Sedan",
+            "brand": "Cobalt",
+            "color": "Black",
+            "condition": "OEM"
+          }
+        }
+      },
+      "response_data": {
+        "response": {
+          "items": [
+            {
+              "id": "f1",
+              "badge": "Top",
+              "status": "Ready",
+              "title": "Turbo Wheel Set",
+              "description": "Forged alloy wheels for sharp handling and cleaner street stance.",
+              "price": "UZS 1 240 000",
+              "model": "SUV",
+              "brand": "Cobalt",
+              "color": "Black",
+              "condition": "New",
+              "oem": "GM 15823942"
+            }
+          ],
+          "total": 6,
+          "page": 1,
+          "pageSize": 24,
+          "availableFilters": [
+            {
+              "key": "brand",
+              "title": "Brand",
+              "options": [
+                { "value": "Cobalt", "label": "Cobalt", "count": 2 },
+                { "value": "BYD", "label": "BYD", "count": 1 }
+              ]
+            }
+          ],
+          "snapshotVersion": "tf-2026-06-11-v1",
+          "socketChannel": "top_featured:catalog"
+        }
+      },
+      "native_integration_details": [
+        "Frontend transport: services/top-featured-service.ts (HttpTopFeaturedTransport).",
+        "When the user arrives via the explore brand chip's 'View all', the brand is locked via route param — the View-All screen hides Model + Color filters since those would only narrow the user's already-chosen vehicle.",
+        "Realtime: socketChannel name from the response is used by the future live-refresh consumer to subscribe for create/update/delete events."
+      ]
+    },
+    {
+      "screen_name": "CartScreen",
+      "api_endpoints": [
+        {
+          "method": "GET",
+          "url": "/v1/cart",
+          "description": "Fetch the authenticated user's cart snapshot. Frontend treats this as the source of truth across devices — adding an item on iOS reflects on Android within seconds via realtime invalidation."
+        },
+        {
+          "method": "POST",
+          "url": "/v1/cart/items",
+          "description": "Add one item (part or service). Server merges by part_id + variant — duplicate adds increment quantity."
+        },
+        {
+          "method": "PATCH",
+          "url": "/v1/cart/items/{item_id}",
+          "description": "Change quantity. Quantity <= 0 client-side becomes a DELETE."
+        },
+        {
+          "method": "DELETE",
+          "url": "/v1/cart/items/{item_id}",
+          "description": "Remove a line from the cart."
+        },
+        {
+          "method": "POST",
+          "url": "/v1/cart/clear",
+          "description": "Empty the cart server-side."
+        },
+        {
+          "method": "POST",
+          "url": "/v1/cart/promo",
+          "description": "Apply a promo code; returns the discount preview without committing the order."
+        },
+        {
+          "method": "DELETE",
+          "url": "/v1/cart/promo",
+          "description": "Remove the active promo code."
+        }
+      ],
+      "request_payload": {
+        "add_item": {
+          "id": "part_01HXC3KK5B3C9S9LK0N1AB2X9V",
+          "title": "Cobalt Remen Generator Xitoy Original",
+          "description": "OEM-class drive belt for B15D2 1.5L engine.",
+          "price": "UZS 185 000",
+          "priceLabel": "Starting at",
+          "badge": "OEM",
+          "status": "Ready to ship",
+          "imageUrl": "https://cdn.mator.uz/parts/01HXC3KK5B/main.webp"
+        },
+        "apply_promo": { "code": "MATOR10" }
+      },
+      "response_data": {
+        "snapshot": {
+          "items": [
+            {
+              "id": "part_01HXC3KK5B3C9S9LK0N1AB2X9V",
+              "title": "Cobalt Remen Generator Xitoy Original",
+              "price": "UZS 185 000",
+              "quantity": 1,
+              "imageUrl": "https://cdn.mator.uz/parts/01HXC3KK5B/main.webp"
+            }
+          ],
+          "promo": { "code": "MATOR10", "discountUzs": 18500, "isValid": true }
+        }
+      },
+      "native_integration_details": [
+        "Frontend transport: services/cart-api.ts (HttpCartTransport).",
+        "Open question for backend: should cart be server-persisted (current frontend assumption) OR client-only with cart_snapshot at order-creation time (current backend.json order spec)? Pick ONE; the frontend currently scaffolds the server-persisted variant and will drop server-cart code if backend prefers client-only."
+      ]
+    },
+    {
+      "screen_name": "AvatarUpload",
+      "api_endpoints": [
+        {
+          "method": "POST",
+          "url": "/v1/me/avatar",
+          "description": "Upload a profile photo (multipart/form-data, field name `file`). Server returns the canonical CDN URL after running NSFW + EXIF strip."
+        }
+      ],
+      "request_payload": {
+        "multipart_form": { "file": "<jpeg blob, max 5MB>" }
+      },
+      "response_data": {
+        "response": {
+          "avatar_url": "https://cdn.mator.uz/avatars/9a8e1d2c.webp",
+          "thumbnail_url": "https://cdn.mator.uz/avatars/9a8e1d2c_thumb.webp"
+        }
+      },
+      "native_integration_details": [
+        "Frontend transport: services/avatar-service.ts.",
+        "Picker: expo-image-picker (quality 0.85, aspect 1:1, allowsEditing on iOS for cropping).",
+        "Caching: invalidate the user-context cache after a successful upload so AppImage renders the new URL immediately."
+      ]
+    },
+    {
+      "screen_name": "GarageRealtimeChannel",
+      "api_endpoints": [
+        {
+          "method": "WS",
+          "url": "wss://api.mator.uz/realtime?channel=garage:{user_id}",
+          "description": "Single multiplexed WebSocket. Client subscribes to `garage:{user_id}` and receives the 6 garage events listed below. Heartbeat: client sends `{type:'ping'}` every 30s; server must reply `{type:'pong'}` within 45s or client reconnects with exp-backoff jitter."
+        }
+      ],
+      "request_payload": {
+        "subscribe_frame": {
+          "type": "subscribe",
+          "channel": "garage:9a8e1d2c-4b7f-4d3e-8c2a-1f0e2b6c9d4a",
+          "events": [
+            "garage.snapshot",
+            "garage.vehicle.created",
+            "garage.vehicle.updated",
+            "garage.vehicle.deleted",
+            "garage.primary.changed",
+            "garage.vehicle.status.updated"
+          ]
+        },
+        "ping_frame": { "type": "ping", "t": 1750000000000 }
+      },
+      "response_data": {
+        "vehicle_status_updated_event": {
+          "type": "event",
+          "payload": {
+            "event": "garage.vehicle.status.updated",
+            "snapshotVersion": "garage-2026-06-11-v18",
+            "timestamp": "2026-06-11T14:55:02.413Z",
+            "vehicleId": "veh_01HXC3KF6S7T4N4LK0N1AB2X9V",
+            "status": {
+              "stage": "in_progress",
+              "label": "Replacing valve cover gasket",
+              "note": "Estimated 90 min. Will message when ready.",
+              "mechanic": "Bobur Toshpo'latov",
+              "emittedAt": "2026-06-11T14:55:02.413Z"
+            }
+          }
+        },
+        "vehicle_updated_event": {
+          "type": "event",
+          "payload": {
+            "event": "garage.vehicle.updated",
+            "snapshotVersion": "garage-2026-06-11-v19",
+            "timestamp": "2026-06-11T14:55:30.100Z",
+            "vehicle": {
+              "id": "veh_01HXC3KF6S7T4N4LK0N1AB2X9V",
+              "is_primary": true,
+              "make": { "id": "make_chevrolet", "name": "Chevrolet" },
+              "model": { "id": "model_chevrolet_cobalt", "name": "Cobalt" },
+              "year": 2019,
+              "mileage_km": 67500
+            }
+          }
+        }
+      },
+      "native_integration_details": [
+        "Frontend transport: services/garage-realtime.ts (native WebSocket — no extra dep).",
+        "Hook: hooks/use-garage-realtime.ts — ref-counted lifecycle, shares one socket across all detail-screen mounts.",
+        "Cache mutation: garageService.applyRealtimeEvent(event) — every event is applied locally, NOT refetched. Snapshot events trigger a full refetch for reconciliation.",
+        "VEHICLE_STATUS_UPDATED renders an animated cell (VehicleDetailStats) via Reanimated LinearTransition + FadeIn. Five stages mapped to semantic color tokens (queued/in_progress/awaiting_parts/ready/flagged)."
+      ]
+    },
+    {
+      "screen_name": "GarageVehicleAdapterContract",
+      "api_endpoints": [],
+      "request_payload": {
+        "client_to_server_create": {
+          "make_id": "make_chevrolet",
+          "model_id": "model_chevrolet_cobalt",
+          "year": 2019,
+          "trim_id": "trim_chevrolet_cobalt_ls_at",
+          "engine_id": "engine_b15d2_1_5l_petrol",
+          "transmission": "automatic",
+          "drivetrain": "fwd",
+          "color_hex": "#1F2A37",
+          "vin": "KL1MJ6CA8KB123456",
+          "license_plate": "01A123BC",
+          "mileage_km": 67420,
+          "nickname": "Mening Cobaltim",
+          "is_primary": true,
+          "fuel_type": "petrol"
+        }
+      },
+      "response_data": {
+        "client_facing_vehicle": {
+          "id": "veh_01HXC3KF6S7T4N4LK0N1AB2X9V",
+          "year": 2019,
+          "make": "Chevrolet",
+          "model": "Cobalt",
+          "trim": "LS AT",
+          "nickname": "Mening Cobaltim",
+          "vin": "KL1MJ6CA8KB123456",
+          "plate": "01A123BC",
+          "mileage": 67420,
+          "color": "graphite",
+          "colorHex": "#1F2A37",
+          "isPrimary": true,
+          "addedAt": 1749653255220,
+          "brandId": "make_chevrolet",
+          "modelId": "model_chevrolet_cobalt",
+          "trimId": "trim_chevrolet_cobalt_ls_at",
+          "engineId": "engine_b15d2_1_5l_petrol",
+          "engineDisplacementCc": 1485,
+          "transmission": "automatic",
+          "drivetrain": "fwd",
+          "fuelType": "petrol",
+          "brandLogoUrl": "https://cdn.mator.uz/brands/chevrolet.svg",
+          "registrationRegionCode": "01"
+        }
+      },
+      "native_integration_details": [
+        "Documentation entry — no endpoints. Captures the contract between backend's nested Vehicle DTO and the frontend's flat Vehicle type.",
+        "Adapters live in services/garage-api.ts: toClientVehicle(raw) for reads, toServerVehicleCreatePayload(input) and toServerVehiclePatchPayload(patch) for writes.",
+        "Color: backend canonical = color_hex (#RRGGBB). Frontend legacy enum (midnight/graphite/pearl/matte) derived via nearest-match in utils/vehicle-color.ts. When the UI ships a full hex picker, drop the enum from the wire payload — color_hex is the source of truth.",
+        "Units: mileage_km on the wire is kilometers (UZ market is metric). Client `mileage` is the same number — formatters label the unit centrally.",
+        "Timestamps: backend ISO strings → client epoch ms via Date.parse(). created_at becomes addedAt for backward-compat with existing hook consumers.",
+        "Realtime: events whose payload omits `make`/`model`/`trim`/`engine` are treated as partial patches — the cache is merged, not replaced."
+      ]
     }
   ]
 }

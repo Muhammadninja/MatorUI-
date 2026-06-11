@@ -11,15 +11,19 @@ import VehicleDetailActionRow from '@/components/screens-components/vehicle-deta
 import VehicleDetailHeader from '@/components/screens-components/vehicle-detail/vehicle-detail-header';
 import VehicleDetailHeadline from '@/components/screens-components/vehicle-detail/vehicle-detail-headline';
 import VehicleDetailStats from '@/components/screens-components/vehicle-detail/vehicle-detail-stats';
+import VinScannerModal from '@/components/screens-components/vin-scanner/vin-scanner-modal';
 import AppBlurView, { useBlurHeaderInset } from '@/components/shared/app-blur-view';
 import AppBottomSheet from '@/components/shared/app-bottom-sheet';
 import { AppButton } from '@/components/shared/app-button';
 import { AppInlineError } from '@/components/shared/app-inline-error';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
+import { useActiveVehicle } from '@/contexts/active-vehicle.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import useGarage from '@/hooks/use-garage';
+import useGarageRealtime from '@/hooks/use-garage-realtime';
 import { useGlobalModal } from '@/hooks/use-global-modal';
+import useVinScanner from '@/hooks/use-vin-scanner';
 import { garageService } from '@/services/garage-service';
 import { toastService } from '@/services/toast-service';
 import { triggerHaptic } from '@/utils/haptics';
@@ -38,6 +42,7 @@ function titleCase(s: string): string {
 export default function VehicleDetailScreen() {
   const { tokens } = useThemeContext();
   const { vehicles, setPrimary, removeVehicle, updateVehicle, addVehicle, error, clearError } = useGarage();
+  const { setPrimaryVehicle } = useActiveVehicle();
   const { openConfirm } = useGlobalModal();
   const params = useLocalSearchParams<{ id?: string }>();
   // peek=-24 means content paddingTop = insets.top + headerHeight + fadeHeight,
@@ -58,6 +63,42 @@ export default function VehicleDetailScreen() {
     if (!params.id) return undefined;
     return vehicles.find((v) => v.id === params.id) ?? garageService.getById(params.id);
   }, [params.id, vehicles]);
+
+  // Realtime channel subscription. The transport mutates the garage
+  // cache on incoming events, so the `vehicle.liveStatus` field above
+  // will update automatically when a mechanic broadcasts. We tap the
+  // `onEvent` callback only to play a haptic + toast for status
+  // changes on THIS vehicle, so the user gets a perceptible cue when
+  // their car's status changes while they're staring at the screen.
+  useGarageRealtime({
+    vehicleIdFilter: vehicle?.id,
+    onEvent: (event) => {
+      if (event.event !== 'garage.vehicle.status.updated') return;
+      if (!event.status) return;
+      triggerHaptic('selection');
+      if (event.status.stage === 'ready') {
+        toastService.success('Your car is ready', { description: event.status.label });
+      } else if (event.status.stage === 'flagged') {
+        toastService.danger('Mechanic flagged an issue', { description: event.status.label });
+      } else {
+        toastService.info(event.status.label, { description: event.status.note });
+      }
+    },
+  });
+
+  // VIN scanner — wired to update the vehicle's vin on success.
+  const vinScanner = useVinScanner({
+    acceptInvalidChecksum: true,
+    onResult: async (vin) => {
+      if (!vehicle) return;
+      try {
+        await updateVehicle(vehicle.id, { vin });
+        toastService.success('VIN updated', { description: vin });
+      } catch {
+        // Surfaced via the hook's error state.
+      }
+    },
+  });
 
   const openEditSheet = useCallback(() => {
     if (!vehicle) return;
@@ -109,7 +150,11 @@ export default function VehicleDetailScreen() {
     triggerHaptic('success');
     setPendingAction('set_primary');
     try {
-      await setPrimary(vehicle.id);
+      // Route through the active-vehicle context so the parts-search
+      // scope updates atomically with the backend flip. The context
+      // calls `garageService.setPrimary` for us — going through both
+      // here would double-flip.
+      await setPrimaryVehicle(vehicle.id);
       // Explicit success confirmation. Closes the "did that work?"
       // moment after the label flips back to "Already primary".
       toastService.success('Set as primary', { description: headline });
@@ -203,6 +248,7 @@ export default function VehicleDetailScreen() {
             mileage={formatMileage(vehicle.mileage)}
             plate={vehicle.plate ?? '—'}
             color={titleCase(vehicle.color)}
+            liveStatus={vehicle.liveStatus}
           />
 
           <AppView px={20} gap={10}>
@@ -215,6 +261,20 @@ export default function VehicleDetailScreen() {
               Actions
             </AppText>
 
+            <VehicleDetailActionRow
+              icon={<ScanLine size={18} strokeWidth={2} color={tokens.text} />}
+              label={vehicle.vin ? `VIN · ${vehicle.vin}` : 'Scan VIN with camera'}
+              hint={
+                vehicle.vin
+                  ? 'Tap to re-scan or replace'
+                  : 'Photograph the VIN barcode for exact-fit parts'
+              }
+              onPress={() => {
+                triggerHaptic('selection');
+                vinScanner.open();
+              }}
+              muted={isAnyMutationPending}
+            />
             <VehicleDetailActionRow
               icon={<ScanLine size={18} strokeWidth={2} color={tokens.text} />}
               label="Find compatible parts"
@@ -271,6 +331,12 @@ export default function VehicleDetailScreen() {
           onCancel={closeEditSheet}
         />
       </AppBottomSheet>
+
+      <VinScannerModal
+        visible={vinScanner.isOpen}
+        onClose={vinScanner.close}
+        onBarcodeScanned={vinScanner.onBarcodeScanned}
+      />
     </AppView>
   );
 }

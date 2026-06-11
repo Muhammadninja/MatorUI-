@@ -32,6 +32,12 @@ export default function ExploreScreen() {
   // Bumped on back-press so the SmartSearchBar's internal form remounts
   // with an empty value (the form is not externally controlled).
   const [formResetKey, setFormResetKey] = useState(0);
+  // Currently selected quick-filter brand (null = none). Intentionally
+  // decoupled from `useSearch` — tapping a brand chip should add an
+  // inline preview section to THIS screen, not swap us out for the full
+  // search-results view. The typed search bar still drives useSearch on
+  // its own, completely independently.
+  const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const { setSearchActive } = useSearchUIContext();
 
   // Signal "search is active" to the parent tab layout so the tab bar
@@ -167,15 +173,21 @@ export default function ExploreScreen() {
           contentContainerStyle={{ paddingTop: topOffset, paddingBottom: 40 }}
           contentInsetAdjustmentBehavior="never"
         >
-          <SearchQuickFilters />
-          <SearchCatalogue />
-          {/* SearchPromoBanner currently returns null while the campaigns
-           *  backend is being wired (see component for the re-enable
-           *  contract). Render call left in place so the section drops
-           *  back into the layout automatically when it starts returning
-           *  content. */}
-          <SearchPromoBanner />
-          <SearchTopFeatured />
+          <SearchQuickFilters selected={selectedBrand} onChange={setSelectedBrand} />
+          {/* Picking a brand collapses the landing into a focused view:
+           *  the catalogue and promo banner are hidden so the user's
+           *  attention sits on the brand-specific Top Featured grid.
+           *  Clearing the chip (X) restores the full layout. */}
+          {selectedBrand ? null : <SearchCatalogue />}
+          {selectedBrand ? null : (
+            // SearchPromoBanner currently returns null while the campaigns
+            // backend is being wired (see component for the re-enable
+            // contract). Render call left in place so the section drops
+            // back into the layout automatically when it starts returning
+            // content.
+            <SearchPromoBanner />
+          )}
+          <SearchTopFeatured brand={selectedBrand} />
         </AppScrollView>
       )}
 

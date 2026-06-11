@@ -9,7 +9,11 @@ export const TOP_FEATURED_FILTER_GROUPS = [
   {
     key: 'brand',
     title: 'Brand',
-    options: ['Toyota', 'BMW', 'Tesla', 'Audi'],
+    // Match the explore-screen quick-filter chips (UZ top brands) so the
+    // filter sheet and the chip row stay coherent — opening Brand in
+    // the sheet now shows the same five options the user already sees
+    // on the chip row.
+    options: ['Cobalt', 'BYD', 'Lacetti', 'Tracker', 'Leapmotor'],
   },
   {
     key: 'color',
@@ -19,7 +23,7 @@ export const TOP_FEATURED_FILTER_GROUPS = [
   {
     key: 'condition',
     title: 'Condition',
-    options: ['New', 'OEM', 'Restored', 'Budget'],
+    options: ['GM', 'OEM', 'Budget'],
   },
 ] as const;
 
@@ -44,6 +48,11 @@ export type TopFeaturedItem = {
    *  backend ships URLs; UI falls back to a placeholder when absent or
    *  empty. */
   images?: string[];
+  /** Manufacturer / OEM part number (e.g. "GM 15823942",
+   *  "BYD-1090012"). Rendered as a small gray pill on the card and
+   *  detail screen — optional so items without a number simply omit
+   *  the pill. */
+  oem?: string;
 };
 
 export type TopFeaturedFilterOptionPayload = {
@@ -104,7 +113,7 @@ export const TOP_FEATURED_SOCKET_EVENTS: TopFeaturedSocketEvent['event'][] = [
 
 export const DEFAULT_TOP_FEATURED_FILTERS: TopFeaturedFilters = {
   Model: 'SUV',
-  Brand: 'Tesla',
+  Brand: 'Cobalt',
   Color: 'Black',
   Condition: 'New',
 };
@@ -113,12 +122,17 @@ const MOCK_ITEM_ATTRIBUTES: Record<
   string,
   Omit<TopFeaturedItem, 'badge' | 'status' | 'title' | 'description' | 'price'>
 > = {
-  f1: { id: 'f1', model: 'SUV', brand: 'Tesla', color: 'Black', condition: 'New' },
-  f2: { id: 'f2', model: 'Coupe', brand: 'BMW', color: 'White', condition: 'OEM' },
-  f3: { id: 'f3', model: 'Sedan', brand: 'Toyota', color: 'Silver', condition: 'Restored' },
-  f4: { id: 'f4', model: 'Truck', brand: 'Audi', color: 'Red', condition: 'Budget' },
-  f5: { id: 'f5', model: 'SUV', brand: 'Tesla', color: 'Black', condition: 'New' },
-  f6: { id: 'f6', model: 'Coupe', brand: 'BMW', color: 'Silver', condition: 'OEM' },
+  // Brands match the explore-screen quick-filter chips (UZ top brands).
+  // Cobalt gets two items so the most-popular chip surfaces a slightly
+  // busier grid than the others when filtered. See
+  // components/screens-components/search/search-quick-filters.tsx for
+  // the canonical chip list.
+  f1: { id: 'f1', model: 'SUV', brand: 'Cobalt', color: 'Black', condition: 'New', oem: 'GM 15823942' },
+  f2: { id: 'f2', model: 'Coupe', brand: 'BYD', color: 'White', condition: 'OEM', oem: 'BYD-1090012' },
+  f3: { id: 'f3', model: 'Sedan', brand: 'Lacetti', color: 'Silver', condition: 'Restored', oem: 'OEM 96405028' },
+  f4: { id: 'f4', model: 'Truck', brand: 'Tracker', color: 'Red', condition: 'Budget', oem: 'GM 13578934' },
+  f5: { id: 'f5', model: 'SUV', brand: 'Leapmotor', color: 'Black', condition: 'New', oem: 'LM-T03-1009' },
+  f6: { id: 'f6', model: 'Coupe', brand: 'Cobalt', color: 'Silver', condition: 'OEM', oem: 'GM 96289942' },
 };
 
 const FILTER_TITLE_TO_KEY: Record<TopFeaturedFilterTitle, TopFeaturedFilterKey> = {
@@ -192,7 +206,7 @@ export function getTopFeaturedMockResponse(filters: TopFeaturedFilters): TopFeat
 
 // ── API Functions (replace mock calls when backend is ready) ─────────
 
-const API_BASE = '/api/v1/top-featured';
+const API_BASE = '/v1/top-featured';
 const MOCK_LATENCY_MS = 320;
 
 /** Same delay helper pattern as the catalog service — promise that

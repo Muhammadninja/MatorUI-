@@ -51,6 +51,7 @@ import { AppView } from '@/components/shared/app-view';
 import GlobalModalHost from '@/components/shared/global-modal-host';
 import LikesListSuggestionHost from '@/components/shared/likes-list-suggestion-host';
 import { useColorScheme } from '@/components/useColorScheme';
+import { ActiveVehicleProvider } from '@/contexts/active-vehicle.context';
 import { CartProvider } from '@/contexts/cart.context';
 import { LanguageProvider, useLanguageContext } from '@/contexts/language.context';
 import { LikesProvider } from '@/contexts/likes.context';
@@ -110,12 +111,14 @@ function RootLayoutNav() {
               <UserProvider>
                 <CartProvider>
                   <LikesProvider>
-                    <SearchUIProvider>
-                      <RootNavigation />
-                      <GlobalModalHost />
-                      <LikesListSuggestionHost />
-                      <AppToastHost />
-                    </SearchUIProvider>
+                    <ActiveVehicleProvider>
+                      <SearchUIProvider>
+                        <RootNavigation />
+                        <GlobalModalHost />
+                        <LikesListSuggestionHost />
+                        <AppToastHost />
+                      </SearchUIProvider>
+                    </ActiveVehicleProvider>
                   </LikesProvider>
                 </CartProvider>
               </UserProvider>

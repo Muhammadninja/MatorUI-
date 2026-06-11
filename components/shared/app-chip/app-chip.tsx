@@ -89,7 +89,13 @@ function resolveColors(
     return { bg: 'transparent', fg: k.bg, border: undefined as string | undefined };
   // outline
   const border = borderColorName ? tokens[borderColorName] : k.bg;
-  const fg = k.bg;
+  // For non-neutral kinds, `k.bg` is the kind's hue (e.g. tokens.primaryBg)
+  // and using it as text on a transparent bg is the standard outline look.
+  // For `neutral`, `k.bg` is `tokens.card` — a *surface* color, not a
+  // hue — which renders invisibly on top of any card-tinted parent
+  // (filter sheets, settings panels). Fall back to the kind's paired
+  // foreground (`tokens.onCard`) so neutral outline chips actually read.
+  const fg = kind === 'neutral' ? k.fg : k.bg;
   const bg = 'transparent';
   return { bg, fg, border };
 }

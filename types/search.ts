@@ -92,6 +92,24 @@ export type SearchResponse = {
   durationMs: number;
 };
 
+/**
+ * Vehicle-scoping payload appended to every parts-search request when
+ * the user has an active vehicle set in `ActiveVehicleProvider`.
+ * Server uses this to:
+ *   - narrow OEM lookup to `oem_catalog_scope` (a part-family subset)
+ *   - filter generation-specific parts via `vehicle_generation`
+ *   - bias relevance toward the matching `engine_type` when present
+ * Optional fields are omitted (not nulled) so the backend widens its
+ * query when the user hasn't disambiguated to that depth.
+ */
+export type SearchVehicleContext = {
+  brand: string;
+  model: string;
+  vehicle_generation?: string;
+  engine_type?: string;
+  oem_catalog_scope?: string;
+};
+
 export type SearchRequest = {
   query: string;
   /** Page size cap. */
@@ -110,6 +128,9 @@ export type SearchRequest = {
   userId?: string;
   /** A/B test variant the client is on; logged for analysis. */
   abVariant?: string;
+  /** Vehicle-scoping context (see SearchVehicleContext). Auto-attached
+   *  by `useSearch` when an active vehicle is set. */
+  vehicleContext?: SearchVehicleContext;
   signal?: AbortSignal;
 };
 

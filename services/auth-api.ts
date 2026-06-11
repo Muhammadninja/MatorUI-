@@ -8,10 +8,10 @@
  * so the endpoints don't 401 the bootstrap call.
  *
  * Backend contract assumed:
- *   POST /api/v1/auth/sign-in    { email, password }       → AuthResult
- *   POST /api/v1/auth/sign-up    { email, password, ... }  → AuthResult
- *   POST /api/v1/auth/refresh    { refreshToken }          → AuthResult
- *   POST /api/v1/auth/sign-out   { refreshToken }          → 204
+ *   POST /v1/auth/sign-in    { email, password }       → AuthResult
+ *   POST /v1/auth/sign-up    { email, password, ... }  → AuthResult
+ *   POST /v1/auth/refresh    { refreshToken }          → AuthResult
+ *   POST /v1/auth/sign-out   { refreshToken }          → 204
  *
  * AuthResult = { accessToken, refreshToken, expiresIn?, user }
  */
@@ -117,7 +117,7 @@ type RawAuthResponse = {
 
 class HttpAuthTransport implements AuthTransport {
   async signIn(input: SignInInput, signal?: AbortSignal): Promise<AuthResult> {
-    const r = await apiClient.post<RawAuthResponse>('/api/v1/auth/sign-in', input, {
+    const r = await apiClient.post<RawAuthResponse>('/v1/auth/sign-in', input, {
       signal,
       skipAuth: true,
     });
@@ -125,7 +125,7 @@ class HttpAuthTransport implements AuthTransport {
   }
 
   async signUp(input: SignUpInput, signal?: AbortSignal): Promise<AuthResult> {
-    const r = await apiClient.post<RawAuthResponse>('/api/v1/auth/sign-up', input, {
+    const r = await apiClient.post<RawAuthResponse>('/v1/auth/sign-up', input, {
       signal,
       skipAuth: true,
     });
@@ -135,7 +135,7 @@ class HttpAuthTransport implements AuthTransport {
   async refresh(refreshToken: string, signal?: AbortSignal): Promise<AuthResult | null> {
     try {
       const r = await apiClient.post<RawAuthResponse>(
-        '/api/v1/auth/refresh',
+        '/v1/auth/refresh',
         { refreshToken },
         { signal, skipAuth: true, maxRetries: 0 },
       );
@@ -148,7 +148,7 @@ class HttpAuthTransport implements AuthTransport {
   }
 
   async signOut(refreshToken: string, signal?: AbortSignal): Promise<void> {
-    await apiClient.post('/api/v1/auth/sign-out', { refreshToken }, { signal });
+    await apiClient.post('/v1/auth/sign-out', { refreshToken }, { signal });
   }
 }
 

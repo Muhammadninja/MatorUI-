@@ -7,8 +7,8 @@
  * through the same `apiClient` so 401 handling is centralized.
  *
  * Backend contract:
- *   GET   /api/v1/me   → UserSummary
- *   PATCH /api/v1/me   → UserSummary  (partial body merged server-side)
+ *   GET   /v1/me  → UserSummary
+ *   PATCH /v1/me  → UserSummary  (partial body merged server-side)
  */
 
 import { shouldUseHttpTransport } from '@/config/api';
@@ -61,11 +61,11 @@ function delay(ms: number): Promise<void> {
 
 class HttpUserTransport implements UserTransport {
   getMe(signal?: AbortSignal): Promise<UserSummary> {
-    return apiClient.get<UserSummary>('/api/v1/me', { signal });
+    return apiClient.get<UserSummary>('/v1/me', { signal });
   }
 
   updateMe(patch: UserPatch, signal?: AbortSignal): Promise<UserSummary> {
-    return apiClient.patch<UserSummary>('/api/v1/me', patch, { signal });
+    return apiClient.patch<UserSummary>('/v1/me', patch, { signal });
   }
 }
 

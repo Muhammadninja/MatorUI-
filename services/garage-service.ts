@@ -9,6 +9,56 @@ import {
 
 export type VehicleColor = 'midnight' | 'graphite' | 'pearl' | 'matte';
 
+/** Drivetrain configuration. Mirrors backend's `drivetrain` enum on
+ *  the garage Vehicle DTO. Optional today (older vehicles created
+ *  before this field shipped won't have it). */
+export type VehicleDrivetrain = 'fwd' | 'rwd' | 'awd' | '4wd';
+
+/** Transmission type. Subset of the UZ-catalog `TransmissionType` —
+ *  kept here as a separate alias so the garage DTO stays
+ *  self-contained and the catalog isn't a load-bearing dependency for
+ *  every Vehicle consumer. */
+export type VehicleTransmission = 'manual' | 'automatic' | 'cvt' | 'dct' | 'amt';
+
+/** Fuel type. Required by the parts-search compatibility engine on
+ *  the backend (different fuel = different intake / exhaust parts). */
+export type VehicleFuelType = 'petrol' | 'diesel' | 'hybrid' | 'phev' | 'ev' | 'cng' | 'lpg';
+
+/** 3D model payload — backend ships a GLB + KTX2 texture archive per
+ *  vehicle so the detail screen can render an interactive walkaround.
+ *  Optional because (a) the model layer isn't built yet on this app
+ *  and (b) older vehicles in the catalog don't have a 3D asset. */
+export type VehicleModel3d = {
+  glbUrl: string;
+  ktx2TexturesUrl: string;
+  version: number;
+  byteSize: number;
+  checksumSha256: string;
+  tuningVariants?: Array<{ id: string; name: string; thumbnailUrl: string }>;
+};
+
+/**
+ * Live status broadcast by an external mechanic's dashboard via the
+ * realtime channel. Drives the animated cell on the Vehicle Detail
+ * screen — null/undefined means "no active job", any other value
+ * means a mechanic has reported on this vehicle in the last few hours.
+ */
+export type VehicleLiveStatus = {
+  /** Coarse stage of work — drives the cell's color tint. */
+  stage: 'queued' | 'in_progress' | 'awaiting_parts' | 'ready' | 'flagged';
+  /** Short label shown in the stats cell (e.g. "Diagnosing", "Brake
+   *  pads ordered", "Test drive"). Backend-localized. */
+  label: string;
+  /** Free-form note from the mechanic, surfaced as the cell's
+   *  subtitle when present. */
+  note?: string;
+  /** Mechanic's display name — surfaced in the detail screen header
+   *  as the source of the live update. */
+  mechanic?: string;
+  /** ISO timestamp the status was emitted. UI shows "5m ago" etc. */
+  emittedAt?: string;
+};
+
 export type Vehicle = {
   id: string;
   year: number;
@@ -26,6 +76,45 @@ export type Vehicle = {
    *  Cards prefer `images[0]`; when missing or empty, fall back to the
    *  seeded Picsum placeholder so the dev surface still gets variety. */
   images?: string[];
+  /** Fitment ids from the UZ catalog (`services/uz-vehicle-catalog.ts`).
+   *  Optional during the migration — older vehicles created before the
+   *  catalog rollout only have the free-text `make`/`model` fields.
+   *  Parts-search uses these when present for exact OEM scope; falls
+   *  back to text-match resolution otherwise. */
+  brandId?: string;
+  modelId?: string;
+  generationId?: string;
+  trimId?: string;
+  engineId?: string;
+  /** Live mechanic-dashboard status (see VehicleLiveStatus). Populated
+   *  exclusively by the realtime channel — never persisted server-side
+   *  on the Vehicle record itself, so a refetch always clears it
+   *  unless the channel re-emits. */
+  liveStatus?: VehicleLiveStatus;
+  // ── Backend-aligned optional fields (UZ market) ────────────────────
+  /** Backend's truthful color value (`#1F2A37`). The legacy `color`
+   *  enum is derived from this via nearest-match for surfaces that
+   *  haven't migrated to picking from a full hex picker yet. */
+  colorHex?: string;
+  transmission?: VehicleTransmission;
+  drivetrain?: VehicleDrivetrain;
+  fuelType?: VehicleFuelType;
+  /** Engine displacement in cc, copied from backend's
+   *  `engine.displacement_cc`. Used by the parts-search compatibility
+   *  engine alongside `engineId`. */
+  engineDisplacementCc?: number;
+  /** Brand logo URL (CDN). Comes from backend's `make.logo_url` —
+   *  rendered on the primary-vehicle card and the action-row. */
+  brandLogoUrl?: string;
+  /** UZ registration region prefix from the plate (e.g. `01`
+   *  Toshkent). Useful for delivery-region defaults in the parts
+   *  catalog. Server-derived from `license_plate`; clients should NOT
+   *  set it on create — backend will fill. */
+  registrationRegionCode?: string;
+  /** 3D model + textures + tuning variants for the detail-screen
+   *  walkaround. Optional — only populated for vehicles the backend
+   *  has a CAD asset for. */
+  model3d?: VehicleModel3d;
 };
 
 export type VehicleInput = Omit<Vehicle, 'id' | 'isPrimary' | 'addedAt'> & {
@@ -48,13 +137,19 @@ export type GarageSocketEvent = {
     | 'garage.vehicle.created'
     | 'garage.vehicle.updated'
     | 'garage.vehicle.deleted'
-    | 'garage.primary.changed';
+    | 'garage.primary.changed'
+    /** Mechanic-broadcast live status change. Carries `vehicleId` and
+     *  `status`; the client applies it to the cache WITHOUT a refetch,
+     *  so the stats panel animates immediately. */
+    | 'garage.vehicle.status.updated';
   /** Server-issued snapshot version. Lets late subscribers reconcile
    *  with the latest cache without re-fetching the full list. */
   snapshotVersion: string;
   timestamp: string;
   vehicle?: Vehicle;
   vehicleId?: string;
+  /** Carried by `garage.vehicle.status.updated`. */
+  status?: VehicleLiveStatus | null;
 };
 
 export const GARAGE_SOCKET_CHANNEL = 'garage:vehicles';
@@ -64,6 +159,7 @@ export const GARAGE_SOCKET_EVENTS: GarageSocketEvent['event'][] = [
   'garage.vehicle.updated',
   'garage.vehicle.deleted',
   'garage.primary.changed',
+  'garage.vehicle.status.updated',
 ];
 
 type GarageListener = (vehicles: Vehicle[]) => void;
@@ -177,6 +273,69 @@ class GarageService {
     const nextList = await this.transport.setPrimary(id, signal);
     this.vehicles = nextList;
     this.emit();
+  }
+
+  /**
+   * Apply a single realtime event to the in-memory cache and broadcast
+   * to subscribers — NO network call. Lets the WebSocket consumer
+   * (`hooks/use-garage-realtime.ts`) deliver mechanic-dashboard updates
+   * to the UI in <50ms without paying for a list refetch.
+   *
+   * Snapshot events trigger a refetch (server tells us "your cache is
+   * stale, refresh"), everything else is applied locally.
+   */
+  applyRealtimeEvent(event: GarageSocketEvent): void {
+    switch (event.event) {
+      case 'garage.snapshot': {
+        // Snapshot means our cache version disagrees with the server's
+        // — fastest reconciliation is to refetch.
+        void this.refresh().catch(() => {});
+        return;
+      }
+      case 'garage.vehicle.created': {
+        if (!event.vehicle) return;
+        if (this.vehicles.some((v) => v.id === event.vehicle!.id)) return;
+        this.vehicles = [event.vehicle, ...this.vehicles];
+        this.emit();
+        return;
+      }
+      case 'garage.vehicle.updated': {
+        if (!event.vehicle) return;
+        const v = event.vehicle;
+        this.vehicles = this.vehicles.map((curr) =>
+          curr.id === v.id ? { ...curr, ...v } : curr,
+        );
+        this.emit();
+        return;
+      }
+      case 'garage.vehicle.deleted': {
+        if (!event.vehicleId) return;
+        this.vehicles = this.vehicles.filter((v) => v.id !== event.vehicleId);
+        this.emit();
+        return;
+      }
+      case 'garage.primary.changed': {
+        if (!event.vehicleId) return;
+        const targetId = event.vehicleId;
+        this.vehicles = this.vehicles.map((v) => ({ ...v, isPrimary: v.id === targetId }));
+        this.emit();
+        return;
+      }
+      case 'garage.vehicle.status.updated': {
+        if (!event.vehicleId) return;
+        const targetId = event.vehicleId;
+        // `null` is meaningful — clears the live status. Distinguish
+        // it from `undefined` (no status field on the event payload
+        // at all, which we treat as a no-op).
+        const next = event.status === undefined ? undefined : event.status ?? undefined;
+        if (next === undefined && event.status !== null) return;
+        this.vehicles = this.vehicles.map((v) =>
+          v.id === targetId ? { ...v, liveStatus: next } : v,
+        );
+        this.emit();
+        return;
+      }
+    }
   }
 
   private emit(): void {

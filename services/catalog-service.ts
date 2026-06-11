@@ -15,6 +15,11 @@ export type CatalogItem = {
   specs: CatalogItemSpec[];
   features: string[];
   category: string;
+  /** Manufacturer / OEM part number ("GM 15823942", "BYD-1090012",
+   *  etc.). Rendered as a small gray pill on the card and detail
+   *  screen so shoppers can cross-reference against existing parts.
+   *  Optional — items without a number simply omit the pill. */
+  oem?: string;
 };
 
 export type CatalogItemSpec = {
@@ -96,6 +101,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     specs: MOCK_SPECS,
     features: MOCK_FEATURES,
     category: 'sedan',
+    oem: 'GM 96289942',
   },
   {
     id: 'northline-suv',
@@ -113,6 +119,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     ],
     features: MOCK_FEATURES,
     category: 'suv',
+    oem: 'NL-SUV-8801',
   },
   {
     id: 'aero-coupe-s',
@@ -130,6 +137,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     ],
     features: MOCK_FEATURES,
     category: 'coupe',
+    oem: 'AC-S-2204',
   },
   {
     id: 'trail-pro-ev',
@@ -147,6 +155,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     ],
     features: MOCK_FEATURES,
     category: 'truck',
+    oem: 'GM 13578901',
   },
   // Test fixture for the "Mator Verified" ribbon. The id is chosen so
   // that `(hashCode(id) * 7) % tagOptions.length === 2` in variant.ts,
@@ -169,6 +178,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     ],
     features: MOCK_FEATURES,
     category: 'sedan',
+    oem: 'MTR-EL-001',
   },
   // Test fixture for the COMPOSITE "Elite Pick" ribbon (Option A
   // escalation). This product qualifies for all three signal sources:
@@ -194,6 +204,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     ],
     features: MOCK_FEATURES,
     category: 'sedan',
+    oem: 'MTR-PR-001',
   },
 ];
 
@@ -247,7 +258,7 @@ export function getCatalogMockDetail(id: string): CatalogDetailResponse | null {
 import { shouldUseHttpTransport } from '@/config/api';
 import { apiClient, ApiError } from '@/services/api-client';
 
-const API_BASE = '/api/v1/catalog';
+const API_BASE = '/v1/catalog';
 const MOCK_LATENCY_MS = 350;
 
 export interface CatalogTransport {

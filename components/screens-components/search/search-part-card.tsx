@@ -38,6 +38,10 @@ export type SearchPartCardProps = {
   compact?: boolean;
   style?: StyleProp<ViewStyle>;
   onPress?: () => void;
+  /** Manufacturer / OEM part number. When set, renders as a small gray
+   *  pill below the add-to-cart row so shoppers can cross-reference
+   *  against an existing part. Omit to hide the pill entirely. */
+  oem?: string;
 };
 
 export default function SearchPartCard({
@@ -54,6 +58,7 @@ export default function SearchPartCard({
   compact = false,
   style,
   onPress,
+  oem,
 }: SearchPartCardProps) {
   const { tokens } = useThemeContext();
   const { addItem } = useCartContext();
@@ -179,24 +184,62 @@ export default function SearchPartCard({
               fullWidth
               onPress={handleAddToCart}
             />
+            {oem ? (
+              <AppView
+                rounded={8}
+                px={8}
+                py={4}
+                style={{ alignSelf: 'flex-start', backgroundColor: tokens.gray100 }}
+              >
+                <AppText textVariant="bodyXs" colorName="gray400">
+                  OEM {oem}
+                </AppText>
+              </AppView>
+            ) : null}
           </AppView>
         ) : (
-          <AppView row align="center" justify="space-between" gap={12}>
-            <AppView gap={2} style={{ flex: 1 }}>
-              <AppText textVariant="bodyXs" colorName="gray400">
-                {priceLabel}
-              </AppText>
-              <AppText textVariant={priceVariant} family="heading">
-                {price}
-              </AppText>
+          <AppView gap={8}>
+            <AppView row align="center" justify="space-between" gap={12}>
+              <AppView gap={2} style={{ flex: 1 }}>
+                <AppText textVariant="bodyXs" colorName="gray400">
+                  {priceLabel}
+                </AppText>
+                {/* numberOfLines + adjustsFontSizeToFit: long prices
+                 *  (e.g. "UZS 11,008,400") would otherwise wrap to a
+                 *  second line because the price column gets whatever
+                 *  width is left after the fixed-size button. One-line
+                 *  clamp + auto-shrink fits any length without
+                 *  truncating digits. */}
+                <AppText
+                  textVariant={priceVariant}
+                  family="heading"
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.7}
+                >
+                  {price}
+                </AppText>
+              </AppView>
+              <AppButton
+                title={wasJustAdded ? 'Added' : actionLabel}
+                kind="secondary"
+                size="sm"
+                containerStyle={{ flexShrink: 0 }}
+                onPress={handleAddToCart}
+              />
             </AppView>
-            <AppButton
-              title={wasJustAdded ? 'Added' : actionLabel}
-              kind="secondary"
-              size="sm"
-              containerStyle={{ flexShrink: 0 }}
-              onPress={handleAddToCart}
-            />
+            {oem ? (
+              <AppView
+                rounded={8}
+                px={8}
+                py={4}
+                style={{ alignSelf: 'flex-start', backgroundColor: tokens.gray100 }}
+              >
+                <AppText textVariant="bodyXs" colorName="gray400">
+                   {oem}
+                </AppText>
+              </AppView>
+            ) : null}
           </AppView>
         )}
       </AppView>

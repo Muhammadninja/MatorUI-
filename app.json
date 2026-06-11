@@ -13,7 +13,8 @@
       "bundleIdentifier": "com.fotih12.matorui",
       "infoPlist": {
         "UIViewControllerBasedStatusBarAppearance": true,
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Mator scans your VIN barcode to fit parts exactly to your vehicle."
       }
     },
     "android": {
@@ -25,7 +26,8 @@
       },
       "predictiveBackGestureEnabled": false,
       "edgeToEdgeEnabled": true,
-      "package": "com.fotih12.matorui"
+      "package": "com.fotih12.matorui",
+      "permissions": ["android.permission.CAMERA"]
     },
     "web": {
       "bundler": "metro",
@@ -45,6 +47,12 @@
       "expo-image",
       "expo-sharing",
       "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Mator scans your VIN barcode to fit parts exactly to your vehicle."
+        }
+      ],
       [
         "@sentry/react-native/expo",
         {

@@ -1,3 +1,4 @@
+import { UZ_BRANDS, getModelsForBrand } from '@/services/uz-vehicle-catalog';
 import AppTextField from '@/components/shared/app-text-field';
 import { AppView } from '@/components/shared/app-view';
 
@@ -8,7 +9,8 @@ export type VehicleFieldKey =
   | 'trim'
   | 'nickname'
   | 'mileage'
-  | 'plate';
+  | 'plate'
+  | 'vin';
 
 export type VehicleFieldValues = Record<VehicleFieldKey, string>;
 
@@ -27,25 +29,44 @@ type FieldConfig = {
 
 type FieldRow = FieldConfig | FieldConfig[];
 
+// Pull the top brand + a popular model from the UZ catalog so the
+// placeholder reflects what most users actually own here (Chevrolet
+// Cobalt) instead of a generic "Toyota". Falls back to literals if the
+// catalog is empty in some bundling edge case.
+const PLACEHOLDER_BRAND = UZ_BRANDS.find((b) => b.tier === 'uz_top')?.label ?? 'Chevrolet';
+const PLACEHOLDER_MODEL =
+  getModelsForBrand(UZ_BRANDS.find((b) => b.tier === 'uz_top')?.id ?? 'chevrolet')[0]?.label ??
+  'Cobalt';
+
 const SCHEMA: FieldRow[] = [
   [
     { key: 'year', label: 'Year', placeholder: '2024', flex: 1, required: true },
     {
       key: 'make',
       label: 'Make',
-      placeholder: 'Toyota',
+      placeholder: PLACEHOLDER_BRAND,
       autoCapitalize: 'words',
       flex: 2,
       required: true,
     },
   ],
-  { key: 'model', label: 'Model', placeholder: '4Runner', autoCapitalize: 'words', required: true },
+  {
+    key: 'model',
+    label: 'Model',
+    placeholder: PLACEHOLDER_MODEL,
+    autoCapitalize: 'words',
+    required: true,
+  },
   [
-    { key: 'trim', label: 'Trim', placeholder: 'TRD Pro', autoCapitalize: 'words', flex: 1 },
-    { key: 'nickname', label: 'Nickname', placeholder: 'Trail truck', flex: 1 },
+    { key: 'trim', label: 'Trim', placeholder: 'Premier', autoCapitalize: 'words', flex: 1 },
+    { key: 'nickname', label: 'Nickname', placeholder: 'Daily driver', flex: 1 },
   ],
-  { key: 'mileage', label: 'Mileage', placeholder: '18,540' },
-  { key: 'plate', label: 'Plate', placeholder: 'TRD4RNR', autoCapitalize: 'characters' },
+  { key: 'mileage', label: 'Mileage', placeholder: '52,840' },
+  { key: 'plate', label: 'Plate', placeholder: '01A123BC', autoCapitalize: 'characters' },
+  // VIN is wired to the camera scanner via `vin-scanner-modal.tsx`.
+  // Form field stays editable for manual entry / paste — scanner just
+  // pre-populates it.
+  { key: 'vin', label: 'VIN', placeholder: '17-character VIN', autoCapitalize: 'characters' },
 ];
 
 /** Exposed so the wizard can know which keys are required without duplicating the schema. */
