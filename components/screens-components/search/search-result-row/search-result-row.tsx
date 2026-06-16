@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { Modal, Pressable, StyleSheet } from 'react-native';
 
 import AppImage from '@/components/shared/app-image';
@@ -39,7 +39,7 @@ export type SearchResultRowProps = {
  * own file under `./`. This file owns only the wrapper pressable and
  * the per-card derived data (rating, review count, variant).
  */
-export default function SearchResultRow({
+function SearchResultRow({
   result,
   query,
   isCheapest,
@@ -175,3 +175,5 @@ export default function SearchResultRow({
     </AppPressableView>
   );
 }
+
+export default memo(SearchResultRow);

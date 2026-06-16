@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { Box, ChevronRight, PackageX } from 'lucide-react-native';
+import { memo, useCallback } from 'react';
 
 import OrderRowSkeleton from '@/components/screens-components/orders/order-row-skeleton';
 
@@ -57,18 +58,24 @@ export default function OrderHistoryScreen() {
     </AppView>
   );
 
+  const keyExtractor = useCallback((order: OrderListRow) => order.id, []);
+  const renderItem = useCallback(
+    ({ item }: { item: OrderListRow }) => (
+      <AppView px="lg" pb="md">
+        <OrderRow order={item} />
+      </AppView>
+    ),
+    [],
+  );
+
   return (
     <AppView flex={1} colorName="background">
       <AppSettingsHeader title="Order History" fallbackHref="/profile" />
       {isList ? (
         <AppList<OrderListRow>
           data={orders}
-          keyExtractor={(order) => order.id}
-          renderItem={({ item }) => (
-            <AppView px="lg" pb="md">
-              <OrderRow order={item} />
-            </AppView>
-          )}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
           ListHeaderComponent={header}
           contentContainerStyle={{ paddingTop: 8, paddingBottom: 32 }}
           showsVerticalScrollIndicator={false}
@@ -104,7 +111,7 @@ function orderCountLabel(state: ReturnType<typeof useOrders>['state'], total: nu
   return ' ';
 }
 
-function OrderRow({ order }: { order: OrderListRow }) {
+const OrderRow = memo(function OrderRow({ order }: { order: OrderListRow }) {
   const { tokens } = useThemeContext();
   const isActionable = IN_PROCESS_STATUSES.has(order.status);
   const handlePress = isActionable
@@ -196,7 +203,7 @@ function OrderRow({ order }: { order: OrderListRow }) {
       </AppView>
     </AppPressableView>
   );
-}
+});
 
 function EmptyCard() {
   const { tokens } = useThemeContext();

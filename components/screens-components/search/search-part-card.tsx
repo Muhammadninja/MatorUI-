@@ -3,7 +3,7 @@ import { useCartContext } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import { toastService } from '@/services/toast-service';
 import { triggerHaptic } from '@/utils/haptics';
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 
 import { AppButton } from '../../shared/app-button';
@@ -44,7 +44,7 @@ export type SearchPartCardProps = {
   oem?: string;
 };
 
-export default function SearchPartCard({
+function SearchPartCard({
   id,
   badge,
   status = 'Ready to ship',
@@ -246,3 +246,5 @@ export default function SearchPartCard({
     </AppCard>
   );
 }
+
+export default memo(SearchPartCard);
