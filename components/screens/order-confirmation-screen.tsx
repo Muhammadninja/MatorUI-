@@ -26,13 +26,16 @@ export default function OrderConfirmationScreen() {
 
   const viewOrderDetails = () => {
     triggerHaptic('selection');
-    // Replace the confirmation with track-order so Back from track-order
-    // lands on cart — the confirmation is a transient success state and
-    // shouldn't be revisited.
+    // Track-order lives on the root stack (above the tabs) so all four
+    // entry points (cart, confirmation, order-history, AI chat) get
+    // honest back behavior. Drop the cart stack back to /cart first so
+    // Back from track-order returns to cart, not the transient
+    // confirmation/checkout history.
     const href = orderId
       ? `/track-order?orderId=${encodeURIComponent(orderId)}`
       : '/track-order';
-    router.replace(href as never);
+    router.dismissTo('/cart');
+    router.push(href as never);
   };
 
   return (

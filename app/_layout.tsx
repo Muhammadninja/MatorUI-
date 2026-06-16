@@ -207,19 +207,32 @@ function RootNavigation() {
             }}
           />
           <Stack.Screen
+            name="modal"
+            options={{
+              presentation: 'modal',
+              animation: 'slide_from_bottom',
+              gestureEnabled: true,
+              gestureDirection: 'vertical',
+            }}
+          />
+          <Stack.Screen
+            name="notifications"
+            options={{
+              headerShown: false,
+              animation: 'slide_from_right',
+              gestureEnabled: true,
+              gestureDirection: 'horizontal',
+            }}
+          />
+          <Stack.Screen
             name="track-order"
             options={{
               headerShown: false,
               animation: 'slide_from_right',
               gestureEnabled: true,
+              gestureDirection: 'horizontal',
             }}
           />
-          <Stack.Screen
-            name="select-language"
-            options={{ headerShown: false, animation: 'fade', gestureEnabled: false }}
-          />
-          <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="notifications" options={{ headerShown: false }} />
         </Stack>
       </NavigationThemeProvider>
     </AppView>

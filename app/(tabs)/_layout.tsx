@@ -38,7 +38,9 @@ export default function TabLayout() {
         if (isSearchActive) return null;
 
         // Hide tab bar when the active tab is showing a secondary stack screen
-        // (e.g. /track-order under (cart), /item-detail under (explore)).
+        // (e.g. /item-detail under (explore)). Note: /track-order lives on
+        // the root stack (above the tabs), so it covers the tab bar without
+        // needing this check.
         const activeRoute = state.routes[state.index];
         const activeTabKey = activeRoute?.name as TabKey | undefined;
         if (activeTabKey && activeTabKey in TAB_META) {
