@@ -64,7 +64,7 @@ function LoadingState({ topInset }: { topInset: number }) {
 function NotFoundState({ topInset, orderId }: { topInset: number; orderId: string | null }) {
   const { tokens } = useThemeContext();
   return (
-    <AppView flex={1} justify="center" align="center" px={32} gap={12} style={{ paddingTop: topInset }}>
+    <AppView flex={1} justify="center" align="center" px="xxl" gap="md" style={{ paddingTop: topInset }}>
       <AppView
         center
         rounded={36}
@@ -96,7 +96,7 @@ function ErrorState({
 }) {
   const { tokens } = useThemeContext();
   return (
-    <AppView flex={1} justify="center" align="center" px={32} gap={12} style={{ paddingTop: topInset }}>
+    <AppView flex={1} justify="center" align="center" px="xxl" gap="md" style={{ paddingTop: topInset }}>
       <AppText textVariant="bodySemibold" align="center">
         Could not load order
       </AppText>
@@ -152,11 +152,11 @@ function OrderBody({ order, topInset }: { order: OrderDetail; topInset: number }
       <AppView gap={14}>
         {/* Status + order ID */}
         <AppView gap={6}>
-          <AppView row align="center" gap={8}>
+          <AppView row align="center" gap="sm">
             <AppView
               rounded={36}
               px={10}
-              py={4}
+              py="xs"
               style={{
                 backgroundColor: scheme === 'dark' ? tokens.card : tokens.white,
                 borderWidth: 1,
@@ -190,8 +190,8 @@ function OrderBody({ order, topInset }: { order: OrderDetail; topInset: number }
         {/* Step tracker */}
         <AppView
           rounded={24}
-          px={16}
-          py={16}
+          px="lg"
+          py="lg"
           gap={14}
           style={{
             borderWidth: 1,
@@ -226,7 +226,7 @@ function OrderBody({ order, topInset }: { order: OrderDetail; topInset: number }
               const iconColor = isPending ? tokens.gray400 : tokens.white;
 
               return (
-                <AppView key={step.key} row align="flex-start" gap={12}>
+                <AppView key={step.key} row align="flex-start" gap="md">
                   <AppView align="center" style={{ width: 28 }}>
                     <AppView
                       center
@@ -300,9 +300,9 @@ function OrderBody({ order, topInset }: { order: OrderDetail; topInset: number }
         {/* Items in this order */}
         <AppView
           rounded={24}
-          px={16}
-          py={16}
-          gap={12}
+          px="lg"
+          py="lg"
+          gap="md"
           style={{
             borderWidth: 1,
             borderColor: tokens.border,
@@ -318,7 +318,7 @@ function OrderBody({ order, topInset }: { order: OrderDetail; topInset: number }
             </AppText>
           </AppView>
           {order.items.map((item) => (
-            <AppView key={item.id} row align="center" gap={12}>
+            <AppView key={item.id} row align="center" gap="md">
               <AppImage
                 source={
                   item.imageUrl
@@ -361,9 +361,9 @@ function CourierCard({
   return (
     <AppView
       rounded={24}
-      px={16}
-      py={16}
-      gap={12}
+      px="lg"
+      py="lg"
+      gap="md"
       style={{
         borderWidth: 1,
         borderColor: tokens.border,
@@ -378,7 +378,7 @@ function CourierCard({
           ★ {courier.rating}
         </AppText>
       </AppView>
-      <AppView row align="center" gap={12}>
+      <AppView row align="center" gap="md">
         <AppImage
           source={
             courier.avatarUrl

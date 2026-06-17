@@ -77,7 +77,7 @@ export function VinScannerOverlay({ hint }: VinScannerOverlayProps) {
       </AppView>
       <AppView style={[styles.scrim, { backgroundColor: tokens.scrim, flex: 1 }]}>
         {hint ? (
-          <AppView pt={24} px={24} align="center">
+          <AppView pt="xl" px="xl" align="center">
             <AppText
               textVariant="bodySm"
               style={{ color: tokens.white, textAlign: 'center', maxWidth: 280 }}

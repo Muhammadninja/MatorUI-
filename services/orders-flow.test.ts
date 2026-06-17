@@ -100,7 +100,7 @@ describe('MockOrdersTransport — createOrder', () => {
     const transport = new MockOrdersTransport();
     const result = await transport.createOrder(BASE_INPUT);
     expect(result.orderId).toMatch(/^M-\d{5}$/);
-    expect(result.eta).toBe('1–2 business days'); // express
+    expect(result.eta).toBe('1-2 business days'); // express
   });
 
   test('seeds a fresh detail row so track-order can fetch the new id', async () => {
@@ -126,7 +126,7 @@ describe('MockOrdersTransport — createOrder', () => {
       ...BASE_INPUT,
       shippingOptionKey: 'standard',
     });
-    expect(standard.eta).toBe('3–5 business days');
+    expect(standard.eta).toBe('3-5 business days');
     const sameDay = await transport.createOrder({
       ...BASE_INPUT,
       shippingOptionKey: 'same_day',

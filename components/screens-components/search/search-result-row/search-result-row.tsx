@@ -90,12 +90,12 @@ function SearchResultRow({
         <AppView
           flex={1}
           justify="space-between"
-          pb={12}
+          pb="md"
         >
           {/* Title row + heart LikeButton on the right. Title can grow up
            *  to 3 lines; LikeButton stays pinned to the top-right corner. */}
           <AppView row gap={30} align="flex-start">
-            <AppView mt={12} style={{ flex: 1 }}>
+            <AppView mt="md" style={{ flex: 1 }}>
               <HighlightedTitle text={result.title} query={query} />
             </AppView>
             <LikeButton liked={liked} onToggle={() => toggleLike(result.id)} />
@@ -106,7 +106,7 @@ function SearchResultRow({
            *  bottom-right. align="flex-end" aligns the button with the
            *  bottom edge of the info column so it sits next to whichever
            *  row is last (rating, status, or delivery). */}
-          <AppView row align="flex-end" gap={8}>
+          <AppView row align="flex-end" gap="sm">
             <AppView flex={1}>
               <PriceBlock
                 priceLabel={result.priceLabel}
@@ -127,7 +127,7 @@ function SearchResultRow({
                 />
               ) : null}
             </AppView>
-            <AppView mr={8}>
+            <AppView mr="sm">
               <AddToCartButton onPress={handleAddToCart} />
             </AppView>
           </AppView>

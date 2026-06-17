@@ -21,7 +21,7 @@ export function AddVehicleHeader({ title, canSubmit, onBack, onSubmit }: AddVehi
           <AppPressableView
             androidRipple={false}
             onPress={onBack}
-            hitSlop={8}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             accessibilityLabel="Go back"
           >
             <AppView row align="center">

@@ -29,14 +29,14 @@ export default function CartItemCard({
       rounded={16}
       px={14}
       py={14}
-      gap={12}
+      gap="md"
       style={{
         borderWidth: 1,
         borderColor: tokens.border,
         backgroundColor: scheme === 'dark' ? tokens.card : tokens.white,
       }}
     >
-      <AppView row align="center" gap={12}>
+      <AppView row align="center" gap="md">
         <AppImage
           source={imageSource}
           width={64}
@@ -45,7 +45,7 @@ export default function CartItemCard({
           contentFit="cover"
           alt={item.title}
         />
-        <AppView gap={4} style={{ flex: 1 }}>
+        <AppView gap="xs" style={{ flex: 1 }}>
           <AppText textVariant="bodySemibold" numberOfLines={2}>
             {item.title}
           </AppText>
@@ -56,7 +56,7 @@ export default function CartItemCard({
         </AppView>
         <AppText textVariant="bodySemibold">{item.price}</AppText>
       </AppView>
-      <AppView row align="center" justify="space-between" gap={12}>
+      <AppView row align="center" justify="space-between" gap="md">
         <AppPressableView
           onPress={onRemove}
           p={6}
@@ -66,7 +66,7 @@ export default function CartItemCard({
         >
           <Trash2 size={18} strokeWidth={2} color={tokens.gray400} />
         </AppPressableView>
-        <AppView row align="center" gap={4}>
+        <AppView row align="center" gap="xs">
           <AppPressableView
             rounded={8}
             px={10}
@@ -77,6 +77,7 @@ export default function CartItemCard({
             onPress={onDecrement}
             accessibilityRole="button"
             accessibilityLabel={`Decrease quantity of ${item.title}`}
+            hitSlop={{ top: 9, bottom: 9, left: 8, right: 8 }}
           >
             <Minus size={14} strokeWidth={2.2} color={tokens.text} />
           </AppPressableView>
@@ -97,6 +98,7 @@ export default function CartItemCard({
             onPress={onIncrement}
             accessibilityRole="button"
             accessibilityLabel={`Increase quantity of ${item.title}`}
+            hitSlop={{ top: 9, bottom: 9, left: 8, right: 8 }}
           >
             <Plus size={14} strokeWidth={2.2} color={tokens.text} />
           </AppPressableView>

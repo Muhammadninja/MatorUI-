@@ -18,7 +18,7 @@ export default function DeliveryRow({
   // also follows the theme.
   const color = delivery.kind === 'free' ? tokens.success : tokens.gray400;
   return (
-    <AppView row align="center" gap={4}>
+    <AppView row align="center" gap="xs">
       <Truck size={12} strokeWidth={2} color={color} />
       <AppText
         textVariant="bodyXs"

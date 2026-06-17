@@ -16,9 +16,9 @@ export type GarageVehicleTileProps = {
   onFindParts?: (id: string) => void;
 };
 
-function formatMileage(mi?: number): string {
-  if (!mi && mi !== 0) return '— mi';
-  return `${mi.toLocaleString('en-US')} mi`;
+function formatMileage(km?: number): string {
+  if (!km && km !== 0) return '-';
+  return `${km.toLocaleString('en-US')} km`;
 }
 
 export function GarageVehicleTile({
@@ -44,7 +44,7 @@ export function GarageVehicleTile({
       accessibilityLabel={headline}
       accessibilityHint="Opens vehicle details"
     >
-      <AppView row align="center" gap={14} px={16} py={14}>
+      <AppView row align="center" gap={14} px="lg" py={14}>
         <AppView
           center
           rounded={RADIUS_MEDIA}

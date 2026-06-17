@@ -18,7 +18,7 @@ export default function CartItemsSection({
   onRemove,
 }: CartItemsSectionProps) {
   return (
-    <AppView gap={12}>
+    <AppView gap="md">
       <AppText textVariant="subtitle" family="accent">
         Cart items
       </AppText>

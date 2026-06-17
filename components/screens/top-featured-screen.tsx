@@ -156,7 +156,7 @@ export default function TopFeaturedScreen() {
           </AppView>
 
           {isFilterExpanded ? (
-            <AppView px={16}>
+            <AppView px="lg">
               <AppView
                 rounded={20}
                 px={14}
@@ -176,7 +176,7 @@ export default function TopFeaturedScreen() {
                     {selectedFilterCount > 0 ? (
                       <Pressable
                         onPress={handleClearFilters}
-                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         accessibilityRole="button"
                         accessibilityLabel="Clear filters"
                         style={({ pressed }) => ({
@@ -198,7 +198,7 @@ export default function TopFeaturedScreen() {
                         triggerHaptic('selection');
                         setIsFilterExpanded(false);
                       }}
-                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       accessibilityRole="button"
                       accessibilityLabel="Close filters"
                       style={({ pressed }) => ({
@@ -218,7 +218,7 @@ export default function TopFeaturedScreen() {
                 </AppView>
 
                 {selectedFilterEntries.length > 0 ? (
-                  <AppView row gap={8} style={{ flexWrap: 'wrap' }}>
+                  <AppView row gap="sm" style={{ flexWrap: 'wrap' }}>
                     {selectedFilterEntries.map(([groupTitle, value]) => (
                       <AppChip
                         key={groupTitle}
@@ -247,7 +247,7 @@ export default function TopFeaturedScreen() {
                   // filtering dimensions on this surface.
                   (g) => !(lockedBrand && (g.key === 'model' || g.key === 'color')),
                 ).map((group) => (
-                  <AppView key={group.title} gap={8}>
+                  <AppView key={group.title} gap="sm">
                     <AppText
                       textVariant="bodyXs"
                       weight="semibold"
@@ -256,7 +256,7 @@ export default function TopFeaturedScreen() {
                     >
                       {group.title}
                     </AppText>
-                    <AppView row gap={8} style={{ flexWrap: 'wrap' }}>
+                    <AppView row gap="sm" style={{ flexWrap: 'wrap' }}>
                       {group.options.map((option) => {
                         const isSelected = selectedFilters[group.title] === option;
                         return (
@@ -292,7 +292,7 @@ export default function TopFeaturedScreen() {
             <AppView
               rounded={20}
               center
-              py={48}
+              py="xxxl"
               px="xl"
               gap="sm"
               style={{

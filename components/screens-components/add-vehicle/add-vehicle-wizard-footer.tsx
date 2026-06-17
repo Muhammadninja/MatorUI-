@@ -17,7 +17,7 @@ export function AddVehicleWizardFooter({
   onSave,
 }: AddVehicleWizardFooterProps) {
   return (
-    <AppView px={20} pt={12} pb={12}>
+    <AppView px={20} pt="md" pb="md">
       <AppButton
         title={isLast ? saveLabel : 'Next'}
         kind="brand"

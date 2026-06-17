@@ -48,7 +48,7 @@ export default function AiChatToolCallCard({ toolCall }: AiChatToolCallCardProps
   return (
     <AppView
       rounded={12}
-      px={12}
+      px="md"
       py={10}
       gap={6}
       style={{
@@ -58,7 +58,7 @@ export default function AiChatToolCallCard({ toolCall }: AiChatToolCallCardProps
         maxWidth: '82%',
       }}
     >
-      <AppView row align="center" gap={8}>
+      <AppView row align="center" gap="sm">
         <AppView
           center
           rounded={999}

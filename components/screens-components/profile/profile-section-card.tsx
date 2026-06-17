@@ -18,7 +18,7 @@ const SECTION_RADIUS = 16;
 
 export default function ProfileSectionCard({ title, subtitle, items }: ProfileSectionCardProps) {
   return (
-    <AppView gap={10} px={16}>
+    <AppView gap={10} px="lg">
       <AppView gap={2}>
         <AppText textVariant="subtitle" family="accent" colorName="text">
           {title}

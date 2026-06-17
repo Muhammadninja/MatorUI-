@@ -81,6 +81,7 @@ export default function SelectLanguageScreen() {
             onPress={handleClose}
             accessibilityRole="button"
             accessibilityLabel="Close"
+            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
             style={({ pressed }) => ({
               width: 36,
               height: 36,
@@ -140,7 +141,7 @@ export default function SelectLanguageScreen() {
       <View style={{ flex: 1 }} />
 
       {/* Options */}
-      <AppView gap={12} mb={16}>
+      <AppView gap="md" mb="lg">
         {LANGUAGE_OPTIONS.map((opt) => {
           const selected = opt.code === pick;
           return (

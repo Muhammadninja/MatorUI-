@@ -42,8 +42,8 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 32 }}
       >
-        <AppView gap={16}>
-          <AppView px={16}>
+        <AppView gap="lg">
+          <AppView px="lg">
             <ProfileHeroCard />
           </AppView>
 

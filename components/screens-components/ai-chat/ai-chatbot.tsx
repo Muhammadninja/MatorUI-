@@ -258,7 +258,7 @@ export default function AiChatbot() {
       try {
         let body = '';
         let replyId = replyDraft.id;
-        let title = 'Matorui Assistant';
+        let title = 'Mator AI';
         let createdAt = new Date().toISOString();
         let suggestions: string[] = [];
         let convoId = conversationId;
@@ -443,7 +443,7 @@ export default function AiChatbot() {
   // component stays presentational.
   const handleAssistantAvatarPress = useCallback(() => {
     triggerHaptic('selection');
-    toastService.info('Matorui Copilot', {
+    toastService.info('Mator AI', {
       description: 'AI assistant for parts, fitment, and orders. Answers improve as the backend tools come online.',
     });
   }, []);
@@ -623,8 +623,8 @@ export default function AiChatbot() {
           row
           align="center"
           justify="space-between"
-          px={16}
-          py={12}
+          px="lg"
+          py="md"
           borderBottomWidth={1}
           borderTopWidth={1}
           borderColor={tokens.border}
@@ -637,7 +637,7 @@ export default function AiChatbot() {
               weight="bold"
               style={{ color: tokens.brand }}
             >
-              Matorist AI
+              Mator AI
             </AppText>
           </AppView>
 
@@ -676,14 +676,14 @@ export default function AiChatbot() {
           }}
           keyboardShouldPersistTaps="handled"
           onScroll={handleScroll}
-          scrollEventThrottle={64}
+          scrollEventThrottle={16}
           automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
           onContentSizeChange={() => {
             if (isAtBottomRef.current) scrollToEnd(false);
           }}
         >
           {!hasMessages ? (
-            <AppView gap={24}>
+            <AppView gap="xl">
               {/* Empty-state anchor + greeting */}
               <AppView gap={14} align="center">
                 <AppView
@@ -696,7 +696,7 @@ export default function AiChatbot() {
                 >
                   <Sparkles size={24} strokeWidth={2} color={tokens.brand} />
                 </AppView>
-                <AppView gap={4} align="center">
+                <AppView gap="xs" align="center">
                   <AppText
                     textVariant="h4"
                     family="heading"
@@ -704,7 +704,7 @@ export default function AiChatbot() {
                     colorName="text"
                     align="center"
                   >
-                    Hello! I&apos;m your Matorui copilot.
+                    Hello! I&apos;m your Mator AI assistant.
                   </AppText>
                   <AppText
                     textVariant="bodySm"
@@ -723,7 +723,7 @@ export default function AiChatbot() {
               </AppView>
 
               {/* Single merged prompts row */}
-              <AppView gap={12}>
+              <AppView gap="md">
                 <AppText
                   textVariant="bodySemibold"
                   family="heading"
@@ -759,7 +759,7 @@ export default function AiChatbot() {
             </AppView>
           ) : (
             <AppView gap={14}>
-              <AppView gap={12}>
+              <AppView gap="md">
                 {timeline.map((entry) => {
                   if (entry.kind === 'date') {
                     return <DatePill key={entry.key} label={entry.label} />;
@@ -865,7 +865,7 @@ export default function AiChatbot() {
                   streamingReply.body || streamingReply.toolCalls.length > 0 ? (
                     <AiChatMessageBubble
                       role="assistant"
-                      title="Matorui Assistant"
+                      title="Mator AI"
                       body={streamingReply.body}
                       caption={streamingReply.body ? 'Typing' : undefined}
                       toolCalls={
@@ -881,7 +881,7 @@ export default function AiChatbot() {
                 ) : null}
 
                 {!streamingReply && lastSuggestions.length > 0 ? (
-                  <AppView gap={8} mt={6}>
+                  <AppView gap="sm" mt={6}>
                     <AppText textVariant="bodyXs" colorName="gray400">
                       Follow up
                     </AppText>
@@ -934,6 +934,7 @@ export default function AiChatbot() {
               onPress={() => scrollToEnd()}
               accessibilityRole="button"
               accessibilityLabel="Scroll to latest message"
+              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               style={{
                 width: 36,
                 height: 36,
@@ -968,7 +969,7 @@ export default function AiChatbot() {
             />
             {/* Persistent AI disclosure — visible across empty state AND
              *  active chat (issue #23 from UX critique). */}
-            <AppView px={12} pt={2} pb={4}>
+            <AppView px="md" pt={2} pb={4}>
               <AppText
                 textVariant="caption"
                 colorName="gray400"
@@ -1009,6 +1010,7 @@ function FeedbackButton({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={kind === 'up' ? 'Good response' : 'Bad response'}
+      hitSlop={{ top: 9, bottom: 9, left: 9, right: 9 }}
       style={{
         width: 26,
         height: 26,
@@ -1028,7 +1030,7 @@ function DatePill({ label }: { label: string }) {
     <AppView
       align="center"
       rounded={999}
-      px={12}
+      px="md"
       py={6}
       style={{
         borderWidth: 1,
@@ -1067,7 +1069,7 @@ function SystemDivider({ label }: { label: string }) {
 function AssistantTypingPlaceholder() {
   const { tokens } = useThemeContext();
   return (
-    <AppView row align="flex-end" gap={8} style={{ width: '100%' }}>
+    <AppView row align="flex-end" gap="sm" style={{ width: '100%' }}>
       <AppView
         center
         rounded={999}

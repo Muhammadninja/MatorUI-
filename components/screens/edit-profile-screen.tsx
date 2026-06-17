@@ -202,7 +202,7 @@ export default function EditProfileScreen() {
             </AppView>
 
             {/* Form */}
-            <AppView px={16} gap={16}>
+            <AppView px="lg" gap="lg">
               <AppTextField
                 label="First Name"
                 placeholder="Enter first name"
@@ -222,7 +222,7 @@ export default function EditProfileScreen() {
               />
             </AppView>
 
-            <AppView px={16}>
+            <AppView px="lg">
               <AppButton
                 title={saving ? 'Saving…' : 'Save Changes'}
                 kind="brand"

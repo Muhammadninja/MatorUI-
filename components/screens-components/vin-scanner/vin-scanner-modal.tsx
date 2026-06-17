@@ -95,13 +95,13 @@ export function VinScannerModal({
             hint={hint}
           />
         ) : (
-          <AppView flex={1} center px={24}>
+          <AppView flex={1} center px="xl">
             <AppText
               textVariant="title"
               family="heading"
               style={{ color: tokens.white, textAlign: 'center' }}
             >
-              Scanner unavailable in this build
+              Enter your VIN manually
             </AppText>
             <AppText
               textVariant="bodySm"
@@ -112,10 +112,8 @@ export function VinScannerModal({
                 opacity: 0.85,
               }}
             >
-              The camera module isn't linked into this binary. Rebuild the dev
-              client (or run `npx expo run:ios` / `npx expo run:android`) to
-              enable VIN scanning. You can still enter the VIN manually in the
-              form.
+              VIN scanning isn't available right now. You can type your VIN in
+              the field instead.
             </AppText>
             <AppView mt={20}>
               <AppButton title="Close" kind="brand" size="md" onPress={handleClose} />
@@ -149,7 +147,7 @@ export function VinScannerModal({
             <X size={20} strokeWidth={2.2} color={tokens.white} />
           </AppPressableView>
           <AppView
-            px={12}
+            px="md"
             py={6}
             rounded={36}
             style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}

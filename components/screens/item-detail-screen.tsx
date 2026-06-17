@@ -24,7 +24,7 @@ const HERO_IMAGES = [
 
 const FALLBACK_SPECS = [
   { label: 'Range', value: '320 mi' },
-  { label: '0–60 mph', value: '4.2s' },
+  { label: '0-60 mph', value: '4.2s' },
   { label: 'Top Speed', value: '155 mph' },
   { label: 'Drivetrain', value: 'AWD' },
 ];
@@ -109,7 +109,7 @@ export default function ItemDetailScreen() {
         row
         justify="space-between"
         align="center"
-        px={16}
+        px="lg"
         style={[styles.navBar, { top: insets.top + 4 }]}
       >
         {/* Floating nav buttons over the hero image. The 1px border is
@@ -123,6 +123,7 @@ export default function ItemDetailScreen() {
           androidRipple
           borderWidth={1}
           borderName="border"
+          hitSlop={{ top: 4, right: 4, bottom: 4, left: 4 }}
           style={[styles.iconButton, { backgroundColor: tokens.surface }]}
         >
           <ArrowLeft size={20} strokeWidth={2.2} color={tokens.text} />
@@ -139,6 +140,7 @@ export default function ItemDetailScreen() {
             androidRipple
             borderWidth={1}
             borderName="border"
+            hitSlop={{ top: 4, right: 4, bottom: 4, left: 4 }}
             style={[styles.iconButton, { backgroundColor: tokens.surface }]}
           >
             <Heart
@@ -154,6 +156,7 @@ export default function ItemDetailScreen() {
             androidRipple
             borderWidth={1}
             borderName="border"
+            hitSlop={{ top: 4, right: 4, bottom: 4, left: 4 }}
             style={[styles.iconButton, { backgroundColor: tokens.surface }]}
           >
             <Share2 size={20} strokeWidth={2.2} color={tokens.text} />
@@ -185,16 +188,16 @@ export default function ItemDetailScreen() {
         </Animated.View>
 
         {/* Content overlaps image with rounded top */}
-        <AppView colorName="background" roundedTop={24} px={16} pt={20} gap={24} style={styles.content}>
+        <AppView colorName="background" roundedTop={24} px="lg" pt={20} gap="xl" style={styles.content}>
           {/* Title + price */}
-          <AppView gap={8}>
+          <AppView gap="sm">
             <AppText textVariant="title" family="heading" weight="bold">
               {title}
             </AppText>
             <AppText textVariant="body" colorName="gray400">
               {description}
             </AppText>
-            <AppView row align="flex-end" gap={6} mt={4}>
+            <AppView row align="flex-end" gap={6} mt="xs">
               <AppText textVariant="bodyXs" colorName="gray400">
                 {priceLabel || 'Starting at'}
               </AppText>
@@ -207,7 +210,7 @@ export default function ItemDetailScreen() {
                 rounded={8}
                 px={10}
                 py={6}
-                mt={4}
+                mt="xs"
                 style={{ alignSelf: 'flex-start', backgroundColor: tokens.gray100 }}
               >
                 <AppText textVariant="bodyXs" colorName="gray400">
@@ -218,7 +221,7 @@ export default function ItemDetailScreen() {
           </AppView>
 
           {/* Specs grid */}
-          <AppView gap={12}>
+          <AppView gap="md">
             <AppText textVariant="h4" family="heading" weight="semibold">
               Specifications
             </AppText>
@@ -246,7 +249,7 @@ export default function ItemDetailScreen() {
           </AppView>
 
           {/* Features */}
-          <AppView gap={12} pb={120}>
+          <AppView gap="md" pb={120}>
             <AppText textVariant="h4" family="heading" weight="semibold">
               Key Features
             </AppText>
@@ -273,8 +276,8 @@ export default function ItemDetailScreen() {
         row
         align="center"
         justify="space-between"
-        px={16}
-        py={12}
+        px="lg"
+        py="md"
         pb={Math.max(insets.bottom, 16)}
         colorName="background"
         borderTopWidth={1}

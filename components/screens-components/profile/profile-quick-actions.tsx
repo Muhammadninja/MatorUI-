@@ -59,7 +59,7 @@ export default function ProfileQuickActions() {
             }}
             onPress={() => triggerHaptic('selection')}
           >
-            <AppView gap={12}>
+            <AppView gap="md">
               <AppView
                 center
                 rounded={18}
@@ -71,7 +71,7 @@ export default function ProfileQuickActions() {
               >
                 <Icon size={18} strokeWidth={2.1} color={tokens.onBrand} />
               </AppView>
-              <AppView gap={4}>
+              <AppView gap="xs">
                 <AppText textVariant="bodySemibold" colorName="text">
                   {title}
                 </AppText>

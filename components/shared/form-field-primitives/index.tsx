@@ -99,7 +99,10 @@ export function TextEntryField({
   containerBorderName,
   ...rest
 }: BaseFieldProps &
-  Pick<TextInputProps, 'onBlur' | 'onFocus' | 'autoCapitalize' | 'autoCorrect' | 'secureTextEntry'> & {
+  Pick<
+    TextInputProps,
+    'onBlur' | 'onFocus' | 'autoCapitalize' | 'autoCorrect' | 'secureTextEntry' | 'accessibilityLabel'
+  > & {
     value?: string;
     onChangeText?: (value: string) => void;
     multiline?: boolean;

@@ -44,9 +44,9 @@ export default function CartSummary({
   return (
     <AppView
       rounded={16}
-      px={16}
-      py={16}
-      gap={12}
+      px="lg"
+      py="lg"
+      gap="md"
       style={{
         borderWidth: 1,
         borderColor: tokens.border,

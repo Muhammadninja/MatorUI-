@@ -17,7 +17,7 @@ export function GarageEmptyState({ onAddVehicle }: GarageEmptyStateProps) {
     <AppView flex={1} px={20} justify="center" align="center">
       <AppView
         rounded={RADIUS_SHEET}
-        p={24}
+        p="xl"
         gap={20}
         align="center"
         colorName="card"

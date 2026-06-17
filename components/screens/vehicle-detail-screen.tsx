@@ -30,9 +30,9 @@ import { triggerHaptic } from '@/utils/haptics';
 
 const VEHICLE_DETAIL_HEADER_HEIGHT = 52;
 
-function formatMileage(mi?: number): string {
-  if (!mi && mi !== 0) return '—';
-  return `${mi.toLocaleString('en-US')} mi`;
+function formatMileage(km?: number): string {
+  if (!km && km !== 0) return '-';
+  return `${km.toLocaleString('en-US')} km`;
 }
 
 function titleCase(s: string): string {
@@ -124,7 +124,7 @@ export default function VehicleDetailScreen() {
   if (!vehicle) {
     return (
       <ScreenShell>
-        <AppView flex={1} center px={20} gap={12}>
+        <AppView flex={1} center px={20} gap="md">
           <AppText textVariant="title" family="heading" colorName="text" align="center">
             Vehicle not found
           </AppText>
@@ -232,7 +232,7 @@ export default function VehicleDetailScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: topInset, paddingBottom: 40 }}
       >
-        <AppView gap={24}>
+        <AppView gap="xl">
           {/* Mutation-error pill. Surfaces failures from set-primary,
            *  remove, or update so the user can dismiss and retry. The
            *  detail screen stays visible underneath — the vehicle data
@@ -246,7 +246,7 @@ export default function VehicleDetailScreen() {
 
           <VehicleDetailStats
             mileage={formatMileage(vehicle.mileage)}
-            plate={vehicle.plate ?? '—'}
+            plate={vehicle.plate ?? '-'}
             color={titleCase(vehicle.color)}
             liveStatus={vehicle.liveStatus}
           />

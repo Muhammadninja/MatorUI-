@@ -140,7 +140,7 @@ export default function AuthScreen({ mode }: AuthScreenProps) {
           borderBottomColor: tokens.divider,
         }}
       >
-        <AppView row align="center" justify="space-between" px={16} pt={8} pb={12}>
+        <AppView row align="center" justify="space-between" px="lg" pt="sm" pb="md">
           <AppPressableView
             center
             rounded={36}
@@ -193,7 +193,7 @@ export default function AuthScreen({ mode }: AuthScreenProps) {
 
         {/* Social — side-by-side on signup to save vertical space */}
         {isSignup ? (
-          <AppView row gap={8}>
+          <AppView row gap="sm">
             <SocialButton label="Apple" Icon={Apple} compact onPress={() => handleSocial('apple')} />
             <SocialButton label="Google" Icon={Globe} compact onPress={() => handleSocial('google')} />
           </AppView>
@@ -273,6 +273,7 @@ export default function AuthScreen({ mode }: AuthScreenProps) {
                 onPress={() => setShowPassword((s) => !s)}
                 androidRipple={false}
                 accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 style={{ paddingHorizontal: 4, paddingVertical: 4 }}
               >
                 {showPassword ? (

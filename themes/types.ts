@@ -65,5 +65,9 @@ export type ThemeTokens = {
    *  not next to neutral chrome). Use instead of hardcoded
    *  `rgba(0,0,0,0.x)` values. */
   scrim: string;
+  /** Low-alpha brand tint (~12% opacity). Replaces the repeated
+   *  `\`${tokens.brand}1F\`` pattern. Use for tinted fill backgrounds
+   *  on brand-accented icons, badges, and highlights. */
+  brandSoft: string;
   [key: string]: string;
 };

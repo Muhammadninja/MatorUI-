@@ -176,7 +176,7 @@ export default function PaymentMethodsScreen() {
           backAccessibilityLabel="Cancel add card"
         />
         <AppView style={{ paddingTop: 8 }}>
-          <AppView  pb={4}>
+          <AppView pb="xs">
             <AppText textVariant="bodyXs" colorName="gray400">
               Enter your card details securely and save only masked card data.
             </AppText>
@@ -189,7 +189,7 @@ export default function PaymentMethodsScreen() {
           offset={120}
           kStyle={{ paddingBottom: 32 }}
         >
-          <AppView gap={14} pt={16}>
+          <AppView gap={14} pt="lg">
             <AppTextField
               label="Card Holder"
               placeholder="Full name on card"
@@ -208,7 +208,7 @@ export default function PaymentMethodsScreen() {
               autoCorrect={false}
             />
 
-            <AppView row gap={12}>
+            <AppView row gap="md">
               <AppView flex={1}>
                 <AppTextField
                   label="Expiry"
@@ -235,7 +235,7 @@ export default function PaymentMethodsScreen() {
             <AppView
               rounded={16}
               px={14}
-              py={12}
+              py="md"
               style={{
                 borderWidth: 1,
                 borderColor: tokens.border,
@@ -309,13 +309,13 @@ export default function PaymentMethodsScreen() {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingTop: 8, paddingBottom: 40 }}
           >
-              <AppView px={16}>
+              <AppView px="lg">
                 <AppText textVariant="bodyXs" colorName="gray400">
                   Manage your cards
                 </AppText>
               </AppView>
               {/* Cards section */}
-              <AppView px={16} mt={24} gap={14}>
+              <AppView px="lg" mt="xl" gap={14}>
                 <AppView row align="center" justify="space-between">
                   <AppText textVariant="subtitle" family="accent" weight="semibold" colorName="text">
                     Saved Cards
@@ -497,7 +497,7 @@ export default function PaymentMethodsScreen() {
                     backgroundColor: 'transparent',
                   }}
                 >
-                  <AppView row align="center" justify="center" gap={8} flex={1}>
+                  <AppView row align="center" justify="center" gap="sm" flex={1}>
                     <Plus size={16} strokeWidth={2.4} color={tokens.brand} />
                     <AppText textVariant="bodySm" weight="semibold" style={{ color: tokens.brand }}>
                       Add Card
@@ -506,7 +506,7 @@ export default function PaymentMethodsScreen() {
                 </AppPressableView>
               </AppView>
 
-              <AppView px={16} mt={32} gap={14}>
+              <AppView px="lg" mt="xxl" gap={14}>
                 <AppText textVariant="subtitle" family="accent" weight="semibold" colorName="text">
                   Terms & Conditions
                 </AppText>
@@ -514,7 +514,7 @@ export default function PaymentMethodsScreen() {
                 <AppView
                   rounded={20}
                   px={18}
-                  py={16}
+                  py="lg"
                   gap={14}
                   style={{
                     borderWidth: 1,
@@ -538,7 +538,7 @@ export default function PaymentMethodsScreen() {
                   ].map((clause, i, arr) => (
                     <AppView
                       key={clause.title}
-                      gap={4}
+                      gap="xs"
                       pb={i < arr.length - 1 ? 14 : 0}
                       style={
                         i < arr.length - 1

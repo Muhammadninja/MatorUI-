@@ -86,8 +86,8 @@ const SEED_PAYMENT_METHODS: PaymentMethod[] = [
 ];
 
 const BASE_SHIPPING_OPTIONS: ShippingOption[] = [
-  { key: 'standard', label: 'Standard', eta: '3–5 business days', price: 0 },
-  { key: 'express', label: 'Express', eta: '1–2 business days', price: 9.99 },
+  { key: 'standard', label: 'Standard', eta: '3-5 business days', price: 0 },
+  { key: 'express', label: 'Express', eta: '1-2 business days', price: 9.99 },
   { key: 'same_day', label: 'Same day', eta: 'By 9 PM today', price: 19.99 },
 ];
 
@@ -145,7 +145,7 @@ function detailFor(row: { id: string; total: string }, statusKey: 'in_transit' |
     id: row.id,
     status: isInTransit ? 'out_for_delivery' : statusKey === 'delivered' ? 'delivered' : 'cancelled',
     statusLabel: isInTransit ? 'Out for delivery' : statusKey === 'delivered' ? 'Delivered' : 'Cancelled',
-    etaWindow: isInTransit ? '14:30 – 15:00' : 'Delivered',
+    etaWindow: isInTransit ? '14:30 - 15:00' : 'Delivered',
     placedAt: 'Jun 4, 2026',
     currentStepIndex: isInTransit ? 3 : statusKey === 'delivered' ? 4 : 0,
     steps: [
@@ -153,7 +153,7 @@ function detailFor(row: { id: string; total: string }, statusKey: 'in_transit' |
       { key: 'packed', label: 'Packed', caption: 'Tue · 4:11 PM' },
       { key: 'shipped', label: 'Shipped', caption: 'Wed · 7:28 AM' },
       { key: 'out_for_delivery', label: 'Out for delivery', caption: 'Today · 8:15 AM' },
-      { key: 'delivered', label: 'Delivered', caption: isInTransit ? 'ETA 14:30 – 15:00' : 'Today · 14:42' },
+      { key: 'delivered', label: 'Delivered', caption: isInTransit ? 'ETA 14:30 - 15:00' : 'Today · 14:42' },
     ],
     destination: SEED_ADDRESSES[0]!,
     courier: isInTransit
@@ -223,7 +223,7 @@ export class MockOrdersTransport implements OrdersTransport {
     }
     const orderId = `M-${Math.floor(40000 + Math.random() * 60000)}`;
     const shipping = BASE_SHIPPING_OPTIONS.find((o) => o.key === input.shippingOptionKey);
-    const eta = shipping?.eta ?? '3–5 business days';
+    const eta = shipping?.eta ?? '3-5 business days';
     // Real server would calculate this; mock just echoes a plausible label.
     const totalLabel = '$—.—'; // intentionally placeholder; confirmation reads from search params we pass instead
     // Seed a new detail row so a subsequent track-order fetch resolves.

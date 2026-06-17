@@ -138,7 +138,7 @@ export default function OrderConfirmationScreen() {
               backgroundColor: tokens.brandBg,
             }}
           >
-            <AppView row align="center" justify="center" gap={8}>
+            <AppView row align="center" justify="center" gap="sm">
               <Truck size={18} strokeWidth={2.4} color={tokens.onBrand} />
               <AppText weight="bold" style={{ color: tokens.onBrand }}>
                 View order details

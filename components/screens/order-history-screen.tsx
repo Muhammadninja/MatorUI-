@@ -142,7 +142,7 @@ const OrderRow = memo(function OrderRow({ order }: { order: OrderListRow }) {
     >
       <AppView gap={10}>
         <AppView row align="center" justify="space-between">
-          <AppView row align="center" gap={8}>
+          <AppView row align="center" gap="sm">
             <AppView
               center
               rounded={8}
@@ -212,7 +212,7 @@ function EmptyCard() {
       rounded={16}
       px={20}
       py={28}
-      gap={12}
+      gap="md"
       align="center"
       style={{
         borderWidth: 1,
@@ -230,7 +230,7 @@ function EmptyCard() {
       >
         <PackageX size={22} strokeWidth={2} color={tokens.gray400} />
       </AppView>
-      <AppView align="center" gap={4}>
+      <AppView align="center" gap="xs">
         <AppText textVariant="bodySemibold">No orders yet</AppText>
         <AppText textVariant="bodySm" colorName="gray400" align="center">
           When you place an order it will appear here.
@@ -247,7 +247,7 @@ function ErrorCard({ message, onRetry }: { message: string; onRetry: () => void 
       rounded={16}
       px={20}
       py={20}
-      gap={8}
+      gap="sm"
       align="center"
       onPress={onRetry}
       accessibilityRole="button"

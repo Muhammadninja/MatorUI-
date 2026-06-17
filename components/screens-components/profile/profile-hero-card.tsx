@@ -31,8 +31,8 @@ export default function ProfileHeroCard() {
     <AppView
       rounded={16}
       px={18}
-      py={24}
-      gap={12}
+      py="xl"
+      gap="md"
       align="center"
       style={{
         borderWidth: 1,
@@ -82,7 +82,7 @@ export default function ProfileHeroCard() {
         ) : null}
       </AppView>
 
-      <AppView align="center" gap={4}>
+      <AppView align="center" gap="xs">
         <AppText
           textVariant="title"
           family="heading"

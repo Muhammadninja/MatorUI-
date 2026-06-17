@@ -148,6 +148,7 @@ export const lightTokens: ThemeTokens = {
   accolade: '#f4c542',
   value: '#4ade80',
   scrim: 'rgba(0, 0, 0, 0.55)',
+  brandSoft: 'rgba(0, 0, 0, 0.12)',
 };
 
 export const darkTokens: ThemeTokens = {
@@ -203,6 +204,7 @@ export const darkTokens: ThemeTokens = {
   accolade: '#b8860b',
   value: '#15803d',
   scrim: 'rgba(0, 0, 0, 0.55)',
+  brandSoft: 'rgba(255, 255, 255, 0.12)',
 };
 
 export function createNavigationTheme(scheme: 'light' | 'dark') {

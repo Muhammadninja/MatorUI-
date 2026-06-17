@@ -61,7 +61,7 @@ export default function AiChatMessageBubble({
       row
       align="flex-end"
       justify={isUser ? 'flex-end' : 'flex-start'}
-      gap={8}
+      gap="sm"
       style={{ width: '100%' }}
     >
       {!isUser ? (
@@ -70,7 +70,7 @@ export default function AiChatMessageBubble({
           rounded={999}
           onPress={onAvatarPress}
           accessibilityRole={onAvatarPress ? 'button' : undefined}
-          accessibilityLabel={onAvatarPress ? 'About Matorui Copilot' : undefined}
+          accessibilityLabel={onAvatarPress ? 'About Mator AI' : undefined}
           style={{
             width: 32,
             height: 32,
@@ -84,7 +84,7 @@ export default function AiChatMessageBubble({
         </AppPressableView>
       ) : null}
 
-      <AppView gap={8} style={{ maxWidth: isUser ? '72%' : '82%' }}>
+      <AppView gap="sm" style={{ maxWidth: isUser ? '72%' : '82%' }}>
         {hasToolCalls ? (
           <AppView gap={6} style={{ alignSelf: 'flex-start' }}>
             {toolCalls!.map((tc) => (

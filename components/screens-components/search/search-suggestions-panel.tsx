@@ -50,8 +50,8 @@ export default function SearchSuggestionsPanel({
 
   return (
     <AppView
-      mx={12}
-      mt={4}
+      mx="md"
+      mt="xs"
       rounded={RADIUS_SHEET}
       colorName="card"
       style={[

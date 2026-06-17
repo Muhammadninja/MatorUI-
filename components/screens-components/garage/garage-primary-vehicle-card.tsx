@@ -22,9 +22,9 @@ export type GaragePrimaryVehicleCardProps = {
   image?: string;
 };
 
-function formatMileage(mi?: number): string {
-  if (!mi && mi !== 0) return '— mi';
-  return `${mi.toLocaleString('en-US')} mi`;
+function formatMileage(km?: number): string {
+  if (!km && km !== 0) return '-';
+  return `${km.toLocaleString('en-US')} km`;
 }
 
 export function GaragePrimaryVehicleCard({
@@ -85,7 +85,7 @@ export function GaragePrimaryVehicleCard({
 
           <VehicleMedia vehicleId={vehicle.id} headline={headline} image={image} />
 
-          <AppView gap={4}>
+          <AppView gap="xs">
             <AppText textVariant="title" family="heading" weight="bold" colorName="text">
               {headline}
             </AppText>
@@ -96,8 +96,8 @@ export function GaragePrimaryVehicleCard({
 
           <AppView
             row
-            gap={12}
-            py={12}
+            gap="md"
+            py="md"
             style={{
               borderTopWidth: 1,
               borderBottomWidth: 1,
@@ -113,7 +113,7 @@ export function GaragePrimaryVehicleCard({
             <MetaCell
               icon={<ScanLine size={16} strokeWidth={2} color={tokens.text} />}
               label="Plate"
-              value={vehicle.plate ?? '—'}
+              value={vehicle.plate ?? '-'}
             />
           </AppView>
         </AppView>
@@ -223,7 +223,7 @@ function ActionPill({ label, icon, onPress, primary }: ActionPillProps) {
       accessibilityRole="button"
       accessibilityLabel={label}
     >
-      <AppView row center gap={8} px={10} py={12}>
+      <AppView row center gap="sm" px={10} py="md">
         <AppView style={{ flexShrink: 0 }}>{icon}</AppView>
         <AppText
           textVariant="buttonSm"

@@ -167,7 +167,7 @@ export function SmartSearchBar({
   );
 
   return (
-    <AppView row align="center" gap={12} px={12}>
+    <AppView row align="center" gap="md" px="md">
       {isSearchActive ? (
         <AppPressableView
           center

@@ -109,7 +109,7 @@ export default function GarageScreen() {
       <ScreenShell>
         <AppView flex={1} center px={20} gap={14}>
           <AlertCircle size={36} strokeWidth={2} color={tokens.error} />
-          <AppView gap={4} align="center">
+          <AppView gap="xs" align="center">
             <AppText textVariant="bodySemibold">Couldn't load your garage</AppText>
             <AppText
               textVariant="bodySm"
@@ -180,7 +180,7 @@ export default function GarageScreen() {
         ) : null}
 
         {secondaryVehicles.length > 0 ? (
-          <AppView gap={12}>
+          <AppView gap="md">
             <AppText
               textVariant="caption"
               family="accent"

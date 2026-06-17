@@ -34,10 +34,11 @@ export default function AiChatComposer({
       : onEmptyTap ?? undefined;
 
   return (
-    <AppView px={10} py={6} row align="center" gap={8}>
-      <AppView flex={1} >
+    <AppView px={10} py={6} row align="center" gap="sm">
+      <AppView flex={1}>
         <AppTextField
           placeholder="Ask a parts question…"
+          accessibilityLabel="Message Mator AI"
           value={value}
           onChangeText={onChangeText}
           autoCapitalize="sentences"
@@ -51,7 +52,7 @@ export default function AiChatComposer({
            *  `tokens.background` since the BlurView underlay was removed).
            *  No border — field reads as one clean surface. */
           containerColorName="background"
-          containerStyle={{ borderWidth: 0 }}
+          containerStyle={{ borderWidth: 1 }}
         />
       </AppView>
 
@@ -63,6 +64,7 @@ export default function AiChatComposer({
         onPress={handleRightPress}
         accessibilityRole="button"
         accessibilityLabel={isSending ? 'Stop generating' : 'Send message'}
+        hitSlop={{ top: 3, bottom: 3, left: 3, right: 3 }}
         style={{
           width: 38,
           height: 38,

@@ -159,7 +159,7 @@ export default function CheckoutScreen() {
           <AppText textVariant="bodyXs" colorName="gray400" weight="semibold">
             EXPRESS CHECKOUT
           </AppText>
-          <AppView row gap={8}>
+          <AppView row gap="sm">
             <ExpressButton
               label="Apple Pay"
               Icon={Apple}
@@ -197,7 +197,7 @@ export default function CheckoutScreen() {
           {addresses.state === 'loading' ? (
             <RowLoading />
           ) : selectedAddress ? (
-            <AppView row align="center" gap={12}>
+            <AppView row align="center" gap="md">
               <AppView
                 center
                 rounded={36}
@@ -236,7 +236,7 @@ export default function CheckoutScreen() {
               No shipping options for this address.
             </AppText>
           ) : (
-            <AppView gap={8}>
+            <AppView gap="sm">
               {shipping.options.map((opt) => {
                 const selected = opt.key === selectedShippingKey;
                 return (
@@ -258,7 +258,7 @@ export default function CheckoutScreen() {
                         : 'transparent',
                     }}
                   >
-                    <AppView row align="center" gap={12} px={12} py={12}>
+                    <AppView row align="center" gap="md" px="md" py="md">
                       <AppView
                         center
                         rounded={36}
@@ -308,7 +308,7 @@ export default function CheckoutScreen() {
           {paymentMethods.state === 'loading' ? (
             <RowLoading />
           ) : selectedPayment ? (
-            <AppView row align="center" gap={12}>
+            <AppView row align="center" gap="md">
               <AppView
                 center
                 rounded={10}
@@ -338,9 +338,9 @@ export default function CheckoutScreen() {
 
         {/* Items review */}
         <Section title={`Order items · ${itemCount}`}>
-          <AppView gap={8}>
+          <AppView gap="sm">
             {items.map((item) => (
-              <AppView key={item.id} row align="center" gap={12}>
+              <AppView key={item.id} row align="center" gap="md">
                 <AppText textVariant="bodySm" style={{ flex: 1 }} numberOfLines={1}>
                   {item.title}
                 </AppText>
@@ -359,7 +359,7 @@ export default function CheckoutScreen() {
         <Section title="Note for courier (optional)">
           <AppView
             rounded={12}
-            px={12}
+            px="md"
             style={{
               borderWidth: 1,
               borderColor: tokens.border,
@@ -387,8 +387,8 @@ export default function CheckoutScreen() {
         {/* Summary */}
         <AppView
           rounded={24}
-          px={16}
-          py={16}
+          px="lg"
+          py="lg"
           gap={10}
           style={{
             borderWidth: 1,
@@ -431,7 +431,7 @@ export default function CheckoutScreen() {
 
       {/* Blur header */}
       <AppBlurView contentHeight={HEADER_HEIGHT}>
-        <AppView row align="center" justify="space-between" px={16} pt={8} pb={12}>
+        <AppView row align="center" justify="space-between" px="lg" pt="sm" pb="md">
           <Pressable
             onPress={handleClose}
             accessibilityRole="button"
@@ -460,7 +460,7 @@ export default function CheckoutScreen() {
 
       {/* Sticky bottom CTA */}
       <AppView
-        px={16}
+        px="lg"
         style={{
           position: 'absolute',
           left: 0,
@@ -473,7 +473,7 @@ export default function CheckoutScreen() {
           borderTopColor: tokens.divider,
         }}
       >
-        <AppView row align="center" justify="space-between" gap={12}>
+        <AppView row align="center" justify="space-between" gap="md">
           <AppView gap={2} style={{ flex: 1 }}>
             <AppText textVariant="bodyXs" colorName="gray400">
               Total
@@ -496,7 +496,7 @@ export default function CheckoutScreen() {
               minWidth: 160,
             }}
           >
-            <AppView row align="center" justify="center" gap={8}>
+            <AppView row align="center" justify="center" gap="sm">
               {phase === 'placing' ? (
                 <ActivityIndicator size="small" color={tokens.onBrand} />
               ) : (
@@ -540,9 +540,9 @@ function Section({
   return (
     <AppView
       rounded={24}
-      px={16}
-      py={16}
-      gap={12}
+      px="lg"
+      py="lg"
+      gap="md"
       style={{
         borderWidth: 1,
         borderColor: tokens.border,
@@ -561,7 +561,7 @@ function Section({
             }}
             androidRipple={false}
           >
-            <AppView row align="center" gap={4}>
+            <AppView row align="center" gap="xs">
               <AppText textVariant="bodyXs" weight="semibold">
                 Change
               </AppText>

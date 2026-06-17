@@ -19,7 +19,7 @@ export function GarageHeader({
   const { tokens } = useThemeContext();
 
   return (
-    <AppView row align="center" justify="space-between" px={20} py={16} gap={12}>
+    <AppView row align="center" justify="space-between" px={20} py="lg" gap="md">
       <AppView gap={2} flex={1}>
         <AppText
           textVariant="caption"

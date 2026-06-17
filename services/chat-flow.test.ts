@@ -102,7 +102,7 @@ describe('MockChatTransport — streaming protocol', () => {
     if (done.type !== 'done') throw new Error('expected done');
     expect(done.replyId).toMatch(/^assistant-/);
     expect(done.suggestions.length).toBeGreaterThan(0);
-    expect(done.title).toBe('Matorui Assistant');
+    expect(done.title).toBe('Mator AI');
     expect(done.conversationId).toBeTruthy();
     expect(typeof done.createdAt).toBe('string');
   });

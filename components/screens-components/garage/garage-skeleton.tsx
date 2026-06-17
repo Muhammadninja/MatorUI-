@@ -64,7 +64,7 @@ export default function GarageSkeleton() {
   } as const;
 
   return (
-    <AppView gap={24}>
+    <AppView gap="xl">
       {/* Primary vehicle card placeholder */}
       <Animated.View
         style={{
@@ -139,7 +139,7 @@ export default function GarageSkeleton() {
               key={i}
               row
               align="center"
-              gap={12}
+              gap="md"
               style={{
                 height: SECONDARY_TILE_HEIGHT,
                 padding: 12,

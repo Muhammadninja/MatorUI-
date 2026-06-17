@@ -48,7 +48,7 @@ export default function NotificationSettingsScreen() {
           {/* Hero master toggle — distinguished from category cards via a
            *  brand-tinted illustration and inline copy. Sets the visual
            *  hierarchy: this switch governs everything below. */}
-          <AppView px={16}>
+          <AppView px="lg">
             <AppView
               rounded={20}
               px={18}
@@ -87,20 +87,21 @@ export default function NotificationSettingsScreen() {
                   <AppText textVariant="bodyXs" colorName="gray400">
                     {masterEnabled
                       ? `${activeCount} of 4 categories on`
-                      : 'Off — you won’t receive any alerts'}
+                      : 'Off, you won’t receive any alerts'}
                   </AppText>
                 </AppView>
                 <Switch
                   value={masterEnabled}
                   onValueChange={setMasterEnabled}
-                  trackColor={{ false: tokens.border, true: tokens.brand }}
-                  thumbColor={tokens.white}
+                  trackColor={{ false: tokens.switchTrackOff, true: tokens.switchTrackOn }}
+                  thumbColor={masterEnabled ? tokens.switchThumbOn : tokens.white}
+                  ios_backgroundColor={tokens.switchTrackOff}
                 />
               </AppView>
             </AppView>
           </AppView>
 
-          <AppView px={16}>
+          <AppView px="lg">
             <AppText textVariant="bodySm" colorName="gray400">
               Choose which alerts reach you. Push must be on for these to fire.
             </AppText>

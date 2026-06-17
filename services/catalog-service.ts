@@ -76,7 +76,7 @@ export const CATALOG_SOCKET_EVENTS: CatalogSocketEvent['event'][] = [
 
 const MOCK_SPECS: CatalogItemSpec[] = [
   { label: 'Range', value: '320 mi' },
-  { label: '0–60 mph', value: '4.2s' },
+  { label: '0-60 mph', value: '4.2s' },
   { label: 'Top Speed', value: '155 mph' },
   { label: 'Drivetrain', value: 'AWD' },
 ];
@@ -113,7 +113,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     images: [],
     specs: [
       { label: 'Range', value: '280 mi' },
-      { label: '0–60 mph', value: '5.1s' },
+      { label: '0-60 mph', value: '5.1s' },
       { label: 'Top Speed', value: '140 mph' },
       { label: 'Drivetrain', value: 'AWD' },
     ],
@@ -131,7 +131,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     images: [],
     specs: [
       { label: 'Range', value: '350 mi' },
-      { label: '0–60 mph', value: '3.5s' },
+      { label: '0-60 mph', value: '3.5s' },
       { label: 'Top Speed', value: '175 mph' },
       { label: 'Drivetrain', value: 'RWD' },
     ],
@@ -149,7 +149,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     images: [],
     specs: [
       { label: 'Range', value: '300 mi' },
-      { label: '0–60 mph', value: '4.8s' },
+      { label: '0-60 mph', value: '4.8s' },
       { label: 'Top Speed', value: '130 mph' },
       { label: 'Drivetrain', value: '4WD' },
     ],
@@ -172,7 +172,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     images: [],
     specs: [
       { label: 'Range', value: '320 mi' },
-      { label: '0–60 mph', value: '4.2s' },
+      { label: '0-60 mph', value: '4.2s' },
       { label: 'Top Speed', value: '155 mph' },
       { label: 'Drivetrain', value: 'AWD' },
     ],
@@ -191,14 +191,14 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     id: 'mator-prime',
     status: 'Ready to ship',
     title: 'Mator Prime',
-    description: 'Flagship sedan — top-selling, lowest entry price, full Mator Verified inspection.',
+    description: 'Flagship sedan, top-selling, lowest entry price, full Mator Verified inspection.',
     price: 'UZS 16,900',
     priceLabel: 'Starting at',
     badge: 'Bestseller',
     images: [],
     specs: [
       { label: 'Range', value: '340 mi' },
-      { label: '0–60 mph', value: '3.9s' },
+      { label: '0-60 mph', value: '3.9s' },
       { label: 'Top Speed', value: '160 mph' },
       { label: 'Drivetrain', value: 'AWD' },
     ],

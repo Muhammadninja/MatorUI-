@@ -133,7 +133,7 @@ export function AddVehicleWizard({ editing, onSubmit, onCancel }: AddVehicleWiza
         current={step}
         label={STEP_LABELS[step - 1]}
       />
-      <AppView px={20} pt={8}>
+      <AppView px={20} pt="sm">
         {step === 1 ? (
           <AddVehicleStepIdentity values={values} errors={errors} onChange={setField} />
         ) : null}

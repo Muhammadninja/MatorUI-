@@ -43,11 +43,11 @@ export default function ProfileGuestEmpty() {
   };
 
   return (
-    <AppView px={16} pt={28} gap={16}>
+    <AppView px="lg" pt={28} gap="lg">
       {/* Guest welcome card */}
       <AppView
         rounded={16}
-        gap={16}
+        gap="lg"
         align="center"
         py={28}
         px={20}
@@ -110,7 +110,7 @@ export default function ProfileGuestEmpty() {
           accessibilityLabel="Log in to your account"
           containerStyle={{ width: '100%', marginTop: 4 }}
         >
-          <AppView row align="center" gap={8}>
+          <AppView row align="center" gap="sm">
             <LogIn size={16} strokeWidth={2.2} color={tokens.onBrand} />
             <AppText weight="semibold" colorName="onBrand">
               Log in
@@ -133,7 +133,7 @@ export default function ProfileGuestEmpty() {
           ...CARD_ELEVATION,
         }}
       >
-        <AppView row align="center" gap={14} px={18} py={16}>
+        <AppView row align="center" gap={14} px={18} py="lg">
           <AppView
             center
             rounded={8}

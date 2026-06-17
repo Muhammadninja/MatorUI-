@@ -79,15 +79,15 @@ export default function CartScreen() {
   return (
     <AppView flex={1} colorName="background">
       <AppView
-        px={16}
-        pb={12}
+        px="lg"
+        pb="md"
         style={{
           paddingTop: insets.top + 12,
           borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: tokens.divider,
         }}
       >
-        <AppView row align="center" justify="space-between" gap={12}>
+        <AppView row align="center" justify="space-between" gap="md">
           <AppView gap={2} style={{ flex: 1 }}>
             <AppText textVariant="h3" family="heading" weight="bold">
               Cart
@@ -109,7 +109,7 @@ export default function CartScreen() {
         </AppView>
       </AppView>
 
-      <AppView flex={1} px={16}>
+      <AppView flex={1} px="lg">
         <AppScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
@@ -119,7 +119,7 @@ export default function CartScreen() {
           }}
         >
           {!isHydrated ? null : hasItems ? (
-            <AppView gap={12}>
+            <AppView gap="md">
               <CartItemsSection
                 items={items}
                 onIncrement={incrementItem}
@@ -142,8 +142,8 @@ export default function CartScreen() {
 
       {showBottomBar ? (
         <AppView
-          px={16}
-          py={12}
+          px="lg"
+          py="md"
           style={{
             paddingBottom: Math.max(insets.bottom, 24),
           }}

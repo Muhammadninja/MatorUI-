@@ -30,7 +30,7 @@ export default function ProfileRecentlyViewed() {
 
   return (
     <AppView gap={10}>
-      <AppView row align="center" justify="flex-end" px={16}>
+      <AppView row align="center" justify="flex-end" px="lg">
         <AppPressableView
           androidRipple={false}
           pressedOpacity={0.6}

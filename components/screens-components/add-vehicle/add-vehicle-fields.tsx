@@ -109,10 +109,10 @@ export function AddVehicleFields({ values, onChange, errors, only, mt }: AddVehi
   const rows = filterSchema(SCHEMA, only);
 
   return (
-    <AppView gap={16} mt={mt}>
+    <AppView gap="lg" mt={mt}>
       {rows.map((row, i) =>
         Array.isArray(row) ? (
-          <AppView key={`row-${i}`} row gap={12}>
+          <AppView key={`row-${i}`} row gap="md">
             {row.map((cfg) => (
               <AppView key={cfg.key} flex={cfg.flex ?? 1}>
                 <FieldRenderer

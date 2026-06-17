@@ -155,14 +155,14 @@ function buildToolResult(
     case 'lookup_order':
       return {
         result: {
-          summary: 'ORD-8790 · Out for delivery · Arrives 14:30 – 15:00',
+          summary: 'ORD-8790 · Out for delivery · Arrives 14:30 - 15:00',
           deepLink: { label: 'Track this order', href: '/track-order?orderId=ORD-8790' },
         },
       };
     case 'search_parts':
       return {
         result: {
-          summary: 'Top match: Mator Elite — fits your build.',
+          summary: 'Top match: Mator Elite, fits your build.',
           deepLink: {
             label: 'Open result',
             href: '/item-detail/mator-elite',
@@ -179,7 +179,7 @@ function buildToolResult(
     case 'check_fitment':
       return {
         result: {
-          summary: 'Compatible — confirmed against your vehicle profile.',
+          summary: 'Compatible, confirmed against your vehicle profile.',
         },
       };
     case 'add_to_cart':
@@ -221,7 +221,7 @@ const SEED_CONVERSATIONS: AiChatConversationSummary[] = [
       {
         id: 'history-assistant-1',
         role: 'assistant',
-        title: 'Matorui Assistant',
+        title: 'Mator AI',
         body: 'For your BMW 340i F30, start with rotor diameter, caliper clearance, and wheel size. A 340mm front kit is the safest baseline unless your car already has the M Sport package.',
         caption: 'Yesterday',
         createdAt: '2026-06-03T20:10:06Z',
@@ -316,7 +316,7 @@ export class MockChatTransport implements ChatTransport {
             'What upgrades fit my build?',
           ],
           replyId,
-          title: 'Matorui Assistant',
+          title: 'Mator AI',
           createdAt: new Date().toISOString(),
         };
       },

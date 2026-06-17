@@ -104,7 +104,7 @@ export default function ListSuggestionSheet({
                 colorName="gray400"
                 style={{ textAlign: 'center', maxWidth: 320 }}
               >
-                You can group saved items into Lists — by build, vehicle, season, or
+                You can group saved items into Lists by build, vehicle, season, or
                 anything else. They show up under Lists in the Cart tab.
               </AppText>
             </AppView>
