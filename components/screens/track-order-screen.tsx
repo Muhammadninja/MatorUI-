@@ -9,7 +9,7 @@ import {
   Truck,
 } from 'lucide-react-native';
 import type { ComponentType } from 'react';
-import { ActivityIndicator } from 'react-native';
+import { ActivityIndicator, Linking } from 'react-native';
 
 import AppImage from '@/components/shared/app-image';
 import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
@@ -39,7 +39,9 @@ export default function TrackOrderScreen() {
   return (
     <AppView flex={1} colorName="background">
       <AppSettingsHeader title="Track order" fallbackHref="/cart" />
-      {state === 'loading' || state === 'idle' ? (
+      {state === 'idle' ? (
+        <NotFoundState topInset={0} orderId={orderId} />
+      ) : state === 'loading' ? (
         <LoadingState topInset={0} />
       ) : state === 'error' ? (
         <ErrorState topInset={0} message={error ?? 'Could not load order.'} onRetry={refresh} />
@@ -128,14 +130,12 @@ function OrderBody({ order, topInset }: { order: OrderDetail; topInset: number }
   const handleCall = () => {
     triggerHaptic('selection');
     if (courier?.phone) {
-      toast.info('Calling courier…', { description: `${courier.name} · ${courier.phone}` });
+      Linking.openURL(`tel:${courier.phone}`).catch(() => {
+        toast.info('Calling courier…', { description: `${courier.name} · ${courier.phone}` });
+      });
     } else {
       toast.info('Calling courier…', { description: courier?.name ?? 'Courier unavailable' });
     }
-  };
-  const handleMessage = () => {
-    triggerHaptic('selection');
-    toast.info('Chat coming soon', { description: 'Courier chat will sync once backend lands.' });
   };
 
   const statusColor = order.status === 'cancelled' ? tokens.error : tokens.success;
@@ -294,7 +294,7 @@ function OrderBody({ order, topInset }: { order: OrderDetail; topInset: number }
 
         {/* Courier card — only when a courier is assigned */}
         {courier ? (
-          <CourierCard courier={courier} onCall={handleCall} onMessage={handleMessage} />
+          <CourierCard courier={courier} onCall={handleCall} />
         ) : null}
 
         {/* Items in this order */}
@@ -351,11 +351,9 @@ function OrderBody({ order, topInset }: { order: OrderDetail; topInset: number }
 function CourierCard({
   courier,
   onCall,
-  onMessage,
 }: {
   courier: Courier;
   onCall: () => void;
-  onMessage: () => void;
 }) {
   const { tokens, scheme } = useThemeContext();
   return (
@@ -423,9 +421,9 @@ function CourierCard({
           </AppView>
         </AppPressableView>
         <AppPressableView
-          onPress={onMessage}
-          androidRipple
-          accessibilityLabel="Message courier"
+          disabled
+          accessibilityLabel="Message courier (coming soon)"
+          accessibilityState={{ disabled: true }}
           style={{
             flex: 1,
             borderRadius: 14,
@@ -433,12 +431,13 @@ function CourierCard({
             borderColor: tokens.border,
             paddingVertical: 10,
             backgroundColor: scheme === 'dark' ? tokens.gray200 : tokens.gray100,
+            opacity: 0.5,
           }}
         >
           <AppView row align="center" justify="center" gap={6}>
             <MessageSquare size={14} strokeWidth={2.2} color={tokens.text} />
             <AppText textVariant="bodySm" weight="semibold">
-              Message
+              Message · Soon
             </AppText>
           </AppView>
         </AppPressableView>

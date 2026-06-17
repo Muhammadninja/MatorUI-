@@ -120,11 +120,14 @@ export default function PaymentMethodsScreen() {
   }
 
   function openCardActions(cardId: string, isDefault: boolean) {
-    const options = isDefault
-      ? ['Edit Card', 'Cancel']
-      : ['Edit Card', 'Set as Default', 'Remove Card', 'Cancel'];
-    const destructiveIndex = isDefault ? undefined : options.indexOf('Remove Card');
+    // "Edit Card" and "Set as Default" were dead TODOs with no backend, so
+    // they're omitted rather than presented as working actions. The default
+    // card can't be removed (there'd be no fallback), so it has no actions.
+    if (isDefault) return;
+
+    const options = ['Remove Card', 'Cancel'];
     const cancelIndex = options.indexOf('Cancel');
+    const destructiveIndex = options.indexOf('Remove Card');
 
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
@@ -137,20 +140,13 @@ export default function PaymentMethodsScreen() {
           if (options[index] === 'Remove Card') {
             confirmRemove(cardId);
           }
-          // TODO: wire "Edit Card" and "Set as Default" to API calls
         },
       );
     } else {
-      const buttons: { text: string; style?: 'destructive' | 'cancel'; onPress?: () => void }[] =
-        options
-          .filter((o) => o !== 'Cancel')
-          .map((o) => ({
-            text: o,
-            style: o === 'Remove Card' ? 'destructive' : undefined,
-            onPress: o === 'Remove Card' ? () => confirmRemove(cardId) : undefined,
-          }));
-      buttons.push({ text: 'Cancel', style: 'cancel' });
-      Alert.alert('Card options', undefined, buttons);
+      Alert.alert('Card options', undefined, [
+        { text: 'Remove Card', style: 'destructive', onPress: () => confirmRemove(cardId) },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
     }
   }
 

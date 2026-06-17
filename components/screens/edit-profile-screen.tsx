@@ -13,6 +13,7 @@ import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useUserContext } from '@/contexts/user.context';
 import { uploadAvatar } from '@/services/avatar-service';
+import { toastService } from '@/services/toast-service';
 import { triggerHaptic } from '@/utils/haptics';
 
 export default function EditProfileScreen() {
@@ -25,13 +26,15 @@ export default function EditProfileScreen() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const uploadAbortRef = useRef<AbortController | null>(null);
 
-  // Save is enabled when *anything* about the profile has changed — name
-  // edits or a freshly-picked avatar. Avoids letting the user "save" a
-  // form that matches the persisted state already.
-  const canSave =
+  // A profile must always carry a non-empty first name, so saving is gated
+  // on a non-blank (trimmed) first name. Beyond that, only allow saving when
+  // *something* actually changed — name edits or a freshly-picked avatar —
+  // so the user can't "save" a form that matches the persisted state.
+  const hasChanges =
     firstName.trim().length > 0 ||
     lastName.trim().length > 0 ||
     avatarUrl !== (profile?.avatarUrl ?? null);
+  const canSave = firstName.trim().length > 0 && hasChanges;
 
   // Abort an in-flight upload if the user navigates away mid-upload —
   // otherwise the response would land into a stale component.
@@ -88,12 +91,19 @@ export default function EditProfileScreen() {
     setSaving(true);
     try {
       await updateProfile({
-        firstName,
-        lastName,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         avatarUrl,
       });
       triggerHaptic('success');
       router.back();
+    } catch {
+      // Surface the failure instead of swallowing the rejection, and stay on
+      // the screen so the user can retry without losing their edits.
+      triggerHaptic('error');
+      toastService.danger('Could not save profile', {
+        description: 'Please check your connection and try again.',
+      });
     } finally {
       setSaving(false);
     }

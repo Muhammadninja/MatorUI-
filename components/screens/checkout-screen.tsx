@@ -10,7 +10,7 @@ import {
   X,
 } from 'lucide-react-native';
 import type { ComponentType } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -96,6 +96,9 @@ export default function CheckoutScreen() {
 
   const [note, setNote] = useState('');
   const { phase, error, placeOrder } = useCreateOrder();
+  // Synchronous in-flight latch: blocks a second tap in the same tick before
+  // any async work, since `phase` only reflects isPending on the next render.
+  const placingRef = useRef(false);
 
   const deliveryFee = selectedShipping?.price ?? 0;
   const grandTotal = totals.total + deliveryFee;
@@ -117,29 +120,37 @@ export default function CheckoutScreen() {
   };
 
   const handlePlaceOrder = async () => {
+    // Authoritative guard: reject a second synchronous tap before any await.
+    if (placingRef.current) return;
     if (!canPlaceOrder || !selectedAddress || !selectedPayment || !selectedShipping) return;
+    placingRef.current = true;
     triggerHaptic('selection');
-    const result = await placeOrder({
-      items: items.map((i) => ({ productId: i.id, quantity: i.quantity })),
-      addressId: selectedAddress.id,
-      paymentMethodId: selectedPayment.id,
-      shippingOptionKey: selectedShipping.key,
-      promoCode: appliedPromo?.code ?? null,
-      note: note.trim() || undefined,
-    });
-    if (!result) {
-      triggerHaptic('error');
-      toast.danger('Could not place order', { description: error ?? 'Try again.' });
-      return;
+    try {
+      const result = await placeOrder({
+        items: items.map((i) => ({ productId: i.id, quantity: i.quantity })),
+        addressId: selectedAddress.id,
+        paymentMethodId: selectedPayment.id,
+        shippingOptionKey: selectedShipping.key,
+        promoCode: appliedPromo?.code ?? null,
+        note: note.trim() || undefined,
+      });
+      if (!result) {
+        triggerHaptic('error');
+        toast.danger('Could not place order', { description: error ?? 'Try again.' });
+        return;
+      }
+      triggerHaptic('success');
+      clearCart();
+      // Replace (not push) so the order can't be re-placed by tapping back —
+      // back stack becomes [cart, order-confirmation] and Close/swipe-down
+      // from the confirmation lands on cart directly.
+      router.replace(
+        `/order-confirmation?orderId=${encodeURIComponent(result.orderId)}&eta=${encodeURIComponent(result.eta)}`,
+      );
+    } finally {
+      // Release the latch so a failed order can be retried.
+      placingRef.current = false;
     }
-    triggerHaptic('success');
-    clearCart();
-    // Replace (not push) so the order can't be re-placed by tapping back —
-    // back stack becomes [cart, order-confirmation] and Close/swipe-down
-    // from the confirmation lands on cart directly.
-    router.replace(
-      `/order-confirmation?orderId=${encodeURIComponent(result.orderId)}&eta=${encodeURIComponent(result.eta)}`,
-    );
   };
 
   return (

@@ -57,14 +57,25 @@ export function LanguageProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     let cancelled = false;
-    loadLanguage().then((stored) => {
-      if (cancelled) return;
-      if (stored) {
-        setLanguageState(stored);
-        setHasChosen(true);
-      }
-      setIsHydrated(true);
-    });
+    loadLanguage()
+      .then((stored) => {
+        if (cancelled) return;
+        if (stored) {
+          setLanguageState(stored);
+          setHasChosen(true);
+        }
+      })
+      .catch((err) => {
+        // Storage read failed — fall back to the default language so the
+        // splash still hides and the app boots instead of hanging forever.
+        if (__DEV__) {
+          console.warn('[language] failed to load persisted language', err);
+        }
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setIsHydrated(true);
+      });
     return () => {
       cancelled = true;
     };

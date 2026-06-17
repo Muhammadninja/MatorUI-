@@ -71,6 +71,9 @@ function SearchPartCard({
       ? { uri: image }
       : imageSource ?? PLACEHOLDER_IMAGE;
   const resetAddedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Debounce guard: rapid double-taps within 800ms would otherwise push
+  // duplicate line items into the cart.
+  const lastAddRef = useRef(0);
   const cardPadding = compact ? 10 : 12;
   const mediaPadding = compact ? 10 : 12;
   const bodyGap = compact ? 8 : 10;
@@ -86,6 +89,9 @@ function SearchPartCard({
   }, []);
 
   const handleAddToCart = () => {
+    const now = Date.now();
+    if (now - lastAddRef.current < 800) return;
+    lastAddRef.current = now;
     triggerHaptic('success');
     addItem({
       id,

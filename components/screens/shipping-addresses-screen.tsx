@@ -9,6 +9,7 @@ import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
+import { useGlobalModal } from '@/hooks/use-global-modal';
 import {
   buildAddress,
   INITIAL_ADDRESSES,
@@ -18,11 +19,25 @@ import {
 
 export default function ShippingAddressesScreen() {
   const { tokens } = useThemeContext();
+  const { openConfirm } = useGlobalModal();
   const [addresses, setAddresses] = useState<Address[]>(INITIAL_ADDRESSES);
   const [isAddingAddress, setIsAddingAddress] = useState(false);
 
   function setDefault(id: string) {
     setAddresses((prev) => prev.map((a) => ({ ...a, isDefault: a.id === id })));
+  }
+
+  // Deleting an address is destructive and irreversible, so confirm first —
+  // matching the confirm step the payment-methods screen uses before removing
+  // a card.
+  function confirmRemove(id: string) {
+    openConfirm({
+      title: 'Delete address?',
+      message: 'This saved delivery location will be removed. You can add it again later.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      onConfirm: () => remove(id),
+    });
   }
 
   function remove(id: string) {
@@ -112,7 +127,7 @@ export default function ShippingAddressesScreen() {
             <AddressCard
               address={item}
               onSetDefault={() => setDefault(item.id)}
-              onRemove={() => remove(item.id)}
+              onRemove={() => confirmRemove(item.id)}
             />
           </AppView>
         )}

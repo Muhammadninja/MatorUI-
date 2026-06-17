@@ -154,6 +154,12 @@ export default function AiChatbot() {
   const [showScrollToLatest, setShowScrollToLatest] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
+  // Synchronous in-flight gate. `isSending` is derived from render state
+  // (streamingReply !== null) and is captured stale in the sendMessage
+  // closure, so two sends in the same tick both see false and race —
+  // overwriting abortRef and orphaning the first stream. This ref is the
+  // authoritative concurrency gate, set/cleared imperatively.
+  const sendingRef = useRef(false);
   const scrollRef = useRef<ScrollView | null>(null);
   const isAtBottomRef = useRef(true);
   const isSending = streamingReply !== null;
@@ -197,7 +203,9 @@ export default function AiChatbot() {
       options: { retryUserId?: string; replaceLastAssistant?: boolean } = {},
     ) => {
       const trimmed = text.trim();
-      if (!trimmed || isSending) return;
+      // Authoritative synchronous guard — see sendingRef declaration.
+      if (!trimmed || sendingRef.current) return;
+      sendingRef.current = true;
 
       const { retryUserId, replaceLastAssistant } = options;
       triggerHaptic('selection');
@@ -347,6 +355,9 @@ export default function AiChatbot() {
         if (abortRef.current === controller) {
           abortRef.current = null;
         }
+        // Release the synchronous gate so the next send is allowed once
+        // this stream completes or aborts.
+        sendingRef.current = false;
       }
     },
     [conversationId, isSending, scrollToEnd, vehicleContext],

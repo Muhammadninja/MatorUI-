@@ -23,7 +23,10 @@ export const TOP_FEATURED_FILTER_GROUPS = [
   {
     key: 'condition',
     title: 'Condition',
-    options: ['GM', 'OEM', 'Budget'],
+    // Must exactly mirror the `condition` values present in
+    // MOCK_ITEM_ATTRIBUTES below — every chip must match ≥1 item and no
+    // selectable/default value may be unselectable.
+    options: ['New', 'OEM', 'Restored', 'Budget'],
   },
 ] as const;
 
@@ -111,11 +114,14 @@ export const TOP_FEATURED_SOCKET_EVENTS: TopFeaturedSocketEvent['event'][] = [
   'top_featured.filters.updated',
 ];
 
+// The unfiltered default: no dimension is pre-selected, so the list
+// shows every item. "Clear filters" resets to exactly this, producing a
+// truly unfiltered list rather than re-applying a hidden filter set.
 export const DEFAULT_TOP_FEATURED_FILTERS: TopFeaturedFilters = {
-  Model: 'SUV',
-  Brand: 'Cobalt',
-  Color: 'Black',
-  Condition: 'New',
+  Model: '',
+  Brand: '',
+  Color: '',
+  Condition: '',
 };
 
 const MOCK_ITEM_ATTRIBUTES: Record<

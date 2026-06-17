@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useRef, useState } from 'react';
 import { Modal, Pressable, StyleSheet } from 'react-native';
 
 import AppImage from '@/components/shared/app-image';
@@ -52,8 +52,14 @@ function SearchResultRow({
   const { addItem } = useCartContext();
   const liked = isLiked(result.id);
   const [viewerVisible, setViewerVisible] = useState(false);
+  // Debounce guard: ignore a second tap within 800ms so rapid taps can't
+  // push duplicate line items into the cart.
+  const lastAddRef = useRef(0);
 
   const handleAddToCart = () => {
+    const now = Date.now();
+    if (now - lastAddRef.current < 800) return;
+    lastAddRef.current = now;
     addItem({
       id: result.id,
       title: result.title,

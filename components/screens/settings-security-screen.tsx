@@ -76,10 +76,13 @@ export default function SettingsSecurityScreen() {
                 ? [
                     {
                       key: 'change-email',
+                      // No backend yet — present as a coming-soon row instead
+                      // of a chevron that promises a flow that doesn't exist.
                       title: 'Change Email',
+                      subtitle: profile?.email ?? '',
                       leading: iconBox(Mail),
-                      rightText: profile?.email ?? '',
-                      rightChevron: true,
+                      rightBadgeLabel: 'Soon',
+                      disabled: true,
                     },
                   ]
                 : []),
@@ -103,15 +106,19 @@ export default function SettingsSecurityScreen() {
               items={[
                 {
                   key: 'password',
+                  // Backend-dependent — mark as coming soon rather than
+                  // showing a tappable-looking chevron with no handler.
                   title: 'Change Password',
                   leading: iconBox(KeyRound),
-                  rightChevron: true,
+                  rightBadgeLabel: 'Soon',
+                  disabled: true,
                 },
                 {
                   key: 'biometrics',
                   title: 'Biometric Login',
                   leading: iconBox(Fingerprint),
-                  rightChevron: true,
+                  rightBadgeLabel: 'Soon',
+                  disabled: true,
                 },
               ]}
             />

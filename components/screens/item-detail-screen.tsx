@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Heart, Share2 } from 'lucide-react-native';
 import { useRef, useState } from 'react';
-import { Animated, Platform, StatusBar, StyleSheet } from 'react-native';
+import { Animated, Platform, Share, StatusBar, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/shared/app-button';
@@ -20,21 +20,6 @@ const HERO_IMAGES = [
   require('@/assets/images/test-image.png'),
   require('@/assets/images/test-image.png'),
   require('@/assets/images/test-image.png'),
-];
-
-const FALLBACK_SPECS = [
-  { label: 'Range', value: '320 mi' },
-  { label: '0-60 mph', value: '4.2s' },
-  { label: 'Top Speed', value: '155 mph' },
-  { label: 'Drivetrain', value: 'AWD' },
-];
-
-const FALLBACK_FEATURES = [
-  'Smart safety assist with collision avoidance',
-  'Adaptive cruise control with lane centering',
-  'Panoramic glass roof with UV protection',
-  'Premium sound system with 12 speakers',
-  'Over-the-air software updates',
 ];
 
 export default function ItemDetailScreen() {
@@ -68,15 +53,31 @@ export default function ItemDetailScreen() {
   const badge = catalogDetail?.item.badge ?? topFeaturedDetail?.badge ?? params.badge;
   const status = catalogDetail?.item.status ?? topFeaturedDetail?.status ?? params.status;
   const oem = catalogDetail?.item.oem ?? topFeaturedDetail?.oem;
-  const specs = catalogDetail?.item.specs ?? FALLBACK_SPECS;
-  const features = catalogDetail?.item.features ?? FALLBACK_FEATURES;
+  // Only real, item-specific specs/features — no fabricated car data.
+  // Top-featured items carry no specs/features, so those sections are
+  // simply omitted rather than back-filled with EV car specs.
+  const specs = catalogDetail?.item.specs ?? [];
+  const features = catalogDetail?.item.features ?? [];
+
+  // A resolvable item requires either a matched mock detail or a usable
+  // title passed via params. When neither exists, the id is a phantom —
+  // render an honest not-found state instead of a blank addable product.
+  const isNotFound = !catalogDetail && !topFeaturedDetail && !title;
 
   const [wasAdded, setWasAdded] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const resetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Timestamp of the last accepted add — debounces rapid double-taps so a
+  // second tap within 800ms can't push a duplicate line item.
+  const lastAddRef = useRef(0);
   const scrollY = useRef(new Animated.Value(0)).current;
 
   const handleAddToCart = () => {
+    // Never add a phantom/untitled item to the cart.
+    if (!title) return;
+    const now = Date.now();
+    if (now - lastAddRef.current < 800) return;
+    lastAddRef.current = now;
     triggerHaptic('success');
     addItem({
       id: id ?? '',
@@ -98,6 +99,20 @@ export default function ItemDetailScreen() {
     outputRange: [0, IMAGE_HEIGHT * 0.5],
     extrapolate: 'clamp',
   });
+
+  if (isNotFound) {
+    return (
+      <AppView flex={1} center colorName="background" px={20} gap="md">
+        <AppText textVariant="title" family="heading" colorName="text" align="center">
+          Item not found
+        </AppText>
+        <AppText textVariant="bodySm" colorName="gray400" align="center">
+          This product may have been removed or is no longer available.
+        </AppText>
+        <AppButton title="Back" kind="brand" size="sm" onPress={() => router.back()} />
+      </AppView>
+    );
+  }
 
   return (
     <AppView flex={1} colorName="background">
@@ -153,6 +168,12 @@ export default function ItemDetailScreen() {
           <AppPressableView
             center
             rounded={36}
+            onPress={() => {
+              triggerHaptic('selection');
+              Share.share({ message: `${title}` }).catch(() => {
+                // User dismissed the share sheet or it failed — no-op.
+              });
+            }}
             androidRipple
             borderWidth={1}
             borderName="border"
@@ -188,7 +209,7 @@ export default function ItemDetailScreen() {
         </Animated.View>
 
         {/* Content overlaps image with rounded top */}
-        <AppView colorName="background" roundedTop={24} px="lg" pt={20} gap="xl" style={styles.content}>
+        <AppView colorName="background" roundedTop={24} px="lg" pt={20} pb={120} gap="xl" style={styles.content}>
           {/* Title + price */}
           <AppView gap="sm">
             <AppText textVariant="title" family="heading" weight="bold">
@@ -220,54 +241,58 @@ export default function ItemDetailScreen() {
             ) : null}
           </AppView>
 
-          {/* Specs grid */}
-          <AppView gap="md">
-            <AppText textVariant="h4" family="heading" weight="semibold">
-              Specifications
-            </AppText>
-            <AppView row wrap gap={10}>
-              {specs.map((spec) => (
-                <AppView
-                  key={spec.label}
-                  flex={1}
-                  p={14}
-                  rounded={16}
-                  colorName="card"
-                  borderWidth={1}
-                  borderName="border"
-                  style={styles.specCard}
-                >
-                  <AppText textVariant="bodyXs" colorName="gray400">
-                    {spec.label}
-                  </AppText>
-                  <AppText textVariant="body" family="heading" weight="semibold">
-                    {spec.value}
-                  </AppText>
-                </AppView>
-              ))}
-            </AppView>
-          </AppView>
-
-          {/* Features */}
-          <AppView gap="md" pb={120}>
-            <AppText textVariant="h4" family="heading" weight="semibold">
-              Key Features
-            </AppText>
-            <AppView gap={10}>
-              {features.map((feature) => (
-                <AppView key={feature} row align="flex-start" gap={10}>
+          {/* Specs grid — only when the resolved item has real specs. */}
+          {specs.length > 0 ? (
+            <AppView gap="md">
+              <AppText textVariant="h4" family="heading" weight="semibold">
+                Specifications
+              </AppText>
+              <AppView row wrap gap={10}>
+                {specs.map((spec) => (
                   <AppView
-                    rounded={36}
-                    center
-                    style={[styles.featureDot, { backgroundColor: tokens.secondary }]}
-                  />
-                  <AppText textVariant="body" style={styles.featureText}>
-                    {feature}
-                  </AppText>
-                </AppView>
-              ))}
+                    key={spec.label}
+                    flex={1}
+                    p={14}
+                    rounded={16}
+                    colorName="card"
+                    borderWidth={1}
+                    borderName="border"
+                    style={styles.specCard}
+                  >
+                    <AppText textVariant="bodyXs" colorName="gray400">
+                      {spec.label}
+                    </AppText>
+                    <AppText textVariant="body" family="heading" weight="semibold">
+                      {spec.value}
+                    </AppText>
+                  </AppView>
+                ))}
+              </AppView>
             </AppView>
-          </AppView>
+          ) : null}
+
+          {/* Features — only when the resolved item has real features. */}
+          {features.length > 0 ? (
+            <AppView gap="md" pb={120}>
+              <AppText textVariant="h4" family="heading" weight="semibold">
+                Key Features
+              </AppText>
+              <AppView gap={10}>
+                {features.map((feature) => (
+                  <AppView key={feature} row align="flex-start" gap={10}>
+                    <AppView
+                      rounded={36}
+                      center
+                      style={[styles.featureDot, { backgroundColor: tokens.secondary }]}
+                    />
+                    <AppText textVariant="body" style={styles.featureText}>
+                      {feature}
+                    </AppText>
+                  </AppView>
+                ))}
+              </AppView>
+            </AppView>
+          ) : null}
         </AppView>
       </Animated.ScrollView>
 
