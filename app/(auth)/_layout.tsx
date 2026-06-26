@@ -32,6 +32,10 @@ export default function AuthStackLayout() {
           gestureDirection: 'vertical',
         }}
       />
+      <Stack.Screen
+        name="select-language"
+        options={{ headerShown: false, animation: 'fade', gestureEnabled: false }}
+      />
     </Stack>
   );
 }
