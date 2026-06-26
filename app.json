@@ -1,33 +1,31 @@
 {
   "expo": {
-    "name": "matorui",
-    "slug": "matorui",
-    "owner": "gearguys",
+    "name": "Mator",
+    "slug": "Mator",
+    "owner": "matoruz",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "matorui",
+    "icon": "./assets/image.png",
+    "scheme": "mator",
     "userInterfaceStyle": "automatic",
+    "buildCacheProvider": "eas",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.fotih12.matorui",
+      "bundleIdentifier": "com.fotih12.mator",
+      "icon": "./assets/image.png",
       "infoPlist": {
         "UIViewControllerBasedStatusBarAppearance": true,
-        "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "Mator scans your VIN barcode to fit parts exactly to your vehicle."
-      }
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "appleTeamId": "DXP9AG6TPN"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#000000",
+        "foregroundImage": "./assets/image.png"
       },
       "predictiveBackGestureEnabled": false,
-      "edgeToEdgeEnabled": true,
-      "package": "com.fotih12.matorui",
-      "permissions": ["android.permission.CAMERA"]
+      "package": "com.fotih12.mator"
     },
     "web": {
       "bundler": "metro",
@@ -39,28 +37,28 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/splash.png",
+          "imageWidth": 300,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#F2F3F5",
+          "dark": {
+            "image": "./assets/splash-dark.png",
+            "backgroundColor": "#0A0A0A"
+          }
         }
       ],
       "expo-image",
       "expo-sharing",
       "expo-secure-store",
       [
-        "expo-camera",
-        {
-          "cameraPermission": "Mator scans your VIN barcode to fit parts exactly to your vehicle."
-        }
-      ],
-      [
         "@sentry/react-native/expo",
         {
-          "organization": "matorui",
-          "project": "matorui-mobile",
+          "organization": "llc-mator-innovations",
+          "project": "apple-ios",
           "url": "https://sentry.io/"
         }
-      ]
+      ],
+      "@sentry/react-native"
     ],
     "experiments": {
       "typedRoutes": true
@@ -68,10 +66,10 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "d447b7a7-bd87-47a9-9c6d-53ab478d9d25"
+        "projectId": "1e4e8419-ba28-4fe4-b4af-953729419716"
       },
       "sentry": {
-        "dsn": "",
+        "dsn": "https://20afea744b5f75def4c8d2f6ffd9c1d2@o4511632480141312.ingest.us.sentry.io/4511632482631680",
         "environment": "production",
         "enableInDev": false
       }
