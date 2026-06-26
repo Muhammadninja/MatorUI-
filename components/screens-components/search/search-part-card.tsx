@@ -39,8 +39,8 @@ export type SearchPartCardProps = {
   style?: StyleProp<ViewStyle>;
   onPress?: () => void;
   /** Manufacturer / OEM part number. When set, renders as a small gray
-   *  pill below the add-to-cart row so shoppers can cross-reference
-   *  against an existing part. Omit to hide the pill entirely. */
+   *  pill directly under the title/description (above price + CTA) so
+   *  shoppers can cross-reference against an existing part. Omit to hide. */
   oem?: string;
 };
 
@@ -173,6 +173,19 @@ function SearchPartCard({
           </AppText>
         </AppView>
 
+        {oem ? (
+          <AppView
+            rounded={8}
+            px={8}
+            py={4}
+            style={{ alignSelf: 'flex-start', backgroundColor: tokens.gray100 }}
+          >
+            <AppText textVariant="bodyXs" colorName="gray400">
+              OEM {oem}
+            </AppText>
+          </AppView>
+        ) : null}
+
         {compact ? (
           <AppView gap={8}>
             <AppView gap={2}>
@@ -190,18 +203,6 @@ function SearchPartCard({
               fullWidth
               onPress={handleAddToCart}
             />
-            {oem ? (
-              <AppView
-                rounded={8}
-                px={8}
-                py={4}
-                style={{ alignSelf: 'flex-start', backgroundColor: tokens.gray100 }}
-              >
-                <AppText textVariant="bodyXs" colorName="gray400">
-                  OEM {oem}
-                </AppText>
-              </AppView>
-            ) : null}
           </AppView>
         ) : (
           <AppView gap={8}>
@@ -234,18 +235,6 @@ function SearchPartCard({
                 onPress={handleAddToCart}
               />
             </AppView>
-            {oem ? (
-              <AppView
-                rounded={8}
-                px={8}
-                py={4}
-                style={{ alignSelf: 'flex-start', backgroundColor: tokens.gray100 }}
-              >
-                <AppText textVariant="bodyXs" colorName="gray400">
-                   {oem}
-                </AppText>
-              </AppView>
-            ) : null}
           </AppView>
         )}
       </AppView>
