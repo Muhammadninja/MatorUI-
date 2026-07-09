@@ -41,10 +41,10 @@ export function GarageEmptyState({ onAddVehicle }: GarageEmptyStateProps) {
 
         <AppView gap={6} align="center">
           <AppText textVariant="title" family="heading" colorName="text" align="center">
-            Build your garage
+            No vehicles yet
           </AppText>
-          <AppText textVariant="bodySm" colorName="gray400" align="center">
-            Add a vehicle to filter parts by fitment and keep notes on the cars you wrench on.
+          <AppText textVariant="bodySm" colorName="textMuted" align="center">
+            Add your first vehicle to unlock guaranteed-fit parts.
           </AppText>
         </AppView>
 

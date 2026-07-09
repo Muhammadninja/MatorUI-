@@ -14,6 +14,18 @@ export default function ExploreStackLayout() {
     >
       <Stack.Screen name="explore" options={{ headerShown: false }} />
       <Stack.Screen
+        name="category"
+        options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }}
+      />
+      <Stack.Screen
+        name="make"
+        options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }}
+      />
+      <Stack.Screen
+        name="search"
+        options={{ headerShown: false, animation: 'fade', gestureEnabled: true }}
+      />
+      <Stack.Screen
         name="item-detail/[id]"
         options={{
           headerShown: false,

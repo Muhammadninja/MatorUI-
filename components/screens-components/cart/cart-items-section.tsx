@@ -1,4 +1,3 @@
-import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import type { CartItem } from '@/contexts/cart.context';
 
@@ -19,9 +18,6 @@ export default function CartItemsSection({
 }: CartItemsSectionProps) {
   return (
     <AppView gap="md">
-      <AppText textVariant="subtitle" family="accent">
-        Cart items
-      </AppText>
       {items.map((item) => (
         <CartItemCard
           key={item.id}

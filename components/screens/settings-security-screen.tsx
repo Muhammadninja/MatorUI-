@@ -1,163 +1,304 @@
 import { router } from 'expo-router';
 import {
+  EyeOff,
   Fingerprint,
   Globe,
-  KeyRound,
-  LogOut,
-  Mail,
+  Lock,
   Moon,
+  ShieldCheck,
 } from 'lucide-react-native';
 import { useState } from 'react';
+import { Switch } from 'react-native';
 
-import LanguagePickerSheet from '@/components/screens-components/language-picker-sheet/language-picker-sheet';
-import ProfileSectionCard from '@/components/screens-components/profile/profile-section-card';
 import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
-import { AppView } from '@/components/shared/app-view';
+import { AppText } from '@/components/shared/app-text';
+import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useLanguageContext } from '@/contexts/language.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useUserContext } from '@/contexts/user.context';
-import { useGlobalModal } from '@/hooks/use-global-modal';
+import { useToast } from '@/hooks/use-toast';
 import { triggerHaptic } from '@/utils/haptics';
 
 export default function SettingsSecurityScreen() {
   const { tokens, scheme, setScheme } = useThemeContext();
-  const { profile, isAuthenticated, signOut } = useUserContext();
-  const { openConfirm } = useGlobalModal();
   const { languageLabel } = useLanguageContext();
+  const { signOut } = useUserContext();
+  const toast = useToast();
   const isDark = scheme === 'dark';
-  const [languageSheetOpen, setLanguageSheetOpen] = useState(false);
 
-  const handleSignOut = () => {
-    openConfirm({
-      title: 'Sign out?',
-      message: 'You can sign back in anytime. Your cart will stay saved on this device.',
-      confirmLabel: 'Sign out',
-      cancelLabel: 'Cancel',
-      onConfirm: () => {
-        triggerHaptic('warning');
-        signOut();
-        router.replace('/profile');
-      },
-    });
-  };
+  // Security toggles (local UI state — no backend)
+  const [faceId, setFaceId] = useState(true);
+  const [twoFactor, setTwoFactor] = useState(true);
+  const [hideOrderHistory, setHideOrderHistory] = useState(false);
 
-  function iconBox(
-    Icon: React.ComponentType<{ size: number; strokeWidth: number; color: string }>,
-    danger = false,
-  ) {
+  function makeSwitch(value: boolean, onChange: (v: boolean) => void) {
     return (
-      <AppView
-        center
-        rounded={8}
-        style={{
-          width: 34,
-          height: 34,
-          backgroundColor: danger ? `${tokens.error}18` : tokens.backgroundSecondary,
-        }}
-      >
-        <Icon size={16} strokeWidth={2.1} color={danger ? tokens.error : tokens.icon} />
-      </AppView>
+      <Switch
+        value={value}
+        onValueChange={onChange}
+        trackColor={{ false: tokens.switchTrackOff, true: tokens.switchTrackOn }}
+        thumbColor={value ? tokens.switchThumbOn : tokens.white}
+        ios_backgroundColor={tokens.switchTrackOff}
+      />
     );
   }
 
   return (
     <AppView flex={1} colorName="background">
-      <AppSettingsHeader title="Settings" fallbackHref="/profile" />
+      <AppSettingsHeader title="Settings & security" fallbackHref="/profile" />
       <AppScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: 8, paddingBottom: 40 }}
       >
         <AppView gap={20}>
-          <ProfileSectionCard
-            title="Account"
-            items={[
-              ...(isAuthenticated
-                ? [
-                    {
-                      key: 'change-email',
-                      // No backend yet — present as a coming-soon row instead
-                      // of a chevron that promises a flow that doesn't exist.
-                      title: 'Change Email',
-                      subtitle: profile?.email ?? '',
-                      leading: iconBox(Mail),
-                      rightBadgeLabel: 'Soon',
-                      disabled: true,
-                    },
-                  ]
-                : []),
-              {
-                key: 'language',
-                title: 'Language',
-                leading: iconBox(Globe),
-                rightText: languageLabel,
-                rightChevron: true,
-                onPress: () => {
+
+          {/* ── Account ─────────────────────────────────────────────────── */}
+          <AppView px="lg" gap={8}>
+            <SectionLabel>Account</SectionLabel>
+
+            <AppView
+              rounded={14}
+              style={{
+                borderWidth: 1,
+                borderColor: tokens.border,
+                backgroundColor: tokens.card,
+                overflow: 'hidden',
+              }}
+            >
+              {/* Change password */}
+              <AppPressableView
+                androidRipple={false}
+                onPress={() => toast.info('Demo')}
+                accessibilityRole="button"
+                accessibilityLabel="Change password"
+                row
+                align="center"
+                gap="md"
+                px="lg"
+                py="md"
+                style={{ borderBottomWidth: 1, borderBottomColor: tokens.divider }}
+              >
+                <IconBox Icon={Lock} />
+                <AppView style={{ flex: 1 }}>
+                  <AppText
+                    family="accent"
+                    weight="semibold"
+                    style={{ fontSize: 14.5, color: tokens.text }}
+                  >
+                    Change password
+                  </AppText>
+                  <AppText
+                    family="default"
+                    style={{ fontSize: 12.5, color: tokens.textMuted, marginTop: 2 }}
+                  >
+                    Last changed 3 months ago
+                  </AppText>
+                </AppView>
+                <ChevronRight />
+              </AppPressableView>
+
+              {/* Language */}
+              <AppPressableView
+                androidRipple={false}
+                onPress={() => {
                   triggerHaptic('selection');
-                  setLanguageSheetOpen(true);
-                },
-              },
-            ]}
-          />
+                  router.push('/select-language');
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Language"
+                row
+                align="center"
+                gap="md"
+                px="lg"
+                py="md"
+              >
+                <IconBox Icon={Globe} />
+                <AppView style={{ flex: 1 }}>
+                  <AppText
+                    family="accent"
+                    weight="semibold"
+                    style={{ fontSize: 14.5, color: tokens.text }}
+                  >
+                    Language
+                  </AppText>
+                </AppView>
+                <AppText
+                  family="default"
+                  style={{ fontSize: 13, color: tokens.textMuted }}
+                >
+                  {languageLabel}
+                </AppText>
+                <ChevronRight />
+              </AppPressableView>
+            </AppView>
+          </AppView>
 
-          {isAuthenticated ? (
-            <ProfileSectionCard
-              title="Security"
-              items={[
-                {
-                  key: 'password',
-                  // Backend-dependent — mark as coming soon rather than
-                  // showing a tappable-looking chevron with no handler.
-                  title: 'Change Password',
-                  leading: iconBox(KeyRound),
-                  rightBadgeLabel: 'Soon',
-                  disabled: true,
-                },
-                {
-                  key: 'biometrics',
-                  title: 'Biometric Login',
-                  leading: iconBox(Fingerprint),
-                  rightBadgeLabel: 'Soon',
-                  disabled: true,
-                },
-              ]}
-            />
-          ) : null}
+          {/* ── Security ────────────────────────────────────────────────── */}
+          <AppView px="lg" gap={8}>
+            <SectionLabel>Security</SectionLabel>
 
-          <ProfileSectionCard
-            title="Preferences"
-            items={[
-              {
-                key: 'dark-mode',
-                title: 'Dark Mode',
-                leading: iconBox(Moon),
-                rightSwitchValue: isDark,
-                onRightSwitchChange: (v) => setScheme(v ? 'dark' : 'light'),
-              },
-            ]}
-          />
+            <AppView
+              rounded={14}
+              style={{
+                borderWidth: 1,
+                borderColor: tokens.border,
+                backgroundColor: tokens.card,
+                paddingHorizontal: 16,
+                paddingVertical: 4,
+                overflow: 'hidden',
+              }}
+            >
+              <ToggleRow
+                label="Face ID login"
+                value={faceId}
+                onChange={setFaceId}
+                border
+              />
+              <ToggleRow
+                label="Two-factor authentication"
+                value={twoFactor}
+                onChange={setTwoFactor}
+                border
+              />
+              <ToggleRow
+                label="Hide order history"
+                value={hideOrderHistory}
+                onChange={setHideOrderHistory}
+                border={false}
+              />
+            </AppView>
+          </AppView>
 
-          {isAuthenticated ? (
-            <ProfileSectionCard
-              title="Account Actions"
-              items={[
-                {
-                  key: 'sign-out',
-                  title: 'Sign Out',
-                  leading: iconBox(LogOut, true),
-                  rightChevron: true,
-                  titleStyle: { color: tokens.error },
-                  onPress: handleSignOut,
-                },
-              ]}
-            />
-          ) : null}
+          {/* ── Appearance ──────────────────────────────────────────────── */}
+          <AppView px="lg" gap={8}>
+            <SectionLabel>Appearance</SectionLabel>
+
+            <AppView
+              rounded={14}
+              style={{
+                borderWidth: 1,
+                borderColor: tokens.border,
+                backgroundColor: tokens.card,
+                paddingHorizontal: 16,
+                paddingVertical: 4,
+                overflow: 'hidden',
+              }}
+            >
+              <ToggleRow
+                label="Dark mode"
+                value={isDark}
+                onChange={(v) => setScheme(v ? 'dark' : 'light')}
+                border={false}
+              />
+            </AppView>
+          </AppView>
+
+          {/* ── Delete account ──────────────────────────────────────────── */}
+          <AppView px="lg" style={{ marginTop: 4 }}>
+            <AppPressableView
+              androidRipple={false}
+              onPress={async () => {
+                await signOut();
+                toast.info('Account deleted');
+                router.replace('/explore');
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Delete account"
+            >
+              <AppText
+                family="accent"
+                weight="bold"
+                style={{ fontSize: 14, color: tokens.error, paddingVertical: 8 }}
+              >
+                Delete account
+              </AppText>
+            </AppPressableView>
+          </AppView>
+
         </AppView>
       </AppScrollView>
+    </AppView>
+  );
+}
 
-      <LanguagePickerSheet
-        visible={languageSheetOpen}
-        onClose={() => setLanguageSheetOpen(false)}
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function SectionLabel({ children }: { children: string }) {
+  const { tokens } = useThemeContext();
+  return (
+    <AppText
+      family="accent"
+      weight="bold"
+      style={{
+        fontSize: 12,
+        color: tokens.textMuted,
+        textTransform: 'uppercase',
+        letterSpacing: 0.06 * 12,
+      }}
+    >
+      {children}
+    </AppText>
+  );
+}
+
+function IconBox({ Icon }: { Icon: React.ComponentType<{ size: number; strokeWidth: number; color: string }> }) {
+  const { tokens } = useThemeContext();
+  return (
+    <AppView
+      center
+      rounded={11}
+      style={{
+        width: 38,
+        height: 38,
+        backgroundColor: tokens.backgroundSecondary,
+        flexShrink: 0,
+      }}
+    >
+      <Icon size={17} strokeWidth={2.1} color={tokens.icon} />
+    </AppView>
+  );
+}
+
+function ChevronRight() {
+  const { tokens } = useThemeContext();
+  return (
+    <AppText style={{ fontSize: 16, color: tokens.textMuted, marginLeft: 2 }}>›</AppText>
+  );
+}
+
+type ToggleRowProps = {
+  label: string;
+  value: boolean;
+  onChange: (v: boolean) => void;
+  border: boolean;
+};
+
+function ToggleRow({ label, value, onChange, border }: ToggleRowProps) {
+  const { tokens } = useThemeContext();
+  return (
+    <AppView
+      row
+      align="center"
+      justify="space-between"
+      style={{
+        paddingVertical: 14,
+        borderBottomWidth: border ? 1 : 0,
+        borderBottomColor: tokens.divider,
+      }}
+    >
+      <AppText
+        family="default"
+        style={{ fontSize: 14.5, color: tokens.text, fontWeight: '500' }}
+      >
+        {label}
+      </AppText>
+      <Switch
+        value={value}
+        onValueChange={onChange}
+        trackColor={{ false: tokens.switchTrackOff, true: tokens.switchTrackOn }}
+        thumbColor={value ? tokens.switchThumbOn : tokens.white}
+        ios_backgroundColor={tokens.switchTrackOff}
       />
     </AppView>
   );

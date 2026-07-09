@@ -3,7 +3,7 @@
  * imperative for now (createOrder side-effects: cart clear, navigation).
  */
 import { useCallback, useMemo, useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
   ordersTransport,
@@ -12,11 +12,13 @@ import {
 } from '@/services/orders-api';
 import type {
   Address,
+  AddressInput,
   CreateOrderInput,
   CreateOrderResult,
   OrderDetail,
   OrderListPage,
   PaymentMethod,
+  PaymentMethodInput,
   ShippingOption,
 } from '@/services/orders-service';
 
@@ -209,6 +211,95 @@ export function usePaymentMethods(): CollectionValue<PaymentMethod> {
     }),
     [query],
   );
+}
+
+// ── Address CRUD mutations ─────────────────────────────────────────────
+//
+// Each invalidates the addresses query so the list re-fetches with the
+// server's canonical shape (including the enforced single-default flag).
+
+export function useCreateAddress() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AddressInput) => ordersTransport.createAddress(input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ordersQueryKeys.addresses() });
+    },
+  });
+}
+
+export function useUpdateAddress() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: AddressInput }) =>
+      ordersTransport.updateAddress(id, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ordersQueryKeys.addresses() });
+    },
+  });
+}
+
+export function useRemoveAddress() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => ordersTransport.removeAddress(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ordersQueryKeys.addresses() });
+    },
+  });
+}
+
+export function useSetDefaultAddress() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => ordersTransport.setDefaultAddress(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ordersQueryKeys.addresses() });
+    },
+  });
+}
+
+// ── Payment-method CRUD mutations ──────────────────────────────────────
+
+export function useCreatePaymentMethod() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: PaymentMethodInput) => ordersTransport.createPaymentMethod(input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ordersQueryKeys.paymentMethods() });
+    },
+  });
+}
+
+export function useUpdatePaymentMethod() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: PaymentMethodInput }) =>
+      ordersTransport.updatePaymentMethod(id, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ordersQueryKeys.paymentMethods() });
+    },
+  });
+}
+
+export function useRemovePaymentMethod() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => ordersTransport.removePaymentMethod(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ordersQueryKeys.paymentMethods() });
+    },
+  });
+}
+
+export function useSetDefaultPaymentMethod() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => ordersTransport.setDefaultPaymentMethod(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ordersQueryKeys.paymentMethods() });
+    },
+  });
 }
 
 // ── useShippingQuote (depends on subtotal + address) ───────────────────

@@ -11,12 +11,14 @@
  */
 import type {
   Address,
+  AddressInput,
   CreateOrderInput,
   CreateOrderResult,
   OrderDetail,
   OrderListPage,
   OrderListStatus,
   PaymentMethod,
+  PaymentMethodInput,
   ShippingOption,
 } from '@/services/orders-service';
 
@@ -39,7 +41,15 @@ export interface OrdersTransport {
   getOrder(orderId: string, signal?: AbortSignal): Promise<OrderDetail | null>;
   createOrder(input: CreateOrderInput, signal?: AbortSignal): Promise<CreateOrderResult>;
   listAddresses(signal?: AbortSignal): Promise<Address[]>;
+  createAddress(input: AddressInput): Promise<Address>;
+  updateAddress(id: string, input: AddressInput): Promise<Address>;
+  removeAddress(id: string): Promise<void>;
+  setDefaultAddress(id: string): Promise<void>;
   listPaymentMethods(signal?: AbortSignal): Promise<PaymentMethod[]>;
+  createPaymentMethod(input: PaymentMethodInput): Promise<PaymentMethod>;
+  updatePaymentMethod(id: string, input: PaymentMethodInput): Promise<PaymentMethod>;
+  removePaymentMethod(id: string): Promise<void>;
+  setDefaultPaymentMethod(id: string): Promise<void>;
   getShippingQuote(
     request: ShippingQuoteRequest,
     signal?: AbortSignal,
@@ -69,14 +79,18 @@ const SEED_ADDRESSES: Address[] = [
   {
     id: 'addr_home',
     label: 'Home',
+    name: 'Alex Marino',
     line1: '128 Marrakesh Rd, Suite 4',
     city: 'Brooklyn, NY 11211',
+    isDefault: true,
   },
   {
     id: 'addr_shop',
     label: 'Shop',
+    name: 'Alex Marino',
     line1: '2210 W Industrial Blvd',
     city: 'Long Island City, NY 11101',
+    isDefault: false,
   },
 ];
 
@@ -183,10 +197,16 @@ const ORDER_DETAILS: Record<string, OrderDetail> = {
 export class MockOrdersTransport implements OrdersTransport {
   private orders: OrderListPage;
   private details: Record<string, OrderDetail>;
+  // Instance copies so CRUD mutations don't leak into the module seeds
+  // (mirrors how `orders`/`details` are cloned above).
+  private addresses: Address[];
+  private paymentMethods: PaymentMethod[];
 
   constructor(seedOrders: OrderListPage = SEED_ORDERS, seedDetails = ORDER_DETAILS) {
     this.orders = { ...seedOrders, items: [...seedOrders.items] };
     this.details = { ...seedDetails };
+    this.addresses = SEED_ADDRESSES.map((a) => ({ ...a }));
+    this.paymentMethods = SEED_PAYMENT_METHODS.map((p) => ({ ...p }));
   }
 
   async listOrders(
@@ -224,8 +244,10 @@ export class MockOrdersTransport implements OrdersTransport {
     const orderId = `M-${Math.floor(40000 + Math.random() * 60000)}`;
     const shipping = BASE_SHIPPING_OPTIONS.find((o) => o.key === input.shippingOptionKey);
     const eta = shipping?.eta ?? '3-5 business days';
-    // Real server would calculate this; mock just echoes a plausible label.
-    const totalLabel = '$—.—'; // intentionally placeholder; confirmation reads from search params we pass instead
+    // Real server calculates this authoritatively; the mock echoes the
+    // client's optimistic grand-total hint so the just-placed order's
+    // confirmation + track screens show a real total instead of a blank.
+    const totalLabel = input.totalLabel ?? '$—.—';
     // Seed a new detail row so a subsequent track-order fetch resolves.
     this.details[orderId] = {
       ...detailFor({ id: orderId, total: totalLabel }, 'in_transit'),
@@ -238,12 +260,88 @@ export class MockOrdersTransport implements OrdersTransport {
 
   async listAddresses(signal?: AbortSignal): Promise<Address[]> {
     await delay(MOCK_LATENCY_MS, signal);
-    return [...SEED_ADDRESSES];
+    return this.addresses.map((a) => ({ ...a }));
+  }
+
+  async createAddress(input: AddressInput): Promise<Address> {
+    await delay(MOCK_LATENCY_MS);
+    // First address becomes the default; otherwise defer to setDefault.
+    const isDefault = this.addresses.length === 0;
+    const created: Address = {
+      id: `addr_${Date.now().toString(36)}`,
+      ...input,
+      isDefault,
+    };
+    this.addresses.push(created);
+    return { ...created };
+  }
+
+  async updateAddress(id: string, input: AddressInput): Promise<Address> {
+    await delay(MOCK_LATENCY_MS);
+    const idx = this.addresses.findIndex((a) => a.id === id);
+    if (idx === -1) throw new Error('Address not found');
+    const updated: Address = { ...this.addresses[idx]!, ...input };
+    this.addresses[idx] = updated;
+    return { ...updated };
+  }
+
+  async removeAddress(id: string): Promise<void> {
+    await delay(MOCK_LATENCY_MS);
+    const removed = this.addresses.find((a) => a.id === id);
+    this.addresses = this.addresses.filter((a) => a.id !== id);
+    // Removing the default promotes the first remaining address.
+    if (removed?.isDefault && this.addresses.length > 0) {
+      this.addresses[0] = { ...this.addresses[0]!, isDefault: true };
+    }
+  }
+
+  async setDefaultAddress(id: string): Promise<void> {
+    await delay(MOCK_LATENCY_MS);
+    // Enforce a single default across the collection.
+    this.addresses = this.addresses.map((a) => ({ ...a, isDefault: a.id === id }));
   }
 
   async listPaymentMethods(signal?: AbortSignal): Promise<PaymentMethod[]> {
     await delay(MOCK_LATENCY_MS, signal);
-    return [...SEED_PAYMENT_METHODS];
+    return this.paymentMethods.map((p) => ({ ...p }));
+  }
+
+  async createPaymentMethod(input: PaymentMethodInput): Promise<PaymentMethod> {
+    await delay(MOCK_LATENCY_MS);
+    const isDefault = this.paymentMethods.length === 0;
+    const created: PaymentMethod = {
+      id: `pm_${Date.now().toString(36)}`,
+      ...input,
+      isDefault,
+    };
+    this.paymentMethods.push(created);
+    return { ...created };
+  }
+
+  async updatePaymentMethod(id: string, input: PaymentMethodInput): Promise<PaymentMethod> {
+    await delay(MOCK_LATENCY_MS);
+    const idx = this.paymentMethods.findIndex((p) => p.id === id);
+    if (idx === -1) throw new Error('Payment method not found');
+    const updated: PaymentMethod = { ...this.paymentMethods[idx]!, ...input };
+    this.paymentMethods[idx] = updated;
+    return { ...updated };
+  }
+
+  async removePaymentMethod(id: string): Promise<void> {
+    await delay(MOCK_LATENCY_MS);
+    const removed = this.paymentMethods.find((p) => p.id === id);
+    this.paymentMethods = this.paymentMethods.filter((p) => p.id !== id);
+    if (removed?.isDefault && this.paymentMethods.length > 0) {
+      this.paymentMethods[0] = { ...this.paymentMethods[0]!, isDefault: true };
+    }
+  }
+
+  async setDefaultPaymentMethod(id: string): Promise<void> {
+    await delay(MOCK_LATENCY_MS);
+    this.paymentMethods = this.paymentMethods.map((p) => ({
+      ...p,
+      isDefault: p.id === id,
+    }));
   }
 
   async getShippingQuote(
@@ -270,7 +368,15 @@ export class MockOrdersTransport implements OrdersTransport {
  *   GET    /v1/orders/:orderId                    → OrderDetail
  *   POST   /v1/orders                              → CreateOrderResult
  *   GET    /v1/account/addresses                   → Address[]
+ *   POST   /v1/addresses                            → Address
+ *   PATCH  /v1/addresses/:id                        → Address
+ *   DELETE /v1/addresses/:id                        → 204
+ *   POST   /v1/addresses/:id/default                → 204
  *   GET    /v1/account/payment-methods             → PaymentMethod[]
+ *   POST   /v1/payment-methods                      → PaymentMethod
+ *   PATCH  /v1/payment-methods/:id                  → PaymentMethod
+ *   DELETE /v1/payment-methods/:id                  → 204
+ *   POST   /v1/payment-methods/:id/default          → 204
  *   POST   /v1/shipping/quote                      → ShippingOption[]
  */
 import { shouldUseHttpTransport } from '@/config/api';
@@ -296,15 +402,47 @@ export class HttpOrdersTransport implements OrdersTransport {
     return apiClient.post<CreateOrderResult>('/v1/orders', input, { signal });
   }
 
-  // Address + payment endpoints — wired but NOT exercised until the
-  // payment/address screens are migrated off their local-state mocks
-  // (intentionally the last step of the API rollout per the project plan).
   listAddresses(signal?: AbortSignal): Promise<Address[]> {
     return apiClient.get<Address[]>('/v1/account/addresses', { signal });
   }
 
+  createAddress(input: AddressInput): Promise<Address> {
+    return apiClient.post<Address>('/v1/addresses', input);
+  }
+
+  updateAddress(id: string, input: AddressInput): Promise<Address> {
+    return apiClient.patch<Address>(`/v1/addresses/${encodeURIComponent(id)}`, input);
+  }
+
+  removeAddress(id: string): Promise<void> {
+    return apiClient.delete<void>(`/v1/addresses/${encodeURIComponent(id)}`);
+  }
+
+  setDefaultAddress(id: string): Promise<void> {
+    return apiClient.post<void>(`/v1/addresses/${encodeURIComponent(id)}/default`);
+  }
+
   listPaymentMethods(signal?: AbortSignal): Promise<PaymentMethod[]> {
     return apiClient.get<PaymentMethod[]>('/v1/account/payment-methods', { signal });
+  }
+
+  createPaymentMethod(input: PaymentMethodInput): Promise<PaymentMethod> {
+    return apiClient.post<PaymentMethod>('/v1/payment-methods', input);
+  }
+
+  updatePaymentMethod(id: string, input: PaymentMethodInput): Promise<PaymentMethod> {
+    return apiClient.patch<PaymentMethod>(
+      `/v1/payment-methods/${encodeURIComponent(id)}`,
+      input,
+    );
+  }
+
+  removePaymentMethod(id: string): Promise<void> {
+    return apiClient.delete<void>(`/v1/payment-methods/${encodeURIComponent(id)}`);
+  }
+
+  setDefaultPaymentMethod(id: string): Promise<void> {
+    return apiClient.post<void>(`/v1/payment-methods/${encodeURIComponent(id)}/default`);
   }
 
   getShippingQuote(
@@ -318,6 +456,6 @@ export class HttpOrdersTransport implements OrdersTransport {
 // ── Singleton ────────────────────────────────────────────────────────
 
 /** Flips automatically based on `EXPO_PUBLIC_API_BASE_URL`. */
-export const ordersTransport: OrdersTransport = shouldUseHttpTransport()
+export const ordersTransport: OrdersTransport = shouldUseHttpTransport('orders')
   ? new HttpOrdersTransport()
   : new MockOrdersTransport();

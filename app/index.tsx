@@ -1,19 +1,13 @@
 import 'expo-dev-client';
 import { Redirect } from 'expo-router';
 
-import { useLanguageContext } from '@/contexts/language.context';
-
 /**
- * Entry-point gate. First launch (no language chosen yet) routes the
- * user to the language picker; otherwise the explore tab.
+ * Entry-point gate. Always routes to the branded Splash, which shows the
+ * spinning MATOR wheel for ~2.4s and then decides where to go: the language
+ * picker on first launch, or straight to Explore once a language has been
+ * chosen. Splash owns the persisted-language hydration wait, so the entry
+ * point stays a dumb redirect.
  */
 export default function RootIndex() {
-  const { isHydrated, hasChosen } = useLanguageContext();
-  // Wait for hydration before deciding — otherwise we'd flash /explore
-  // on first launch and then yank to /select-language.
-  if (!isHydrated) return null;
-  if (!hasChosen) {
-    return <Redirect href="/select-language?mode=onboarding" />;
-  }
-  return <Redirect href="/explore" />;
+  return <Redirect href="/splash" />;
 }

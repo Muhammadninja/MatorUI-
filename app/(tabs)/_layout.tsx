@@ -1,5 +1,5 @@
 import { Link, Tabs } from 'expo-router';
-import { Bell, BotMessageSquare, Car, Compass, ShoppingCart, UserRound } from 'lucide-react-native';
+import { Bell, Car, Search, ShoppingBag, Sparkles, User } from 'lucide-react-native';
 
 import AppTabBar from '@/components/shared/app-tab-bar';
 import { AppPressableView } from '@/components/shared/app-view';
@@ -14,11 +14,11 @@ export const unstable_settings = {
 };
 
 const TAB_META = {
-  '(explore)': { label: 'Explore', icon: Compass, primary: 'explore' },
-  '(garage)': { label: 'Garage', icon: Car, primary: 'garage' },
-  '(cart)': { label: 'Cart', icon: ShoppingCart, primary: 'cart' },
-  '(profile)': { label: 'Profile', icon: UserRound, primary: 'profile' },
-  '(ai-chat)': { label: 'AI Chat', icon: BotMessageSquare, primary: 'ai-chat' },
+  '(explore)': { label: 'Explore', icon: Search, primary: 'explore', emphasized: false },
+  '(garage)': { label: 'Garage', icon: Car, primary: 'garage', emphasized: false },
+  '(ai-chat)': { label: 'Assistant', icon: Sparkles, primary: 'ai-chat', emphasized: true },
+  '(cart)': { label: 'Cart', icon: ShoppingBag, primary: 'cart', emphasized: false },
+  '(profile)': { label: 'Profile', icon: User, primary: 'profile', emphasized: false },
 } as const;
 
 type TabKey = keyof typeof TAB_META;
@@ -68,10 +68,15 @@ export default function TabLayout() {
                     ? descriptor.options.title
                     : meta.label;
                 const Icon = meta.icon;
+                const { emphasized } = meta;
+                // Emphasized center button sits on a brand-filled circle, so
+                // its icon uses the on-brand (inverted) color at every state.
+                const emphasizedIconColor = tokens.onBrand;
 
                 return {
                   key: route.name,
                   label: title,
+                  emphasized,
                   onPress: () => navigation.navigate(route.name),
                   badgeLabel:
                     route.name === '(cart)' && itemCount > 0
@@ -79,13 +84,16 @@ export default function TabLayout() {
                         ? '99+'
                         : String(itemCount)
                       : undefined,
-                  icon: (isActive: boolean) => (
-                    <Icon
-                      size={18}
-                      strokeWidth={2.2}
-                      color={isActive ? tokens.text : tokens.gray400}
-                    />
-                  ),
+                  icon: (isActive: boolean) =>
+                    emphasized ? (
+                      <Icon size={22} strokeWidth={2.2} color={emphasizedIconColor} />
+                    ) : (
+                      <Icon
+                        size={18}
+                        strokeWidth={isActive ? 2.6 : 2.2}
+                        color={isActive ? tokens.text : tokens.textMuted}
+                      />
+                    ),
                 };
               })}
           />
@@ -112,9 +120,9 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen name="(garage)" options={{ title: 'Garage', headerShown: false }} />
+      <Tabs.Screen name="(ai-chat)" options={{ title: 'Assistant', headerShown: false }} />
       <Tabs.Screen name="(cart)" options={{ title: 'Cart', headerShown: false }} />
       <Tabs.Screen name="(profile)" options={{ title: 'Profile', headerShown: false }} />
-      <Tabs.Screen name="(ai-chat)" options={{ title: 'AI Chat', headerShown: false }} />
     </Tabs>
   );
 }

@@ -1,228 +1,96 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Pencil, ScanLine, Star, Trash2 } from 'lucide-react-native';
-import { useCallback, useMemo, useState } from 'react';
-import { ScrollView } from 'react-native';
+import { ArrowLeft, CarFront } from 'lucide-react-native';
+import { ScrollView, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import ScreenShell from '@/components/screens-components/screen-shell';
-import AddVehicleWizard, {
-  type AddVehicleWizardSubmit,
-} from '@/components/screens-components/add-vehicle/add-vehicle-wizard';
-import VehicleDetailActionRow from '@/components/screens-components/vehicle-detail/vehicle-detail-action-row';
-import VehicleDetailHeader from '@/components/screens-components/vehicle-detail/vehicle-detail-header';
-import VehicleDetailHeadline from '@/components/screens-components/vehicle-detail/vehicle-detail-headline';
-import VehicleDetailStats from '@/components/screens-components/vehicle-detail/vehicle-detail-stats';
-import VinScannerModal from '@/components/screens-components/vin-scanner/vin-scanner-modal';
-import AppBlurView, { useBlurHeaderInset } from '@/components/shared/app-blur-view';
-import AppBottomSheet from '@/components/shared/app-bottom-sheet';
+import ProductCard from '@/components/screens-components/home/product-card';
+import AppImage from '@/components/shared/app-image';
 import { AppButton } from '@/components/shared/app-button';
-import { AppInlineError } from '@/components/shared/app-inline-error';
 import { AppText } from '@/components/shared/app-text';
-import { AppView } from '@/components/shared/app-view';
+import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useActiveVehicle } from '@/contexts/active-vehicle.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import useGarage from '@/hooks/use-garage';
-import useGarageRealtime from '@/hooks/use-garage-realtime';
-import { useGlobalModal } from '@/hooks/use-global-modal';
-import useVinScanner from '@/hooks/use-vin-scanner';
-import { garageService } from '@/services/garage-service';
+import { MATOR_PRODUCTS } from '@/mocks/mator-catalog';
 import { toastService } from '@/services/toast-service';
-import { triggerHaptic } from '@/utils/haptics';
-
-const VEHICLE_DETAIL_HEADER_HEIGHT = 52;
 
 function formatMileage(km?: number): string {
-  if (!km && km !== 0) return '-';
-  return `${km.toLocaleString('en-US')} km`;
+  if (km === undefined) return '—';
+  return `${km.toLocaleString('en-US')} mi`;
 }
 
 function titleCase(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+/**
+ * Vehicle Detail screen — reads the selected vehicle from the real
+ * garage layer (`useGarage()`), keyed by the `id` route param and
+ * falling back to the primary vehicle.
+ *
+ * Shows the vehicle photo, year/make/model headline + ACTIVE pill,
+ * trim·color subline, 2-col spec grid (VIN / Mileage / Trim / Color),
+ * a "Compatible parts" grid (catalog mocks — parts search isn't wired
+ * here yet), and "Set active" / "Delete" action buttons.
+ *
+ * Setting active goes through `useActiveVehicle().setPrimaryVehicle` so
+ * the parts-search scope stays in sync; delete goes through
+ * `useGarage().removeVehicle`.
+ */
 export default function VehicleDetailScreen() {
   const { tokens } = useThemeContext();
-  const { vehicles, setPrimary, removeVehicle, updateVehicle, addVehicle, error, clearError } = useGarage();
-  const { setPrimaryVehicle } = useActiveVehicle();
-  const { openConfirm } = useGlobalModal();
-  const params = useLocalSearchParams<{ id?: string }>();
-  // peek=-24 means content paddingTop = insets.top + headerHeight + fadeHeight,
-  // i.e. the headline starts BELOW the entire blur strip (no overlap behind the fade).
-  const topInset = useBlurHeaderInset(VEHICLE_DETAIL_HEADER_HEIGHT, -24);
+  const insets = useSafeAreaInsets();
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { vehicles, primaryVehicle, removeVehicle } = useGarage();
+  const { currentActiveVehicle, setPrimaryVehicle } = useActiveVehicle();
 
-  const [editSheetVisible, setEditSheetVisible] = useState(false);
-  const [editSessionId, setEditSessionId] = useState(0);
-  /** Which action is currently mid-mutation. Used to:
-   *  - show "Setting…" / "Removing…" label on the active action
-   *  - mute every other action so the user can't pile up concurrent
-   *    mutations (e.g. tap Remove then Set Primary before the first lands).
-   *  Cleared in `finally` so a thrown mutation still re-enables the UI. */
-  const [pendingAction, setPendingAction] = useState<'remove' | 'set_primary' | null>(null);
-  const isAnyMutationPending = pendingAction !== null;
+  const vehicle = vehicles.find((v) => v.id === id) ?? primaryVehicle;
 
-  const vehicle = useMemo(() => {
-    if (!params.id) return undefined;
-    return vehicles.find((v) => v.id === params.id) ?? garageService.getById(params.id);
-  }, [params.id, vehicles]);
-
-  // Realtime channel subscription. The transport mutates the garage
-  // cache on incoming events, so the `vehicle.liveStatus` field above
-  // will update automatically when a mechanic broadcasts. We tap the
-  // `onEvent` callback only to play a haptic + toast for status
-  // changes on THIS vehicle, so the user gets a perceptible cue when
-  // their car's status changes while they're staring at the screen.
-  useGarageRealtime({
-    vehicleIdFilter: vehicle?.id,
-    onEvent: (event) => {
-      if (event.event !== 'garage.vehicle.status.updated') return;
-      if (!event.status) return;
-      triggerHaptic('selection');
-      if (event.status.stage === 'ready') {
-        toastService.success('Your car is ready', { description: event.status.label });
-      } else if (event.status.stage === 'flagged') {
-        toastService.danger('Mechanic flagged an issue', { description: event.status.label });
-      } else {
-        toastService.info(event.status.label, { description: event.status.note });
-      }
-    },
-  });
-
-  // VIN scanner — wired to update the vehicle's vin on success.
-  const vinScanner = useVinScanner({
-    acceptInvalidChecksum: true,
-    onResult: async (vin) => {
-      if (!vehicle) return;
-      try {
-        await updateVehicle(vehicle.id, { vin });
-        toastService.success('VIN updated', { description: vin });
-      } catch {
-        // Surfaced via the hook's error state.
-      }
-    },
-  });
-
-  const openEditSheet = useCallback(() => {
-    if (!vehicle) return;
-    triggerHaptic('selection');
-    setEditSessionId((id) => id + 1);
-    setEditSheetVisible(true);
-  }, [vehicle]);
-
-  const closeEditSheet = useCallback(() => {
-    setEditSheetVisible(false);
-  }, []);
-
-  const handleEditSubmit = useCallback(
-    async ({ payload, setAsPrimary }: AddVehicleWizardSubmit) => {
-      if (!vehicle) return;
-      await updateVehicle(vehicle.id, payload);
-      if (setAsPrimary && !vehicle.isPrimary) await setPrimary(vehicle.id);
-      closeEditSheet();
-    },
-    [vehicle, updateVehicle, setPrimary, closeEditSheet],
-  );
-
+  // No vehicles in the garage (or none matched) — nothing to show.
   if (!vehicle) {
     return (
-      <ScreenShell>
-        <AppView flex={1} center px={20} gap="md">
-          <AppText textVariant="title" family="heading" colorName="text" align="center">
-            Vehicle not found
-          </AppText>
-          <AppText textVariant="bodySm" colorName="gray400" align="center">
-            It may have been removed from your garage.
-          </AppText>
-          <AppButton
-            title="Go back"
-            kind="brand"
-            size="sm"
-            onPress={() => router.back()}
-          />
-        </AppView>
-      </ScreenShell>
+      <AppView flex={1} center colorName="background" px={20} gap={12}>
+        <CarFront size={34} strokeWidth={2} color={tokens.textMuted} />
+        <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted }}>
+          Vehicle not found.
+        </AppText>
+        <AppButton title="Back to garage" kind="secondary" size="sm" onPress={() => router.back()} />
+      </AppView>
     );
   }
 
+  const isActive = currentActiveVehicle?.vehicleId === vehicle.id;
+  const parts = MATOR_PRODUCTS.slice(0, 4);
+
+  const makeModel = `${vehicle.make} ${vehicle.model}`.toUpperCase();
   const headline = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
-  const subline = [vehicle.trim, vehicle.nickname].filter(Boolean).join(' · ') || 'In your garage';
+  const vinValue = vehicle.vin ?? '—';
+  const trimValue = vehicle.trim ?? '—';
+  const colorValue = vehicle.color ? titleCase(vehicle.color) : '—';
+  const subline = [vehicle.trim, vehicle.color ? titleCase(vehicle.color) : undefined]
+    .filter(Boolean)
+    .join(' · ');
+  const imageSource = vehicle.images?.[0] ?? `https://picsum.photos/seed/${vehicle.id}/800/400`;
+  // Capture the id so the async handlers below keep the narrowed
+  // (non-undefined) reference past the early-return guard above.
+  const vehicleId = vehicle.id;
 
-  async function handleSetPrimary() {
-    if (!vehicle || vehicle.isPrimary || isAnyMutationPending) return;
-    triggerHaptic('success');
-    setPendingAction('set_primary');
+  async function handleSetActive() {
+    await setPrimaryVehicle(vehicleId);
+    toastService.success('Active vehicle set', { description: headline });
+    router.back();
+  }
+
+  async function handleRemove() {
     try {
-      // Route through the active-vehicle context so the parts-search
-      // scope updates atomically with the backend flip. The context
-      // calls `garageService.setPrimary` for us — going through both
-      // here would double-flip.
-      await setPrimaryVehicle(vehicle.id);
-      // Explicit success confirmation. Closes the "did that work?"
-      // moment after the label flips back to "Already primary".
-      toastService.success('Set as primary', { description: headline });
+      await removeVehicle(vehicleId);
+      toastService.info(`Removed ${headline}`, { description: 'Vehicle removed from garage' });
+      router.back();
     } catch {
-      // Surfaced via the hook's error state.
-    } finally {
-      setPendingAction(null);
+      toastService.danger('Couldn’t remove vehicle', {
+        description: 'Please try again.',
+      });
     }
-  }
-
-  function handleFindParts() {
-    triggerHaptic('selection');
-    router.push('/explore');
-  }
-
-  function handleRemove() {
-    if (!vehicle || isAnyMutationPending) return;
-    // Snapshot the vehicle data BEFORE the confirm so the undo path
-    // can re-create it. Captured outside the async closure so refs
-    // can't go stale. Vehicle gets a new id on undo (the original is
-    // gone server-side) — semantically still "the same car" to the user.
-    const undoSnapshot = {
-      year: vehicle.year,
-      make: vehicle.make,
-      model: vehicle.model,
-      trim: vehicle.trim,
-      nickname: vehicle.nickname,
-      vin: vehicle.vin,
-      plate: vehicle.plate,
-      mileage: vehicle.mileage,
-      color: vehicle.color,
-      setAsPrimary: vehicle.isPrimary,
-    };
-    const snapshotHeadline = headline;
-    openConfirm({
-      title: 'Remove vehicle?',
-      message: `${headline} will be removed from your garage.`,
-      confirmLabel: 'Remove',
-      cancelLabel: 'Cancel',
-      onConfirm: async () => {
-        triggerHaptic('warning');
-        setPendingAction('remove');
-        try {
-          await removeVehicle(vehicle.id);
-          router.back();
-          // Undo toast — gives the user 5 seconds to recover from an
-          // accidental tap. Tapping "Undo" re-creates the vehicle from
-          // the snapshot taken before the destructive call.
-          toastService.info(`Removed ${snapshotHeadline}`, {
-            description: 'Tap undo to bring it back',
-            actionLabel: 'Undo',
-            duration: 5000,
-            onAction: async () => {
-              try {
-                await addVehicle(undoSnapshot);
-                toastService.success('Restored', { description: snapshotHeadline });
-              } catch {
-                // Hook's error state surfaces; user can retry from garage.
-              }
-            },
-          });
-        } catch {
-          // Surfaced via the hook's error state; stay on the detail screen.
-        } finally {
-          setPendingAction(null);
-        }
-      },
-    });
   }
 
   return (
@@ -230,113 +98,218 @@ export default function VehicleDetailScreen() {
       <ScrollView
         style={{ flex: 1 }}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: topInset, paddingBottom: 40 }}
+        contentContainerStyle={{ paddingTop: insets.top + 56 + 16, paddingBottom: 40 }}
       >
-        <AppView gap="xl">
-          {/* Mutation-error pill. Surfaces failures from set-primary,
-           *  remove, or update so the user can dismiss and retry. The
-           *  detail screen stays visible underneath — the vehicle data
-           *  is still valid, only the last mutation failed. */}
-          {error ? (
-            <AppView px={20}>
-              <AppInlineError message={error} onDismiss={clearError} />
-            </AppView>
-          ) : null}
-          <VehicleDetailHeadline headline={headline} subline={subline} />
-
-          <VehicleDetailStats
-            mileage={formatMileage(vehicle.mileage)}
-            plate={vehicle.plate ?? '-'}
-            color={titleCase(vehicle.color)}
-            liveStatus={vehicle.liveStatus}
+        {/* Vehicle image */}
+        <AppView px={20} mb={20}>
+          <AppImage
+            source={imageSource}
+            height={170}
+            rounded={18}
+            contentFit="cover"
+            priority="high"
+            cachePolicy="memory-disk"
+            transition={180}
+            alt={`${headline} photo`}
+            fallback={
+              <AppView flex={1} center colorName="backgroundSecondary">
+                <CarFront size={40} strokeWidth={2} color={tokens.gray400} />
+              </AppView>
+            }
           />
+        </AppView>
 
-          <AppView px={20} gap={10}>
+        {/* Info block */}
+        <AppView px={20} mb={24} gap={8}>
+          <AppView row align="center" gap={10} style={{ flexWrap: 'wrap' }}>
             <AppText
-              textVariant="caption"
-              family="accent"
-              colorName="gray400"
-              transform="uppercase"
+              family="heading"
+              weight="bold"
+              colorName="text"
+              style={{ fontSize: 22, lineHeight: 28 }}
             >
-              Actions
+              {headline}
             </AppText>
-
-            <VehicleDetailActionRow
-              icon={<ScanLine size={18} strokeWidth={2} color={tokens.text} />}
-              label={vehicle.vin ? `VIN · ${vehicle.vin}` : 'Scan VIN with camera'}
-              hint={
-                vehicle.vin
-                  ? 'Tap to re-scan or replace'
-                  : 'Photograph the VIN barcode for exact-fit parts'
-              }
-              onPress={() => {
-                triggerHaptic('selection');
-                vinScanner.open();
-              }}
-              muted={isAnyMutationPending}
-            />
-            <VehicleDetailActionRow
-              icon={<ScanLine size={18} strokeWidth={2} color={tokens.text} />}
-              label="Find compatible parts"
-              hint="Filter the catalog by this vehicle"
-              onPress={handleFindParts}
-              muted={isAnyMutationPending}
-            />
-            {/* "Service log — Coming soon" row removed: shipping
-             *  placeholder rows in production action lists makes the
-             *  surface look unfinished. Re-add when the feature ships. */}
-            <VehicleDetailActionRow
-              icon={<Star size={18} strokeWidth={2} color={tokens.text} />}
-              label={
-                pendingAction === 'set_primary'
-                  ? 'Setting…'
-                  : vehicle.isPrimary
-                  ? 'Already primary'
-                  : 'Set as primary'
-              }
-              hint={vehicle.isPrimary ? undefined : 'Default for fitment filters'}
-              onPress={handleSetPrimary}
-              muted={vehicle.isPrimary || isAnyMutationPending}
-            />
-            <VehicleDetailActionRow
-              icon={<Pencil size={18} strokeWidth={2} color={tokens.text} />}
-              label="Edit details"
-              onPress={openEditSheet}
-              muted={isAnyMutationPending}
-            />
-            <VehicleDetailActionRow
-              icon={<Trash2 size={18} strokeWidth={2} color={tokens.error} />}
-              label={pendingAction === 'remove' ? 'Removing…' : 'Remove from garage'}
-              onPress={handleRemove}
-              destructive
-              muted={isAnyMutationPending && pendingAction !== 'remove'}
-            />
+            {isActive ? (
+              <AppView
+                rounded={999}
+                px={10}
+                py={5}
+                colorName="brand"
+              >
+                <AppText
+                  family="accent"
+                  weight="bold"
+                  colorName="onBrand"
+                  style={{ fontSize: 10, letterSpacing: 0.8 }}
+                  transform="uppercase"
+                >
+                  Active
+                </AppText>
+              </AppView>
+            ) : null}
           </AppView>
+          {subline ? (
+            <AppText
+              family="default"
+              colorName="textMuted"
+              style={{ fontSize: 13.5, marginTop: 3 }}
+            >
+              {subline}
+            </AppText>
+          ) : null}
+        </AppView>
+
+        {/* 2-col spec grid */}
+        <AppView px={20} mb={24}>
+          <AppView
+            rounded={12}
+            colorName="card"
+            style={{
+              borderWidth: 1,
+              borderColor: tokens.border,
+              overflow: 'hidden',
+            }}
+          >
+            {/* Row 1: VIN + Mileage */}
+            <AppView row style={styles.specRow}>
+              <SpecCell label="VIN" value={vinValue} />
+              <AppView style={[styles.specDividerV, { backgroundColor: tokens.border }]} />
+              <SpecCell label="Mileage" value={formatMileage(vehicle.mileage)} />
+            </AppView>
+            <AppView style={[styles.specDividerH, { backgroundColor: tokens.border }]} />
+            {/* Row 2: Trim + Color */}
+            <AppView row style={styles.specRow}>
+              <SpecCell label="Trim" value={trimValue} />
+              <AppView style={[styles.specDividerV, { backgroundColor: tokens.border }]} />
+              <SpecCell label="Color" value={colorValue} />
+            </AppView>
+          </AppView>
+        </AppView>
+
+        {/* Compatible parts */}
+        <AppView px={20} mb={16}>
+          <AppText
+            family="heading"
+            weight="bold"
+            colorName="text"
+            style={{ fontSize: 18, marginTop: 4, marginBottom: 12 }}
+          >
+            Compatible parts
+          </AppText>
+          <AppView row style={{ flexWrap: 'wrap', gap: 12 }}>
+            {parts.map((p) => (
+              <AppView key={p.id} style={{ width: '47%' }}>
+                <ProductCard product={p} />
+              </AppView>
+            ))}
+          </AppView>
+        </AppView>
+
+        {/* Action buttons */}
+        <AppView px={20} gap={10} style={{ marginTop: 4 }}>
+          {!isActive ? (
+            <AppButton
+              title="Set as active vehicle"
+              kind="brand"
+              size="lg"
+              fullWidth
+              onPress={handleSetActive}
+            />
+          ) : null}
+          <AppButton
+            title="Delete vehicle"
+            kind="error"
+            variant="outline"
+            size="lg"
+            fullWidth
+            onPress={handleRemove}
+          />
         </AppView>
       </ScrollView>
 
-      <AppBlurView contentHeight={VEHICLE_DETAIL_HEADER_HEIGHT}>
-        <VehicleDetailHeader onBack={() => router.back()} isPrimary={vehicle.isPrimary} />
-      </AppBlurView>
-
-      <AppBottomSheet
-        visible={editSheetVisible}
-        onClose={closeEditSheet}
-        heightFraction={0.85}
+      {/* Blur header */}
+      <AppView
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          paddingTop: insets.top + 8,
+          paddingBottom: 12,
+          paddingHorizontal: 20,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          backgroundColor: tokens.background,
+          borderBottomWidth: 1,
+          borderBottomColor: tokens.divider,
+        }}
       >
-        <AddVehicleWizard
-          key={editSessionId}
-          editing={vehicle}
-          onSubmit={handleEditSubmit}
-          onCancel={closeEditSheet}
-        />
-      </AppBottomSheet>
+        <AppPressableView
+          androidRipple={false}
+          onPress={() => router.back()}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <ArrowLeft size={20} strokeWidth={2.2} color={tokens.text} />
+        </AppPressableView>
 
-      <VinScannerModal
-        visible={vinScanner.isOpen}
-        onClose={vinScanner.close}
-        onBarcodeScanned={vinScanner.onBarcodeScanned}
-      />
+        <AppText
+          family="heading"
+          weight="bold"
+          colorName="text"
+          numberOfLines={1}
+          style={{ fontSize: 16, lineHeight: 22 }}
+        >
+          {makeModel}
+        </AppText>
+
+        {/* Right spacer */}
+        <AppView style={{ width: 20 }} />
+      </AppView>
     </AppView>
   );
 }
+
+// ─── Spec Cell ────────────────────────────────────────────────────────────────
+
+type SpecCellProps = { label: string; value: string };
+
+function SpecCell({ label, value }: SpecCellProps) {
+  return (
+    <AppView flex={1} px={14} py={12} gap={4}>
+      <AppText
+        family="accent"
+        weight="semibold"
+        colorName="textMuted"
+        style={{ fontSize: 11, letterSpacing: 0.7 }}
+        transform="uppercase"
+      >
+        {label}
+      </AppText>
+      <AppText
+        family="default"
+        weight="semibold"
+        colorName="text"
+        style={{ fontSize: 14, marginTop: 3 }}
+        numberOfLines={2}
+      >
+        {value}
+      </AppText>
+    </AppView>
+  );
+}
+
+const styles = StyleSheet.create({
+  specRow: {
+    alignItems: 'stretch',
+  },
+  specDividerV: {
+    width: 1,
+  },
+  specDividerH: {
+    height: 1,
+  },
+});

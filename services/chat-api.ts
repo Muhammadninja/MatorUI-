@@ -433,6 +433,6 @@ export class HttpChatTransport implements ChatTransport {
 // ── Singleton ────────────────────────────────────────────────────────
 
 /** Flips automatically based on `EXPO_PUBLIC_API_BASE_URL`. */
-export const chatTransport: ChatTransport = shouldUseHttpTransport()
+export const chatTransport: ChatTransport = shouldUseHttpTransport('chat')
   ? new HttpChatTransport()
   : new MockChatTransport();

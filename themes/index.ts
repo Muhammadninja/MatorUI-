@@ -49,25 +49,30 @@ export function resolveSpace(value: number | SpacingKey | undefined): number | u
   return SPACING[value];
 }
 
+// Mator v2 uses a single family — Figtree — across every role, per the
+// design handoff (weights 400/500/600/700/800). The three "family" names
+// (default/heading/accent) still exist so the ~1k existing `family=` call
+// sites keep working; they now all resolve to a Figtree weight. The MATOR
+// wordmark is the one exception — it uses Raleway 800 (see `app-logo`).
 export const APP_FONTS: Record<FontFamilyName, string | undefined> = {
-  default: 'Montserrat_400Regular',
-  heading: 'SpaceGrotesk_700Bold',
-  accent: 'Manrope_600SemiBold',
+  default: 'Figtree_400Regular',
+  heading: 'Figtree_700Bold',
+  accent: 'Figtree_600SemiBold',
   mono: 'SpaceMono',
 };
 
 export const FONT_PACKAGES = {
   body: {
-    regular: 'Montserrat_400Regular',
-    medium: 'Montserrat_500Medium',
-    semibold: 'Montserrat_600SemiBold',
-    bold: 'Montserrat_700Bold',
+    regular: 'Figtree_400Regular',
+    medium: 'Figtree_500Medium',
+    semibold: 'Figtree_600SemiBold',
+    bold: 'Figtree_700Bold',
   },
   heading: {
-    bold: 'SpaceGrotesk_700Bold',
+    bold: 'Figtree_700Bold',
   },
   accent: {
-    semibold: 'Manrope_600SemiBold',
+    semibold: 'Figtree_600SemiBold',
   },
   mono: {
     regular: 'SpaceMono',
@@ -75,24 +80,24 @@ export const FONT_PACKAGES = {
 } as const;
 
 const textVariants: Record<TextVariant, TextStyle> = {
-  body: { fontSize: 16, lineHeight: 24, fontFamily: 'Montserrat_400Regular' },
-  bodySm: { fontSize: 14, lineHeight: 20, fontFamily: 'Montserrat_400Regular' },
-  bodyXs: { fontSize: 12, lineHeight: 16, fontFamily: 'Montserrat_400Regular' },
-  bodySemibold: { fontSize: 15, lineHeight: 22, fontFamily: 'Montserrat_600SemiBold' },
-  h3: { fontSize: 24, lineHeight: 30, fontFamily: 'SpaceGrotesk_700Bold' },
-  h4: { fontSize: 20, lineHeight: 26, fontFamily: 'SpaceGrotesk_700Bold' },
-  button: { fontSize: 16, lineHeight: 20, fontFamily: 'Manrope_600SemiBold' },
-  buttonSm: { fontSize: 14, lineHeight: 18, fontFamily: 'Manrope_600SemiBold' },
-  caption: { fontSize: 11, lineHeight: 14, fontFamily: 'Montserrat_400Regular' },
-  subtitle: { fontSize: 18, lineHeight: 24, fontFamily: 'Manrope_600SemiBold' },
-  title: { fontSize: 28, lineHeight: 34, fontFamily: 'SpaceGrotesk_700Bold' },
+  body: { fontSize: 16, lineHeight: 24, fontFamily: 'Figtree_400Regular' },
+  bodySm: { fontSize: 14, lineHeight: 20, fontFamily: 'Figtree_400Regular' },
+  bodyXs: { fontSize: 12, lineHeight: 16, fontFamily: 'Figtree_400Regular' },
+  bodySemibold: { fontSize: 15, lineHeight: 22, fontFamily: 'Figtree_600SemiBold' },
+  h3: { fontSize: 24, lineHeight: 30, fontFamily: 'Figtree_700Bold' },
+  h4: { fontSize: 20, lineHeight: 26, fontFamily: 'Figtree_700Bold' },
+  button: { fontSize: 16, lineHeight: 20, fontFamily: 'Figtree_600SemiBold' },
+  buttonSm: { fontSize: 14, lineHeight: 18, fontFamily: 'Figtree_600SemiBold' },
+  caption: { fontSize: 11, lineHeight: 14, fontFamily: 'Figtree_500Medium' },
+  subtitle: { fontSize: 18, lineHeight: 24, fontFamily: 'Figtree_600SemiBold' },
+  title: { fontSize: 28, lineHeight: 34, fontFamily: 'Figtree_800ExtraBold' },
 };
 
 const weightStyles: Record<WeightName, TextStyle> = {
-  regular: { fontFamily: 'Montserrat_400Regular', fontWeight: '400' },
-  medium: { fontFamily: 'Montserrat_500Medium', fontWeight: '500' },
-  semibold: { fontFamily: 'Montserrat_600SemiBold', fontWeight: '600' },
-  bold: { fontFamily: 'Montserrat_700Bold', fontWeight: '700' },
+  regular: { fontFamily: 'Figtree_400Regular', fontWeight: '400' },
+  medium: { fontFamily: 'Figtree_500Medium', fontWeight: '500' },
+  semibold: { fontFamily: 'Figtree_600SemiBold', fontWeight: '600' },
+  bold: { fontFamily: 'Figtree_700Bold', fontWeight: '700' },
 };
 
 export const lightTokens: ThemeTokens = {
@@ -103,6 +108,7 @@ export const lightTokens: ThemeTokens = {
   onCard: '#050505',
   text: '#050505',
   onBackground: '#050505',
+  textMuted: '#707070',
   border: '#d6d6d6',
   divider: '#ececec',
   overlay: 'rgba(5, 5, 5, 0.12)',
@@ -147,6 +153,7 @@ export const lightTokens: ThemeTokens = {
   rating: '#F59E0B',
   accolade: '#f4c542',
   value: '#4ade80',
+  onValue: '#05310f',
   scrim: 'rgba(0, 0, 0, 0.55)',
   brandSoft: 'rgba(0, 0, 0, 0.12)',
 };
@@ -159,6 +166,7 @@ export const darkTokens: ThemeTokens = {
   onCard: '#ffffff',
   text: '#ffffff',
   onBackground: '#ffffff',
+  textMuted: '#8f8f8f',
   border: '#2a2a2a',
   divider: '#1c1c1c',
   overlay: 'rgba(255, 255, 255, 0.14)',
@@ -203,6 +211,7 @@ export const darkTokens: ThemeTokens = {
   rating: '#F59E0B',
   accolade: '#b8860b',
   value: '#15803d',
+  onValue: '#05310f',
   scrim: 'rgba(0, 0, 0, 0.55)',
   brandSoft: 'rgba(255, 255, 255, 0.12)',
 };

@@ -1,20 +1,11 @@
 import { BlurView } from 'expo-blur';
 import {
-    Car,
     ChevronDown,
-    ChevronRight,
-    Gauge,
     MoreVertical,
-    Receipt,
     RefreshCw,
-    ScanSearch,
-    SlidersHorizontal,
     Sparkles,
-    Tag,
     ThumbsDown,
     ThumbsUp,
-    Wrench,
-    X,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -33,7 +24,6 @@ import { KeyboardStickyView } from 'react-native-keyboard-controller';
 
 import AiChatComposer from '@/components/screens-components/ai-chat/ai-chat-composer';
 import AiChatMessageBubble from '@/components/screens-components/ai-chat/ai-chat-message-bubble';
-import AiChatSuggestionChip from '@/components/screens-components/ai-chat/ai-chat-suggestion-chip';
 import AiChatTypingDots from '@/components/screens-components/ai-chat/ai-chat-typing-dots';
 import ComposerBlurWrapper from '@/components/screens-components/ai-chat/composer-blur-wrapper';
 import VehicleContextBar from '@/components/screens-components/ai-chat/vehicle-context-bar';
@@ -41,6 +31,7 @@ import ScreenShell from '@/components/screens-components/screen-shell';
 import { AppIconButton } from '@/components/shared/app-icon-button';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
+import { useActiveVehicle } from '@/contexts/active-vehicle.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import useGarage from '@/hooks/use-garage';
 import { useGlobalModal } from '@/hooks/use-global-modal';
@@ -56,13 +47,12 @@ import type {
 import { triggerHaptic } from '@/utils/haptics';
 import { router } from 'expo-router';
 
-const QUICK_PROMPTS = [
-  { key: 'fitment', label: 'Check part fitment', Icon: Wrench },
-  { key: 'orders', label: 'Track orders', Icon: Receipt },
-  { key: 'compare', label: 'Compare brands', Icon: SlidersHorizontal },
-  { key: 'upgrade', label: 'Upgrades for my build', Icon: Gauge },
-  { key: 'deals', label: 'Deals for my car', Icon: Tag },
-  { key: 'identify', label: 'Identify a part', Icon: ScanSearch },
+/** Handoff §16 suggestion chips — tap fills the composer. */
+const SUGGESTION_CHIPS = [
+  { key: 'brakes', label: 'Brakes squeaking' },
+  { key: 'oil', label: 'Need an oil filter' },
+  { key: 'engine', label: 'Check engine light' },
+  { key: 'spark', label: 'Best spark plugs' },
 ] as const;
 
 type StreamingReply = {
@@ -118,6 +108,7 @@ export default function AiChatbot() {
   const { tokens } = useThemeContext();
   const { openConfirm } = useGlobalModal();
   const { primaryVehicle } = useGarage();
+  const { currentActiveVehicle } = useActiveVehicle();
   const [historyItems, setHistoryItems] = useState<AiChatConversationSummary[]>([]);
 
   // Load conversations from the transport. Real backend pushes the full
@@ -626,10 +617,18 @@ export default function AiChatbot() {
   // ── Render ──────────────────────────────────────────────────────────
   const hasMessages = messages.length > 0 || streamingReply !== null;
 
+  // Build the "fits your X" suffix from the real active vehicle.
+  // Only show the model name (not full year+make+model) to keep the
+  // header compact, matching handoff copy "● Online · fits your Camry".
+  const activeVehicleModel = currentActiveVehicle?.vehicle?.model ?? null;
+  const onlineLabel = activeVehicleModel
+    ? `fits your ${activeVehicleModel}`
+    : null;
+
   return (
     <ScreenShell>
       <AppView flex={1} pt={6}>
-        {/* Top bar */}
+        {/* Handoff §16 header: brand "AI" avatar + "Parts Assistant" + online status */}
         <AppView
           row
           align="center"
@@ -640,16 +639,54 @@ export default function AiChatbot() {
           borderTopWidth={1}
           borderColor={tokens.border}
         >
-          <AppView row align="center" gap={6}>
-            <Sparkles size={16} strokeWidth={2.2} color={tokens.brand} />
-            <AppText
-              textVariant="bodySemibold"
-              family="heading"
-              weight="bold"
-              style={{ color: tokens.brand }}
+          <AppView row align="center" gap={10}>
+            {/* Brand "AI" avatar */}
+            <AppView
+              center
+              rounded={999}
+              style={{
+                width: 36,
+                height: 36,
+                backgroundColor: tokens.brand,
+              }}
             >
-              Mator AI
-            </AppText>
+              <AppText
+                textVariant="caption"
+                family="accent"
+                weight="semibold"
+                style={{ color: tokens.onBrand, fontSize: 11, letterSpacing: 0.4 }}
+              >
+                AI
+              </AppText>
+            </AppView>
+
+            {/* Title + status row */}
+            <AppView gap={1}>
+              <AppText
+                textVariant="bodySemibold"
+                family="heading"
+                weight="bold"
+                colorName="text"
+                style={{ lineHeight: 18 }}
+              >
+                Parts Assistant
+              </AppText>
+              <AppView row align="center" gap={4}>
+                {/* Online dot */}
+                <AppView
+                  rounded={999}
+                  style={{ width: 7, height: 7, backgroundColor: tokens.success }}
+                />
+                <AppText
+                  textVariant="caption"
+                  family="accent"
+                  weight="semibold"
+                  style={{ color: tokens.success, lineHeight: 14 }}
+                >
+                  Online{onlineLabel ? ` · ${onlineLabel}` : ''}
+                </AppText>
+              </AppView>
+            </AppView>
           </AppView>
 
           <AppIconButton
@@ -733,28 +770,46 @@ export default function AiChatbot() {
                 </AppView>
               </AppView>
 
-              {/* Single merged prompts row */}
+              {/* Handoff §16 suggestion chips */}
               <AppView gap="md">
                 <AppText
-                  textVariant="bodySemibold"
-                  family="heading"
-                  weight="bold"
-                  colorName="text"
+                  textVariant="bodySm"
+                  family="accent"
+                  weight="semibold"
+                  colorName="textMuted"
+                  style={{ textTransform: 'uppercase', letterSpacing: 0.6, fontSize: 11 }}
                 >
-                  Try a prompt
+                  Try asking
                 </AppText>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ gap: 10, paddingRight: 12 }}
+                  contentContainerStyle={{ gap: 8, paddingRight: 12 }}
                 >
-                  {QUICK_PROMPTS.map((item) => (
-                    <AiChatSuggestionChip
+                  {SUGGESTION_CHIPS.map((item) => (
+                    <AppPressableView
                       key={item.key}
-                      label={item.label}
-                      Icon={item.Icon}
+                      rounded={999}
+                      px="md"
+                      py={10}
                       onPress={() => fillDraft(item.label)}
-                    />
+                      accessibilityRole="button"
+                      accessibilityLabel={item.label}
+                      style={{
+                        borderWidth: 1,
+                        borderColor: tokens.border,
+                        backgroundColor: tokens.card,
+                      }}
+                    >
+                      <AppText
+                        textVariant="bodySm"
+                        weight="semibold"
+                        colorName="text"
+                        numberOfLines={1}
+                      >
+                        {item.label}
+                      </AppText>
+                    </AppPressableView>
                   ))}
                 </ScrollView>
               </AppView>

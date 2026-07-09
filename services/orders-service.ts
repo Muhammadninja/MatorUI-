@@ -56,6 +56,13 @@ export type Address = {
   line1: string;
   /** "Brooklyn, NY 11211" — server-formatted to avoid client locale work. */
   city: string;
+  /** Recipient full name for the shipping label. Added for the account
+   *  shipping-addresses form, which collects a name; optional so existing
+   *  order/detail seeds that don't set it stay valid. */
+  name?: string;
+  /** True for the user's default shipping address. Optional for the same
+   *  back-compat reason — the server enforces a single default. */
+  isDefault?: boolean;
 };
 
 export type Courier = {
@@ -146,6 +153,11 @@ export type CreateOrderInput = {
   promoCode: string | null;
   /** Optional courier note. */
   note?: string;
+  /** Optimistic display hint: the grand total the client already
+   *  rendered on the checkout button. A real backend recomputes pricing
+   *  authoritatively and MAY ignore this; the mock echoes it so the
+   *  just-placed order's confirmation/track total isn't blank. */
+  totalLabel?: string;
 };
 
 export type CreateOrderResult = {
@@ -154,4 +166,24 @@ export type CreateOrderResult = {
   eta: string;
   /** Pre-formatted grand total for the receipt. */
   totalLabel: string;
+};
+
+// ── Account CRUD inputs ────────────────────────────────────────────────
+
+/** Client-supplied fields when creating/updating a shipping address. The
+ *  server owns `id` and (via `setDefaultAddress`) the default flag. */
+export type AddressInput = {
+  label: string;
+  name: string;
+  line1: string;
+  city: string;
+};
+
+/** Client-supplied fields when creating/updating a payment method. Never
+ *  the PAN — the card form only collects brand + last4 + expiry (a real
+ *  integration would swap this for a tokenized handle from a PCI vault). */
+export type PaymentMethodInput = {
+  brand: string;
+  last4: string;
+  exp: string;
 };

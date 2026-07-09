@@ -71,6 +71,7 @@ const AppPressableViewBase = forwardRef<React.ElementRef<typeof Pressable>, AppP
       columnGap,
       // rounding/border
       rounded,
+      borderRadius,
       roundedTop,
       roundedBottom,
       roundedLeft,
@@ -167,6 +168,7 @@ const AppPressableViewBase = forwardRef<React.ElementRef<typeof Pressable>, AppP
       const flexbox = composeFlexbox({ row, center, align, justify, wrap, flex, grow, shrink });
       const rounding = composeRounding({
         rounded,
+        borderRadius,
         roundedTop,
         roundedBottom,
         roundedLeft,
@@ -229,6 +231,7 @@ const AppPressableViewBase = forwardRef<React.ElementRef<typeof Pressable>, AppP
       grow,
       shrink,
       rounded,
+      borderRadius,
       roundedTop,
       roundedBottom,
       roundedLeft,

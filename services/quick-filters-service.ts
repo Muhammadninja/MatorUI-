@@ -118,7 +118,7 @@ class HttpQuickFiltersTransport implements QuickFiltersTransport {
   }
 }
 
-export const quickFiltersTransport: QuickFiltersTransport = shouldUseHttpTransport()
+export const quickFiltersTransport: QuickFiltersTransport = shouldUseHttpTransport('search')
   ? new HttpQuickFiltersTransport()
   : new MockQuickFiltersTransport();
 

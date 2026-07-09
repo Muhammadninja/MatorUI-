@@ -34,6 +34,7 @@ const SEED_PROFILE: UserSummary = {
   lastName: 'Abdullaev',
   username: 'm.abdullaev',
   email: 'muhammad@example.com',
+  phone: '+1 (215) 555-0139',
   avatarUrl: null,
   memberSince: '2024-03-15T00:00:00Z',
 };
@@ -71,6 +72,6 @@ class HttpUserTransport implements UserTransport {
 
 // ── Singleton ──────────────────────────────────────────────────────────
 
-export const userTransport: UserTransport = shouldUseHttpTransport()
+export const userTransport: UserTransport = shouldUseHttpTransport('user')
   ? new HttpUserTransport()
   : new MockUserTransport();

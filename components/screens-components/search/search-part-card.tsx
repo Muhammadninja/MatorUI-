@@ -8,6 +8,7 @@ import type { StyleProp, ViewStyle } from 'react-native';
 
 import { AppButton } from '../../shared/app-button';
 import { AppCard } from '../../shared/app-card/app-card';
+import { AppOemPill } from '../../shared/app-oem-pill';
 import { AppText } from '../../shared/app-text';
 import { AppView } from '../../shared/app-view';
 import { RADIUS_SHEET } from './radii';
@@ -168,28 +169,17 @@ function SearchPartCard({
           <AppText textVariant={titleVariant} family="heading" numberOfLines={compact ? 2 : 1}>
             {title}
           </AppText>
-          <AppText textVariant="bodySm" colorName="gray400" numberOfLines={compact ? 3 : 2}>
+          <AppText textVariant="bodySm" colorName="textMuted" numberOfLines={compact ? 3 : 2}>
             {description}
           </AppText>
         </AppView>
 
-        {oem ? (
-          <AppView
-            rounded={8}
-            px={8}
-            py={4}
-            style={{ alignSelf: 'flex-start', backgroundColor: tokens.gray100 }}
-          >
-            <AppText textVariant="bodyXs" colorName="gray400">
-              OEM {oem}
-            </AppText>
-          </AppView>
-        ) : null}
+        {oem ? <AppOemPill oem={oem} /> : null}
 
         {compact ? (
           <AppView gap={8}>
             <AppView gap={2}>
-              <AppText textVariant="bodyXs" colorName="gray400">
+              <AppText textVariant="bodyXs" colorName="textMuted">
                 {priceLabel}
               </AppText>
               <AppText textVariant={priceVariant} family="heading">
@@ -208,7 +198,7 @@ function SearchPartCard({
           <AppView gap={8}>
             <AppView row align="center" justify="space-between" gap={12}>
               <AppView gap={2} style={{ flex: 1 }}>
-                <AppText textVariant="bodyXs" colorName="gray400">
+                <AppText textVariant="bodyXs" colorName="textMuted">
                   {priceLabel}
                 </AppText>
                 {/* numberOfLines + adjustsFontSizeToFit: long prices

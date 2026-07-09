@@ -277,22 +277,74 @@ class MockCatalogTransport implements CatalogTransport {
   }
 }
 
+// ── Live backend shape (GET /v1/catalog/parts) ───────────────────────
+// The real catalog is a parts marketplace exposed at `/v1/catalog/parts`
+// with snake_case params + a nested part shape. We map it onto the app's
+// flat `CatalogItem`. NOTE: the backend strictly rejects unknown query
+// params (it 400s on `pageSize`), so we send ONLY `page`/`page_size` for
+// now; wire `search`/`category` once their accepted param names are known.
+type ApiCatalogPart = {
+  id: string;
+  title: string;
+  brand?: { id: string; name: string } | null;
+  category?: { id: string; name: string } | null;
+  oem_numbers?: string[];
+  price_uzs?: number;
+  price_label?: string;
+  in_stock?: boolean;
+  stock_qty?: number;
+  images?: string[];
+  specs?: { label: string; value: string }[];
+  features?: string[];
+};
+
+type ApiCatalogPartsResponse = {
+  items: ApiCatalogPart[];
+  total: number;
+  page: number;
+  page_size: number;
+  next_page: number | null;
+};
+
+function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
+  return {
+    id: p.id,
+    status: p.in_stock === false ? 'Out of stock' : 'In stock',
+    title: p.title,
+    description: [p.brand?.name, p.category?.name].filter(Boolean).join(' · '),
+    price:
+      p.price_label ??
+      (p.price_uzs != null ? `UZS ${p.price_uzs.toLocaleString('ru-RU')}` : ''),
+    priceLabel: '',
+    images: p.images ?? [],
+    specs: p.specs ?? [],
+    features: p.features ?? [],
+    category: p.category?.name ?? '',
+    oem: p.oem_numbers?.[0],
+  };
+}
+
 class HttpCatalogTransport implements CatalogTransport {
-  list(request: CatalogListRequest): Promise<CatalogListResponse> {
+  async list(request: CatalogListRequest): Promise<CatalogListResponse> {
     const params = new URLSearchParams({
       page: String(request.page),
-      pageSize: String(request.pageSize),
+      page_size: String(request.pageSize),
     });
-    if (request.category) params.set('category', request.category);
-    if (request.search) params.set('search', request.search);
-    if (request.sortBy) params.set('sortBy', request.sortBy);
-    return apiClient.get<CatalogListResponse>(`${API_BASE}/items?${params.toString()}`, {
-      signal: request.signal,
-    });
+    const res = await apiClient.get<ApiCatalogPartsResponse>(
+      `${API_BASE}/parts?${params.toString()}`,
+      { signal: request.signal },
+    );
+    return {
+      items: res.items.map(mapPartToCatalogItem),
+      total: res.total,
+      page: res.page,
+      pageSize: res.page_size,
+    };
   }
   async detail(id: string, signal?: AbortSignal): Promise<CatalogDetailResponse | null> {
     try {
-      return await apiClient.get<CatalogDetailResponse>(`${API_BASE}/items/${id}`, { signal });
+      const part = await apiClient.get<ApiCatalogPart>(`${API_BASE}/parts/${id}`, { signal });
+      return part ? { item: mapPartToCatalogItem(part) } : null;
     } catch (err) {
       // 404 is a normal "not found" — surface as null instead of throwing.
       if (err instanceof ApiError && err.status === 404) return null;
@@ -301,7 +353,7 @@ class HttpCatalogTransport implements CatalogTransport {
   }
 }
 
-export const catalogTransport: CatalogTransport = shouldUseHttpTransport()
+export const catalogTransport: CatalogTransport = shouldUseHttpTransport('catalog')
   ? new HttpCatalogTransport()
   : new MockCatalogTransport();
 

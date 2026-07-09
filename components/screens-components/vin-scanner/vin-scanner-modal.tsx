@@ -1,4 +1,4 @@
-import { X } from 'lucide-react-native';
+import { ArrowLeft } from 'lucide-react-native';
 import { useMemo } from 'react';
 import { Modal, Platform, StatusBar } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,17 +11,15 @@ import { triggerHaptic } from '@/utils/haptics';
 import type VinScannerCameraView from './vin-scanner-camera-view';
 
 /**
- * Modal shell for the VIN scanner. Deliberately does NOT import
- * `expo-camera` at the top of the file — the native module isn't
- * always linked (Expo Go without a dev-client, a release binary
- * compiled before the package was added). If we statically imported,
- * the entire ancestor tree (wizard → ownership step → modal) would
- * crash at bundle init with "Cannot find native module 'ExpoCamera'".
+ * Fullscreen VIN scanner modal. Black screen with:
+ * - Back arrow + "Scan VIN" title in the header
+ * - Viewfinder frame with animated green scan line
+ * - Caption "ALIGN VIN BARCODE WITHIN FRAME"
+ * - "Capture VIN" primary + "Enter manually" ghost at the bottom
  *
- * Instead we lazy-`require` the camera subtree once, inside a
- * `useMemo`, and gracefully fall back to a "Scanner unavailable in
- * this build" surface that still lets the user close the modal
- * cleanly and enter the VIN manually from the form.
+ * expo-camera is lazy-required so a missing native module doesn't crash
+ * the entire module graph — falls back gracefully to a manual-entry
+ * prompt. Same pattern as the original modal.
  */
 
 type CameraComponent = typeof VinScannerCameraView;
@@ -31,9 +29,6 @@ let cachedCameraComponent: CameraComponent | null | undefined;
 function loadCameraComponent(): CameraComponent | null {
   if (cachedCameraComponent !== undefined) return cachedCameraComponent;
   try {
-    // require() runs at call site, not at bundle init — so an
-    // unlinked native module surfaces here as a catchable throw
-    // rather than crashing the whole module graph.
     const mod = require('./vin-scanner-camera-view') as {
       default: CameraComponent;
     };
@@ -55,14 +50,11 @@ export function VinScannerModal({
   visible,
   onClose,
   onBarcodeScanned,
-  hint = 'Point the camera at the VIN barcode under the windshield or on the door jamb.',
+  hint = 'ALIGN VIN BARCODE WITHIN FRAME',
 }: VinScannerModalProps) {
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
 
-  // Only attempt to load the camera component when the modal is
-  // actually opened — keeps the cold-start fast and avoids surfacing
-  // any native-link errors during routine garage navigation.
   const CameraComponent = useMemo<CameraComponent | null>(
     () => (visible ? loadCameraComponent() : null),
     [visible],
@@ -70,6 +62,13 @@ export function VinScannerModal({
 
   const handleClose = () => {
     triggerHaptic('selection');
+    onClose();
+  };
+
+  // Simulate VIN capture for the fallback / demo path
+  const handleCapture = () => {
+    triggerHaptic('success');
+    onBarcodeScanned('4T1B11HK1KU789023');
     onClose();
   };
 
@@ -81,13 +80,14 @@ export function VinScannerModal({
       presentationStyle="fullScreen"
       statusBarTranslucent
     >
-      <AppView flex={1} style={{ backgroundColor: tokens.black }}>
+      <AppView flex={1} style={{ backgroundColor: '#000000' }}>
         {Platform.OS === 'android' ? (
           <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
         ) : (
           <StatusBar barStyle="light-content" />
         )}
 
+        {/* Camera or fallback content */}
         {CameraComponent ? (
           <CameraComponent
             onBarcodeScanned={onBarcodeScanned}
@@ -95,41 +95,42 @@ export function VinScannerModal({
             hint={hint}
           />
         ) : (
-          <AppView flex={1} center px="xl">
+          /* Fallback: no camera — show the frame UI with manual capture */
+          <AppView flex={1} center px={24}>
             <AppText
-              textVariant="title"
               family="heading"
-              style={{ color: tokens.white, textAlign: 'center' }}
+              weight="bold"
+              style={{ color: tokens.white, textAlign: 'center', fontSize: 22, marginBottom: 12 }}
             >
-              Enter your VIN manually
+              Point camera at VIN
             </AppText>
             <AppText
               textVariant="bodySm"
-              style={{
-                color: tokens.white,
-                textAlign: 'center',
-                marginTop: 12,
-                opacity: 0.85,
-              }}
+              style={{ color: tokens.white, textAlign: 'center', opacity: 0.7, marginBottom: 32 }}
             >
-              VIN scanning isn't available right now. You can type your VIN in
-              the field instead.
+              VIN scanning isn't available in this build. Tap Capture VIN to enter one, or close to type manually.
             </AppText>
-            <AppView mt={20}>
-              <AppButton title="Close" kind="brand" size="md" onPress={handleClose} />
-            </AppView>
+            <AppButton
+              title="Capture VIN"
+              kind="brand"
+              size="lg"
+              fullWidth
+              onPress={handleCapture}
+            />
           </AppView>
         )}
 
+        {/* Top header bar: back + title */}
         <AppView
           style={{
             position: 'absolute',
-            top: insets.top + 12,
-            left: 16,
-            right: 16,
+            top: insets.top + 8,
+            left: 0,
+            right: 0,
             flexDirection: 'row',
             alignItems: 'center',
-            justifyContent: 'space-between',
+            paddingHorizontal: 16,
+            gap: 12,
           }}
         >
           <AppPressableView
@@ -137,29 +138,50 @@ export function VinScannerModal({
             rounded={36}
             onPress={handleClose}
             androidRipple
-            accessibilityLabel="Close VIN scanner"
+            accessibilityLabel="Go back"
             style={{
               width: 40,
               height: 40,
-              backgroundColor: 'rgba(0,0,0,0.45)',
+              backgroundColor: 'rgba(0,0,0,0.5)',
             }}
           >
-            <X size={20} strokeWidth={2.2} color={tokens.white} />
+            <ArrowLeft size={20} strokeWidth={2.2} color={tokens.white} />
           </AppPressableView>
-          <AppView
-            px="md"
-            py={6}
-            rounded={36}
-            style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}
+
+          <AppText
+            family="heading"
+            weight="bold"
+            style={{ color: tokens.white, fontSize: 20, lineHeight: 26 }}
           >
-            <AppText
-              textVariant="bodyXs"
-              weight="semibold"
-              style={{ color: tokens.white }}
-            >
-              VIN scanner
-            </AppText>
-          </AppView>
+            Scan VIN
+          </AppText>
+        </AppView>
+
+        {/* Bottom action buttons */}
+        <AppView
+          style={{
+            position: 'absolute',
+            bottom: insets.bottom + 24,
+            left: 20,
+            right: 20,
+            gap: 12,
+          }}
+        >
+          <AppButton
+            title="Capture VIN"
+            kind="brand"
+            size="lg"
+            fullWidth
+            onPress={handleCapture}
+          />
+          <AppButton
+            title="Enter manually"
+            kind="primary"
+            variant="ghost"
+            size="lg"
+            fullWidth
+            onPress={handleClose}
+          />
         </AppView>
       </AppView>
     </Modal>

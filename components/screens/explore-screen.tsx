@@ -1,229 +1,243 @@
+import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Keyboard } from 'react-native';
+import { Bell, Search } from 'lucide-react-native';
+import { useCallback, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Defs, Rect, Stop, LinearGradient as SvgLinearGradient } from 'react-native-svg';
 
-import SearchCatalogue from '@/components/screens-components/search/search-catalogue';
-import SearchFiltersSheet from '@/components/screens-components/search/search-filters-sheet';
-import SearchPromoBanner from '@/components/screens-components/search/search-promo-banner';
-import SearchQuickFilters from '@/components/screens-components/search/search-quick-filters';
-import SearchResults from '@/components/screens-components/search/search-results';
-import SearchSuggestionsPanel from '@/components/screens-components/search/search-suggestions-panel';
-import SearchTopFeatured from '@/components/screens-components/search/search-top-featured';
-import SmartSearchBar from '@/components/screens-components/search/smart-search-bar';
-import AppBlurView, { useBlurHeaderInset } from '@/components/shared/app-blur-view';
-import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
-import { AppView } from '@/components/shared/app-view';
-import { useSearchUIContext } from '@/contexts/search-ui.context';
-import useRecentSearches from '@/hooks/use-recent-searches';
-import useSearch, { DEFAULT_FILTERS, hasActiveFilters } from '@/hooks/use-search';
-import useTypeahead from '@/hooks/use-typeahead';
-import type { TypeaheadSuggestion } from '@/types/search';
+import { LOGO_BRANDS } from '@/components/screens-components/catalog/brand-logo';
+import CategoryTile from '@/components/screens-components/catalog/category-tile';
+import CertifiedSection from '@/components/screens-components/catalog/certified-section';
+import MatorFitBanner from '@/components/screens-components/catalog/mator-fit-banner';
+import VehicleMakeTile from '@/components/screens-components/catalog/vehicle-make-tile';
+import { AppLogo } from '@/components/shared/app-logo';
+import { AppText } from '@/components/shared/app-text';
+import { AppPressableView, AppView } from '@/components/shared/app-view';
+import { WheelLoader } from '@/components/shared/wheel-loader';
+import { useThemeContext } from '@/contexts/theme.context';
+import { useToast } from '@/hooks/use-toast';
+import { categoryRouteFor, MATOR_CAT_TILES } from '@/mocks/mator-catalog';
+import { triggerHaptic } from '@/utils/haptics';
 
-const SEARCH_BAR_HEIGHT = 52;
-const FADE_HEIGHT = 24;
+// Soft feather under the header so the frosted panel dissolves into the
+// content instead of ending in a hard seam ("dropline").
+const HEADER_FADE = 24;
 
+/**
+ * Explore (home) — v2 AutoZone-style **category browser** (not a product
+ * list). A frosted sticky header (greeting + notifications + pill search)
+ * over a scroll of: the vehicle-fit banner, a "Shop by vehicle" make row
+ * with custom car silhouettes, and a colorful "Shop by category" grid with
+ * custom part icons. Tiles route to the Make / Category screens.
+ */
 export default function ExploreScreen() {
-  const search = useSearch();
-  const recents = useRecentSearches();
-  const typeahead = useTypeahead(search.query);
-  const isSearching = search.state !== 'idle';
-  const [filtersVisible, setFiltersVisible] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);
-  // Bumped on back-press so the SmartSearchBar's internal form remounts
-  // with an empty value (the form is not externally controlled).
-  const [formResetKey, setFormResetKey] = useState(0);
-  // Currently selected quick-filter brand (null = none). Intentionally
-  // decoupled from `useSearch` — tapping a brand chip should add an
-  // inline preview section to THIS screen, not swap us out for the full
-  // search-results view. The typed search bar still drives useSearch on
-  // its own, completely independently.
-  const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
-  const { setSearchActive } = useSearchUIContext();
+  const { tokens, scheme } = useThemeContext();
+  const insets = useSafeAreaInsets();
+  const dark = scheme === 'dark';
+  // Measured header height; the scroll content is padded by this much so it
+  // starts below the frosted panel it scrolls under.
+  const [headerHeight, setHeaderHeight] = useState(insets.top + 132);
+  const toast = useToast();
 
-  // Signal "search is active" to the parent tab layout so the tab bar
-  // can hide itself when the user has actually typed something OR
-  // results are showing. Focusing the empty bar alone does NOT hide it
-  // — that felt jumpy. Cleared on unmount so other tabs always see the
-  // tab bar regardless of what state the explore tab was last in.
-  const hasTypedQuery = search.query.trim().length > 0;
-  useEffect(() => {
-    setSearchActive(isSearching || hasTypedQuery);
-    return () => setSearchActive(false);
-  }, [isSearching, hasTypedQuery, setSearchActive]);
-  // peek = -FADE_HEIGHT → content paddingTop = insets.top + headerHeight
-  // + fadeHeight, i.e. the first scroll child starts BELOW the entire
-  // blur strip so the search bar never sits on top of the quick-filter
-  // chips.
-  const topOffset = useBlurHeaderInset(SEARCH_BAR_HEIGHT, -FADE_HEIGHT);
+  // Pull-to-refresh — a branded wheel bar replaces the stock spinner; on
+  // release it "refreshes" (~1.2s) then confirms with a toast.
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    setTimeout(() => {
+      setRefreshing(false);
+      toast.success('Prices & stock updated');
+    }, 1200);
+  }, [toast]);
 
-  const filtersActive = hasActiveFilters(search.filters);
-  const clearFilters = useCallback(() => {
-    search.setFilters(DEFAULT_FILTERS);
-  }, [search]);
-
-  // Persist any committed query (one that produced results OR a real
-  // "no matches" answer from the server) into recents. Loading/idle/error
-  // are explicitly excluded — we don't want to remember a typo the user
-  // never finished typing or a network blip.
-  //
-  // CRITICAL: depend on `recents.add` (a stable useCallback) — NOT on
-  // `recents` itself. The hook returns a fresh object every render, so
-  // depending on `recents` would re-fire the effect every render, which
-  // would call add() again, which would push state again, which would
-  // re-render — a tight infinite loop that surfaces inside FlashList as
-  // "Maximum update depth exceeded".
-  const addRecent = recents.add;
-  useEffect(() => {
-    if (search.state === 'success' || search.state === 'empty') {
-      if (search.query.trim().length >= 2) {
-        addRecent(search.query);
-      }
-    }
-  }, [search.state, search.query, addRecent]);
-
-  const handleSelectSuggestion = useCallback(
-    (suggestion: TypeaheadSuggestion) => {
-      search.setQuery(suggestion.text);
-      search.flush();
-      Keyboard.dismiss();
-      setIsFocused(false);
-    },
-    [search],
-  );
-
-  const handleSelectRecent = useCallback(
-    (query: string) => {
-      search.setQuery(query);
-      search.flush();
-      Keyboard.dismiss();
-      setIsFocused(false);
-    },
-    [search],
-  );
-
-  const handleFocusChange = useCallback(
-    (focused: boolean) => {
-      setIsFocused(focused);
-      if (!focused) typeahead.clear();
-    },
-    [typeahead],
-  );
-
-  // Back-button handler: returns the screen to the idle landing.
-  // Clears the search hook's query (which moves state → 'idle'),
-  // dismisses keyboard + focus, and bumps the form-reset key so the
-  // SmartSearchBar's internal text field also empties.
-  const handleBackPress = useCallback(() => {
-    search.setQuery('');
-    Keyboard.dismiss();
-    setIsFocused(false);
-    setFormResetKey((k) => k + 1);
-  }, [search]);
-
-  const isSearchActive = isSearching || hasTypedQuery;
-
-  // Show the suggestions panel only when the user is actively typing.
-  // Empty input + focused → no panel at all (avoids the "second search
-  // bar" feel of a card sitting under the bar with no content).
-  // Recents are filtered to prefix-matches against the live input so the
-  // list stays relevant to what the user is in the middle of typing.
-  const trimmedPrefix = search.query.trim();
-  const matchingRecents = useMemo(() => {
-    if (trimmedPrefix.length === 0) return [];
-    const key = trimmedPrefix.toLowerCase();
-    return recents.queries.filter((q) => q.toLowerCase().includes(key));
-  }, [recents.queries, trimmedPrefix]);
-
-  const hasTypeaheadContent = typeahead.suggestions.length > 0 || typeahead.isLoading;
-  const hasRecentsContent = matchingRecents.length > 0;
-  const showSuggestions =
-    isFocused &&
-    !isSearching &&
-    trimmedPrefix.length > 0 &&
-    (hasTypeaheadContent || hasRecentsContent);
+  const openCategory = useCallback((name: string) => {
+    triggerHaptic('selection');
+    const { cat, label } = categoryRouteFor(name);
+    router.push({ pathname: '/category', params: { cat, label } });
+  }, []);
+  const openMake = useCallback((brandId: string) => {
+    triggerHaptic('selection');
+    router.push({ pathname: '/make', params: { make: brandId } });
+  }, []);
 
   return (
     <AppView flex={1} colorName="background">
-      {isSearching ? (
-        // SearchResults renders a virtualized list when state === 'success'.
-        // It MUST live outside AppScrollView (virtualized-list-in-ScrollView
-        // breaks recycling). The list itself extends to the top of the screen
-        // so rows scroll UNDER the blur header — topInset is applied as
-        // contentContainerStyle.paddingTop, not as a wrapping View.
-        <SearchResults
-          state={search.state}
-          results={search.results}
-          total={search.total}
-          durationMs={search.durationMs}
-          query={search.query}
-          error={search.error}
-          didYouMean={search.didYouMean}
-          hasActiveFilters={filtersActive}
-          onClearFilters={clearFilters}
-          onUseSuggestion={search.setQuery}
-          onEndReached={search.loadMore}
-          isLoadingMore={search.isLoadingMore}
-          topInset={topOffset}
-          onFilterPress={() => setFiltersVisible(true)}
+      {/* Frosted sticky header — greeting + notifications + pill search. */}
+      <AppView
+        onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}
+      >
+        <BlurView
+          intensity={dark ? 40 : 60}
+          tint={dark ? 'dark' : 'light'}
+          blurMethod="dimezisBlurView"
+          style={StyleSheet.absoluteFill}
         />
-      ) : (
-        <AppScrollView
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingTop: topOffset, paddingBottom: 40 }}
-          contentInsetAdjustmentBehavior="never"
+        <AppView
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            // ~0.82 alpha (0xd1) over the theme background = the frosted wash.
+            backgroundColor: `${tokens.background}d1`,
+          }}
+        />
+        <AppView style={{ paddingTop: insets.top + 8, paddingHorizontal: 20, paddingBottom: 12, gap: 12 }}>
+          <AppView row align="center" justify="space-between">
+            <AppLogo size={26} />
+            <AppPressableView
+              onPress={() => router.push('/notifications')}
+              accessibilityRole="button"
+              accessibilityLabel="Notifications"
+              androidRipple={false}
+              center
+              rounded={13}
+              borderWidth={1}
+              borderName="border"
+              colorName="card"
+              style={{ width: 42, height: 42 }}
+            >
+              <Bell size={21} strokeWidth={2.2} color={tokens.text} />
+              <AppView
+                style={{
+                  position: 'absolute',
+                  top: 9,
+                  right: 10,
+                  width: 8,
+                  height: 8,
+                  borderRadius: 999,
+                  backgroundColor: tokens.error,
+                  borderWidth: 2,
+                  borderColor: tokens.card,
+                }}
+              />
+            </AppPressableView>
+          </AppView>
+
+          <AppPressableView
+            onPress={() => router.push('/search')}
+            accessibilityRole="search"
+            accessibilityLabel="Search parts, brands, OEM number"
+            androidRipple={false}
+            row
+            align="center"
+            gap={10}
+            rounded={999}
+            px={18}
+            py={13}
+            colorName="backgroundSecondary"
+            borderWidth={1}
+            borderName="border"
+          >
+            <Search size={20} strokeWidth={2.2} color={tokens.textMuted} />
+            <AppText family="default" style={{ fontSize: 15, color: tokens.textMuted }}>
+              Search parts, brands, OEM #
+            </AppText>
+          </AppPressableView>
+        </AppView>
+
+        {/* Blended dropline — the panel feathers into the content below. */}
+        <Svg
+          pointerEvents="none"
+          width="100%"
+          height={HEADER_FADE}
+          style={{ position: 'absolute', left: 0, right: 0, bottom: -HEADER_FADE }}
         >
-          <SearchQuickFilters selected={selectedBrand} onChange={setSelectedBrand} />
-          {/* Picking a brand collapses the landing into a focused view:
-           *  the catalogue and promo banner are hidden so the user's
-           *  attention sits on the brand-specific Top Featured grid.
-           *  Clearing the chip (X) restores the full layout. */}
-          {selectedBrand ? null : <SearchCatalogue />}
-          {selectedBrand ? null : (
-            // SearchPromoBanner currently returns null while the campaigns
-            // backend is being wired (see component for the re-enable
-            // contract). Render call left in place so the section drops
-            // back into the layout automatically when it starts returning
-            // content.
-            <SearchPromoBanner />
-          )}
-          <SearchTopFeatured brand={selectedBrand} />
-        </AppScrollView>
-      )}
+          <Defs>
+            <SvgLinearGradient id="exploreFade" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={tokens.background} stopOpacity={1} />
+              <Stop offset="1" stopColor={tokens.background} stopOpacity={0} />
+            </SvgLinearGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height={HEADER_FADE} fill="url(#exploreFade)" />
+        </Svg>
+      </AppView>
 
-      <AppBlurView contentHeight={SEARCH_BAR_HEIGHT} fadeHeight={FADE_HEIGHT}>
-        <SmartSearchBar
-          onPress={search.setQuery}
-          onNotificationPress={() => router.push('/notifications')}
-          isSearching={isSearching}
-          onFocusChange={handleFocusChange}
-          isSearchActive={isSearchActive}
-          onBackPress={handleBackPress}
-          formResetKey={formResetKey}
-        />
-        {showSuggestions ? (
-          <SearchSuggestionsPanel
-            prefix={search.query}
-            suggestions={typeahead.suggestions}
-            isLoadingSuggestions={typeahead.isLoading}
-            recents={matchingRecents}
-            onSelectSuggestion={handleSelectSuggestion}
-            onSelectRecent={handleSelectRecent}
-            onRemoveRecent={recents.remove}
-            onClearRecents={recents.clear}
+      {/* Branded pull-to-refresh bar — sits just under the frosted header
+       *  while refreshing, replacing the stock RefreshControl spinner. */}
+      {refreshing ? (
+        <AppView
+          row
+          center
+          gap={10}
+          colorName="background"
+          style={{
+            position: 'absolute',
+            top: headerHeight,
+            left: 0,
+            right: 0,
+            height: 52,
+            zIndex: 9,
+            borderBottomWidth: 1,
+            borderBottomColor: tokens.divider,
+          }}
+        >
+          <WheelLoader size={22} color={tokens.text} />
+          <AppText family="accent" weight="semibold" style={{ fontSize: 13, color: tokens.textMuted }}>
+            Refreshing…
+          </AppText>
+        </AppView>
+      ) : null}
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="transparent"
+            colors={['transparent']}
+            progressViewOffset={headerHeight}
           />
-        ) : null}
-      </AppBlurView>
+        }
+        contentContainerStyle={{
+          paddingTop: headerHeight + 12,
+          paddingHorizontal: 20,
+          paddingBottom: 28,
+          gap: 16,
+        }}
+      >
+        <MatorFitBanner />
 
-      <SearchFiltersSheet
-        visible={filtersVisible}
-        filters={search.filters}
-        availableCategories={search.availableCategories}
-        facetCounts={search.facetCounts}
-        onApply={search.setFilters}
-        onClose={() => setFiltersVisible(false)}
-      />
+        {/* ── Shop by vehicle ── */}
+        <AppView row align="center" justify="space-between" style={{ marginTop: 2 }}>
+          <AppText family="heading" weight="bold" style={{ fontSize: 18, color: tokens.text }}>
+            Shop by vehicle
+          </AppText>
+          <AppPressableView onPress={() => router.push('/garage')} androidRipple={false} accessibilityRole="button">
+            <AppText family="accent" weight="semibold" style={{ fontSize: 13, color: tokens.textMuted }}>
+              My garage ›
+            </AppText>
+          </AppPressableView>
+        </AppView>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 12, paddingHorizontal: 20, paddingVertical: 2 }}
+          style={{ marginHorizontal: -20 }}
+        >
+          {LOGO_BRANDS.map((b) => (
+            <VehicleMakeTile key={b.id} brandId={b.id} label={b.label} onPress={openMake} />
+          ))}
+        </ScrollView>
+
+        {/* ── MATOR Certified ── */}
+        <CertifiedSection />
+
+        {/* ── Shop by category ── */}
+        <AppText family="heading" weight="bold" style={{ fontSize: 18, color: tokens.text, marginTop: 6 }}>
+          Shop by category
+        </AppText>
+        <AppView row wrap justify="space-between" style={{ rowGap: 12 }}>
+          {MATOR_CAT_TILES.map((c) => (
+            <CategoryTile key={c.name} name={c.name} count={c.count} onPress={openCategory} />
+          ))}
+        </AppView>
+      </ScrollView>
     </AppView>
   );
 }
-

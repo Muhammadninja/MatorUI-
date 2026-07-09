@@ -1,0 +1,438 @@
+# Mator — Backend API Contract
+
+**Source of truth:** this document is derived from the frontend transport/service code
+(`services/*`, `contexts/*`, `hooks/*`, `config/api.ts`) as of the current build. It
+describes **exactly what the app sends and expects back**. Where the code and the older
+handoff docs (`mocks/*.txt`) disagree, **this document wins** — it reflects shipping code.
+
+> ⚠️ **Read the "Conventions & gotchas" and "New endpoints needed" sections first** —
+> several things drifted from the original spec (tax rate, price-as-string, path-root
+> asymmetry, response wrappers, and a handful of screens with no backend at all).
+
+---
+
+## 1. Environment & transport switching
+
+Every domain ships a **mock** implementation and an **HTTP** implementation, selected at
+module load by `config/api.ts`:
+
+- `EXPO_PUBLIC_API_BASE_URL` — when set, transports switch to HTTP. Trailing slash is
+  stripped; endpoint paths below are appended verbatim (`${base}${path}`). Unset/empty →
+  every domain stays on mocks.
+- `EXPO_PUBLIC_HTTP_DOMAINS` — optional comma-separated allowlist of domain keys
+  (`catalog, search, top-featured, cart, orders, garage, …`). When set, **only** those
+  domains use HTTP; everything else stays mock. Lets the backend bring endpoints online
+  one at a time. Unset → base URL enables HTTP for all domains.
+
+### Auth
+
+- `Authorization: Bearer <accessToken>` is injected by `apiClient` from the in-memory
+  session (`services/auth-storage`, hydrated from `expo-secure-store`, envelope `auth:v1`).
+- Public endpoints (catalog/search/featured) still work for guests — the header is simply
+  omitted when there's no token.
+- Auth calls (`sign-in/up/refresh`) use `skipAuth` (no token). `sign-out` **does** send the
+  header.
+- On any **401**, `apiClient` fires a single coalesced refresh; on refresh failure the user
+  is signed out.
+
+### HTTP client (`services/api-client.ts`)
+
+- Headers: `Accept: application/json`; `Content-Type: application/json` only when a body is
+  present.
+- 15s timeout (AbortController); GET/HEAD retry with exponential backoff on 5xx + network
+  errors.
+- Errors thrown as `ApiError { status, code, message, response }` (reads body `code` /
+  `message` / `error`). `204` → `undefined`; non-JSON body tolerated.
+
+---
+
+## 2. Conventions & gotchas (backend must honor these exactly)
+
+1. **Prices are display strings, not numbers.** `price: "UZS 11,008,400"` / `"$486.00"`
+   everywhere the UI renders. Numeric fields exist in a few places (`price_uzs`,
+   `SearchResult.priceCents`) but the rendered rows use the string. The cart parses the
+   string (`/[^0-9.]/g` stripped) to compute subtotal — keep line prices parseable.
+2. **Query-param casing is inconsistent** (real, not a typo):
+   - Catalog list: `pageSize` (camelCase).
+   - Catalog **parts** endpoint (used by Top Featured today): `page_size` (snake_case).
+   - Search: camelCase JSON body.
+3. **Response wrapper inconsistency:** cart item endpoints return `{ item: CartItem }`
+   (wrapped); garage returns `{ vehicle }` / `{ vehicles }`; orders/addresses/payments
+   return the **bare** object/array. Match each exactly.
+4. **List vs mutation path roots differ** for account resources:
+   - Read: `GET /v1/account/addresses`, `GET /v1/account/payment-methods`.
+   - Write: `POST/PATCH/DELETE /v1/addresses/…`, `/v1/payment-methods/…`.
+5. **Tax = `0.085` (8.5%)** in code (`services/cart-math.ts`) — **not** the 6% in the old
+   handoff. Applied to `subtotal − discount`, never to shipping. (Confirm which is correct.)
+6. **Server owns pricing on order create** — the client sends only
+   `{ productId, quantity }` selections + a `totalLabel` display hint it may ignore.
+7. **Realtime/WebSocket channels are typed but not consumed** (catalog, top-featured,
+   garage). No live subscription today.
+
+---
+
+## 3. Auth — `services/auth-api.ts`
+
+```ts
+type UserSummary = {
+  id: string; firstName: string; lastName: string; email: string; username: string;
+  phone?: string | null; avatarUrl?: string | null; memberSince: string; // ISO
+};
+type RawAuthResponse = {
+  accessToken: string; refreshToken: string; expiresIn?: number /* seconds */; user: UserSummary;
+};
+```
+
+| Method & path | Request | Response |
+|---|---|---|
+| `POST /v1/auth/sign-in` | `{ email, password }` | `RawAuthResponse` |
+| `POST /v1/auth/sign-up` | `{ email, password, firstName, lastName }` | `RawAuthResponse` |
+| `POST /v1/auth/refresh` | `{ refreshToken }` | `RawAuthResponse` (401/400 → client signs out) |
+| `POST /v1/auth/sign-out` | `{ refreshToken }` (auth header sent) | `204` (best-effort) |
+
+Client converts `expiresIn` → `expiresAt = now + expiresIn` (unix seconds).
+
+---
+
+## 4. User / Profile — `services/user-api.ts`
+
+| Method & path | Request | Response |
+|---|---|---|
+| `GET /v1/me` | — | `UserSummary` (fetched on cold-boot; failure → guest) |
+| `PATCH /v1/me` | `Partial<Omit<UserSummary,'id'\|'memberSince'>>` | full updated `UserSummary` (optimistic in UI) |
+
+Editable: `firstName, lastName, email, username, phone, avatarUrl`.
+
+---
+
+## 5. Catalog — `services/catalog-service.ts` (domain key `catalog`)
+
+Drives the **Category** and **Search** product rows and **Item Detail**.
+
+```ts
+type CatalogItem = {
+  id: string;
+  badge?: string;            // corner ribbon ("Hot pick","New")
+  status: string;            // "Ready to ship","Low stock",…
+  title: string;
+  description: string;
+  price: string;             // DISPLAY string, e.g. "UZS 11,008,400"
+  priceLabel: string;        // "Starting at"
+  images: string[];          // URLs; mock is []
+  specs: { label: string; value: string }[];
+  features: string[];
+  category: string;          // slug: "sedan"|"suv"|"coupe"|"truck"
+  oem?: string;
+};
+```
+
+### `GET /v1/catalog/items?page&pageSize[&category][&search][&sortBy]`
+
+- Query: `page` (req), `pageSize` (req), `category` (if truthy), `search` (if truthy),
+  `sortBy` ∈ `featured|newest|price_asc|price_desc`.
+- Response: `{ items: CatalogItem[]; total; page; pageSize }`.
+- **UI (ProductRow) consumes:** `id, title, description, price, status, images[0], oem` + `total`.
+- Unused on rows: `badge, priceLabel, specs, features, category, images[1+]` (some used on detail).
+
+### `GET /v1/catalog/items/:id`
+
+- Response: `{ item: CatalogItem }`. **404 → treated as not-found** by the client.
+- Detail screen consumes the full item incl. `specs, features, badge, priceLabel, images`.
+
+---
+
+## 6. Search — `services/search-service.ts` (domain key `search`)
+
+Powers the smart-search surface (typeahead, filter sheet, did-you-mean). Note: the Mator
+`/search` **screen** currently renders catalog rows via `useCatalogList`, so `SearchResult`
+below feeds the richer search UI, not the basic product rows.
+
+### `POST /v1/search`
+
+Request body (`SearchRequest` minus `signal`; `requestId` → `X-Request-Id` header):
+
+```ts
+{ query: string; limit?: number; pageToken?: string;
+  filters?: { categories: string[]; price: 'any'|'under_1k'|'1k_to_10k'|'over_10k';
+              minRating: 'any'|'3_plus'|'4_plus' };
+  sortBy?: 'relevance'|'price_asc'|'price_desc'|'rating'|'newest';
+  vehicleContext?: { brand; model; vehicle_generation?; engine_type?; oem_catalog_scope? };
+  // defined but never sent: locale, userId, abVariant
+}
+```
+
+Response (`SearchResponse`):
+
+```ts
+{ query; requestId; results: SearchResult[]; total; nextPageToken?; didYouMean?;
+  suggestedRefinements?; facetCounts?: { categories?; price?; minRating? };
+  appliedFilters?; suggestedCategories?: string[]; durationMs }
+
+type SearchResult = {
+  id; title; description; price /* display */; priceLabel; priceCents?; category;
+  badge?; accentTagKind?: 'lowest_price'|'bestseller'; status?; rating?; reviewCount?;
+  score; explanation?;
+};
+```
+
+- **Mock-only:** `rating/reviewCount/accentTagKind` hash-derived; `didYouMean` a 4-entry
+  map; default page size 2. `isCheapest` is derived client-side, **not** a server field.
+
+### `GET /v1/typeahead?q&limit`  (limit default 6)
+
+Response: `{ prefix; suggestions: { text; kind: 'query'|'product'; productId? }[] }`.
+
+---
+
+## 7. Top Featured — `services/top-featured-service.ts` (domain key `top-featured`)
+
+> ⚠️ **Intended endpoint `POST /v1/top-featured/list` is NOT live.** Its snapshot is empty
+> on the backend, so the HTTP transport **temporarily sources from `GET /v1/catalog/parts`**
+> and maps parts → featured items. Treat the featured-snapshot contract as aspirational.
+
+### `GET /v1/catalog/parts?page&page_size[&search]`  (snake_case!)
+
+Real backend response consumed today:
+
+```ts
+type ApiCatalogPartsResponse = {
+  items: ApiCatalogPart[]; total; page; page_size; next_page: number | null;
+};
+type ApiCatalogPart = {
+  id; title;
+  brand?: { id; name } | null;
+  category?: { id; name } | null;
+  oem_numbers?: string[];
+  price_uzs?: number;
+  price_label?: string;
+  in_stock?: boolean;
+  stock_qty?: number;
+  images?: string[];
+};
+```
+
+Mapped to `TopFeaturedItem { id, badge, status, title, description, price, model, brand,
+color, condition, images?, oem? }` where `status ← in_stock ? 'In stock' : 'Out of stock'`,
+`description ← brand.name · category.name`, `price ← price_label ?? "UZS <price_uzs>"`,
+`oem ← oem_numbers[0]`. **`badge, model, color, condition` are empty** (no backing).
+`filters.brand` is applied **client-side** by name; other filter dims are mock-only.
+
+---
+
+## 8. Cart — `services/cart-api.ts` + `contexts/cart.context.tsx` (domain key `cart`)
+
+```ts
+type CartItem = {
+  id; title; description; price /* display */; priceLabel?; badge?; status?;
+  imageUrl?; quantity: number;
+};
+type AddItemInput = { productId; title; description; price; priceLabel?; badge?; status?; imageUrl? };
+```
+
+| Method & path | Request | Response | Notes |
+|---|---|---|---|
+| `GET /v1/cart` | — | `{ items: CartItem[]; appliedPromoCode: string\|null }` | offline-first: overwrites local cache only when `items.length>0` |
+| `POST /v1/cart/items` | `AddItemInput` | **`{ item: CartItem }`** | created-or-incremented; add is optimistic (qty+1 local) |
+| `PATCH /v1/cart/items/:itemId` | `{ quantity }` | `{ item: CartItem }` | qty≤0 → client calls DELETE instead |
+| `DELETE /v1/cart/items/:itemId` | — | `204` | |
+| `POST /v1/cart/clear` | — | `204` | |
+| `POST /v1/cart/promo` | `{ code }` | `PromoResult` (below) | validated client-side first; server call is fire-and-confirm |
+| `DELETE /v1/cart/promo` | — | `204` | |
+
+The UI's add path sends `addItem({ id, title, description, price, imageUrl })`
+(`id → productId`); `priceLabel/badge/status` usually undefined. Add happens only **after
+the guest auth gate passes**.
+
+```ts
+type PromoResult =
+  | { ok: true; promo: PromoCode }
+  | { ok: false; reason: 'invalid'|'min_subtotal'; minSubtotal?: number };
+type PromoCode = { code; label; kind: 'percent'|'fixed'|'free_shipping'; value: number; maxDiscount?: number };
+```
+
+> Promo codes live **client-side** (`WELCOME10` 10%, `RIDE25` 25% cap $200, `FREESHIP`).
+> The server's rules must mirror this table exactly or the two diverge.
+
+### Cart math (client; backend must mirror) — `services/cart-math.ts`
+
+- `TAX_RATE = 0.085`, `FLAT_SHIPPING = 49`, `FREE_SHIPPING_THRESHOLD = 500`, `PROMO_MIN_SUBTOTAL = 100`.
+- `shipping = subtotal>0 ? (subtotal>=500 ? 0 : 49) : 0`
+- promo `percent → min(subtotal*value, maxDiscount?)`; `fixed → min(subtotal, value)`; `free_shipping → shipping=0`
+- `taxedBase = max(0, subtotal − discount)`; **`tax = taxedBase * 0.085`**; `total = taxedBase + shipping + tax`
+- `subtotal = Σ parsePrice(price) * quantity`.
+
+---
+
+## 9. Checkout / Orders — `services/orders-service.ts` (domain key `orders`)
+
+```ts
+type CreateOrderInput = {
+  items: { productId; quantity }[];   // selections only — NO prices
+  addressId; paymentMethodId; shippingOptionKey; promoCode: string|null;
+  note?; totalLabel?;                  // totalLabel = optimistic display hint
+};
+type CreateOrderResult = { orderId; eta; totalLabel };
+```
+
+| Method & path | Request | Response |
+|---|---|---|
+| `POST /v1/orders` | `CreateOrderInput` | `CreateOrderResult` (server re-validates pricing; empty items → error) |
+| `GET /v1/orders?page&pageSize&status` | query (all optional) | `OrderListPage` |
+| `GET /v1/orders/:orderId` | — | `OrderDetail` (404 → not-found) |
+
+```ts
+type OrderListRow = { id; date; status: 'Processing'|'In Transit'|'Out for delivery'|'Delivered'|'Cancelled';
+                      items: number; total /* "$486.00" */; summary /* "Garrett GTX3582R + 2 items" */ };
+type OrderListPage = { items: OrderListRow[]; total; page; pageSize };
+
+type OrderDetail = {
+  id; status: 'placed'|'packed'|'shipped'|'out_for_delivery'|'delivered'|'cancelled';
+  statusLabel; etaWindow; placedAt;
+  steps: { key; label; caption /* "Tue · 9:42 AM" */ }[];
+  currentStepIndex; destination: Address; courier: Courier|null;
+  items: { id; title; quantity; price; imageUrl? }[]; totalLabel;
+};
+type Courier = { name; company; vehicle; rating; phone?; chatThreadId?; avatarUrl? };
+```
+
+Server owns step timestamps, locale/formatting, and `currentStepIndex`.
+
+---
+
+## 10. Addresses — reads `/v1/account/addresses`, writes `/v1/addresses`
+
+```ts
+type Address = { id; label; line1; city /* "Brooklyn, NY 11211" */; name?; isDefault? };
+type AddressInput = { label; name; line1; city };
+```
+
+| Method & path | Request | Response |
+|---|---|---|
+| `GET /v1/account/addresses` | — | `Address[]` |
+| `POST /v1/addresses` | `AddressInput` | `Address` (first created → default) |
+| `PATCH /v1/addresses/:id` | `AddressInput` | updated `Address` |
+| `DELETE /v1/addresses/:id` | — | `204` (deleting default promotes another) |
+| `POST /v1/addresses/:id/default` | — | `204` (single default enforced server-side) |
+
+---
+
+## 11. Payment methods — reads `/v1/account/payment-methods`, writes `/v1/payment-methods`
+
+```ts
+type PaymentMethod = { id; brand; last4; exp /* "MM/YY" */; isDefault };
+type PaymentMethodInput = { brand; last4; exp };
+```
+
+Same CRUD shape as addresses (`GET /v1/account/payment-methods`, `POST/PATCH/DELETE
+/v1/payment-methods/:id`, `POST /v1/payment-methods/:id/default`).
+> **Security:** the form collects only `brand/last4/exp` — never a PAN. A real integration
+> should replace this with a tokenized handle from a PCI vault; **no tokenization field
+> exists yet.**
+
+---
+
+## 12. Shipping — `POST /v1/shipping/quote`
+
+```ts
+type ShippingQuoteRequest = { addressId; subtotal /* dollars */ };
+type ShippingOption = { key /* "standard"|"express"|"same_day" */; label; eta; price /* 0 = free */ };
+```
+
+Request `{ addressId, subtotal }` → `ShippingOption[]`. The chosen `key` is sent as
+`CreateOrderInput.shippingOptionKey`. `subtotal` lets the server flip free-shipping
+thresholds (client won't guess). Mock returns standard/$0 · express/$9.99 · same_day/$19.99,
+forcing standard→free at subtotal ≥ 500.
+
+---
+
+## 13. Garage / Vehicles — `services/garage-api.ts` (domain key `garage`)
+
+Base `/v1/garage`. **Wire DTO is snake_case with nested `make/model/trim/engine`; responses
+are envelope-wrapped.** Client flattens to `Vehicle` and derives `color`, `addedAt`, ids.
+
+```ts
+type ServerVehicle = {
+  id; user_id?; is_primary: boolean; nickname?: string|null;
+  make: { id; name; logo_url?: string|null }; model: { id; name }; year: number;
+  trim?: { id; name }|null;
+  engine?: { id; name; displacement_cc?; fuel_type? }|null;
+  transmission?; drivetrain?; color_hex?; vin?; license_plate?;
+  registration_region_code?; mileage_km?; fuel_type?;
+  model_3d?: { glb_url; ktx2_textures_url; version; byte_size; checksum_sha256; tuning_variants? }|null;
+  created_at; updated_at?;
+};
+// enums: transmission manual|automatic|cvt|dct|amt · drivetrain fwd|rwd|awd|4wd
+//        fuel petrol|diesel|hybrid|phev|ev|cng|lpg
+```
+
+| Method & path | Request | Response |
+|---|---|---|
+| `GET /v1/garage/vehicles` | — | `{ vehicles: ServerVehicle[] }` |
+| `GET /v1/garage/vehicles/:id` | — | `{ vehicle }` (404 → null) |
+| `POST /v1/garage/vehicles` | `ServerVehicleCreatePayload` (`make_id, model_id, year, color_hex` req; `trim_id, engine_id, vin, license_plate, mileage_km, nickname, is_primary, fuel_type` opt) | `{ vehicle }` (then full list refresh) |
+| `PATCH /v1/garage/vehicles/:id` | `Partial<CreatePayload>` (changed keys only) | `{ vehicle }` |
+| `DELETE /v1/garage/vehicles/:id` | — | 2xx (list refetched) |
+| `POST /v1/garage/vehicles/:id/set-primary` | — | `{ vehicles }` (full re-ordered list) |
+
+Realtime `GarageSocketEvent` on `garage:vehicles` is typed but **not subscribed** yet.
+
+---
+
+## 14. AI Chat — `services/chat-api.ts`
+
+Base `/v1/chatbot`. Streaming uses raw `fetch` SSE (`Accept: text/event-stream`) with a
+manual bearer header.
+
+| Method & path | Request | Response |
+|---|---|---|
+| `GET /v1/chatbot/conversations` | — | `AiChatConversationSummary[]` |
+| `GET /v1/chatbot/conversations/:id` | — | `AiChatConversationSummary` (404 → null) |
+| `DELETE /v1/chatbot/conversations/:id` | — | `204` |
+| `POST /v1/chatbot/messages` | `{ conversationId?; message; vehicleContext? }` | **SSE** stream of `ChatStreamEvent` |
+| `POST /v1/chatbot/messages/:id/feedback` | `{ kind: 'up'\|'down'; note? }` | `204` |
+
+```ts
+type ChatStreamEvent =
+  | { type: 'token'; value }
+  | { type: 'tool_call_start'; toolCall }
+  | { type: 'tool_call_update'; toolCallId; status: 'pending'|'running'|'success'|'error';
+      result?: { summary?; deepLink?: { label; href }; payload? }; errorMessage? }
+  | { type: 'done'; conversationId; suggestions: string[]; replyId; title; createdAt };
+// tool names: lookup_order|search_parts|add_to_cart|apply_promo|check_fitment|identify_part|<string>
+```
+
+---
+
+## 15. Static / local-only (⚠ NO backend today) — NEW ENDPOINTS NEEDED
+
+These power live screens but have **no transport** — they're hardcoded constants or device
+storage. Each needs a backend endpoint to become real.
+
+| # | Data | Where | Shape | Endpoint needed |
+|---|---|---|---|---|
+| 1 | **MATOR Certified dealers** | `mocks/mator-catalog.ts` `MATOR_DEALERS` (4), Explore "MATOR Certified" row | `{ id; name; initial; color; orders: string; years: number }` | **`GET /v1/dealers`** — certified storefronts |
+| 2 | **Shop-by-category tiles + live counts** | `MATOR_CAT_TILES` (12), Explore grid | `{ name; count: number; color }` | **`GET /v1/categories`** with real per-category `count` |
+| 3 | **Brand/make taxonomy + logos** | `services/uz-vehicle-catalog.ts` (`UZ_BRANDS`/`UZ_MODELS`/…), `assets/brands/*` | brands/models/generations/trims/engines; `logoUrl`/`make.logo_url` | **brand-catalog endpoint** (add/update brands, models, **logos**) |
+| 4 | **Favorites / likes** | `services/likes-storage.ts` — AsyncStorage `likes:v1` only | `Set<productId>` | **favorites API** (per-user list/add/remove) for cross-device sync |
+| 5 | **Top Featured snapshot** | `POST /v1/top-featured/list` intended but empty | `TopFeaturedListResponse` + WS `top_featured:catalog` | populate the real snapshot endpoint (today it falls back to `/v1/catalog/parts`) |
+| 6 | **Realtime channels** | catalog `catalog:items`, top-featured `top_featured:catalog`, garage `garage:vehicles` | typed events | WS/subscription backing (types exist, nothing subscribes yet) |
+
+Also mock seed only (demo screens, not contract): `MATOR_PRODUCTS`, `MATOR_ADDRESSES`,
+`MATOR_CARDS`, `MATOR_SEED_CART`, `MATOR_VEHICLES`.
+
+---
+
+## 16. Backend action-item summary
+
+1. **Confirm tax rate** — code uses **8.5%** (`0.085`); old handoff said 6%.
+2. **Fix/keep casing** — catalog list `pageSize` vs parts `page_size`. Pick one or document both.
+3. **Match response wrappers** — `{ item }` (cart), `{ vehicle(s) }` (garage), bare (orders/addresses/payments).
+4. **Match path roots** — account **reads** at `/v1/account/*`, **writes** at `/v1/addresses` & `/v1/payment-methods`.
+5. **Server owns pricing** on `POST /v1/orders`; re-validate, ignore client `totalLabel`.
+6. **Mirror the promo table** (`WELCOME10/RIDE25/FREESHIP`) or the client will diverge.
+7. **Stand up the 6 missing endpoints/systems** in §15 (dealers, categories+counts, brand catalog+logos, favorites, top-featured snapshot, realtime).
+8. **Payments:** add a tokenization field; today it sends raw `brand/last4/exp`.
+</content>
+
+</invoke>
+âº Update(components/screens-components/catalog/product-row.tsx)

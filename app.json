@@ -5,27 +5,40 @@
     "owner": "matoruz",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/image.png",
+    "icon": "./assets/MATOR-app-icons/expo/icon.png",
     "scheme": "mator",
     "userInterfaceStyle": "automatic",
     "buildCacheProvider": "eas",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.fotih12.mator",
-      "icon": "./assets/image.png",
+      "icon": {
+        "light": "./assets/MATOR-app-icons/expo/icon-light.png",
+        "dark": "./assets/MATOR-app-icons/expo/icon.png",
+        "tinted": "./assets/MATOR-app-icons/expo/adaptive-icon.png"
+      },
       "infoPlist": {
         "UIViewControllerBasedStatusBarAppearance": true,
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSAppTransportSecurity": {
+          "NSExceptionDomains": {
+            "138.68.70.45": {
+              "NSExceptionAllowsInsecureHTTPLoads": true,
+              "NSIncludesSubdomains": true
+            }
+          }
+        }
       },
       "appleTeamId": "DXP9AG6TPN"
     },
     "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#000000",
-        "foregroundImage": "./assets/image.png"
-      },
       "predictiveBackGestureEnabled": false,
-      "package": "com.fotih12.mator"
+      "package": "com.fotih12.mator",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/MATOR-app-icons/expo/adaptive-icon.png",
+        "monochromeImage": "./assets/MATOR-app-icons/expo/adaptive-icon.png",
+        "backgroundColor": "#000000"
+      }
     },
     "web": {
       "bundler": "metro",
@@ -37,12 +50,12 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/splash.png",
-          "imageWidth": 300,
+          "image": "./assets/splash-blank.png",
+          "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#F2F3F5",
           "dark": {
-            "image": "./assets/splash-dark.png",
+            "image": "./assets/splash-blank.png",
             "backgroundColor": "#0A0A0A"
           }
         }

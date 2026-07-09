@@ -1,6 +1,8 @@
-import { Minus, Plus, Trash2 } from 'lucide-react-native';
+import { X } from 'lucide-react-native';
 
 import AppImage from '@/components/shared/app-image';
+import { AppOemPill } from '@/components/shared/app-oem-pill';
+import { AppQtyStepper } from '@/components/shared/app-qty-stepper';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import type { CartItem } from '@/contexts/cart.context';
@@ -15,6 +17,12 @@ export type CartItemCardProps = {
   onRemove: () => void;
 };
 
+/**
+ * Cart line item, styled to the Mator handoff: 80px thumbnail, title + OEM
+ * pill (when present), line price, a 30px quantity stepper, and an ✕ remove
+ * affordance. Real cart data only — the OEM pill renders only if the item
+ * carries an `oem`.
+ */
 export default function CartItemCard({
   item,
   onIncrement,
@@ -23,85 +31,61 @@ export default function CartItemCard({
 }: CartItemCardProps) {
   const { tokens, scheme } = useThemeContext();
   const imageSource = item.imageUrl ? { uri: item.imageUrl } : FALLBACK_IMAGE;
+  const oem = (item as CartItem & { oem?: string }).oem;
 
   return (
     <AppView
-      rounded={16}
-      px={14}
-      py={14}
+      row
       gap="md"
+      rounded={16}
+      px={12}
+      py={12}
       style={{
         borderWidth: 1,
         borderColor: tokens.border,
         backgroundColor: scheme === 'dark' ? tokens.card : tokens.white,
       }}
     >
-      <AppView row align="center" gap="md">
-        <AppImage
-          source={imageSource}
-          width={64}
-          height={64}
-          rounded={8}
-          contentFit="cover"
-          alt={item.title}
-        />
-        <AppView gap="xs" style={{ flex: 1 }}>
-          <AppText textVariant="bodySemibold" numberOfLines={2}>
-            {item.title}
-          </AppText>
-          <AppText textVariant="bodyXs" colorName="gray400">
-            {item.badge ? `${item.badge} · ` : ''}
-            {item.status ?? 'Ready'}
-          </AppText>
-        </AppView>
-        <AppText textVariant="bodySemibold">{item.price}</AppText>
-      </AppView>
-      <AppView row align="center" justify="space-between" gap="md">
-        <AppPressableView
-          onPress={onRemove}
-          p={6}
-          rounded={8}
-          accessibilityRole="button"
-          accessibilityLabel={`Remove ${item.title} from cart`}
-        >
-          <Trash2 size={18} strokeWidth={2} color={tokens.gray400} />
-        </AppPressableView>
-        <AppView row align="center" gap="xs">
-          <AppPressableView
-            rounded={8}
-            px={10}
-            py={6}
-            colorName="card"
-            borderWidth={1}
-            borderName="border"
-            onPress={onDecrement}
-            accessibilityRole="button"
-            accessibilityLabel={`Decrease quantity of ${item.title}`}
-            hitSlop={{ top: 9, bottom: 9, left: 8, right: 8 }}
-          >
-            <Minus size={14} strokeWidth={2.2} color={tokens.text} />
-          </AppPressableView>
-          <AppView
-            style={{ minWidth: 28, alignItems: 'center' }}
-          >
-            <AppText textVariant="bodySm" family="heading">
-              {item.quantity}
+      <AppImage
+        source={imageSource}
+        width={80}
+        height={80}
+        rounded={12}
+        contentFit="cover"
+        alt={item.title}
+      />
+      <AppView flex={1} gap={8} style={{ justifyContent: 'space-between' }}>
+        <AppView row align="flex-start" gap={8}>
+          <AppView flex={1} gap={5}>
+            <AppText textVariant="bodySemibold" weight="semibold" numberOfLines={2}>
+              {item.title}
             </AppText>
+            {oem ? <AppOemPill oem={oem} /> : null}
           </AppView>
           <AppPressableView
-            rounded={8}
-            px={10}
-            py={6}
-            colorName="card"
-            borderWidth={1}
-            borderName="border"
-            onPress={onIncrement}
+            onPress={onRemove}
+            center
+            rounded={999}
+            pressedOpacity={0.6}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
-            accessibilityLabel={`Increase quantity of ${item.title}`}
-            hitSlop={{ top: 9, bottom: 9, left: 8, right: 8 }}
+            accessibilityLabel={`Remove ${item.title} from cart`}
+            style={{ width: 26, height: 26 }}
           >
-            <Plus size={14} strokeWidth={2.2} color={tokens.text} />
+            <X size={16} strokeWidth={2.2} color={tokens.textMuted} />
           </AppPressableView>
+        </AppView>
+
+        <AppView row align="center" justify="space-between" gap="md">
+          <AppText textVariant="body" family="heading" weight="bold">
+            {item.price}
+          </AppText>
+          <AppQtyStepper
+            value={item.quantity}
+            onIncrement={onIncrement}
+            onDecrement={onDecrement}
+            size="sm"
+          />
         </AppView>
       </AppView>
     </AppView>

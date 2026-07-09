@@ -132,7 +132,6 @@ export type VehicleFitment = {
 
 export const UZ_BRANDS: VehicleBrand[] = [
   { id: 'chevrolet', label: 'Chevrolet', tier: 'uz_top', manufacturer: 'UzAuto Motors' },
-  { id: 'daewoo', label: 'Daewoo', tier: 'uz_top', manufacturer: 'UzAuto Motors (legacy)' },
   { id: 'byd', label: 'BYD', tier: 'uz_top', manufacturer: 'BYD Uzbekistan' },
   { id: 'kia', label: 'Kia', tier: 'uz_top' },
   { id: 'chery', label: 'Chery', tier: 'uz_top' },
@@ -142,6 +141,28 @@ export const UZ_BRANDS: VehicleBrand[] = [
   { id: 'haval', label: 'Haval', tier: 'uz_mid' },
   { id: 'nissan', label: 'Nissan', tier: 'global' },
 ];
+
+/** Brand accent color per brand id — used for tile borders / monogram tiles
+ *  on Explore's "Shop by vehicle" row and the Make screen. Theme-independent
+ *  brand identity (kept here, out of the token-linted component tree). */
+const BRAND_COLORS: Record<string, string> = {
+  chevrolet: '#CD9834',
+  daewoo: '#1C6BBA',
+  byd: '#C3002F',
+  kia: '#BB162B',
+  chery: '#D7263D',
+  hyundai: '#002C5E',
+  lada: '#1F6FB2',
+  toyota: '#EB0A1E',
+  haval: '#B01E28',
+  nissan: '#C3002F',
+  skoda: '#4BA82E',
+  volkswagen: '#151F5D',
+};
+
+export function brandColor(brandId: string): string {
+  return BRAND_COLORS[brandId] ?? '#3949ab';
+}
 
 // ── Models ───────────────────────────────────────────────────────────
 
