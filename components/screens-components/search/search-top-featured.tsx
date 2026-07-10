@@ -37,10 +37,10 @@ export default function SearchTopFeatured({ brand }: SearchTopFeaturedProps = {}
   });
 
   return (
-    <AppView mt={18} gap={16}>
-      <AppView px={16} row align="center" justify="space-between" gap={12}>
+    <AppView mt={18} gap="lg">
+      <AppView px="lg" row align="center" justify="space-between" gap="md">
         <AppText textVariant="title" family="heading" weight="bold">
-          {brand ? `Results for ${brand}` : 'Top Featured'}
+          {brand ? ` ${brand}` : 'Top Featured'}
         </AppText>
         <AppPressableView
           androidRipple={false}
@@ -70,9 +70,9 @@ export default function SearchTopFeatured({ brand }: SearchTopFeaturedProps = {}
       {state === 'idle' || state === 'loading' ? (
         <SearchTopFeaturedSkeleton />
       ) : state === 'error' ? (
-        <AppView px={16} gap={12} align="center" py={24}>
+        <AppView px="lg" gap="md" align="center" py="xl">
           <AlertCircle size={32} strokeWidth={2} color={tokens.error} />
-          <AppView gap={4} align="center">
+          <AppView gap="xs" align="center">
             <AppText textVariant="bodySemibold">Couldn't load top featured</AppText>
             <AppText
               textVariant="bodySm"
@@ -85,7 +85,7 @@ export default function SearchTopFeatured({ brand }: SearchTopFeaturedProps = {}
           <AppButton title="Retry" kind="secondary" size="sm" onPress={refresh} />
         </AppView>
       ) : state === 'empty' ? (
-        <AppView px={16} gap={10} align="center" py={24}>
+        <AppView px="lg" gap={10} align="center" py="xl">
           <PackageOpen size={32} strokeWidth={2} color={tokens.gray400} />
           <AppText
             textVariant="bodySm"
@@ -96,8 +96,8 @@ export default function SearchTopFeatured({ brand }: SearchTopFeaturedProps = {}
           </AppText>
         </AppView>
       ) : (
-        <AppView px={16}>
-          <AppView row gap={12} justify="space-between" style={{ flexWrap: 'wrap' }}>
+        <AppView px="lg">
+          <AppView row gap="md" justify="space-between" style={{ flexWrap: 'wrap' }}>
             {items.map((item) => (
               <SearchPartCard
                 key={item.id}

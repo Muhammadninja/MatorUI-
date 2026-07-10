@@ -37,8 +37,8 @@ export default function SearchCatalogue() {
   });
 
   return (
-    <AppView mt={14} gap={16}>
-      <AppView px={16}>
+    <AppView mt={14} gap="lg">
+      <AppView px="lg">
         <AppText textVariant="title" family="heading" weight="bold">
           Catalogue
         </AppText>
@@ -47,9 +47,9 @@ export default function SearchCatalogue() {
       {state === 'idle' || state === 'loading' ? (
         <SearchCatalogueSkeleton />
       ) : state === 'error' ? (
-        <AppView px={16} gap={12} align="center" py={24}>
+        <AppView px="lg" gap="md" align="center" py="xl">
           <AlertCircle size={32} strokeWidth={2} color={tokens.error} />
-          <AppView gap={4} align="center">
+          <AppView gap="xs" align="center">
             <AppText textVariant="bodySemibold">Couldn't load catalogue</AppText>
             <AppText
               textVariant="bodySm"
@@ -62,7 +62,7 @@ export default function SearchCatalogue() {
           <AppButton title="Retry" kind="secondary" size="sm" onPress={refresh} />
         </AppView>
       ) : state === 'empty' ? (
-        <AppView px={16} gap={10} align="center" py={24}>
+        <AppView px="lg" gap={10} align="center" py="xl">
           <PackageOpen size={32} strokeWidth={2} color={tokens.gray400} />
           <AppText
             textVariant="bodySm"

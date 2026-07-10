@@ -58,10 +58,10 @@ describe('round', () => {
 });
 
 describe('formatCurrency', () => {
-  test('formats with $ + thousands separators + 2 decimals', () => {
-    expect(formatCurrency(0)).toBe('$0.00');
-    expect(formatCurrency(1240.5)).toBe('$1,240.50');
-    expect(formatCurrency(1234567.8)).toBe('$1,234,567.80');
+  test('formats as UZS whole som with thousands separators', () => {
+    expect(formatCurrency(0)).toBe('UZS 0');
+    expect(formatCurrency(1240.5)).toBe('UZS 1,241');
+    expect(formatCurrency(1234567.8)).toBe('UZS 1,234,568');
   });
 });
 

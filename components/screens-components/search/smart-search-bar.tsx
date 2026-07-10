@@ -71,6 +71,12 @@ export function SmartSearchBar({
   // registry's deps stay stable and the registry can be created once.
   const onFocusChangeRef = useRef(onFocusChange);
   const onVoicePressRef = useRef(onVoicePress);
+  // Presence of a voice handler decides whether the mic affordance is
+  // shown at all. It's a boolean (not a callback), so it's safe to use as
+  // a registry dependency — it only changes when the parent wires/unwires
+  // voice search, never on a keystroke, so it won't trigger the
+  // remount-on-type bug the callbacks-via-refs pattern guards against.
+  const hasVoiceHandler = typeof onVoicePress === 'function';
   useEffect(() => {
     onFocusChangeRef.current = onFocusChange;
   }, [onFocusChange]);
@@ -116,9 +122,11 @@ export function SmartSearchBar({
                 </AppView>
               }
               rightAdornment={
-                // Mic and X are mutually exclusive: while the user has
-                // typed something, the right slot is the clear-X. Empty
-                // input → mic (voice search). One slot, two roles.
+                // While the user has typed something, the right slot is
+                // the clear-X. When empty, the slot shows the mic ONLY if
+                // a voice handler was actually wired by the parent — an
+                // unwired mic is a dead affordance, so we hide it rather
+                // than render a button that does nothing.
                 (rhf.value as string)?.length > 0 ? (
                   <AppPressableView
                     center
@@ -135,7 +143,7 @@ export function SmartSearchBar({
                   >
                     <X size={14} strokeWidth={2} color={tokens.text} />
                   </AppPressableView>
-                ) : (
+                ) : hasVoiceHandler ? (
                   <AppPressableView
                     center
                     rounded={36}
@@ -146,7 +154,7 @@ export function SmartSearchBar({
                   >
                     <Mic size={18} strokeWidth={2} color={tokens.text} />
                   </AppPressableView>
-                )
+                ) : undefined
               }
               containerRounded={36}
               containerPx={12}
@@ -161,13 +169,14 @@ export function SmartSearchBar({
     }),
     // Intentionally NOT depending on onVoicePress / onFocusChange — those
     // are read through refs above. Putting them in deps reintroduces the
-    // remount-on-every-keystroke bug. Only `tokens` legitimately needs to
-    // invalidate the registry (theme change → icon recolor).
-    [tokens],
+    // remount-on-every-keystroke bug. `tokens` invalidates on theme change
+    // (icon recolor); `hasVoiceHandler` is a stable boolean that only
+    // flips when the parent wires/unwires voice search.
+    [tokens, hasVoiceHandler],
   );
 
   return (
-    <AppView row align="center" gap={12} px={12}>
+    <AppView row align="center" gap="md" px="md">
       {isSearchActive ? (
         <AppPressableView
           center

@@ -23,7 +23,7 @@ export default function LikeButton(props: {
   const likedColor = tokens.text;
 
   return (
-    <AppView mt={8} mr={8}>
+    <AppView mt="sm" mr="sm">
       <AppIconButton
         Icon={Heart}
         onPress={handlePress}

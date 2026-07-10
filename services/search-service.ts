@@ -329,6 +329,6 @@ export class HttpSearchTransport implements SearchTransport {
   }
 }
 
-export const searchTransport: SearchTransport = shouldUseHttpTransport()
+export const searchTransport: SearchTransport = shouldUseHttpTransport('search')
   ? new HttpSearchTransport()
   : new MockSearchTransport();

@@ -1,0 +1,114 @@
+Confirmed — scope shift understood. Service Masters / СТО is out for this release; we ship a pure parts e-commerce marketplace. I've ingested text/backend.json
+  (the v1.0.0 Mator API contract, 14 screens) and cross-referenced it against the current React Native / Expo codebase under services/ and app/(tabs)/. Below is the
+  alignment brief — no schema or code changes yet, awaiting your go.
+
+  1. What stays — the marketplace core (in-scope screens)
+
+  ┌───────────────────────────────────────────────────────┬────────────────────────────────────────┬────────────────────────────────────────────────────────────┐
+  │                        Screen                         │            Endpoint family             │                            Role                            │
+  ├───────────────────────────────────────────────────────┼────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+  │ AuthPhoneEntry → AuthOtpVerify → AuthMyIdVerification │ /v1/auth/*, /v1/auth/myid/*            │ Phone+OTP, MyID for transaction limit                      │
+  │                                                       │                                        │ (transaction_limit_uzs) — gates checkout                   │
+  ├───────────────────────────────────────────────────────┼────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+  │ GarageListScreen                                      │ /v1/garage/vehicles                    │ Source of the persistent compatibility key — vehicle_id +  │
+  │                                                       │                                        │ make/model/year/trim_id/engine_id                          │
+  ├───────────────────────────────────────────────────────┼────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+  │ ExploreSearchScreen + ExploreQuickFiltersStrip        │ /v1/search, /v1/typeahead,             │ Free-text + vehicleContext envelope                        │
+  │                                                       │ /v1/search/quick-filters               │                                                            │
+  ├───────────────────────────────────────────────────────┼────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+  │ PartsCatalogueScreen                                  │ /v1/catalog/parts*                     │ Faceted listing with server-projected compatibility.status │
+  ├───────────────────────────────────────────────────────┼────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+  │ TopFeaturedScreen                                     │ /v1/top-featured/list                  │ Curated grid                                               │
+  ├───────────────────────────────────────────────────────┼────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+  │ CartScreen                                            │ /v1/cart*                              │ Server-persisted cart (open question called out below)     │
+  ├───────────────────────────────────────────────────────┼────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+  │ CheckoutScreen                                        │ /v1/orders,                            │ UZS pricing, deep-link payments                            │
+  │                                                       │ /v1/payments/{payme,click}/*           │                                                            │
+  ├───────────────────────────────────────────────────────┼────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+  │ PushNotificationRouter                                │ /v1/devices/*, /v1/notifications/*     │ Push + inbox                                               │
+  ├───────────────────────────────────────────────────────┼────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+  │ AvatarUpload, GarageRealtimeChannel,                  │ —                                      │ Support contracts                                          │
+  │ AiAdvisorChatScreen, GarageVehicleAdapterContract     │                                        │                                                            │
+  └───────────────────────────────────────────────────────┴────────────────────────────────────────┴────────────────────────────────────────────────────────────┘
+
+  2. What gets removed / sanitized (postponed surface)
+
+  Concrete deletions to make against backend.json and any stale code paths:
+
+  - Whole screen contract: MapMastersSearchScreen — drop /v1/masters/*, /v1/sto/*, /v1/masters/{id}/bookings.
+  - CheckoutScreen.create_order.cart_snapshot.items[] — strip the { service_id, master_id, scheduled_at } line-item variant. Cart lines for v1 are { part_id, qty,
+  price_uzs } only. total_uzs decomposition (subtotal + delivery + service_fee + discount) stays; service_fee_uzs is the platform fee, not a mechanic fee — confirm
+  naming so frontend doesn't conflate it.
+  - AiAdvisorChatScreen.message_response.structured.suggested_services — remove; keep suggested_parts only. Disclaimer wording stays.
+  - PushNotificationRouter.routing_matrix — drop master_message row; drop master_messages from topics_subscribed, preferences_update.topics, and Android channels.
+  - GarageRealtimeChannel — drop garage.vehicle.status.updated event (the stage / label / mechanic payload is STO-coupled). Keep snapshot / vehicle.created / updated
+   / deleted / primary.changed.
+  - Frontend status: no app/(tabs)/(masters), no master-detail route, no services/masters-*.ts exists today. Repo is clean — this is a contract-only deletion plus
+  removing any dormant references in copy/strings.
+
+  3. Hard constraints I extracted (the things schema + RN code must honor)
+
+  Currency & pricing
+  - All money is UZS, integer. Payme amounts wire as tiyin (×100): amount_tiyin: 36500000 ↔ amount_uzs: 365000. Click stays in UZS units. Frontend formatter is the
+  only place soum/tiyin conversion happens.
+  - Pricing fields are inconsistent across screens — some send numeric price_uzs: 185000, some send pre-formatted "price": "UZS 185 000" (search, top-featured,
+  cart). The canonical wire type must be integer *_uzs; the formatted price_label is display-only. Worth normalizing before schema lockdown.
+
+  Vehicle → compatibility (the load-bearing relation)
+  - Active vehicle_id is the persistent join key. It's read from MMKV mator.garage.primary_id for synchronous cold-start use.
+  - vehicleContext on /v1/search is scoping, not filtering — full corpus is searched, matched rows get a relevance boost and a per-row projection compatibility: {
+  status: 'fits' | 'maybe' | 'does_not_fit', confidence, notes }. The UI badge logic depends on this exact tri-state.
+  - /v1/catalog/parts?vehicle_id=... returns the same projection plus a facet bucket: facets.compatibility = { fits, maybe, does_not_fit }. Schema must expose a
+  deterministic compat-resolver — likely part ↔ trim_id × year and part ↔ engine_id, per the compatibility_response (matched_trims[].years, matched_engines[],
+  source: "manufacturer_oem_mapping").
+  - OEM cross-refs are first-class: oem_numbers: ["96440756", "55562234"] on parts; search must hit these as exact-match boosters.
+
+  Search
+  - Two endpoints: POST /v1/search (envelope: free-text, filters, vehicleContext, locale, pageToken) and GET /v1/typeahead?q=... (suggestions can be query or product
+   with a deeplink to item-detail/{id}).
+  - Facet response shape is non-uniform (facetCounts.categories is a string-keyed map; appliedFilters echo-back). Frontend depends on requestId round-tripping for
+  stale-response rejection.
+
+  Cart — open contract decision (flag from backend.json itself)
+  - The contract says: "should cart be server-persisted (current frontend assumption) OR client-only with cart_snapshot at order-creation time (current backend.json
+  order spec)? Pick ONE." My recommendation: server-persisted (/v1/cart*) — cross-device parity, abandoned-cart analytics, promo validation server-side. The order
+  endpoint can still accept a cart_snapshot as the idempotency payload at checkout. Needs your decision.
+
+  Checkout
+  - Order state machine implicit in the spec: pending_payment → (Payme/Click webhook) → paid. expires_at: T+30min on the order.
+  - Two providers, identical deep-link pattern: canOpenURL → openURL(deep_link) else openURL(https_fallback). Return URLs are mator://payments/{provider}/return.
+  - Confirmation arrives via either polling /v1/payments/{id} (every 2s, max 30s) or an order_paid data-only push. Frontend must dedupe — backend must guarantee both
+   paths produce the same terminal state.
+
+  MyID & transaction limits
+  - transaction_limit_uzs on the user (default 0, post-MyID e.g. 50,000,000). Server-side check at order creation; client should also pre-flight to render an upgrade
+   prompt instead of an error.
+
+  Garage adapter contract
+  - Backend nested DTO ↔ frontend flat Vehicle (see GarageVehicleAdapterContract). Color: backend canonical is color_hex; client legacy enum is derived. Mileage is
+  km. created_at (ISO) ↔ addedAt (epoch ms). All adapters live in services/garage-api.ts.
+
+  Realtime
+  - Single multiplexed WS wss://api.mator.uz/realtime?channel=garage:{user_id}, 30s ping / 45s pong timeout, exp-backoff. Events apply locally to cache; snapshot
+  triggers full refetch.
+
+  4. Data-layer realignment — what to remove from Postgres/Supabase
+
+  Tables/functions safe to drop or never create for this release:
+  - masters, sto, master_services, master_certifications, master_portfolio, master_working_hours, master_reviews
+  - bookings, booking_holds, service_slots
+  - Any RPC like nearby_masters(lat, lng, radius), nearby_sto(...), create_booking_hold(...)
+  - Any cron/queue for booking expiry
+  - Realtime publication entries for booking/master tables
+
+  Tables that must exist for the marketplace path: users, user_devices, myid_verifications, vehicles (+ catalog tables makes/models/trims/engines), parts,
+  part_compatibility (trim×year, engine), part_oem_numbers, brands, categories, sellers, part_offers (seller × part × price × stock × eta), carts, cart_items,
+  orders, order_items, payments, addresses, promos, notifications, device_subscriptions, ai_sessions, ai_messages.
+
+  5. Open questions I need you to resolve before code
+
+  1. Cart persistence model — server (recommended) or client + snapshot-at-order?
+  2. service_fee_uzs semantics — platform fee or vestigial from STO? Naming if it stays.
+  3. AI Advisor scope — keep in v1 with parts-only suggestions, or also postpone?
+  4. GarageRealtimeChannel — without STO, do we still need WS in v1 for cross-device garage sync, or can polling/optimistic-updates carry?
+  5. Price wire format normalization — am I cleared to enforce integer *_uzs everywhere and remove the pre-formatted "price": "UZS 185 000" strings from contracts?

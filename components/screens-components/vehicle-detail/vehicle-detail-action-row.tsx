@@ -39,7 +39,7 @@ export function VehicleDetailActionRow({
       accessibilityHint={hint}
       accessibilityState={{ disabled: !!muted }}
     >
-      <AppView row align="center" gap={14} px={16} py={14}>
+      <AppView row align="center" gap={14} px="lg" py={14}>
         <AppView
           center
           rounded={RADIUS_MEDIA}

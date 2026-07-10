@@ -102,7 +102,7 @@ async function request<T>(
     throw new ApiError(
       0,
       'NO_API_BASE_URL',
-      'No EXPO_PUBLIC_API_BASE_URL configured — apiClient cannot run against a mock backend. Use the transport layer instead.',
+      'No EXPO_PUBLIC_API_BASE_URL configured. apiClient cannot run against a mock backend. Use the transport layer instead.',
     );
   }
 

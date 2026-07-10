@@ -1,11 +1,11 @@
-import { Manrope_600SemiBold } from '@expo-google-fonts/manrope';
 import {
-    Montserrat_400Regular,
-    Montserrat_500Medium,
-    Montserrat_600SemiBold,
-    Montserrat_700Bold,
-} from '@expo-google-fonts/montserrat';
-import { SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk';
+    Figtree_400Regular,
+    Figtree_500Medium,
+    Figtree_600SemiBold,
+    Figtree_700Bold,
+    Figtree_800ExtraBold,
+} from '@expo-google-fonts/figtree';
+import { Raleway_800ExtraBold } from '@expo-google-fonts/raleway';
 import { useFonts } from 'expo-font';
 import { requireNativeModule } from 'expo-modules-core';
 import { ThemeProvider as NavigationThemeProvider, Stack } from 'expo-router';
@@ -77,12 +77,12 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
-    Montserrat_400Regular,
-    Montserrat_500Medium,
-    Montserrat_600SemiBold,
-    Montserrat_700Bold,
-    Manrope_600SemiBold,
-    SpaceGrotesk_700Bold,
+    Figtree_400Regular,
+    Figtree_500Medium,
+    Figtree_600SemiBold,
+    Figtree_700Bold,
+    Figtree_800ExtraBold,
+    Raleway_800ExtraBold,
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
 
@@ -195,6 +195,11 @@ function RootNavigation() {
             statusBarStyle: resolvedScheme === 'dark' ? 'light' : 'dark',
           }}
         >
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="splash"
+            options={{ headerShown: false, animation: 'fade', gestureEnabled: false }}
+          />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen
             name="(auth)"

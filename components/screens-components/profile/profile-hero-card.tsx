@@ -25,14 +25,20 @@ export default function ProfileHeroCard() {
   const { profile } = useUserContext();
 
   const hasProfile = !!profile;
-  const displayName = profile ? `${profile.firstName} ${profile.lastName}` : 'Loading…';
-  const initials = profile ? `${profile.firstName[0]}${profile.lastName[0]}`.toUpperCase() : '••';
+  // Names can be blank (e.g. a freshly-created account), so guard every
+  // character access and fall back to sensible labels rather than rendering
+  // an empty avatar/name.
+  const fullName = profile ? `${profile.firstName ?? ''} ${profile.lastName ?? ''}`.trim() : '';
+  const displayName = !profile ? 'Loading…' : fullName || 'Your Profile';
+  const initials = profile
+    ? `${profile.firstName?.[0] ?? ''}${profile.lastName?.[0] ?? ''}`.toUpperCase() || 'M'
+    : '••';
   return (
     <AppView
       rounded={16}
       px={18}
-      py={24}
-      gap={12}
+      py="xl"
+      gap="md"
       align="center"
       style={{
         borderWidth: 1,
@@ -82,7 +88,7 @@ export default function ProfileHeroCard() {
         ) : null}
       </AppView>
 
-      <AppView align="center" gap={4}>
+      <AppView align="center" gap="xs">
         <AppText
           textVariant="title"
           family="heading"

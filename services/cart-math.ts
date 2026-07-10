@@ -84,10 +84,9 @@ export function round(value: number): number {
 }
 
 export function formatCurrency(amount: number): string {
-  return `$${amount.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  // UZS is a whole-som currency (no minor unit), thousands separated by comma
+  // to match the catalog's price strings ("UZS 11,008,400").
+  return `UZS ${Math.round(amount).toLocaleString('en-US')}`;
 }
 
 /**

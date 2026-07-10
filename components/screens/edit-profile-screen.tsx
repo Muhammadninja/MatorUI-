@@ -1,133 +1,101 @@
-import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import { Camera, Check } from 'lucide-react-native';
-import { useEffect, useRef, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { useState } from 'react';
+import {
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+} from 'react-native';
 
-import AppImage from '@/components/shared/app-image';
 import { AppButton } from '@/components/shared/app-button';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
 import AppTextField from '@/components/shared/app-text-field';
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
+import { useToast } from '@/hooks/use-toast';
 import { useUserContext } from '@/contexts/user.context';
-import { uploadAvatar } from '@/services/avatar-service';
-import { triggerHaptic } from '@/utils/haptics';
+
+/** Initials monogram from first + last name, e.g. "AM". Falls back to "M". */
+function initials(name: string): string {
+  const derived = name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('');
+  return derived || 'M';
+}
+
+// ── Screen ────────────────────────────────────────────────────────────────────
 
 export default function EditProfileScreen() {
   const { tokens } = useThemeContext();
+  const toast = useToast();
   const { profile, updateProfile } = useUserContext();
-  const [firstName, setFirstName] = useState(profile?.firstName ?? '');
-  const [lastName, setLastName] = useState(profile?.lastName ?? '');
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatarUrl ?? null);
+
+  const [fullName, setFullName] = useState(
+    `${profile?.firstName ?? ''} ${profile?.lastName ?? ''}`.trim(),
+  );
+  const [email, setEmail]       = useState(profile?.email ?? '');
+  const [phone, setPhone]       = useState(profile?.phone ?? '');
+  const [avatarUri, setAvatarUri] = useState<string | undefined>(
+    profile?.avatarUrl ?? undefined,
+  );
   const [saving, setSaving] = useState(false);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const uploadAbortRef = useRef<AbortController | null>(null);
 
-  // Save is enabled when *anything* about the profile has changed — name
-  // edits or a freshly-picked avatar. Avoids letting the user "save" a
-  // form that matches the persisted state already.
-  const canSave =
-    firstName.trim().length > 0 ||
-    lastName.trim().length > 0 ||
-    avatarUrl !== (profile?.avatarUrl ?? null);
-
-  // Abort an in-flight upload if the user navigates away mid-upload —
-  // otherwise the response would land into a stale component.
-  useEffect(() => () => uploadAbortRef.current?.abort(), []);
-
-  const pickAvatar = async () => {
-    triggerHaptic('selection');
-    const perms = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perms.granted) {
-      Alert.alert(
-        'Permission needed',
-        'Allow photo access to update your profile picture.',
-      );
+  const pickPhoto = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      toast.info('Photo access is needed to change your picture');
       return;
     }
-
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.85,
+      quality: 0.7,
     });
-    if (result.canceled || !result.assets[0]) return;
-
-    const localUri = result.assets[0].uri;
-    // Optimistic preview — show the picked image instantly even though
-    // the upload is still pending. If the upload fails we roll back.
-    const previousUrl = avatarUrl;
-    setAvatarUrl(localUri);
-    setUploadingAvatar(true);
-
-    uploadAbortRef.current?.abort();
-    const controller = new AbortController();
-    uploadAbortRef.current = controller;
-
-    try {
-      const remoteUrl = await uploadAvatar(localUri, controller.signal);
-      setAvatarUrl(remoteUrl);
-    } catch (err) {
-      if (controller.signal.aborted) return;
-      setAvatarUrl(previousUrl);
-      Alert.alert('Upload failed', 'Could not upload your photo. Please try again.');
-    } finally {
-      if (uploadAbortRef.current === controller) {
-        uploadAbortRef.current = null;
-        setUploadingAvatar(false);
-      }
+    if (!result.canceled && result.assets[0]?.uri) {
+      setAvatarUri(result.assets[0].uri);
     }
   };
 
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const canSave = Boolean(fullName.trim() && emailValid) && !saving;
+
   const handleSave = async () => {
-    if (saving || !canSave) return;
-    triggerHaptic('selection');
+    if (!canSave) return;
+    // UserSummary carries firstName + lastName; the form is a single field, so
+    // split on the first space — first token is the given name, the rest is the
+    // family name.
+    const trimmedName = fullName.trim();
+    const spaceIdx = trimmedName.indexOf(' ');
+    const firstName = spaceIdx === -1 ? trimmedName : trimmedName.slice(0, spaceIdx);
+    const lastName = spaceIdx === -1 ? '' : trimmedName.slice(spaceIdx + 1).trim();
+
     setSaving(true);
     try {
       await updateProfile({
         firstName,
         lastName,
-        avatarUrl,
+        email: email.trim(),
+        phone: phone.trim(),
+        avatarUrl: avatarUri ?? null,
       });
-      triggerHaptic('success');
+      toast.success('Profile updated');
       router.back();
+    } catch {
+      toast.danger('Could not save changes. Please try again.');
     } finally {
       setSaving(false);
     }
   };
 
-  const initials =
-    `${profile?.firstName?.[0] ?? ''}${profile?.lastName?.[0] ?? ''}`.toUpperCase() || 'YOU';
-
   return (
     <AppView flex={1} colorName="background">
-      <AppSettingsHeader
-        title="Edit Profile"
-        fallbackHref="/profile"
-        right={
-          <Pressable
-            onPress={handleSave}
-            disabled={!canSave || saving}
-            accessibilityRole="button"
-            accessibilityLabel="Save changes"
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={({ pressed }) => ({
-              width: 36,
-              height: 36,
-              borderRadius: 999,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: tokens.brand,
-              opacity: !canSave || saving ? 0.4 : pressed ? 0.85 : 1,
-            })}
-          >
-            <Check size={16} strokeWidth={2.4} color={tokens.onBrand} />
-          </Pressable>
-        }
-      />
+      <AppSettingsHeader title="Edit profile" fallbackHref="/profile" />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -135,45 +103,42 @@ export default function EditProfileScreen() {
       >
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingTop: 8, paddingBottom: 40 }}
+          contentContainerStyle={{ paddingTop: 24, paddingBottom: 40 }}
           keyboardShouldPersistTaps="handled"
         >
           <AppView gap={28}>
-            {/* Avatar */}
-            <AppView align="center" gap={10}>
+            {/* Centered 92px avatar with brand edit-badge */}
+            <AppView align="center" style={{ marginBottom: 4 }}>
               <AppView style={{ position: 'relative' }}>
+                {/* Avatar */}
                 <AppView
                   center
                   rounded={999}
                   style={{
-                    width: 100,
-                    height: 100,
-                    backgroundColor: tokens.backgroundSecondary,
-                    borderWidth: 3,
-                    borderColor: tokens.border,
+                    width: 92,
+                    height: 92,
                     overflow: 'hidden',
+                    backgroundColor: tokens.backgroundSecondary,
+                    borderWidth: 1,
+                    borderColor: tokens.border,
                   }}
                 >
-                  {avatarUrl ? (
-                    <AppImage
-                      source={{ uri: avatarUrl }}
-                      style={{ width: '100%', height: '100%' }}
-                    />
+                  {avatarUri ? (
+                    <Image source={{ uri: avatarUri }} style={{ width: 92, height: 92 }} />
                   ) : (
                     <AppText
-                      textVariant="title"
                       family="heading"
                       weight="bold"
-                      colorName="text"
+                      style={{ fontSize: 30, lineHeight: 36, color: tokens.text }}
                     >
-                      {initials}
+                      {initials(fullName)}
                     </AppText>
                   )}
                 </AppView>
 
+                {/* Brand edit-badge */}
                 <Pressable
-                  onPress={pickAvatar}
-                  disabled={uploadingAvatar}
+                  onPress={pickPhoto}
                   accessibilityRole="button"
                   accessibilityLabel="Change profile photo"
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -181,54 +146,61 @@ export default function EditProfileScreen() {
                     position: 'absolute',
                     bottom: 0,
                     right: 0,
-                    width: 32,
-                    height: 32,
+                    width: 30,
+                    height: 30,
                     borderRadius: 999,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: tokens.brand,
-                    borderWidth: 2,
+                    backgroundColor: tokens.brandBg,
+                    borderWidth: 3,
                     borderColor: tokens.background,
-                    opacity: uploadingAvatar ? 0.6 : pressed ? 0.75 : 1,
+                    opacity: pressed ? 0.75 : 1,
                   })}
                 >
-                  <Camera size={15} strokeWidth={2.1} color={tokens.onBrand} />
+                  <AppText style={{ fontSize: 13, color: tokens.onBrand }}>✎</AppText>
                 </Pressable>
               </AppView>
-
-              <AppText textVariant="bodyXs" colorName="gray400">
-                {uploadingAvatar ? 'Uploading…' : 'Tap camera to update photo'}
-              </AppText>
             </AppView>
 
-            {/* Form */}
-            <AppView px={16} gap={16}>
+            {/* Form fields */}
+            <AppView px="lg" gap="lg">
               <AppTextField
-                label="First Name"
-                placeholder="Enter first name"
-                value={firstName}
-                onChangeText={setFirstName}
+                label="Full name"
+                placeholder="Enter your full name"
+                value={fullName}
+                onChangeText={setFullName}
                 autoCapitalize="words"
                 autoCorrect={false}
               />
 
               <AppTextField
-                label="Last Name"
-                placeholder="Enter last name"
-                value={lastName}
-                onChangeText={setLastName}
-                autoCapitalize="words"
+                label="Email"
+                placeholder="Email address"
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                autoCorrect={false}
+              />
+
+              <AppTextField
+                label="Phone"
+                placeholder="+1 (000) 000-0000"
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
                 autoCorrect={false}
               />
             </AppView>
 
-            <AppView px={16}>
+            {/* Save CTA */}
+            <AppView px="lg" style={{ marginTop: 8 }}>
               <AppButton
-                title={saving ? 'Saving…' : 'Save Changes'}
+                title="Save changes"
                 kind="brand"
                 size="lg"
                 fullWidth
-                disabled={!canSave || saving}
+                disabled={!canSave}
                 onPress={handleSave}
               />
             </AppView>

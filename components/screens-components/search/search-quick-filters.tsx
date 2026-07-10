@@ -38,7 +38,7 @@ export function SearchQuickFilters({ selected, onChange }: SearchQuickFiltersPro
   }, [selected, items]);
 
   return (
-    <AppView gap={12} px={8}>
+    <AppView gap="md" px="sm">
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}

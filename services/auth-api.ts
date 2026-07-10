@@ -25,6 +25,7 @@ export type UserSummary = {
   lastName: string;
   email: string;
   username: string;
+  phone?: string | null;
   avatarUrl?: string | null;
   memberSince: string;
 };
@@ -170,6 +171,6 @@ function toResult(r: RawAuthResponse): AuthResult {
 
 import { shouldUseHttpTransport } from '@/config/api';
 
-export const authTransport: AuthTransport = shouldUseHttpTransport()
+export const authTransport: AuthTransport = shouldUseHttpTransport('auth')
   ? new HttpAuthTransport()
   : new MockAuthTransport();

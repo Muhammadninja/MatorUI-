@@ -25,7 +25,7 @@ export function AddVehicleColorPicker({ value, onChange }: AddVehicleColorPicker
       >
         Color
       </AppText>
-      <AppView row wrap gap={8}>
+      <AppView row wrap gap="sm">
         {COLOR_OPTIONS.map((opt) => {
           const selected = opt.value === value;
           return (
@@ -39,7 +39,7 @@ export function AddVehicleColorPicker({ value, onChange }: AddVehicleColorPicker
               onPress={() => onChange(opt.value)}
               accessibilityLabel={`Color ${opt.label}`}
             >
-              <AppView px={14} py={8}>
+              <AppView px={14} py="sm">
                 <AppText
                   textVariant="buttonSm"
                   family="accent"

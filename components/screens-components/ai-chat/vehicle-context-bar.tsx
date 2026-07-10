@@ -109,6 +109,7 @@ export default function VehicleContextBar({
             onPress={onClear}
             accessibilityRole="button"
             accessibilityLabel="Clear vehicle context"
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             style={({ pressed }) => ({
               width: 24,
               height: 24,

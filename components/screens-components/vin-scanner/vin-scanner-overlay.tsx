@@ -68,7 +68,7 @@ export function VinScannerOverlay({ hint }: VinScannerOverlayProps) {
           <Animated.View
             style={[
               styles.sweepLine,
-              { backgroundColor: tokens.white },
+              { backgroundColor: '#00e676' },
               sweepStyle,
             ]}
           />
@@ -76,16 +76,21 @@ export function VinScannerOverlay({ hint }: VinScannerOverlayProps) {
         <AppView style={[styles.scrim, { backgroundColor: tokens.scrim, flex: 1 }]} />
       </AppView>
       <AppView style={[styles.scrim, { backgroundColor: tokens.scrim, flex: 1 }]}>
-        {hint ? (
-          <AppView pt={24} px={24} align="center">
-            <AppText
-              textVariant="bodySm"
-              style={{ color: tokens.white, textAlign: 'center', maxWidth: 280 }}
-            >
-              {hint}
-            </AppText>
-          </AppView>
-        ) : null}
+        <AppView pt="xl" px="xl" align="center">
+          <AppText
+            family="accent"
+            weight="semibold"
+            style={{
+              color: tokens.white,
+              textAlign: 'center',
+              fontSize: 11,
+              letterSpacing: 1.2,
+              textTransform: 'uppercase',
+            }}
+          >
+            {hint ?? 'Align VIN barcode within frame'}
+          </AppText>
+        </AppView>
       </AppView>
     </AppView>
   );

@@ -1,343 +1,263 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Heart, Share2 } from 'lucide-react-native';
-import { useRef, useState } from 'react';
-import { Animated, Platform, StatusBar, StyleSheet } from 'react-native';
+import { AlertCircle, ArrowLeft, Heart } from 'lucide-react-native';
+import { useState, type ReactNode } from 'react';
+import { ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import ImageBox from '@/components/screens-components/home/image-box';
 import { AppButton } from '@/components/shared/app-button';
-import { AppImageCarousel } from '@/components/shared/app-image-carousel/app-image-carousel';
+import { AppOemPill } from '@/components/shared/app-oem-pill';
+import { AppQtyStepper } from '@/components/shared/app-qty-stepper';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
+import { WheelLoader } from '@/components/shared/wheel-loader';
+import { useActiveVehicle } from '@/contexts/active-vehicle.context';
 import { useCartContext } from '@/contexts/cart.context';
+import { useLikesContext } from '@/contexts/likes.context';
 import { useThemeContext } from '@/contexts/theme.context';
-import { getCatalogMockDetail } from '@/services/catalog-service';
-import { getTopFeaturedMockDetail } from '@/services/top-featured-service';
+import { useUserContext } from '@/contexts/user.context';
+import { useCatalogDetail } from '@/hooks/use-catalog-detail';
+import { useToast } from '@/hooks/use-toast';
+import { parsePrice } from '@/services/cart-math';
 import { triggerHaptic } from '@/utils/haptics';
 
-const IMAGE_HEIGHT = 360;
-
-const HERO_IMAGES = [
-  require('@/assets/images/test-image.png'),
-  require('@/assets/images/test-image.png'),
-  require('@/assets/images/test-image.png'),
-];
-
-const FALLBACK_SPECS = [
-  { label: 'Range', value: '320 mi' },
-  { label: '0–60 mph', value: '4.2s' },
-  { label: 'Top Speed', value: '155 mph' },
-  { label: 'Drivetrain', value: 'AWD' },
-];
-
-const FALLBACK_FEATURES = [
-  'Smart safety assist with collision avoidance',
-  'Adaptive cruise control with lane centering',
-  'Panoramic glass roof with UV protection',
-  'Premium sound system with 12 speakers',
-  'Over-the-air software updates',
-];
-
+/**
+ * Item Detail — backed by the REAL catalog (`useCatalogDetail`). Hero image,
+ * title, OEM pill, price, confirmed-fit (from the active garage vehicle),
+ * quantity stepper, the catalog's own spec table, and a sticky guest-gated
+ * Add-to-cart bar. The real `CatalogItem.id` flows into the cart (and thus the
+ * order), so the buy path is consistent end-to-end. Fields the catalog doesn't
+ * carry (rating, was-price, reviews, related) are omitted rather than faked.
+ */
 export default function ItemDetailScreen() {
-  const params = useLocalSearchParams<{
-    id: string;
-    title?: string;
-    description?: string;
-    price?: string;
-    priceLabel?: string;
-    badge?: string;
-    status?: string;
-  }>();
-
+  const { id } = useLocalSearchParams<{ id: string }>();
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
-  const { addItem } = useCartContext();
+  const toast = useToast();
+  const { addItem, formatCurrency } = useCartContext();
+  const { isLiked, toggleLike } = useLikesContext();
+  const { currentActiveVehicle } = useActiveVehicle();
+  const { isAuthenticated } = useUserContext();
+  const [qty, setQty] = useState(1);
 
-  // Resolve the item dynamically from id — checks catalog first, then top-featured.
-  const id = params.id;
-  const catalogDetail = id ? getCatalogMockDetail(id) : null;
-  const topFeaturedDetail = !catalogDetail && id ? getTopFeaturedMockDetail(id) : null;
+  const { state, detail, error, refresh } = useCatalogDetail(id ?? null);
+  const item = detail?.item ?? null;
+  const activeVehicle = currentActiveVehicle?.vehicle ?? null;
 
-  const title = catalogDetail?.item.title ?? topFeaturedDetail?.title ?? params.title ?? '';
-  const description =
-    catalogDetail?.item.description ??
-    topFeaturedDetail?.description ??
-    params.description ??
-    '';
-  const price = catalogDetail?.item.price ?? topFeaturedDetail?.price ?? params.price ?? '';
-  const priceLabel = catalogDetail?.item.priceLabel ?? params.priceLabel ?? 'Starting at';
-  const badge = catalogDetail?.item.badge ?? topFeaturedDetail?.badge ?? params.badge;
-  const status = catalogDetail?.item.status ?? topFeaturedDetail?.status ?? params.status;
-  const oem = catalogDetail?.item.oem ?? topFeaturedDetail?.oem;
-  const specs = catalogDetail?.item.specs ?? FALLBACK_SPECS;
-  const features = catalogDetail?.item.features ?? FALLBACK_FEATURES;
+  if (state === 'loading' || state === 'idle') {
+    return (
+      <AppView flex={1} colorName="background" center>
+        <WheelLoader size={30} color={tokens.text} />
+      </AppView>
+    );
+  }
 
-  const [wasAdded, setWasAdded] = useState(false);
-  const [isLiked, setIsLiked] = useState(false);
-  const resetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const scrollY = useRef(new Animated.Value(0)).current;
+  if (state === 'error' || state === 'not_found' || !item) {
+    return (
+      <AppView flex={1} colorName="background" center px="xl" gap={12} style={{ paddingTop: insets.top }}>
+        <AlertCircle size={32} strokeWidth={2} color={tokens.error} />
+        <AppText family="heading" weight="bold" style={{ fontSize: 18, color: tokens.text }}>
+          {state === 'not_found' ? 'Product not found' : "Couldn't load product"}
+        </AppText>
+        <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted, textAlign: 'center', maxWidth: 280 }}>
+          {error ?? 'This item may no longer be available.'}
+        </AppText>
+        <AppView row gap={10}>
+          <AppButton title="Go back" kind="secondary" size="sm" onPress={() => router.back()} />
+          {state === 'error' ? <AppButton title="Retry" kind="brand" size="sm" onPress={refresh} /> : null}
+        </AppView>
+      </AppView>
+    );
+  }
 
-  const handleAddToCart = () => {
-    triggerHaptic('success');
-    addItem({
-      id: id ?? '',
-      title,
-      description,
-      price,
-      priceLabel,
-      badge,
-      status,
-    });
-    setWasAdded(true);
-    if (resetRef.current) clearTimeout(resetRef.current);
-    resetRef.current = setTimeout(() => setWasAdded(false), 1400);
+  const image = item.images?.[0];
+  const isFavorite = isLiked(item.id);
+
+  const toggleFavorite = () => {
+    const nowFav = toggleLike(item.id);
+    toast.info(nowFav ? 'Saved to favorites' : 'Removed from favorites');
   };
 
-  // Image translates with scroll to appear pinned
-  const imageTranslateY = scrollY.interpolate({
-    inputRange: [0, IMAGE_HEIGHT],
-    outputRange: [0, IMAGE_HEIGHT * 0.5],
-    extrapolate: 'clamp',
-  });
+  // Guest-first purchase gate: guests go to Sign In; signed-in users add the
+  // real catalog item `qty` times (one unit per `addItem`) and land on Cart.
+  const addToCart = () => {
+    if (!isAuthenticated) {
+      triggerHaptic('selection');
+      router.push('/sign-in?gate=1');
+      return;
+    }
+    triggerHaptic('success');
+    const cartItem = {
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      price: item.price,
+      imageUrl: image,
+    };
+    for (let i = 0; i < qty; i += 1) addItem(cartItem);
+    setQty(1);
+    router.replace('/cart');
+  };
 
   return (
     <AppView flex={1} colorName="background">
-      {Platform.OS === 'android' ? (
-        <StatusBar translucent backgroundColor="transparent" />
-      ) : null}
-      {/* Nav buttons (floating) */}
-      <AppView
-        row
-        justify="space-between"
-        align="center"
-        px={16}
-        style={[styles.navBar, { top: insets.top + 4 }]}
-      >
-        {/* Floating nav buttons over the hero image. The 1px border is
-         *  load-bearing in light mode: `tokens.surface` is near-white,
-         *  so on a white-background product photo the filled circle
-         *  disappears without a stroke outlining it. */}
-        <AppPressableView
-          center
-          rounded={36}
-          onPress={() => router.back()}
-          androidRipple
-          borderWidth={1}
-          borderName="border"
-          style={[styles.iconButton, { backgroundColor: tokens.surface }]}
-        >
-          <ArrowLeft size={20} strokeWidth={2.2} color={tokens.text} />
-        </AppPressableView>
-
-        <AppView row gap={10}>
+      <AppScrollRegion insetTop={insets.top}>
+        {/* Header: back + favorite */}
+        <AppView row align="center" justify="space-between" px="lg" style={{ paddingTop: 6, paddingBottom: 14 }}>
           <AppPressableView
+            onPress={() => router.back()}
             center
-            rounded={36}
-            onPress={() => {
-              triggerHaptic('selection');
-              setIsLiked((v) => !v);
-            }}
-            androidRipple
+            rounded={12}
             borderWidth={1}
             borderName="border"
-            style={[styles.iconButton, { backgroundColor: tokens.surface }]}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+            style={{ width: 40, height: 40 }}
+          >
+            <ArrowLeft size={22} strokeWidth={2.2} color={tokens.text} />
+          </AppPressableView>
+          <AppPressableView
+            onPress={toggleFavorite}
+            center
+            rounded={12}
+            borderWidth={1}
+            borderName="border"
+            accessibilityRole="button"
+            accessibilityLabel={isFavorite ? 'Remove from favorites' : 'Save to favorites'}
+            style={{ width: 40, height: 40 }}
           >
             <Heart
               size={20}
               strokeWidth={2.2}
-              color={isLiked ? tokens.error : tokens.text}
-              fill={isLiked ? tokens.error : 'none'}
+              color={isFavorite ? tokens.error : tokens.text}
+              fill={isFavorite ? tokens.error : 'none'}
             />
           </AppPressableView>
-          <AppPressableView
-            center
-            rounded={36}
-            androidRipple
-            borderWidth={1}
-            borderName="border"
-            style={[styles.iconButton, { backgroundColor: tokens.surface }]}
-          >
-            <Share2 size={20} strokeWidth={2.2} color={tokens.text} />
-          </AppPressableView>
         </AppView>
-      </AppView>
 
-      <Animated.ScrollView
-        showsVerticalScrollIndicator={false}
-        contentInsetAdjustmentBehavior="never"
-        automaticallyAdjustContentInsets={false}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: true },
-        )}
-        scrollEventThrottle={16}
-      >
-        {/* Carousel inside scroll — receives touches, visually pinned via transform */}
-        <Animated.View style={[styles.carouselWrap, { transform: [{ translateY: imageTranslateY }] }]}>
-          <AppImageCarousel
-            sources={HERO_IMAGES}
-            height={IMAGE_HEIGHT}
-            rounded={0}
-            showIndicators="dots"
-            dotsVariant="pill"
-            dotsAlign="right"
-            dotsContainerStyle={styles.dotsPosition}
-          />
-        </Animated.View>
-
-        {/* Content overlaps image with rounded top */}
-        <AppView colorName="background" roundedTop={24} px={16} pt={20} gap={24} style={styles.content}>
-          {/* Title + price */}
-          <AppView gap={8}>
-            <AppText textVariant="title" family="heading" weight="bold">
-              {title}
-            </AppText>
-            <AppText textVariant="body" colorName="gray400">
-              {description}
-            </AppText>
-            <AppView row align="flex-end" gap={6} mt={4}>
-              <AppText textVariant="bodyXs" colorName="gray400">
-                {priceLabel || 'Starting at'}
-              </AppText>
-              <AppText textVariant="h3" family="heading" weight="bold">
-                {price}
-              </AppText>
+        {/* Hero + dots */}
+        <AppView px="lg">
+          <ImageBox label={item.title} uri={image} height={240} radius={20} />
+          {item.images.length > 1 ? (
+            <AppView row justify="center" gap={8} style={{ marginTop: 10 }}>
+              {item.images.map((src, i) => (
+                <AppView
+                  key={src}
+                  style={{
+                    width: i === 0 ? 22 : 7,
+                    height: 7,
+                    borderRadius: 999,
+                    backgroundColor: i === 0 ? tokens.text : tokens.border,
+                  }}
+                />
+              ))}
             </AppView>
-            {oem ? (
-              <AppView
-                rounded={8}
-                px={10}
-                py={6}
-                mt={4}
-                style={{ alignSelf: 'flex-start', backgroundColor: tokens.gray100 }}
-              >
-                <AppText textVariant="bodyXs" colorName="gray400">
-                  OEM {oem}
+          ) : null}
+        </AppView>
+
+        {/* Body */}
+        <AppView px="lg" gap={16} style={{ paddingTop: 16 }}>
+          {item.badge ? (
+            <AppText family="accent" weight="semibold" style={{ fontSize: 13, color: tokens.textMuted }}>
+              {item.badge}
+            </AppText>
+          ) : null}
+
+          <AppText
+            family="heading"
+            weight="bold"
+            style={{ fontSize: 24, lineHeight: 29, color: tokens.text, marginTop: item.badge ? -6 : 0 }}
+          >
+            {item.title}
+          </AppText>
+
+          {item.oem ? <AppOemPill oem={item.oem} /> : null}
+
+          <AppText family="heading" weight="bold" style={{ fontSize: 30, lineHeight: 36, color: tokens.info }}>
+            {item.price}
+          </AppText>
+
+          {/* Confirmed fit — only when a vehicle is active in the garage. */}
+          {activeVehicle ? (
+            <AppView row align="center" gap={10} rounded={14} p={14} colorName="backgroundSecondary" borderWidth={1} borderName="border">
+              <AppView center rounded={999} style={{ width: 22, height: 22, backgroundColor: tokens.success }}>
+                <AppText weight="bold" style={{ fontSize: 13, color: tokens.white }}>✓</AppText>
+              </AppView>
+              <AppView flex={1}>
+                <AppText family="accent" weight="bold" style={{ fontSize: 14, color: tokens.text }}>
+                  Confirmed fit
+                </AppText>
+                <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted }}>
+                  {`${activeVehicle.year} ${activeVehicle.make} ${activeVehicle.model} ${activeVehicle.trim ?? ''}`.trim()}
                 </AppText>
               </AppView>
-            ) : null}
+            </AppView>
+          ) : null}
+
+          {/* Quantity */}
+          <AppText family="heading" weight="bold" style={{ fontSize: 16, color: tokens.text, marginTop: 4 }}>
+            Quantity
+          </AppText>
+          <AppView row align="center" gap={18}>
+            <AppQtyStepper value={qty} onIncrement={() => setQty((q) => q + 1)} onDecrement={() => setQty((q) => Math.max(1, q - 1))} size="md" />
+            <AppText family="default" style={{ fontSize: 13, color: tokens.success }}>
+              {item.status || 'In stock'}
+            </AppText>
           </AppView>
 
-          {/* Specs grid */}
-          <AppView gap={12}>
-            <AppText textVariant="h4" family="heading" weight="semibold">
-              Specifications
-            </AppText>
-            <AppView row wrap gap={10}>
-              {specs.map((spec) => (
+          {/* Spec table (from the catalog) */}
+          {item.specs.length > 0 ? (
+            <AppView rounded={14} borderWidth={1} borderName="border" style={{ overflow: 'hidden' }}>
+              {item.specs.map((row, i) => (
                 <AppView
-                  key={spec.label}
-                  flex={1}
-                  p={14}
-                  rounded={16}
-                  colorName="card"
-                  borderWidth={1}
-                  borderName="border"
-                  style={styles.specCard}
+                  key={row.label}
+                  row
+                  align="center"
+                  justify="space-between"
+                  style={{ paddingHorizontal: 15, paddingVertical: 13, borderBottomWidth: i < item.specs.length - 1 ? 1 : 0, borderBottomColor: tokens.divider }}
                 >
-                  <AppText textVariant="bodyXs" colorName="gray400">
-                    {spec.label}
-                  </AppText>
-                  <AppText textVariant="body" family="heading" weight="semibold">
-                    {spec.value}
-                  </AppText>
+                  <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>{row.label}</AppText>
+                  <AppText family="accent" weight="semibold" style={{ fontSize: 13, color: tokens.text }}>{row.value}</AppText>
                 </AppView>
               ))}
             </AppView>
-          </AppView>
-
-          {/* Features */}
-          <AppView gap={12} pb={120}>
-            <AppText textVariant="h4" family="heading" weight="semibold">
-              Key Features
-            </AppText>
-            <AppView gap={10}>
-              {features.map((feature) => (
-                <AppView key={feature} row align="flex-start" gap={10}>
-                  <AppView
-                    rounded={36}
-                    center
-                    style={[styles.featureDot, { backgroundColor: tokens.secondary }]}
-                  />
-                  <AppText textVariant="body" style={styles.featureText}>
-                    {feature}
-                  </AppText>
-                </AppView>
-              ))}
-            </AppView>
-          </AppView>
+          ) : null}
         </AppView>
-      </Animated.ScrollView>
+      </AppScrollRegion>
 
       {/* Sticky bottom bar */}
       <AppView
         row
         align="center"
-        justify="space-between"
-        px={16}
-        py={12}
-        pb={Math.max(insets.bottom, 16)}
+        gap={12}
+        px="lg"
         colorName="background"
-        borderTopWidth={1}
-        borderName="divider"
+        style={{ paddingTop: 14, paddingBottom: Math.max(insets.bottom, 16), borderTopWidth: 1, borderTopColor: tokens.divider }}
       >
-        <AppView gap={2}>
-          <AppText textVariant="bodyXs" colorName="gray400">
-            {priceLabel || 'Starting at'}
-          </AppText>
-          <AppText textVariant="h4" family="heading" weight="bold">
-            {price}
+        <AppView>
+          <AppText family="default" style={{ fontSize: 11, color: tokens.textMuted }}>Total</AppText>
+          <AppText family="heading" weight="bold" style={{ fontSize: 20, color: tokens.text }}>
+            {formatCurrency(parsePrice(item.price) * qty)}
           </AppText>
         </AppView>
-        <AppButton
-          kind="secondary"
-          size="md"
-          accessibilityLabel={wasAdded ? 'Added to cart' : 'Add to cart'}
-          onPress={handleAddToCart}
-        >
-          <AppView row align="center" gap={6}>
-            {!wasAdded ? (
-              <AppText weight="bold" colorName="onSecondary" fontSize={18}>+</AppText>
-            ) : null}
-            <AppText weight="semibold" colorName="onSecondary">
-              {wasAdded ? 'Added!' : 'Add to Cart'}
-            </AppText>
-          </AppView>
-        </AppButton>
+        <AppView flex={1}>
+          <AppButton title="Add to cart" kind="brand" size="lg" fullWidth onPress={addToCart} />
+        </AppView>
       </AppView>
     </AppView>
   );
 }
 
-const styles = StyleSheet.create({
-  navBar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    zIndex: 2,
-  },
-  carouselWrap: {
-    height: IMAGE_HEIGHT,
-    overflow: 'hidden',
-  },
-  content: {
-    marginTop: -24,
-  },
-  dotsPosition: {
-    bottom: 36,
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-  },
-  specCard: {
-    minWidth: '45%',
-  },
-  featureDot: {
-    width: 6,
-    height: 6,
-    marginTop: 7,
-  },
-  featureText: {
-    flex: 1,
-  },
-});
+// Local lightweight scroll wrapper so the sticky bottom bar stays fixed while
+// the content scrolls. Kept inline to avoid a new shared file.
+function AppScrollRegion({ children, insetTop }: { children: ReactNode; insetTop: number }) {
+  return (
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingTop: insetTop + 4, paddingBottom: 24 }}
+      style={{ flex: 1 }}
+    >
+      {children}
+    </ScrollView>
+  );
+}

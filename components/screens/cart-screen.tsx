@@ -1,163 +1,197 @@
 import { router } from 'expo-router';
-import { Truck } from 'lucide-react-native';
-import { useMemo } from 'react';
-import { StyleSheet } from 'react-native';
+import { AlertCircle, ShoppingBag, X } from 'lucide-react-native';
+import { RefreshControl, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import CartEmptyState from '@/components/screens-components/cart/cart-empty-state';
-import CartItemsSection from '@/components/screens-components/cart/cart-items-section';
-import CartSummary from '@/components/screens-components/cart/cart-summary';
+import ImageBox from '@/components/screens-components/home/image-box';
 import { AppButton } from '@/components/shared/app-button';
-import { AppIconButton } from '@/components/shared/app-icon-button';
-import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
+import { AppQtyStepper } from '@/components/shared/app-qty-stepper';
 import { AppText } from '@/components/shared/app-text';
-import { AppView } from '@/components/shared/app-view';
+import { AppPressableView, AppView } from '@/components/shared/app-view';
+import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useCartContext } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
-import { useAuthGuard } from '@/guards';
-import { useOrders } from '@/hooks/use-orders';
-import type { OrderListStatus } from '@/services/orders-service';
-import { triggerHaptic } from '@/utils/haptics';
+import { useUserContext } from '@/contexts/user.context';
+import { parsePrice } from '@/services/cart-math';
 
-// Statuses that map to "a delivery is in motion" — these are the ones
-// the cart's truck icon should jump straight to. Anything terminal
-// (Delivered / Cancelled) is intentionally excluded.
-const IN_TRANSIT_STATUSES = new Set<OrderListStatus>([
-  'In Transit',
-  'Out for delivery',
-  'Processing',
-]);
-
+/**
+ * Cart — faithful rebuild of the prototype's `scCart`, now on the real
+ * transport-abstracted cart context (`useCartContext`): line items (84px
+ * thumb, title, line price, 30px stepper, ✕ remove) and a sticky Subtotal /
+ * Est. tax / Total footer + auth-gated Checkout.
+ *
+ * Quantity mutations and removal are optimistic; a row mid-flight to the
+ * transport is greyed via `pendingIds`. State flips to the live backend the
+ * moment `EXPO_PUBLIC_API_BASE_URL` is set — no code change here.
+ */
 export default function CartScreen() {
+  const { tokens } = useThemeContext();
+  const insets = useSafeAreaInsets();
+  const { isAuthenticated } = useUserContext();
   const {
     items,
     itemCount,
     totals,
-    appliedPromo,
-    freeShippingThreshold,
-    freeShippingRemaining,
-    isHydrated,
     incrementItem,
     decrementItem,
     removeItem,
     formatCurrency,
+    pendingIds,
+    isHydrated,
+    error,
+    refresh,
   } = useCartContext();
-  const { tokens } = useThemeContext();
-  const insets = useSafeAreaInsets();
-  const { requireAuth } = useAuthGuard();
 
-  const handleProceedToCheckout = requireAuth(() => router.push('/checkout'), {
-    title: 'Sign in to check out',
-    message:
-      'You must sign up or log in before you can place an order. Your cart will stay saved.',
-    redirectTo: '/checkout',
-  });
-
-  // Resolve the most recent in-transit order so the truck icon jumps
-  // straight to its tracking screen. Falls back to the order list when
-  // nothing is currently in motion.
-  const ordersPage = useOrders();
-  const activeOrderId = useMemo(() => {
-    const rows = ordersPage.page?.items ?? [];
-    return rows.find((o) => IN_TRANSIT_STATUSES.has(o.status))?.id ?? null;
-  }, [ordersPage.page]);
-
-  const handleTrackOrder = () => {
-    triggerHaptic('selection');
-    if (activeOrderId) {
-      router.push(`/track-order?orderId=${encodeURIComponent(activeOrderId)}`);
+  const goCheckout = () => {
+    if (!isAuthenticated) {
+      router.push('/sign-in');
       return;
     }
-    // No in-flight delivery — fall back to the order list so the user
-    // still has somewhere meaningful to land.
-    router.push('/order-history');
+    router.push('/checkout');
   };
 
-  const hasItems = items.length > 0;
-  const showBottomBar = hasItems;
+  // While the cart is still loading from the backend, don't flash the empty
+  // state. Show a branded loader, or an error + retry if the fetch failed.
+  if (!isHydrated) {
+    return (
+      <AppView flex={1} colorName="background" style={{ paddingTop: insets.top + 8 }}>
+        <AppText family="heading" weight="bold" style={{ fontSize: 26, lineHeight: 32, color: tokens.text, paddingHorizontal: 20, paddingTop: 6 }}>
+          Cart
+        </AppText>
+        <AppView flex={1} center gap={14} px="xl">
+          {error ? (
+            <>
+              <AlertCircle size={30} strokeWidth={2} color={tokens.error} />
+              <AppText family="heading" weight="bold" style={{ fontSize: 18, color: tokens.text }}>
+                Couldn&apos;t load your cart
+              </AppText>
+              <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted, textAlign: 'center', maxWidth: 280 }}>
+                {error}
+              </AppText>
+              <AppButton title="Retry" kind="secondary" size="sm" onPress={refresh} />
+            </>
+          ) : (
+            <WheelLoader size={30} color={tokens.text} />
+          )}
+        </AppView>
+      </AppView>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <AppView flex={1} colorName="background" style={{ paddingTop: insets.top + 8 }}>
+        <AppText family="heading" weight="bold" style={{ fontSize: 26, lineHeight: 32, color: tokens.text, paddingHorizontal: 20, paddingTop: 6 }}>
+          Cart
+        </AppText>
+        <AppView flex={1} center gap={14} px="xl">
+          <AppView center rounded={999} style={{ width: 72, height: 72, backgroundColor: tokens.backgroundSecondary }}>
+            <ShoppingBag size={30} strokeWidth={1.8} color={tokens.textMuted} />
+          </AppView>
+          <AppText family="heading" weight="bold" style={{ fontSize: 20, color: tokens.text }}>Your cart is empty</AppText>
+          <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted, textAlign: 'center', maxWidth: 280 }}>
+            Browse parts that fit your vehicle and add them here.
+          </AppText>
+          <AppButton title="Start shopping" kind="brand" size="md" onPress={() => router.navigate('/explore')} />
+        </AppView>
+      </AppView>
+    );
+  }
 
   return (
     <AppView flex={1} colorName="background">
-      <AppView
-        px={16}
-        pb={12}
-        style={{
-          paddingTop: insets.top + 12,
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: tokens.divider,
-        }}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingTop: insets.top + 8, paddingHorizontal: 20, paddingBottom: 24, gap: 16 }}
+        refreshControl={
+          <RefreshControl refreshing={false} onRefresh={refresh} tintColor={tokens.textMuted} colors={[tokens.brandBg]} />
+        }
       >
-        <AppView row align="center" justify="space-between" gap={12}>
-          <AppView gap={2} style={{ flex: 1 }}>
-            <AppText textVariant="h3" family="heading" weight="bold">
-              Cart
-            </AppText>
-            {hasItems ? (
-              <AppText textVariant="bodyXs" colorName="gray400">
-                {itemCount} item{itemCount === 1 ? '' : 's'}
-              </AppText>
-            ) : null}
+        <AppText family="heading" weight="bold" style={{ fontSize: 26, lineHeight: 32, color: tokens.text, paddingTop: 6 }}>
+          Cart · {itemCount} item{itemCount === 1 ? '' : 's'}
+        </AppText>
+
+        {error ? (
+          <AppView row align="center" gap={8}>
+            <AlertCircle size={16} strokeWidth={2} color={tokens.error} />
+            <AppText family="default" style={{ fontSize: 12.5, color: tokens.error }}>{error}</AppText>
           </AppView>
-          <AppIconButton
-            Icon={Truck}
-            onPress={handleTrackOrder}
-            accessibilityLabel="Track orders"
-            backgroundColorName="card"
-            borderColorName="border"
-            colorName="text"
-          />
-        </AppView>
-      </AppView>
+        ) : null}
 
-      <AppView flex={1} px={16}>
-        <AppScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{
-            paddingBottom: showBottomBar ? 120 : 24,
-            paddingTop: 12,
-            flexGrow: 1,
-          }}
-        >
-          {!isHydrated ? null : hasItems ? (
-            <AppView gap={12}>
-              <CartItemsSection
-                items={items}
-                onIncrement={incrementItem}
-                onDecrement={decrementItem}
-                onRemove={removeItem}
-              />
-              <CartSummary
-                totals={totals}
-                appliedPromo={appliedPromo}
-                freeShippingThreshold={freeShippingThreshold}
-                freeShippingRemaining={freeShippingRemaining}
-                formatCurrency={formatCurrency}
-              />
+        {items.map((item) => {
+          const pending = pendingIds.has(item.id);
+          return (
+            <AppView
+              key={item.id}
+              row
+              gap={12}
+              rounded={16}
+              p={12}
+              colorName="card"
+              borderWidth={1}
+              borderName="border"
+              style={{ opacity: pending ? 0.55 : 1 }}
+            >
+              <AppView style={{ width: 84 }}>
+                <ImageBox label={item.title} uri={item.imageUrl} height={84} radius={11} small />
+              </AppView>
+              <AppView flex={1}>
+                <AppText family="default" weight="semibold" numberOfLines={2} style={{ fontSize: 14, lineHeight: 18, color: tokens.text }}>
+                  {item.title}
+                </AppText>
+                {item.badge ? (
+                  <AppText family="accent" weight="semibold" style={{ fontSize: 11.5, color: tokens.textMuted, marginTop: 4 }}>
+                    {item.badge}
+                  </AppText>
+                ) : null}
+                <AppView row align="center" justify="space-between" style={{ marginTop: 'auto', paddingTop: 8 }}>
+                  <AppText family="heading" weight="bold" style={{ fontSize: 16, color: tokens.text }}>
+                    {formatCurrency(parsePrice(item.price) * item.quantity)}
+                  </AppText>
+                  <AppQtyStepper
+                    value={item.quantity}
+                    onIncrement={() => incrementItem(item.id)}
+                    onDecrement={() => decrementItem(item.id)}
+                    size="sm"
+                  />
+                </AppView>
+              </AppView>
+              <AppPressableView
+                onPress={() => removeItem(item.id)}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove ${item.title}`}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={{ alignSelf: 'flex-start' }}
+              >
+                <X size={16} strokeWidth={2.2} color={tokens.textMuted} />
+              </AppPressableView>
             </AppView>
-          ) : (
-            <CartEmptyState />
-          )}
-        </AppScrollView>
-      </AppView>
+          );
+        })}
+      </ScrollView>
 
-      {showBottomBar ? (
-        <AppView
-          px={16}
-          py={12}
-          style={{
-            paddingBottom: Math.max(insets.bottom, 24),
-          }}
-        >
-          <AppButton
-            title={`Checkout · ${formatCurrency(totals.total)}`}
-            kind="brand"
-            weight="bold"
-            size="md"
-            fullWidth
-            onPress={handleProceedToCheckout}
-          />
+      {/* Sticky footer */}
+      <AppView colorName="background" px="lg" style={{ paddingTop: 16, paddingBottom: Math.max(insets.bottom, 20), borderTopWidth: 1, borderTopColor: tokens.divider }}>
+        <SummaryRow label="Subtotal" value={formatCurrency(totals.subtotal)} tokens={tokens} />
+        {totals.discount > 0 ? (
+          <SummaryRow label="Discount" value={`−${formatCurrency(totals.discount)}`} tokens={tokens} />
+        ) : null}
+        <SummaryRow label="Est. tax" value={formatCurrency(totals.tax)} tokens={tokens} />
+        <AppView row justify="space-between" style={{ marginBottom: 12 }}>
+          <AppText family="accent" weight="bold" style={{ fontSize: 16, color: tokens.text }}>Total</AppText>
+          <AppText family="heading" weight="bold" style={{ fontSize: 20, color: tokens.text }}>{formatCurrency(totals.total)}</AppText>
         </AppView>
-      ) : null}
+        <AppButton title="Checkout" kind="brand" size="lg" fullWidth onPress={goCheckout} />
+      </AppView>
+    </AppView>
+  );
+}
+
+function SummaryRow({ label, value, tokens }: { label: string; value: string; tokens: ReturnType<typeof useThemeContext>['tokens'] }) {
+  return (
+    <AppView row justify="space-between" style={{ marginBottom: 4 }}>
+      <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>{label}</AppText>
+      <AppText family="accent" weight="semibold" style={{ fontSize: 13, color: tokens.text }}>{value}</AppText>
     </AppView>
   );
 }

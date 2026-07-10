@@ -51,7 +51,7 @@ export function AddVehicleStepOwnership({
   });
 
   return (
-    <AppView gap={16}>
+    <AppView gap="lg">
       <AddVehicleFields
         values={values}
         errors={errors}
@@ -67,7 +67,7 @@ export function AddVehicleStepOwnership({
         }}
         accessibilityLabel="Scan VIN with camera"
       >
-        <AppView row align="center" gap={8}>
+        <AppView row align="center" gap="sm">
           <ScanLine size={18} strokeWidth={2} color={tokens.text} />
           <AppText textVariant="bodySemibold">Scan VIN with camera</AppText>
         </AppView>

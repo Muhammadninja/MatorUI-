@@ -1,35 +1,30 @@
-import { StatusBar } from 'expo-status-bar';
-import { Platform, StyleSheet } from 'react-native';
+import { router, Stack } from 'expo-router';
 
-import EditScreenInfo from '@/components/EditScreenInfo';
-import { Text, View } from '@/components/Themed';
+import { AppButton } from '@/components/shared/app-button';
+import { AppText } from '@/components/shared/app-text';
+import { AppView } from '@/components/shared/app-view';
 
 export default function ModalScreen() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Modal</Text>
-      <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
-      <EditScreenInfo path="app/modal.tsx" />
-
-      {/* Use a light status bar on iOS to account for the black space above the modal */}
-      <StatusBar style={Platform.OS === 'ios' ? 'light' : 'auto'} />
-    </View>
+    <>
+      <Stack.Screen
+        options={{
+          headerShown: false,
+          presentation: 'modal',
+          animation: 'slide_from_bottom',
+          gestureEnabled: true,
+          gestureDirection: 'vertical',
+        }}
+      />
+      <AppView flex={1} colorName="background" center px="xl" gap="lg" safeArea="all">
+        <AppText textVariant="title" family="heading" colorName="text">
+          Mator
+        </AppText>
+        <AppText textVariant="body" colorName="gray400">
+          Swipe down to dismiss.
+        </AppText>
+        <AppButton title="Close" kind="secondary" onPress={() => router.back()} />
+      </AppView>
+    </>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  separator: {
-    marginVertical: 30,
-    height: 1,
-    width: '80%',
-  },
-});

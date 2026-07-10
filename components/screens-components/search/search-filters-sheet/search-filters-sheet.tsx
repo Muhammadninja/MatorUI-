@@ -33,7 +33,7 @@ export type SearchFiltersSheetProps = {
 const PRICE_BUCKETS: { key: PriceBucket; label: string }[] = [
   { key: 'any', label: 'Any price' },
   { key: 'under_1k', label: 'Under $1,000' },
-  { key: '1k_to_10k', label: '$1k – $10k' },
+  { key: '1k_to_10k', label: '$1k - $10k' },
   { key: 'over_10k', label: 'Over $10,000' },
 ];
 
@@ -115,7 +115,7 @@ export default function SearchFiltersSheet({
             />
           </AppView>
 
-          <AppView row align="center" justify="space-between" px={20} pb={8}>
+          <AppView row align="center" justify="space-between" px={20} pb="sm">
             <AppText textVariant="title" family="heading" weight="bold">
               Filters
             </AppText>
@@ -125,6 +125,7 @@ export default function SearchFiltersSheet({
               onPress={onClose}
               androidRipple
               accessibilityLabel="Close filters"
+              hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
               style={{
                 width: 32,
                 height: 32,
@@ -136,10 +137,10 @@ export default function SearchFiltersSheet({
             </AppPressableView>
           </AppView>
 
-          <AppView px={20} pb={16} gap={20}>
+          <AppView px={20} pb="lg" gap={20}>
             {availableCategories.length > 0 ? (
               <FilterSection title="Category">
-                <AppView row gap={8} style={{ flexWrap: 'wrap' }}>
+                <AppView row gap="sm" style={{ flexWrap: 'wrap' }}>
                   {availableCategories.map((cat) => {
                     const count = facetCounts?.categories?.[cat];
                     return (
@@ -156,7 +157,7 @@ export default function SearchFiltersSheet({
             ) : null}
 
             <FilterSection title="Price">
-              <AppView row gap={8} style={{ flexWrap: 'wrap' }}>
+              <AppView row gap="sm" style={{ flexWrap: 'wrap' }}>
                 {PRICE_BUCKETS.map((b) => {
                   const count = b.key === 'any' ? undefined : facetCounts?.price?.[b.key];
                   return (
@@ -172,7 +173,7 @@ export default function SearchFiltersSheet({
             </FilterSection>
 
             <FilterSection title="Minimum rating">
-              <AppView row gap={8} style={{ flexWrap: 'wrap' }}>
+              <AppView row gap="sm" style={{ flexWrap: 'wrap' }}>
                 {RATING_BUCKETS.map((b) => {
                   const count =
                     b.key === 'any' ? undefined : facetCounts?.minRating?.[b.key];

@@ -19,7 +19,7 @@ import { triggerHaptic } from '@/utils/haptics';
 const MOCK_CAMPAIGN = {
   accentLabel: 'Limited drop',
   headline: 'Save up to 28% on suspension upgrades',
-  body: 'Curated KW, Bilstein, and Öhlins kits ready for your build — free shipping over $500.',
+  body: 'Curated KW, Bilstein, and Öhlins kits ready for your build, free shipping over $500.',
   ctaLabel: 'Shop the deals',
   imageSeed: 'matorui-suspension-promo',
   href: '/item-detail/mator-elite',
@@ -35,7 +35,7 @@ export default function SearchPromoBanner() {
   };
 
   return (
-    <AppView px={16} pt={16}>
+    <AppView px="lg" pt="lg">
       <Pressable
         onPress={handlePress}
         accessibilityRole="button"

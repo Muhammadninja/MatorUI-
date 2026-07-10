@@ -56,7 +56,7 @@ export default function AiChatTypingDots() {
   };
 
   return (
-    <AppView row align="center" gap={4} style={{ paddingVertical: 4 }}>
+    <AppView row align="center" gap="xs" style={{ paddingVertical: 4 }}>
       <Animated.View style={[dotStyle, { opacity: dot1 }]} />
       <Animated.View style={[dotStyle, { opacity: dot2 }]} />
       <Animated.View style={[dotStyle, { opacity: dot3 }]} />

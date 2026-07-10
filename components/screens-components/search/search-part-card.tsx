@@ -8,6 +8,7 @@ import type { StyleProp, ViewStyle } from 'react-native';
 
 import { AppButton } from '../../shared/app-button';
 import { AppCard } from '../../shared/app-card/app-card';
+import { AppOemPill } from '../../shared/app-oem-pill';
 import { AppText } from '../../shared/app-text';
 import { AppView } from '../../shared/app-view';
 import { RADIUS_SHEET } from './radii';
@@ -39,8 +40,8 @@ export type SearchPartCardProps = {
   style?: StyleProp<ViewStyle>;
   onPress?: () => void;
   /** Manufacturer / OEM part number. When set, renders as a small gray
-   *  pill below the add-to-cart row so shoppers can cross-reference
-   *  against an existing part. Omit to hide the pill entirely. */
+   *  pill directly under the title/description (above price + CTA) so
+   *  shoppers can cross-reference against an existing part. Omit to hide. */
   oem?: string;
 };
 
@@ -71,6 +72,9 @@ function SearchPartCard({
       ? { uri: image }
       : imageSource ?? PLACEHOLDER_IMAGE;
   const resetAddedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Debounce guard: rapid double-taps within 800ms would otherwise push
+  // duplicate line items into the cart.
+  const lastAddRef = useRef(0);
   const cardPadding = compact ? 10 : 12;
   const mediaPadding = compact ? 10 : 12;
   const bodyGap = compact ? 8 : 10;
@@ -86,6 +90,9 @@ function SearchPartCard({
   }, []);
 
   const handleAddToCart = () => {
+    const now = Date.now();
+    if (now - lastAddRef.current < 800) return;
+    lastAddRef.current = now;
     triggerHaptic('success');
     addItem({
       id,
@@ -162,15 +169,17 @@ function SearchPartCard({
           <AppText textVariant={titleVariant} family="heading" numberOfLines={compact ? 2 : 1}>
             {title}
           </AppText>
-          <AppText textVariant="bodySm" colorName="gray400" numberOfLines={compact ? 3 : 2}>
+          <AppText textVariant="bodySm" colorName="textMuted" numberOfLines={compact ? 3 : 2}>
             {description}
           </AppText>
         </AppView>
 
+        {oem ? <AppOemPill oem={oem} /> : null}
+
         {compact ? (
           <AppView gap={8}>
             <AppView gap={2}>
-              <AppText textVariant="bodyXs" colorName="gray400">
+              <AppText textVariant="bodyXs" colorName="textMuted">
                 {priceLabel}
               </AppText>
               <AppText textVariant={priceVariant} family="heading">
@@ -184,24 +193,12 @@ function SearchPartCard({
               fullWidth
               onPress={handleAddToCart}
             />
-            {oem ? (
-              <AppView
-                rounded={8}
-                px={8}
-                py={4}
-                style={{ alignSelf: 'flex-start', backgroundColor: tokens.gray100 }}
-              >
-                <AppText textVariant="bodyXs" colorName="gray400">
-                  OEM {oem}
-                </AppText>
-              </AppView>
-            ) : null}
           </AppView>
         ) : (
           <AppView gap={8}>
             <AppView row align="center" justify="space-between" gap={12}>
               <AppView gap={2} style={{ flex: 1 }}>
-                <AppText textVariant="bodyXs" colorName="gray400">
+                <AppText textVariant="bodyXs" colorName="textMuted">
                   {priceLabel}
                 </AppText>
                 {/* numberOfLines + adjustsFontSizeToFit: long prices
@@ -228,18 +225,6 @@ function SearchPartCard({
                 onPress={handleAddToCart}
               />
             </AppView>
-            {oem ? (
-              <AppView
-                rounded={8}
-                px={8}
-                py={4}
-                style={{ alignSelf: 'flex-start', backgroundColor: tokens.gray100 }}
-              >
-                <AppText textVariant="bodyXs" colorName="gray400">
-                   {oem}
-                </AppText>
-              </AppView>
-            ) : null}
           </AppView>
         )}
       </AppView>

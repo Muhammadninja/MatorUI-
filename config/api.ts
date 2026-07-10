@@ -26,9 +26,26 @@ export function getApiBaseUrl(): string | null {
   return raw.replace(/\/+$/, '');
 }
 
-/** True when transports should construct their HTTP implementation. */
-export function shouldUseHttpTransport(): boolean {
-  return getApiBaseUrl() !== null;
+/**
+ * Per-domain HTTP gate. A transport uses its HTTP implementation when a
+ * base URL is configured AND its domain is enabled.
+ *
+ * `EXPO_PUBLIC_HTTP_DOMAINS` is an optional comma-separated allowlist of
+ * domain keys (e.g. "top-featured,garage"). When set, ONLY those domains
+ * use HTTP and every other transport stays on its mock — so endpoints can
+ * be brought online one at a time as the backend seeds/verifies them,
+ * instead of an all-or-nothing flip. When the var is unset/empty, the base
+ * URL alone enables HTTP for every domain (the original behavior).
+ *
+ * `domain` is optional for back-compat; when a filter is active a call
+ * that doesn't tag its domain stays on the mock (safe default).
+ */
+export function shouldUseHttpTransport(domain?: string): boolean {
+  if (getApiBaseUrl() === null) return false;
+  const raw = process.env.EXPO_PUBLIC_HTTP_DOMAINS;
+  const allow = raw ? raw.split(',').map((d) => d.trim()).filter(Boolean) : [];
+  if (allow.length === 0) return true; // no filter → every domain uses HTTP
+  return domain ? allow.includes(domain) : false;
 }
 
 /**

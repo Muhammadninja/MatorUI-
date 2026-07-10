@@ -18,12 +18,18 @@ export type AppTabBarItem = {
   onPress?: () => void;
   badgeLabel?: string;
   disabled?: boolean;
+  /** Center "Assistant" tab: renders inline as a brand-filled circular
+   *  button instead of a plain icon (no active-indicator bar). */
+  emphasized?: boolean;
 };
 
 export type AppTabBarProps = {
   items?: AppTabBarItem[];
   activeKey?: string;
 };
+
+/** Soft indigo accent for the emphasized AI Assistant button (both themes). */
+const ASSISTANT_ACCENT = '#6366F1';
 
 const PREVIEW_ITEMS: AppTabBarItem[] = [
   { key: 'home', label: 'Home' },
@@ -88,6 +94,50 @@ export default function AppTabBar({ items = PREVIEW_ITEMS, activeKey = 'home' }:
         {items.map((item) => {
           const isActive = item.key === activeKey;
           const icon = typeof item.icon === 'function' ? item.icon(isActive) : item.icon;
+
+          // Center "Assistant" tab — brand-filled circular button, inline
+          // with the row (never protrudes above the bar, per the handoff).
+          if (item.emphasized) {
+            return (
+              <AppView key={item.key} style={styles.itemSlot}>
+                <AppPressableView
+                  onPress={item.onPress}
+                  accessibilityLabel={item.label}
+                  accessibilityRole="button"
+                  disabled={item.disabled}
+                  rounded={999}
+                  androidRipple={false}
+                  pressedOpacity={0.85}
+                  pressedScale={0.96}
+                  center
+                  style={[
+                    styles.emphasized,
+                    {
+                      // The AI Assistant button gets its own soft indigo accent
+                      // (same in both themes) so it reads as "smart/AI" instead
+                      // of a hard black disc. Faint top-sheen rim + a gentle
+                      // color-tinted shadow keep it modern but modest.
+                      backgroundColor: ASSISTANT_ACCENT,
+                      borderWidth: 1,
+                      borderColor: 'rgba(255, 255, 255, 0.22)',
+                      ...(isActive
+                        ? {
+                            shadowColor: ASSISTANT_ACCENT,
+                            shadowOpacity: 0.45,
+                            shadowRadius: 14,
+                            shadowOffset: { width: 0, height: 5 },
+                            elevation: 8,
+                          }
+                        : null),
+                    },
+                  ]}
+                  hitSlop={10}
+                >
+                  {icon}
+                </AppPressableView>
+              </AppView>
+            );
+          }
 
           return (
             <AppView key={item.key} style={styles.itemSlot}>
@@ -174,6 +224,10 @@ const styles = StyleSheet.create({
   item: {
     width: '100%',
     minHeight: 44,
+  },
+  emphasized: {
+    width: 46,
+    height: 46,
   },
   itemContent: {
     minHeight: 44,

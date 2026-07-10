@@ -13,7 +13,7 @@ export function AddVehicleStepIndicator({
   label,
 }: AddVehicleStepIndicatorProps) {
   return (
-    <AppView gap={8} px={20} pb={4}>
+    <AppView gap="sm" px={20} pb="xs">
       <AppView row align="center" justify="space-between" gap={10}>
         <AppText
           textVariant="caption"

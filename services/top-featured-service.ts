@@ -23,7 +23,10 @@ export const TOP_FEATURED_FILTER_GROUPS = [
   {
     key: 'condition',
     title: 'Condition',
-    options: ['GM', 'OEM', 'Budget'],
+    // Must exactly mirror the `condition` values present in
+    // MOCK_ITEM_ATTRIBUTES below — every chip must match ≥1 item and no
+    // selectable/default value may be unselectable.
+    options: ['New', 'OEM', 'Restored', 'Budget'],
   },
 ] as const;
 
@@ -111,11 +114,14 @@ export const TOP_FEATURED_SOCKET_EVENTS: TopFeaturedSocketEvent['event'][] = [
   'top_featured.filters.updated',
 ];
 
+// The unfiltered default: no dimension is pre-selected, so the list
+// shows every item. "Clear filters" resets to exactly this, producing a
+// truly unfiltered list rather than re-applying a hidden filter set.
 export const DEFAULT_TOP_FEATURED_FILTERS: TopFeaturedFilters = {
-  Model: 'SUV',
-  Brand: 'Cobalt',
-  Color: 'Black',
-  Condition: 'New',
+  Model: '',
+  Brand: '',
+  Color: '',
+  Condition: '',
 };
 
 const MOCK_ITEM_ATTRIBUTES: Record<
@@ -267,14 +273,89 @@ class MockTopFeaturedTransport implements TopFeaturedTransport {
   }
 }
 
+// ── Live "all parts" catalog shape (GET /v1/catalog/parts) ────────────
+// The backend's real /v1/top-featured/list snapshot is empty (no parts
+// flagged featured yet), so — TEMPORARILY — we source the Top Featured
+// grid from the populated "all parts" catalog endpoint and map each part
+// onto the TopFeaturedItem the cards render. Revert `HttpTopFeaturedTransport`
+// to the `POST ${API_BASE}/list` one-liner once the featured snapshot is built.
+
+type ApiCatalogPart = {
+  id: string;
+  title: string;
+  brand?: { id: string; name: string } | null;
+  category?: { id: string; name: string } | null;
+  oem_numbers?: string[];
+  price_uzs?: number;
+  price_label?: string;
+  in_stock?: boolean;
+  stock_qty?: number;
+  images?: string[];
+};
+
+type ApiCatalogPartsResponse = {
+  items: ApiCatalogPart[];
+  total: number;
+  page: number;
+  page_size: number;
+  next_page: number | null;
+};
+
+function mapPartToTopFeaturedItem(p: ApiCatalogPart): TopFeaturedItem {
+  return {
+    id: p.id,
+    badge: '',
+    status: p.in_stock ? 'In stock' : 'Out of stock',
+    title: p.title,
+    description: [p.brand?.name, p.category?.name].filter(Boolean).join(' · '),
+    price: p.price_label ?? (p.price_uzs != null ? `UZS ${p.price_uzs.toLocaleString('ru-RU')}` : ''),
+    model: '',
+    brand: p.brand?.name ?? '',
+    color: '',
+    condition: '',
+    images: p.images ?? [],
+    oem: p.oem_numbers?.[0],
+  };
+}
+
 class HttpTopFeaturedTransport implements TopFeaturedTransport {
-  list(request: TopFeaturedListRequest): Promise<TopFeaturedListResponse> {
-    const { signal, ...body } = request;
-    return apiClient.post<TopFeaturedListResponse>(`${API_BASE}/list`, body, { signal });
+  async list(request: TopFeaturedListRequest): Promise<TopFeaturedListResponse> {
+    const params = new URLSearchParams({
+      page: String(request.page),
+      page_size: String(request.pageSize),
+    });
+    if (request.search) params.set('search', request.search);
+    const res = await apiClient.get<ApiCatalogPartsResponse>(
+      `/v1/catalog/parts?${params.toString()}`,
+      { signal: request.signal },
+    );
+
+    let items = res.items.map(mapPartToTopFeaturedItem);
+    // The catalog endpoint filters brand by id, not name; the UI passes a
+    // brand *name* — so honor a brand chip client-side over the page.
+    const brand = request.filters?.brand;
+    if (brand) {
+      items = items.filter((i) => i.brand.toLowerCase() === brand.toLowerCase());
+    }
+
+    // Derive the brand filter options from whatever brands are on the page.
+    const brandOptions = Array.from(new Set(items.map((i) => i.brand).filter(Boolean))).map(
+      (b) => ({ value: b, label: b }),
+    );
+
+    return {
+      items,
+      total: brand ? items.length : res.total,
+      page: res.page,
+      pageSize: res.page_size,
+      snapshotVersion: 'catalog-parts-fallback',
+      socketChannel: TOP_FEATURED_SOCKET_CHANNEL,
+      availableFilters: [{ key: 'brand', title: 'Brand', options: brandOptions }],
+    };
   }
 }
 
-export const topFeaturedTransport: TopFeaturedTransport = shouldUseHttpTransport()
+export const topFeaturedTransport: TopFeaturedTransport = shouldUseHttpTransport('top-featured')
   ? new HttpTopFeaturedTransport()
   : new MockTopFeaturedTransport();
 

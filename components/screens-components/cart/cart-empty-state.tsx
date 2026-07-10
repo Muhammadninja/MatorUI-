@@ -12,14 +12,14 @@ export default function CartEmptyState() {
 
   const handleBrowse = () => {
     triggerHaptic('selection');
-    router.push('/explore');
+    router.navigate('/explore');
   };
 
   return (
-    <AppView flex={1} px={20} justify="center" align="center" py={48}>
+    <AppView flex={1} px={20} justify="center" align="center" py="xxxl">
       <AppView
         rounded={16}
-        p={24}
+        p="xl"
         gap={20}
         align="center"
         colorName="card"

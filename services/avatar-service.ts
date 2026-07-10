@@ -89,7 +89,7 @@ export class HttpAvatarTransport implements AvatarTransport {
 
 // ── Singleton ──────────────────────────────────────────────────────────
 
-export const avatarTransport: AvatarTransport = shouldUseHttpTransport()
+export const avatarTransport: AvatarTransport = shouldUseHttpTransport('avatar')
   ? new HttpAvatarTransport()
   : new MockAvatarTransport();
 

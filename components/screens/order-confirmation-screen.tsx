@@ -1,160 +1,224 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Check, Truck } from 'lucide-react-native';
+import { AlertCircle, Check } from 'lucide-react-native';
+import { ScrollView } from 'react-native';
+
+import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/shared/app-button';
 import { AppText } from '@/components/shared/app-text';
-import { AppPressableView, AppView } from '@/components/shared/app-view';
+import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
+import { useOrder } from '@/hooks/use-orders';
 import { triggerHaptic } from '@/utils/haptics';
 
+/**
+ * Order Confirmation — faithful rebuild of the prototype's `scOrderConfirm`,
+ * now reading the freshly-created order from the orders layer. Checkout
+ * navigates here with an `orderId` route param; `useOrder(id)` fetches the
+ * `OrderDetail`, whose `totalLabel` + line items populate the receipt.
+ */
 export default function OrderConfirmationScreen() {
-  const { tokens, scheme } = useThemeContext();
+  const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ orderId?: string; eta?: string }>();
 
-  const orderId = typeof params.orderId === 'string' ? params.orderId : '';
-  const eta = typeof params.eta === 'string' ? params.eta : '';
+  const { orderId } = useLocalSearchParams<{ orderId?: string }>();
+  const { state, order, error, refresh } = useOrder(orderId ?? null);
 
-  const goToCart = () => {
+  const goTrackOrder = () => {
     triggerHaptic('selection');
-    // Checkout was replaced when the order was placed, so back/dismissTo
-    // both land on cart cleanly. dismissTo also covers the deep-link case
-    // where the confirmation was opened without cart in history.
-    router.dismissTo('/cart');
+    router.push({ pathname: '/track-order', params: orderId ? { orderId } : {} });
   };
 
-  const viewOrderDetails = () => {
+  const goShopping = () => {
     triggerHaptic('selection');
-    // Track-order lives on the root stack (above the tabs) so all four
-    // entry points (cart, confirmation, order-history, AI chat) get
-    // honest back behavior. Drop the cart stack back to /cart first so
-    // Back from track-order returns to cart, not the transient
-    // confirmation/checkout history.
-    const href = orderId
-      ? `/track-order?orderId=${encodeURIComponent(orderId)}`
-      : '/track-order';
-    router.dismissTo('/cart');
-    router.push(href as never);
+    // This screen lives on the Cart tab's stack ([cart → checkout → here]).
+    // Pop the whole checkout flow back to the cart root FIRST, so returning to
+    // the Cart tab shows the (now-empty) cart, not this receipt. Then jump to
+    // Explore with `navigate` (not `push`) so we land on the existing Explore
+    // root instead of stacking a duplicate.
+    if (router.canDismiss()) router.dismissAll();
+    router.navigate('/explore');
   };
+
+  if (state === 'loading' || state === 'idle') {
+    return (
+      <AppView flex={1} colorName="background" center>
+        <WheelLoader size={30} color={tokens.text} />
+      </AppView>
+    );
+  }
+
+  if (state === 'error' || state === 'not_found' || !order) {
+    return (
+      <AppView flex={1} colorName="background" center px="xl" gap={12}>
+        <AlertCircle size={32} strokeWidth={2} color={tokens.error} />
+        <AppText family="heading" weight="bold" style={{ fontSize: 17, color: tokens.text }}>
+          Couldn&apos;t load your order
+        </AppText>
+        <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted, textAlign: 'center', maxWidth: 280 }}>
+          {error ?? 'This order could not be found.'}
+        </AppText>
+        <AppView row gap={10}>
+          <AppButton title="Retry" kind="secondary" size="sm" onPress={refresh} />
+          <AppButton title="Continue shopping" kind="brand" size="sm" onPress={goShopping} />
+        </AppView>
+      </AppView>
+    );
+  }
 
   return (
     <AppView flex={1} colorName="background">
-      <AppView flex={1} px={20} pt={Math.max(insets.top + 24, 48)}>
-        <AppView align="center" gap={20}>
-          {/* Concentric rings — outer halo + brand-tinted ring + solid puck —
-           *  give the success moment a tactile centerpiece instead of a flat
-           *  green disc. */}
-          <AppView
-            center
-            rounded={999}
-            style={{
-              width: 120,
-              height: 120,
-              backgroundColor: `${tokens.success}14`,
-            }}
-          >
-            <AppView
-              center
-              rounded={999}
-              style={{
-                width: 96,
-                height: 96,
-                backgroundColor: `${tokens.success}24`,
-              }}
-            >
-              <AppView
-                center
-                rounded={999}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingTop: insets.top + 40,
+          paddingBottom: 28,
+          paddingHorizontal: 24,
+          alignItems: 'center',
+        }}
+      >
+        {/* 88px success circle + check */}
+        <AppView
+          center
+          rounded={999}
+          style={{ width: 88, height: 88, backgroundColor: tokens.success }}
+        >
+          <Check size={46} strokeWidth={2.5} color="#fff" />
+        </AppView>
+
+        {/* Heading */}
+        <AppText
+          family="heading"
+          weight="bold"
+          style={{ fontSize: 26, lineHeight: 32, color: tokens.text, marginTop: 22, textAlign: 'center' }}
+        >
+          Order placed
+        </AppText>
+
+        {/* Sub-copy */}
+        <AppText
+          family="default"
+          style={{
+            fontSize: 14,
+            color: tokens.textMuted,
+            marginTop: 8,
+            maxWidth: 260,
+            lineHeight: 21,
+            textAlign: 'center',
+          }}
+        >
+          Thanks! A confirmation has been sent to your email.
+        </AppText>
+
+        {/* Receipt card */}
+        <AppView
+          style={{
+            width: '100%',
+            backgroundColor: tokens.card,
+            borderWidth: 1,
+            borderColor: tokens.border,
+            borderRadius: 16,
+            padding: 18,
+            marginTop: 24,
+          }}
+        >
+          {/* Order number + Total row */}
+          <AppView row justify="space-between" style={{ marginBottom: 12 }}>
+            <AppView>
+              <AppText
+                family="accent"
+                weight="semibold"
                 style={{
-                  width: 72,
-                  height: 72,
-                  backgroundColor: tokens.success,
+                  fontSize: 11,
+                  color: tokens.textMuted,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.6,
                 }}
               >
-                <Check size={36} strokeWidth={3} color={tokens.white} />
-              </AppView>
-            </AppView>
-          </AppView>
-          <AppView align="center" gap={6}>
-            <AppText textVariant="title" family="heading" weight="bold">
-              Thanks for your order
-            </AppText>
-            <AppText
-              textVariant="bodySm"
-              colorName="gray400"
-              style={{ textAlign: 'center' }}
-            >
-              We sent a confirmation to your email. You can follow it on the way.
-            </AppText>
-          </AppView>
-
-          {orderId || eta ? (
-            <AppView
-              rounded={16}
-              px={20}
-              py={20}
-              gap={14}
-              style={{
-                alignSelf: 'stretch',
-                borderWidth: 1,
-                borderColor: tokens.border,
-                backgroundColor: scheme === 'dark' ? tokens.card : tokens.white,
-              }}
-            >
-              {orderId ? (
-                <AppView row align="center" justify="space-between">
-                  <AppText textVariant="bodyXs" colorName="gray400">
-                    Order number
-                  </AppText>
-                  <AppText textVariant="bodySm" weight="semibold">
-                    #{orderId}
-                  </AppText>
-                </AppView>
-              ) : null}
-              {eta ? (
-                <AppView row align="center" justify="space-between">
-                  <AppText textVariant="bodyXs" colorName="gray400">
-                    Estimated arrival
-                  </AppText>
-                  <AppText textVariant="bodySm" weight="semibold">
-                    {eta}
-                  </AppText>
-                </AppView>
-              ) : null}
-            </AppView>
-          ) : null}
-        </AppView>
-
-        <AppView style={{ flex: 1 }} />
-
-        <AppView gap={10} style={{ paddingBottom: Math.max(insets.bottom, 24) }}>
-          <AppPressableView
-            onPress={viewOrderDetails}
-            androidRipple
-            style={{
-              borderRadius: 36,
-              paddingVertical: 16,
-              backgroundColor: tokens.brandBg,
-            }}
-          >
-            <AppView row align="center" justify="center" gap={8}>
-              <Truck size={18} strokeWidth={2.4} color={tokens.onBrand} />
-              <AppText weight="bold" style={{ color: tokens.onBrand }}>
-                View order details
+                Order number
+              </AppText>
+              <AppText
+                family="mono"
+                weight="bold"
+                style={{ fontSize: 16, color: tokens.text }}
+              >
+                {order.id}
               </AppText>
             </AppView>
-          </AppPressableView>
+            <AppView style={{ alignItems: 'flex-end' }}>
+              <AppText
+                family="accent"
+                weight="semibold"
+                style={{
+                  fontSize: 11,
+                  color: tokens.textMuted,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.6,
+                }}
+              >
+                Total
+              </AppText>
+              <AppText
+                family="heading"
+                weight="bold"
+                style={{ fontSize: 16, color: tokens.text }}
+              >
+                {order.totalLabel}
+              </AppText>
+            </AppView>
+          </AppView>
+
+          {/* Divider */}
+          <AppView
+            style={{ height: 1, backgroundColor: tokens.divider, marginBottom: 12 }}
+          />
+
+          {/* Line items */}
+          {order.items.map((line) => (
+            <AppView
+              key={line.id}
+              row
+              justify="space-between"
+              style={{ marginBottom: 6 }}
+            >
+              <AppText
+                family="default"
+                style={{ fontSize: 13, color: tokens.textMuted, flex: 1 }}
+                numberOfLines={1}
+              >
+                {line.title} × {line.quantity}
+              </AppText>
+              <AppText
+                family="accent"
+                weight="semibold"
+                style={{ fontSize: 13, color: tokens.text }}
+              >
+                {line.price}
+              </AppText>
+            </AppView>
+          ))}
+        </AppView>
+
+        {/* Buttons */}
+        <AppView style={{ width: '100%', gap: 12, marginTop: 24 }}>
           <AppButton
-            title="Close"
+            title="Track order"
+            kind="brand"
+            size="lg"
+            fullWidth
+            onPress={goTrackOrder}
+          />
+          <AppButton
+            title="Continue shopping"
             kind="secondary"
             variant="outline"
-            size="md"
+            size="lg"
             fullWidth
-            onPress={goToCart}
+            onPress={goShopping}
           />
         </AppView>
-      </AppView>
+      </ScrollView>
     </AppView>
   );
 }

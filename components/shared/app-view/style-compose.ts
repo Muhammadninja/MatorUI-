@@ -38,6 +38,8 @@ export type FlexboxProps = {
 
 export type RoundingProps = {
   rounded?: number;
+  /** Alias for `rounded` using the RN style name. `rounded` wins if both set. */
+  borderRadius?: number;
   roundedTop?: number;
   roundedBottom?: number;
   roundedLeft?: number;
@@ -109,8 +111,9 @@ export function composeFlexbox(f: FlexboxProps): ViewStyle {
 }
 
 export function composeRounding(r: RoundingProps): ViewStyle {
+  const borderRadius = r.rounded ?? r.borderRadius;
   return {
-    ...(r.rounded != null ? { borderRadius: r.rounded } : null),
+    ...(borderRadius != null ? { borderRadius } : null),
     ...(r.roundedTop != null
       ? { borderTopLeftRadius: r.roundedTop, borderTopRightRadius: r.roundedTop }
       : null),

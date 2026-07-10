@@ -40,7 +40,20 @@ const DEFAULT_REQUEST: CatalogListRequest = {
 /** Build the React Query key for a catalog list request. Exported so
  *  mutations elsewhere can invalidate a specific list. */
 export function catalogListQueryKey(req: CatalogListRequest) {
-  return ['catalog', 'list', req.page, req.pageSize, req.category, req.search, req.sortBy] as const;
+  return [
+    'catalog',
+    'list',
+    req.page,
+    req.pageSize,
+    req.category,
+    req.make,
+    req.model,
+    req.brand,
+    req.regions,
+    req.gmOnly,
+    req.search,
+    req.sortBy,
+  ] as const;
 }
 
 export function useCatalogList(

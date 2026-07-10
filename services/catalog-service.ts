@@ -1,5 +1,7 @@
 // ── Types ────────────────────────────────────────────────────────────
 
+import { brandRegion, isGmBrand, normalizeRegion, type CatalogRegion } from '@/constants/catalog-regions';
+
 export type CatalogItem = {
   id: string;
   /** Optional corner-ribbon label ("Hot pick", "New"). Items without
@@ -20,6 +22,10 @@ export type CatalogItem = {
    *  screen so shoppers can cross-reference against existing parts.
    *  Optional — items without a number simply omit the pill. */
   oem?: string;
+  /** Market of origin (China / Europe / Russia / Korea / USA), used by the
+   *  region filter. Backend-supplied when available, else inferred from the
+   *  brand at map time. */
+  region?: CatalogRegion;
 };
 
 export type CatalogItemSpec = {
@@ -30,9 +36,19 @@ export type CatalogItemSpec = {
 export type CatalogListRequest = {
   page: number;
   pageSize: number;
+  /** System / category key (from the catalog systems screen). */
   category?: string;
   search?: string | null;
-  sortBy?: 'featured' | 'newest' | 'price_asc' | 'price_desc';
+  sortBy?: 'featured' | 'newest' | 'price_asc' | 'price_desc' | 'relevance';
+  /** Vehicle-fit context from the Make → Model flow. */
+  make?: string;
+  model?: string;
+  /** Fine filters. */
+  brand?: string;
+  /** Market-of-origin regions (china/europe/russia/korea/usa); empty/undefined = all. */
+  regions?: string[];
+  /** Restrict to GM-family brands (Chevrolet / Ravon / Daewoo …). */
+  gmOnly?: boolean;
   /** Cancellation token. The HTTP transport must pass this to fetch.
    *  Mock transport honors it by aborting the simulated delay. */
   signal?: AbortSignal;
@@ -76,7 +92,7 @@ export const CATALOG_SOCKET_EVENTS: CatalogSocketEvent['event'][] = [
 
 const MOCK_SPECS: CatalogItemSpec[] = [
   { label: 'Range', value: '320 mi' },
-  { label: '0–60 mph', value: '4.2s' },
+  { label: '0-60 mph', value: '4.2s' },
   { label: 'Top Speed', value: '155 mph' },
   { label: 'Drivetrain', value: 'AWD' },
 ];
@@ -113,7 +129,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     images: [],
     specs: [
       { label: 'Range', value: '280 mi' },
-      { label: '0–60 mph', value: '5.1s' },
+      { label: '0-60 mph', value: '5.1s' },
       { label: 'Top Speed', value: '140 mph' },
       { label: 'Drivetrain', value: 'AWD' },
     ],
@@ -131,7 +147,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     images: [],
     specs: [
       { label: 'Range', value: '350 mi' },
-      { label: '0–60 mph', value: '3.5s' },
+      { label: '0-60 mph', value: '3.5s' },
       { label: 'Top Speed', value: '175 mph' },
       { label: 'Drivetrain', value: 'RWD' },
     ],
@@ -149,7 +165,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     images: [],
     specs: [
       { label: 'Range', value: '300 mi' },
-      { label: '0–60 mph', value: '4.8s' },
+      { label: '0-60 mph', value: '4.8s' },
       { label: 'Top Speed', value: '130 mph' },
       { label: 'Drivetrain', value: '4WD' },
     ],
@@ -172,7 +188,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     images: [],
     specs: [
       { label: 'Range', value: '320 mi' },
-      { label: '0–60 mph', value: '4.2s' },
+      { label: '0-60 mph', value: '4.2s' },
       { label: 'Top Speed', value: '155 mph' },
       { label: 'Drivetrain', value: 'AWD' },
     ],
@@ -191,14 +207,14 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     id: 'mator-prime',
     status: 'Ready to ship',
     title: 'Mator Prime',
-    description: 'Flagship sedan — top-selling, lowest entry price, full Mator Verified inspection.',
+    description: 'Flagship sedan, top-selling, lowest entry price, full Mator Verified inspection.',
     price: 'UZS 16,900',
     priceLabel: 'Starting at',
     badge: 'Bestseller',
     images: [],
     specs: [
       { label: 'Range', value: '340 mi' },
-      { label: '0–60 mph', value: '3.9s' },
+      { label: '0-60 mph', value: '3.9s' },
       { label: 'Top Speed', value: '160 mph' },
       { label: 'Drivetrain', value: 'AWD' },
     ],
@@ -228,6 +244,27 @@ export function getCatalogMockList(request: CatalogListRequest): CatalogListResp
         item.title.toLowerCase().includes(query) ||
         item.description.toLowerCase().includes(query),
     );
+  }
+
+  // Vehicle-fit + brand + region filters (mirror the HTTP query).
+  for (const term of [request.make, request.model, request.brand]) {
+    if (term) {
+      const t = term.toLowerCase();
+      items = items.filter(
+        (item) =>
+          item.title.toLowerCase().includes(t) || item.description.toLowerCase().includes(t),
+      );
+    }
+  }
+  if (request.regions?.length) {
+    const want = new Set(request.regions);
+    items = items.filter((item) => {
+      const region = item.region ?? brandRegion(item.title) ?? brandRegion(item.description);
+      return region != null && want.has(region);
+    });
+  }
+  if (request.gmOnly) {
+    items = items.filter((item) => isGmBrand(item.title) || isGmBrand(item.description));
   }
 
   if (request.sortBy === 'price_asc') {
@@ -277,22 +314,105 @@ class MockCatalogTransport implements CatalogTransport {
   }
 }
 
+// ── Live backend shape (GET /v1/catalog/parts) ───────────────────────
+// The real catalog is a parts marketplace exposed at `/v1/catalog/parts`
+// with snake_case params + a nested part shape. We map it onto the app's
+// flat `CatalogItem`. NOTE: the backend strictly rejects unknown query
+// params (it 400s on `pageSize`), so we send ONLY `page`/`page_size` for
+// now; wire `search`/`category` once their accepted param names are known.
+type ApiCatalogPart = {
+  id: string;
+  title: string;
+  brand?: { id: string; name: string } | null;
+  category?: { id: string; name: string } | null;
+  oem_numbers?: string[];
+  price_uzs?: number;
+  price_label?: string;
+  in_stock?: boolean;
+  stock_qty?: number;
+  images?: string[];
+  specs?: { label: string; value: string }[];
+  features?: string[];
+  /** Market of origin, if the backend tags it (e.g. "china", "korea"). */
+  region?: string;
+};
+
+type ApiCatalogPartsResponse = {
+  items: ApiCatalogPart[];
+  total: number;
+  page: number;
+  page_size: number;
+  next_page: number | null;
+};
+
+function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
+  return {
+    id: p.id,
+    status: p.in_stock === false ? 'Out of stock' : 'In stock',
+    title: p.title,
+    description: [p.brand?.name, p.category?.name].filter(Boolean).join(' · '),
+    price:
+      p.price_label ??
+      (p.price_uzs != null ? `UZS ${p.price_uzs.toLocaleString('ru-RU')}` : ''),
+    priceLabel: '',
+    images: p.images ?? [],
+    specs: p.specs ?? [],
+    features: p.features ?? [],
+    category: p.category?.name ?? '',
+    oem: p.oem_numbers?.[0],
+    // Prefer the backend's tagged region; fall back to brand inference.
+    region: normalizeRegion(p.region) ?? brandRegion(p.brand?.name),
+  };
+}
+
+// Query-param names for GET /v1/catalog/parts. The backend STRICTLY rejects
+// unknown params (400 on `pageSize`), so these must match the backend's
+// Swagger exactly. Names below are the assumed snake_case set derived from the
+// endpoint's response facets (`brands`, `price_range_uzs`, `compatibility`).
+// If a filter 400s, correct the value here — it's the single source of truth.
+const PARTS_PARAM = {
+  page: 'page',
+  pageSize: 'page_size',
+  search: 'q',
+  category: 'category',
+  make: 'make',
+  model: 'model',
+  brand: 'brand',
+  region: 'region',
+  gmOnly: 'gm_only',
+  sort: 'sort',
+} as const;
+
 class HttpCatalogTransport implements CatalogTransport {
-  list(request: CatalogListRequest): Promise<CatalogListResponse> {
+  async list(request: CatalogListRequest): Promise<CatalogListResponse> {
     const params = new URLSearchParams({
-      page: String(request.page),
-      pageSize: String(request.pageSize),
+      [PARTS_PARAM.page]: String(request.page),
+      [PARTS_PARAM.pageSize]: String(request.pageSize),
     });
-    if (request.category) params.set('category', request.category);
-    if (request.search) params.set('search', request.search);
-    if (request.sortBy) params.set('sortBy', request.sortBy);
-    return apiClient.get<CatalogListResponse>(`${API_BASE}/items?${params.toString()}`, {
-      signal: request.signal,
-    });
+    if (request.search) params.set(PARTS_PARAM.search, request.search);
+    if (request.category) params.set(PARTS_PARAM.category, request.category);
+    if (request.make) params.set(PARTS_PARAM.make, request.make);
+    if (request.model) params.set(PARTS_PARAM.model, request.model);
+    if (request.brand) params.set(PARTS_PARAM.brand, request.brand);
+    // Region is multi-select → repeated `region=` params (e.g. region=china&region=korea).
+    request.regions?.forEach((r) => params.append(PARTS_PARAM.region, r));
+    if (request.gmOnly) params.set(PARTS_PARAM.gmOnly, 'true');
+    if (request.sortBy) params.set(PARTS_PARAM.sort, request.sortBy);
+    const res = await apiClient.get<ApiCatalogPartsResponse>(
+      `${API_BASE}/parts?${params.toString()}`,
+      { signal: request.signal },
+    );
+    return {
+      items: res.items.map(mapPartToCatalogItem),
+      total: res.total,
+      page: res.page,
+      pageSize: res.page_size,
+    };
   }
   async detail(id: string, signal?: AbortSignal): Promise<CatalogDetailResponse | null> {
     try {
-      return await apiClient.get<CatalogDetailResponse>(`${API_BASE}/items/${id}`, { signal });
+      const part = await apiClient.get<ApiCatalogPart>(`${API_BASE}/parts/${id}`, { signal });
+      return part ? { item: mapPartToCatalogItem(part) } : null;
     } catch (err) {
       // 404 is a normal "not found" — surface as null instead of throwing.
       if (err instanceof ApiError && err.status === 404) return null;
@@ -301,7 +421,7 @@ class HttpCatalogTransport implements CatalogTransport {
   }
 }
 
-export const catalogTransport: CatalogTransport = shouldUseHttpTransport()
+export const catalogTransport: CatalogTransport = shouldUseHttpTransport('catalog')
   ? new HttpCatalogTransport()
   : new MockCatalogTransport();
 

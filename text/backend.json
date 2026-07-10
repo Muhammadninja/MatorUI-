@@ -2,14 +2,17 @@
   "contract_meta": {
     "project": "Mator",
     "domain": "mator.uz",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "api_base_url": "https://api.mator.uz",
     "cdn_base_url": "https://cdn.mator.uz",
     "locale_default": "uz-UZ",
     "currency_default": "UZS",
     "timezone_default": "Asia/Tashkent",
     "auth_scheme": "Bearer",
-    "client_platforms": ["ios", "android"],
+    "client_platforms": [
+      "ios",
+      "android"
+    ],
     "expo_runtime_version": "53.0.0",
     "mobile_framework": "react-native + expo-router"
   },
@@ -144,7 +147,12 @@
         "initiate": {
           "user_id": "9a8e1d2c-4b7f-4d3e-8c2a-1f0e2b6c9d4a",
           "redirect_uri": "mator://auth/myid/callback",
-          "scopes": ["passport_data", "pinfl", "address", "biometric_verdict"],
+          "scopes": [
+            "passport_data",
+            "pinfl",
+            "address",
+            "biometric_verdict"
+          ],
           "ui_locale": "uz"
         },
         "callback": {
@@ -251,11 +259,26 @@
             "user_id": "9a8e1d2c-4b7f-4d3e-8c2a-1f0e2b6c9d4a",
             "is_primary": true,
             "nickname": "Mening Cobaltim",
-            "make": { "id": "make_chevrolet", "name": "Chevrolet", "logo_url": "https://cdn.mator.uz/brands/chevrolet.svg" },
-            "model": { "id": "model_chevrolet_cobalt", "name": "Cobalt" },
+            "make": {
+              "id": "make_chevrolet",
+              "name": "Chevrolet",
+              "logo_url": "https://cdn.mator.uz/brands/chevrolet.svg"
+            },
+            "model": {
+              "id": "model_chevrolet_cobalt",
+              "name": "Cobalt"
+            },
             "year": 2019,
-            "trim": { "id": "trim_chevrolet_cobalt_ls_at", "name": "LS AT" },
-            "engine": { "id": "engine_b15d2_1_5l_petrol", "name": "B15D2 1.5L", "displacement_cc": 1485, "fuel_type": "petrol" },
+            "trim": {
+              "id": "trim_chevrolet_cobalt_ls_at",
+              "name": "LS AT"
+            },
+            "engine": {
+              "id": "engine_b15d2_1_5l_petrol",
+              "name": "B15D2 1.5L",
+              "displacement_cc": 1485,
+              "fuel_type": "petrol"
+            },
             "transmission": "automatic",
             "drivetrain": "fwd",
             "color_hex": "#1F2A37",
@@ -266,9 +289,21 @@
               "glb_url": "https://cdn.mator.uz/3d/chevrolet/cobalt/2019/ls/model_v3.glb",
               "ktx2_textures_url": "https://cdn.mator.uz/3d/chevrolet/cobalt/2019/ls/textures_ktx2.zip",
               "tuning_variants": [
-                { "id": "tuning_stock", "name": "Stock", "thumbnail_url": "https://cdn.mator.uz/3d/chevrolet/cobalt/2019/ls/thumbs/stock.webp" },
-                { "id": "tuning_sport", "name": "Sport Pack", "thumbnail_url": "https://cdn.mator.uz/3d/chevrolet/cobalt/2019/ls/thumbs/sport.webp" },
-                { "id": "tuning_offroad", "name": "Offroad Pack", "thumbnail_url": "https://cdn.mator.uz/3d/chevrolet/cobalt/2019/ls/thumbs/offroad.webp" }
+                {
+                  "id": "tuning_stock",
+                  "name": "Stock",
+                  "thumbnail_url": "https://cdn.mator.uz/3d/chevrolet/cobalt/2019/ls/thumbs/stock.webp"
+                },
+                {
+                  "id": "tuning_sport",
+                  "name": "Sport Pack",
+                  "thumbnail_url": "https://cdn.mator.uz/3d/chevrolet/cobalt/2019/ls/thumbs/sport.webp"
+                },
+                {
+                  "id": "tuning_offroad",
+                  "name": "Offroad Pack",
+                  "thumbnail_url": "https://cdn.mator.uz/3d/chevrolet/cobalt/2019/ls/thumbs/offroad.webp"
+                }
               ],
               "version": 3,
               "byte_size": 18643217,
@@ -318,11 +353,15 @@
           "center_lat": 41.311081,
           "center_lng": 69.240562,
           "radius_m": 5000,
-          "viewport_min_lat": 41.270000,
-          "viewport_min_lng": 69.180000,
-          "viewport_max_lat": 41.360000,
-          "viewport_max_lng": 69.310000,
-          "specialization": ["engine", "transmission", "electrical"],
+          "viewport_min_lat": 41.27,
+          "viewport_min_lng": 69.18,
+          "viewport_max_lat": 41.36,
+          "viewport_max_lng": 69.31,
+          "specialization": [
+            "engine",
+            "transmission",
+            "electrical"
+          ],
           "vehicle_make_id": "make_chevrolet",
           "vehicle_model_id": "model_chevrolet_cobalt",
           "min_rating": 4.0,
@@ -332,7 +371,10 @@
         },
         "booking_payload": {
           "vehicle_id": "veh_01HXC3KF6S7T4N4LK0N1AB2X9V",
-          "service_ids": ["svc_diag_full", "svc_oil_change"],
+          "service_ids": [
+            "svc_diag_full",
+            "svc_oil_change"
+          ],
           "scheduled_at": "2026-06-12T09:00:00+05:00",
           "notes": "Suvuq holatda dvigatel sekin yuriadi.",
           "contact_phone_e164": "+998901234567"
@@ -349,8 +391,15 @@
               "avatar_url": "https://cdn.mator.uz/masters/bobur/avatar.jpg",
               "rating_avg": 4.82,
               "rating_count": 312,
-              "specializations": ["engine", "transmission"],
-              "supported_makes": ["make_chevrolet", "make_daewoo", "make_kia"],
+              "specializations": [
+                "engine",
+                "transmission"
+              ],
+              "supported_makes": [
+                "make_chevrolet",
+                "make_daewoo",
+                "make_kia"
+              ],
               "geo": {
                 "lat": 41.314211,
                 "lng": 69.247885,
@@ -372,11 +421,19 @@
               "avatar_url": "https://cdn.mator.uz/sto/avtotex/logo.jpg",
               "rating_avg": 4.61,
               "rating_count": 188,
-              "specializations": ["body", "paint", "electrical"],
-              "supported_makes": ["make_chevrolet", "make_ravon", "make_toyota"],
+              "specializations": [
+                "body",
+                "paint",
+                "electrical"
+              ],
+              "supported_makes": [
+                "make_chevrolet",
+                "make_ravon",
+                "make_toyota"
+              ],
               "geo": {
-                "lat": 41.302450,
-                "lng": 69.231200,
+                "lat": 41.30245,
+                "lng": 69.2312,
                 "accuracy_m": 5,
                 "geohash": "tzeu4rjyk"
               },
@@ -390,7 +447,12 @@
             }
           ],
           "cluster_hints": [
-            { "lat": 41.318000, "lng": 69.255000, "count": 14, "cluster_id": "cluster_yunusobod_n_01" }
+            {
+              "lat": 41.318,
+              "lng": 69.255,
+              "count": 14,
+              "cluster_id": "cluster_yunusobod_n_01"
+            }
           ],
           "next_cursor": "cur_01HXC3KH2X1Y7Q7LK0N1AB2X9V",
           "total": 27,
@@ -404,31 +466,83 @@
           "rating_avg": 4.82,
           "rating_count": 312,
           "certifications": [
-            { "id": "cert_uz_mech_lvl3", "name": "O'zbekiston Avto-mexanika sertifikati, 3-daraja", "issued_at": "2022-03-14" }
+            {
+              "id": "cert_uz_mech_lvl3",
+              "name": "O'zbekiston Avto-mexanika sertifikati, 3-daraja",
+              "issued_at": "2022-03-14"
+            }
           ],
           "portfolio": [
-            { "id": "p1", "image_url": "https://cdn.mator.uz/masters/bobur/portfolio/p1.jpg" },
-            { "id": "p2", "image_url": "https://cdn.mator.uz/masters/bobur/portfolio/p2.jpg" }
+            {
+              "id": "p1",
+              "image_url": "https://cdn.mator.uz/masters/bobur/portfolio/p1.jpg"
+            },
+            {
+              "id": "p2",
+              "image_url": "https://cdn.mator.uz/masters/bobur/portfolio/p2.jpg"
+            }
           ],
           "services": [
-            { "id": "svc_diag_full", "name": "To'liq diagnostika", "duration_min": 60, "price_uzs": 150000 },
-            { "id": "svc_oil_change", "name": "Yog' almashtirish", "duration_min": 30, "price_uzs": 90000 }
+            {
+              "id": "svc_diag_full",
+              "name": "To'liq diagnostika",
+              "duration_min": 60,
+              "price_uzs": 150000
+            },
+            {
+              "id": "svc_oil_change",
+              "name": "Yog' almashtirish",
+              "duration_min": 30,
+              "price_uzs": 90000
+            }
           ],
           "working_hours": [
-            { "weekday": 1, "open": "09:00", "close": "20:00" },
-            { "weekday": 2, "open": "09:00", "close": "20:00" },
-            { "weekday": 3, "open": "09:00", "close": "20:00" },
-            { "weekday": 4, "open": "09:00", "close": "20:00" },
-            { "weekday": 5, "open": "09:00", "close": "20:00" },
-            { "weekday": 6, "open": "10:00", "close": "18:00" },
-            { "weekday": 0, "open": null, "close": null }
+            {
+              "weekday": 1,
+              "open": "09:00",
+              "close": "20:00"
+            },
+            {
+              "weekday": 2,
+              "open": "09:00",
+              "close": "20:00"
+            },
+            {
+              "weekday": 3,
+              "open": "09:00",
+              "close": "20:00"
+            },
+            {
+              "weekday": 4,
+              "open": "09:00",
+              "close": "20:00"
+            },
+            {
+              "weekday": 5,
+              "open": "09:00",
+              "close": "20:00"
+            },
+            {
+              "weekday": 6,
+              "open": "10:00",
+              "close": "18:00"
+            },
+            {
+              "weekday": 0,
+              "open": null,
+              "close": null
+            }
           ],
           "contact": {
             "phone_e164": "+998901112233",
             "telegram_username": "@boburautoservis",
             "website_url": null
           },
-          "geo": { "lat": 41.314211, "lng": 69.247885, "address_text": "Toshkent sh., Yunusobod tumani, Amir Temur ko'chasi 24" }
+          "geo": {
+            "lat": 41.314211,
+            "lng": 69.247885,
+            "address_text": "Toshkent sh., Yunusobod tumani, Amir Temur ko'chasi 24"
+          }
         },
         "booking_response": {
           "booking_id": "bk_01HXC3KJ4Z2A8R8LK0N1AB2X9V",
@@ -470,15 +584,18 @@
       "request_payload": {
         "list_query_params": {
           "vehicle_id": "veh_01HXC3KF6S7T4N4LK0N1AB2X9V",
-          "category_id": "cat_engine_belts",
-          "search": "remen generator",
-          "min_price_uzs": 100000,
-          "max_price_uzs": 2000000,
-          "brand_ids": ["brand_gates", "brand_dayco"],
-          "condition": "new",
+          "category": "cat_engine_belts",
+          "q": "remen generator",
+          "make": "Chevrolet",
+          "model": "Cobalt",
+          "brand": "brand_gates",
+          "region": [
+            "china",
+            "korea"
+          ],
+          "gm_only": true,
           "in_stock_only": true,
-          "delivery_region_code": "01",
-          "sort_by": "price_asc",
+          "sort": "price_asc",
           "page": 1,
           "page_size": 20
         }
@@ -489,9 +606,18 @@
             {
               "id": "part_01HXC3KK5B3C9S9LK0N1AB2X9V",
               "title": "Cobalt Remen Generator Xitoy Original",
-              "brand": { "id": "brand_gates", "name": "Gates" },
-              "category": { "id": "cat_engine_belts", "name": "Dvigatel kamarlari" },
-              "oem_numbers": ["96440756", "55562234"],
+              "brand": {
+                "id": "brand_gates",
+                "name": "Gates"
+              },
+              "category": {
+                "id": "cat_engine_belts",
+                "name": "Dvigatel kamarlari"
+              },
+              "oem_numbers": [
+                "96440756",
+                "55562234"
+              ],
               "price_uzs": 185000,
               "price_label": "UZS 185 000",
               "currency": "UZS",
@@ -508,16 +634,35 @@
                 "https://cdn.mator.uz/parts/01HXC3KK5B/main.webp",
                 "https://cdn.mator.uz/parts/01HXC3KK5B/02.webp"
               ],
-              "seller": { "id": "seller_avtomir", "name": "Avtomir TM", "rating_avg": 4.7 }
+              "seller": {
+                "id": "seller_avtomir",
+                "name": "Avtomir TM",
+                "rating_avg": 4.7
+              }
             }
           ],
           "facets": {
             "brands": [
-              { "id": "brand_gates", "name": "Gates", "count": 12 },
-              { "id": "brand_dayco", "name": "Dayco", "count": 6 }
+              {
+                "id": "brand_gates",
+                "name": "Gates",
+                "count": 12
+              },
+              {
+                "id": "brand_dayco",
+                "name": "Dayco",
+                "count": 6
+              }
             ],
-            "price_range_uzs": { "min": 95000, "max": 1850000 },
-            "compatibility": { "fits": 14, "maybe": 3, "does_not_fit": 81 }
+            "price_range_uzs": {
+              "min": 95000,
+              "max": 1850000
+            },
+            "compatibility": {
+              "fits": 14,
+              "maybe": 3,
+              "does_not_fit": 81
+            }
           },
           "page": 1,
           "page_size": 20,
@@ -530,10 +675,27 @@
           "status": "fits",
           "confidence": 0.97,
           "matched_trims": [
-            { "trim_id": "trim_chevrolet_cobalt_ls_at", "years": [2018, 2019, 2020, 2021] },
-            { "trim_id": "trim_chevrolet_cobalt_lt_at", "years": [2019, 2020, 2021] }
+            {
+              "trim_id": "trim_chevrolet_cobalt_ls_at",
+              "years": [
+                2018,
+                2019,
+                2020,
+                2021
+              ]
+            },
+            {
+              "trim_id": "trim_chevrolet_cobalt_lt_at",
+              "years": [
+                2019,
+                2020,
+                2021
+              ]
+            }
           ],
-          "matched_engines": ["engine_b15d2_1_5l_petrol"],
+          "matched_engines": [
+            "engine_b15d2_1_5l_petrol"
+          ],
           "source": "manufacturer_oem_mapping"
         }
       },
@@ -542,7 +704,8 @@
         "expo-image: prefetch items[].images[0] for the visible window via Image.prefetch on FlashList onViewableItemsChanged.",
         "react-native-mmkv: read 'mator.garage.primary_id' to auto-populate vehicle_id filter; the absence of it disables the 'Fits your car' chip.",
         "expo-haptics: Haptics.selectionAsync on filter chip toggle and Haptics.notificationAsync(Success) when the 'fits' badge is tapped to add to cart.",
-        "shopify/flash-list FlashList: estimatedItemSize=320, keyExtractor=id, disableAutoLayout for perf on the long catalog list."
+        "shopify/flash-list FlashList: estimatedItemSize=320, keyExtractor=id, disableAutoLayout for perf on the long catalog list.",
+        "Filter model updated (2026): `region` is sent as REPEATED query params (region=china&region=korea; keys china|europe|russia|korea|usa = market of origin); `gm_only=true` restricts to GM brands (Chevrolet/Ravon/Daewoo); the price-range slider was removed so price is sort-only (`sort` = price_asc|price_desc). Server-side: category/make/model/region/gm_only; client-side refinement: brand/sort/search/in_stock/OEM. The endpoint STRICTLY rejects unknown query params with 400."
       ]
     },
     {
@@ -575,7 +738,11 @@
           "role": "user",
           "content": "Mening Cobaltimda dvigatel sovuq holatda titrayapti. Sabab nima bo'lishi mumkin?",
           "attachments": [
-            { "type": "image", "url": "https://uploads.mator.uz/u/9a8e1d2c/2026-06-11/engine-photo.jpg", "mime": "image/jpeg" }
+            {
+              "type": "image",
+              "url": "https://uploads.mator.uz/u/9a8e1d2c/2026-06-11/engine-photo.jpg",
+              "mime": "image/jpeg"
+            }
           ],
           "stream": true
         }
@@ -598,11 +765,23 @@
           "content": "Sovuq holatda titrash ko'pincha quyidagilardan biri sabab bo'ladi: 1) Sham (svecha) yoki ularning ulangichlari eskirgan. 2) Yonilg'i forsunkalari iflos. 3) Yonilg'i bosimi past. Birinchi qadam — diagnostika qilib OBD-II kodlarini tekshirish. Sizning 2019 Chevrolet Cobalt B15D2 uchun mos shamlar va forsunka tozalagichlarni katalogda topishingiz mumkin.",
           "structured": {
             "suggested_parts": [
-              { "part_id": "part_01HXC3KK5B3C9S9LK0N1AB2X9V", "title": "Iridium spark plug NGK", "price_uzs": 75000 },
-              { "part_id": "part_01HXC3KP9G8H3W3LK0N1AB2X9V", "title": "Forsunka tozalagich Wynn's", "price_uzs": 45000 }
+              {
+                "part_id": "part_01HXC3KK5B3C9S9LK0N1AB2X9V",
+                "title": "Iridium spark plug NGK",
+                "price_uzs": 75000
+              },
+              {
+                "part_id": "part_01HXC3KP9G8H3W3LK0N1AB2X9V",
+                "title": "Forsunka tozalagich Wynn's",
+                "price_uzs": 45000
+              }
             ],
             "suggested_services": [
-              { "service_id": "svc_diag_full", "name": "To'liq diagnostika", "price_uzs": 150000 }
+              {
+                "service_id": "svc_diag_full",
+                "name": "To'liq diagnostika",
+                "price_uzs": 150000
+              }
             ],
             "confidence": 0.78,
             "disclaimer": "AI maslahati. Aniq tashxis uchun mexanikaga murojaat qiling."
@@ -613,8 +792,18 @@
         "session_restore_response": {
           "session_id": "ai_01HXC3KM7E6F1U1LK0N1AB2X9V",
           "messages": [
-            { "message_id": "msg_01HXC3KM9X0Y4Z4LK0N1AB2X9V", "role": "user", "content": "Mening Cobaltimda dvigatel sovuq holatda titrayapti...", "created_at": "2026-06-11T14:42:31.000Z" },
-            { "message_id": "msg_01HXC3KN8F7G2V2LK0N1AB2X9V", "role": "assistant", "content": "Sovuq holatda titrash...", "created_at": "2026-06-11T14:42:33.812Z" }
+            {
+              "message_id": "msg_01HXC3KM9X0Y4Z4LK0N1AB2X9V",
+              "role": "user",
+              "content": "Mening Cobaltimda dvigatel sovuq holatda titrayapti...",
+              "created_at": "2026-06-11T14:42:31.000Z"
+            },
+            {
+              "message_id": "msg_01HXC3KN8F7G2V2LK0N1AB2X9V",
+              "role": "assistant",
+              "content": "Sovuq holatda titrash...",
+              "created_at": "2026-06-11T14:42:33.812Z"
+            }
           ]
         }
       },
@@ -660,8 +849,17 @@
         "create_order": {
           "cart_snapshot": {
             "items": [
-              { "part_id": "part_01HXC3KK5B3C9S9LK0N1AB2X9V", "qty": 1, "price_uzs": 185000 },
-              { "service_id": "svc_diag_full", "master_id": "master_01HXC3KG7T8U5O5LK0N1AB2X9V", "scheduled_at": "2026-06-12T09:00:00+05:00", "price_uzs": 150000 }
+              {
+                "part_id": "part_01HXC3KK5B3C9S9LK0N1AB2X9V",
+                "qty": 1,
+                "price_uzs": 185000
+              },
+              {
+                "service_id": "svc_diag_full",
+                "master_id": "master_01HXC3KG7T8U5O5LK0N1AB2X9V",
+                "scheduled_at": "2026-06-12T09:00:00+05:00",
+                "price_uzs": 150000
+              }
             ],
             "delivery_address_id": "addr_01HXC3KQ4J3K5X5LK0N1AB2X9V",
             "delivery_method": "courier",
@@ -690,8 +888,20 @@
           "total_uzs": 365000,
           "currency": "UZS",
           "items": [
-            { "part_id": "part_01HXC3KK5B3C9S9LK0N1AB2X9V", "title": "Cobalt Remen Generator Xitoy Original", "qty": 1, "price_uzs": 185000, "line_total_uzs": 185000 },
-            { "service_id": "svc_diag_full", "title": "To'liq diagnostika — Bobur Auto Servis", "qty": 1, "price_uzs": 150000, "line_total_uzs": 150000 }
+            {
+              "part_id": "part_01HXC3KK5B3C9S9LK0N1AB2X9V",
+              "title": "Cobalt Remen Generator Xitoy Original",
+              "qty": 1,
+              "price_uzs": 185000,
+              "line_total_uzs": 185000
+            },
+            {
+              "service_id": "svc_diag_full",
+              "title": "To'liq diagnostika — Bobur Auto Servis",
+              "qty": 1,
+              "price_uzs": 150000,
+              "line_total_uzs": 150000
+            }
           ],
           "expires_at": "2026-06-11T15:00:00.000Z"
         },
@@ -789,14 +999,22 @@
             "master_messages": true,
             "marketing": false
           },
-          "quiet_hours": { "start": "22:00", "end": "08:00" }
+          "quiet_hours": {
+            "start": "22:00",
+            "end": "08:00"
+          }
         }
       },
       "response_data": {
         "register_device_response": {
           "device_id": "dev_01HXC3KU8O7P9B9LK0N1AB2X9V",
           "registered_at": "2026-06-11T14:31:01.000Z",
-          "topics_subscribed": ["orders", "payments", "ai_replies", "master_messages"]
+          "topics_subscribed": [
+            "orders",
+            "payments",
+            "ai_replies",
+            "master_messages"
+          ]
         },
         "outbound_push_envelope": {
           "to": "ExponentPushToken[xY9-aB3cD2eF4gH5iJ6kL7mN8oP9qR0sT1u]",
@@ -814,16 +1032,54 @@
             "order_id": "ord_01HXC3KR5L4M6Y6LK0N1AB2X9V",
             "payment_id": "pay_01HXC3KS6M5N7Z7LK0N1AB2X9V",
             "deeplink_path": "/(tabs)/(cart)/order-confirmation",
-            "deeplink_params": { "orderId": "ord_01HXC3KR5L4M6Y6LK0N1AB2X9V" }
+            "deeplink_params": {
+              "orderId": "ord_01HXC3KR5L4M6Y6LK0N1AB2X9V"
+            }
           }
         },
         "routing_matrix": [
-          { "data.type": "order_paid", "expo_router_path": "/(tabs)/(cart)/order-confirmation", "params": ["orderId"] },
-          { "data.type": "order_status_changed", "expo_router_path": "/(tabs)/(cart)/track-order", "params": ["orderId", "status"] },
-          { "data.type": "ai_reply", "expo_router_path": "/(tabs)/(explore)/ai-chat", "params": ["sessionId"] },
-          { "data.type": "master_message", "expo_router_path": "/(tabs)/(explore)/master-detail/[id]", "params": ["id", "threadId"] },
-          { "data.type": "myid_verified", "expo_router_path": "/(auth)/identity-complete", "params": [] },
-          { "data.type": "marketing", "expo_router_path": "/(tabs)/(explore)", "params": ["campaignId"] }
+          {
+            "data.type": "order_paid",
+            "expo_router_path": "/(tabs)/(cart)/order-confirmation",
+            "params": [
+              "orderId"
+            ]
+          },
+          {
+            "data.type": "order_status_changed",
+            "expo_router_path": "/(tabs)/(cart)/track-order",
+            "params": [
+              "orderId",
+              "status"
+            ]
+          },
+          {
+            "data.type": "ai_reply",
+            "expo_router_path": "/(tabs)/(explore)/ai-chat",
+            "params": [
+              "sessionId"
+            ]
+          },
+          {
+            "data.type": "master_message",
+            "expo_router_path": "/(tabs)/(explore)/master-detail/[id]",
+            "params": [
+              "id",
+              "threadId"
+            ]
+          },
+          {
+            "data.type": "myid_verified",
+            "expo_router_path": "/(auth)/identity-complete",
+            "params": []
+          },
+          {
+            "data.type": "marketing",
+            "expo_router_path": "/(tabs)/(explore)",
+            "params": [
+              "campaignId"
+            ]
+          }
         ],
         "inbox_response": {
           "items": [
@@ -837,7 +1093,9 @@
               "data": {
                 "order_id": "ord_01HXC3KR5L4M6Y6LK0N1AB2X9V",
                 "deeplink_path": "/(tabs)/(cart)/order-confirmation",
-                "deeplink_params": { "orderId": "ord_01HXC3KR5L4M6Y6LK0N1AB2X9V" }
+                "deeplink_params": {
+                  "orderId": "ord_01HXC3KR5L4M6Y6LK0N1AB2X9V"
+                }
               }
             }
           ],
@@ -854,6 +1112,119 @@
         "expo-router deep linking: const path = routing_matrix.find(r => r.type === data.type).expo_router_path; router.push({ pathname: path, params: pick(data, r.params) }) — use routing_matrix as the single source of truth so backend can extend without a client release.",
         "Cold-start guard: in app/_layout.tsx run const last = await Notifications.getLastNotificationResponseAsync(); if present and not yet processed (compare data.notification_id against MMKV 'mator.push.last_handled'), route once on mount.",
         "Permissions: Notifications.requestPermissionsAsync({ ios: { allowAlert: true, allowBadge: true, allowSound: true, allowAnnouncements: false } }) deferred to after the first sign-in success (not on cold start) to avoid burning the prompt."
+      ]
+    },
+    {
+      "screen_name": "ExploreLandingScreen",
+      "api_endpoints": [
+        {
+          "method": "GET",
+          "url": "/v1/vehicle-catalog/brands",
+          "description": "Shop-by-vehicle tiles on the explore/home landing — UZ-market makes with logo assets, ordered by catalog inventory. Tapping a tile opens the make -> model -> master systems -> parts catalog flow."
+        },
+        {
+          "method": "GET",
+          "url": "/v1/categories",
+          "description": "Shop-by-category grid with live per-category part counts. When vehicle_id is supplied, counts are scoped to parts that fit the active vehicle."
+        },
+        {
+          "method": "GET",
+          "url": "/v1/dealers",
+          "description": "MATOR Certified row — verified storefronts/dealers shown under the category grid."
+        }
+      ],
+      "request_payload": {
+        "brands_query_params": {
+          "locale": "uz",
+          "market": "uz",
+          "limit": 24
+        },
+        "categories_query_params": {
+          "locale": "uz",
+          "vehicle_id": "veh_01HXC3KF6S7T4N4LK0N1AB2X9V"
+        },
+        "dealers_query_params": {
+          "locale": "uz",
+          "certified_only": true,
+          "limit": 10
+        }
+      },
+      "response_data": {
+        "brands_response": {
+          "items": [
+            {
+              "id": "brand_chevrolet",
+              "name": "Chevrolet",
+              "slug": "chevrolet",
+              "region": "usa",
+              "logoUrl": "https://cdn.mator.uz/brands/chevrolet.svg",
+              "modelCount": 38,
+              "partCount": 12480
+            },
+            {
+              "id": "brand_byd",
+              "name": "BYD",
+              "slug": "byd",
+              "region": "china",
+              "logoUrl": "https://cdn.mator.uz/brands/byd.svg",
+              "modelCount": 11,
+              "partCount": 882
+            }
+          ],
+          "total": 14
+        },
+        "categories_response": {
+          "items": [
+            {
+              "id": "cat_brakes",
+              "name": "Brakes",
+              "slug": "brakes",
+              "count": 1284,
+              "iconKey": "brakes",
+              "color": "#EA4335"
+            },
+            {
+              "id": "cat_engine",
+              "name": "Engine",
+              "slug": "engine",
+              "count": 2571,
+              "iconKey": "engine",
+              "color": "#4285F4"
+            }
+          ],
+          "total": 12
+        },
+        "dealers_response": {
+          "items": [
+            {
+              "id": "dlr_avto_bozor",
+              "name": "Avto Bozor Parts",
+              "initial": "A",
+              "color": "#34A853",
+              "ordersLabel": "3.2k orders",
+              "years": 6,
+              "certified": true
+            },
+            {
+              "id": "dlr_gm_uz",
+              "name": "GM Uzbekistan OEM",
+              "initial": "G",
+              "color": "#4285F4",
+              "ordersLabel": "8.9k orders",
+              "years": 11,
+              "certified": true
+            }
+          ],
+          "total": 4
+        }
+      },
+      "native_integration_details": [
+        "Frontend: components/screens/explore-screen.tsx. The home landing was rebuilt into: Shop-by-vehicle (VehicleMakeTile + LOGO_BRANDS), Shop-by-category (CategoryTile grid + MATOR_CAT_TILES with live counts), MATOR Certified (CertifiedSection), and a MatorFitBanner.",
+        "These three sections are currently seeded from local constants (LOGO_BRANDS, MATOR_CAT_TILES, MATOR_DEALERS) + asset SVGs — the endpoints here replace those seeds. Category `count` must be REAL per-category inventory; when a primary vehicle exists the client may pass vehicle_id to scope counts to fitting parts.",
+        "Shop-by-category tile press routes into the catalog flow (PartsCatalogueScreen / GET /v1/catalog/parts) carrying `category`, plus the region + gm_only + sort filters chosen in the filter sheet.",
+        "Shop-by-vehicle tile press routes make -> model -> master systems -> parts; brand `logoUrl` drives the tile art (falls back to a monogram when absent).",
+        "Quick-filter chips reuse GET /v1/search/quick-filters (ExploreQuickFiltersStrip); the header notification bell links to the notifications inbox (PushNotificationRouter) and was restyled to a borderless icon (no backend impact). NOTE: the home landing does NOT render Top Featured — that surface lives on Search + the dedicated /top-featured screen.",
+        "Optional optimization: a single aggregate GET /v1/explore/home returning { brands, categories, dealers } would collapse the landing to one roundtrip; the split endpoints above are the minimum contract."
       ]
     },
     {
@@ -876,7 +1247,9 @@
           "limit": 20,
           "pageToken": null,
           "filters": {
-            "categories": ["cat_engine_belts"],
+            "categories": [
+              "cat_engine_belts"
+            ],
             "price": "any",
             "minRating": "any"
           },
@@ -911,22 +1284,42 @@
           "durationMs": 84,
           "nextPageToken": null,
           "facetCounts": {
-            "categories": { "Dvigatel kamarlari": 12, "Generator": 6 },
-            "price": { "under_200k": 8, "200k_to_500k": 7 },
-            "minRating": { "4plus": 14 }
+            "categories": {
+              "Dvigatel kamarlari": 12,
+              "Generator": 6
+            },
+            "price": {
+              "under_200k": 8,
+              "200k_to_500k": 7
+            },
+            "minRating": {
+              "4plus": 14
+            }
           },
           "appliedFilters": {
-            "categories": ["cat_engine_belts"],
+            "categories": [
+              "cat_engine_belts"
+            ],
             "price": "any",
             "minRating": "any"
           },
           "didYouMean": null,
-          "suggestedCategories": ["Dvigatel kamarlari", "Generator"]
+          "suggestedCategories": [
+            "Dvigatel kamarlari",
+            "Generator"
+          ]
         },
         "typeahead_response": {
           "suggestions": [
-            { "text": "remen generator", "type": "query" },
-            { "text": "Cobalt Remen Generator Xitoy Original", "type": "product", "deeplink": "/(tabs)/(explore)/item-detail/part_01HXC3KK5B3C9S9LK0N1AB2X9V" }
+            {
+              "text": "remen generator",
+              "type": "query"
+            },
+            {
+              "text": "Cobalt Remen Generator Xitoy Original",
+              "type": "product",
+              "deeplink": "/(tabs)/(explore)/item-detail/part_01HXC3KK5B3C9S9LK0N1AB2X9V"
+            }
           ]
         }
       },
@@ -954,11 +1347,43 @@
       "response_data": {
         "response": {
           "items": [
-            { "id": "qf-cobalt",   "label": "Cobalt",    "slug": "cobalt",    "kind": "brand", "count": 1240, "iconUrl": "https://cdn.mator.uz/brands/chevrolet.svg" },
-            { "id": "qf-byd",      "label": "BYD",       "slug": "byd",       "kind": "brand", "count": 882,  "iconUrl": "https://cdn.mator.uz/brands/byd.svg" },
-            { "id": "qf-lacetti",  "label": "Lacetti",   "slug": "lacetti",   "kind": "brand", "count": 614 },
-            { "id": "qf-tracker",  "label": "Tracker",   "slug": "tracker",   "kind": "brand", "count": 503 },
-            { "id": "qf-leapmotor","label": "Leapmotor", "slug": "leapmotor", "kind": "brand", "count": 297 }
+            {
+              "id": "qf-cobalt",
+              "label": "Cobalt",
+              "slug": "cobalt",
+              "kind": "brand",
+              "count": 1240,
+              "iconUrl": "https://cdn.mator.uz/brands/chevrolet.svg"
+            },
+            {
+              "id": "qf-byd",
+              "label": "BYD",
+              "slug": "byd",
+              "kind": "brand",
+              "count": 882,
+              "iconUrl": "https://cdn.mator.uz/brands/byd.svg"
+            },
+            {
+              "id": "qf-lacetti",
+              "label": "Lacetti",
+              "slug": "lacetti",
+              "kind": "brand",
+              "count": 614
+            },
+            {
+              "id": "qf-tracker",
+              "label": "Tracker",
+              "slug": "tracker",
+              "kind": "brand",
+              "count": 503
+            },
+            {
+              "id": "qf-leapmotor",
+              "label": "Leapmotor",
+              "slug": "leapmotor",
+              "kind": "brand",
+              "count": 297
+            }
           ],
           "snapshotVersion": "qf-2026-06-11-v1"
         }
@@ -976,7 +1401,7 @@
         {
           "method": "POST",
           "url": "/v1/top-featured/list",
-          "description": "Returns the curated Top Featured grid + available filter facets. Used by both the explore-landing preview and the dedicated /top-featured screen. Brand chip on explore narrows scope via `filters.brand`."
+          "description": "Returns the curated Top Featured grid + available filter facets. Used by the smart-search Top Featured strip (SearchTopFeatured) and the dedicated /top-featured screen — NOT the home landing. A `filters.brand` narrows scope when opened with a brand param."
         }
       ],
       "request_payload": {
@@ -1018,8 +1443,16 @@
               "key": "brand",
               "title": "Brand",
               "options": [
-                { "value": "Cobalt", "label": "Cobalt", "count": 2 },
-                { "value": "BYD", "label": "BYD", "count": 1 }
+                {
+                  "value": "Cobalt",
+                  "label": "Cobalt",
+                  "count": 2
+                },
+                {
+                  "value": "BYD",
+                  "label": "BYD",
+                  "count": 1
+                }
               ]
             }
           ],
@@ -1029,7 +1462,7 @@
       },
       "native_integration_details": [
         "Frontend transport: services/top-featured-service.ts (HttpTopFeaturedTransport).",
-        "When the user arrives via the explore brand chip's 'View all', the brand is locked via route param — the View-All screen hides Model + Color filters since those would only narrow the user's already-chosen vehicle.",
+        "When the user arrives via the search Top Featured strip's 'View all', the brand is locked via route param — the View-All screen hides Model + Color filters since those would only narrow the user's already-chosen vehicle.",
         "Realtime: socketChannel name from the response is used by the future live-refresh consumer to subscribe for create/update/delete events."
       ]
     },
@@ -1083,7 +1516,9 @@
           "status": "Ready to ship",
           "imageUrl": "https://cdn.mator.uz/parts/01HXC3KK5B/main.webp"
         },
-        "apply_promo": { "code": "MATOR10" }
+        "apply_promo": {
+          "code": "MATOR10"
+        }
       },
       "response_data": {
         "snapshot": {
@@ -1096,7 +1531,11 @@
               "imageUrl": "https://cdn.mator.uz/parts/01HXC3KK5B/main.webp"
             }
           ],
-          "promo": { "code": "MATOR10", "discountUzs": 18500, "isValid": true }
+          "promo": {
+            "code": "MATOR10",
+            "discountUzs": 18500,
+            "isValid": true
+          }
         }
       },
       "native_integration_details": [
@@ -1114,7 +1553,9 @@
         }
       ],
       "request_payload": {
-        "multipart_form": { "file": "<jpeg blob, max 5MB>" }
+        "multipart_form": {
+          "file": "<jpeg blob, max 5MB>"
+        }
       },
       "response_data": {
         "response": {
@@ -1150,7 +1591,10 @@
             "garage.vehicle.status.updated"
           ]
         },
-        "ping_frame": { "type": "ping", "t": 1750000000000 }
+        "ping_frame": {
+          "type": "ping",
+          "t": 1750000000000
+        }
       },
       "response_data": {
         "vehicle_status_updated_event": {
@@ -1178,8 +1622,14 @@
             "vehicle": {
               "id": "veh_01HXC3KF6S7T4N4LK0N1AB2X9V",
               "is_primary": true,
-              "make": { "id": "make_chevrolet", "name": "Chevrolet" },
-              "model": { "id": "model_chevrolet_cobalt", "name": "Cobalt" },
+              "make": {
+                "id": "make_chevrolet",
+                "name": "Chevrolet"
+              },
+              "model": {
+                "id": "model_chevrolet_cobalt",
+                "name": "Cobalt"
+              },
               "year": 2019,
               "mileage_km": 67500
             }

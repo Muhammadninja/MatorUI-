@@ -1,4 +1,3 @@
-import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import type { CartItem } from '@/contexts/cart.context';
 
@@ -18,10 +17,7 @@ export default function CartItemsSection({
   onRemove,
 }: CartItemsSectionProps) {
   return (
-    <AppView gap={12}>
-      <AppText textVariant="subtitle" family="accent">
-        Cart items
-      </AppText>
+    <AppView gap="md">
       {items.map((item) => (
         <CartItemCard
           key={item.id}

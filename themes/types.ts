@@ -6,6 +6,11 @@ export type ThemeTokens = {
   onCard: string;
   text: string;
   onBackground: string;
+  /** Muted body/label text per the Mator handoff (#707070 light, #8f8f8f
+   *  dark). Distinct from `gray400`, which is tuned as a neutral ramp step;
+   *  `textMuted` is the exact secondary-text value the design spec calls for
+   *  (eyebrows, subtitles, captions). */
+  textMuted: string;
   border: string;
   divider: string;
   overlay: string;
@@ -59,11 +64,19 @@ export type ThemeTokens = {
    *  (black ribbon), deeper in dark mode (white ribbon). Separate from
    *  `success` because that token is tuned for normal page backgrounds. */
   value: string;
+  /** Text color that sits ON the green "SAVE X%" savings pill (`value`
+   *  background). Deep green (#05310f) per the handoff so the label reads
+   *  as high-contrast on the bright pill in both themes. */
+  onValue: string;
   /** Near-black backdrop for badges, modal scrims, and other "always
    *  dark over content" surfaces. Theme-independent — scrims read as
    *  dark in both light and dark mode (they sit ON photographic content,
    *  not next to neutral chrome). Use instead of hardcoded
    *  `rgba(0,0,0,0.x)` values. */
   scrim: string;
+  /** Low-alpha brand tint (~12% opacity). Replaces the repeated
+   *  `\`${tokens.brand}1F\`` pattern. Use for tinted fill backgrounds
+   *  on brand-accented icons, badges, and highlights. */
+  brandSoft: string;
   [key: string]: string;
 };

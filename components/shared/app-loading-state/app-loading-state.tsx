@@ -1,7 +1,6 @@
-import { ActivityIndicator } from 'react-native';
-
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
+import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useThemeContext } from '@/contexts/theme.context';
 import type { ColorName } from '@/themes';
 
@@ -31,7 +30,7 @@ export function AppLoadingState({
   const { tokens } = useThemeContext();
   return (
     <AppView flex={1} center gap={12}>
-      <ActivityIndicator size={size} color={tokens[spinnerColorName]} />
+      <WheelLoader size={size === 'large' ? 44 : 28} color={tokens[spinnerColorName]} />
       {label ? (
         <AppText textVariant="bodySm" colorName={labelColorName}>
           {label}

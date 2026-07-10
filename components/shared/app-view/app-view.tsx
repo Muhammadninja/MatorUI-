@@ -42,6 +42,8 @@ export type AppViewProps = Omit<ViewProps, 'style'> & {
   columnGap?: SpaceValue;
   /** Rounded corners (number maps to borderRadius) */
   rounded?: number;
+  /** Alias for `rounded` using the RN style name. `rounded` wins if both set. */
+  borderRadius?: number;
   roundedTop?: number;
   roundedBottom?: number;
   roundedLeft?: number;
@@ -97,6 +99,7 @@ const AppViewBase = forwardRef<View, AppViewProps>(function AppView(
     rowGap,
     columnGap,
     rounded,
+    borderRadius,
     roundedTop,
     roundedBottom,
     roundedLeft,
@@ -152,6 +155,7 @@ const AppViewBase = forwardRef<View, AppViewProps>(function AppView(
     const flexbox = composeFlexbox({ row, center, align, justify, wrap, flex, grow, shrink });
     const rounding = composeRounding({
       rounded,
+      borderRadius,
       roundedTop,
       roundedBottom,
       roundedLeft,
@@ -207,6 +211,7 @@ const AppViewBase = forwardRef<View, AppViewProps>(function AppView(
     grow,
     shrink,
     rounded,
+    borderRadius,
     roundedTop,
     roundedBottom,
     roundedLeft,

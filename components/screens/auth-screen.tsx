@@ -109,18 +109,6 @@ export default function AuthScreen({ mode }: AuthScreenProps) {
     }
   };
 
-  const handleSocial = (provider: 'apple' | 'google') => {
-    triggerHaptic('selection');
-    toast.info(`${provider === 'apple' ? 'Apple' : 'Google'} sign-in placeholder`);
-  };
-
-  const handleForgot = () => {
-    triggerHaptic('selection');
-    toast.info('Password reset', {
-      description: 'Reset email will fire once the auth backend lands.',
-    });
-  };
-
   const switchMode = () => {
     triggerHaptic('selection');
     const target = isSignup ? '/sign-in' : '/sign-up';
@@ -140,7 +128,7 @@ export default function AuthScreen({ mode }: AuthScreenProps) {
           borderBottomColor: tokens.divider,
         }}
       >
-        <AppView row align="center" justify="space-between" px={16} pt={8} pb={12}>
+        <AppView row align="center" justify="space-between" px="lg" pt="sm" pb="md">
           <AppPressableView
             center
             rounded={36}
@@ -193,22 +181,14 @@ export default function AuthScreen({ mode }: AuthScreenProps) {
 
         {/* Social — side-by-side on signup to save vertical space */}
         {isSignup ? (
-          <AppView row gap={8}>
-            <SocialButton label="Apple" Icon={Apple} compact onPress={() => handleSocial('apple')} />
-            <SocialButton label="Google" Icon={Globe} compact onPress={() => handleSocial('google')} />
+          <AppView row gap="sm">
+            <SocialButton label="Apple · Soon" Icon={Apple} compact disabled />
+            <SocialButton label="Google · Soon" Icon={Globe} compact disabled />
           </AppView>
         ) : (
           <AppView gap={10}>
-            <SocialButton
-              label="Continue with Apple"
-              Icon={Apple}
-              onPress={() => handleSocial('apple')}
-            />
-            <SocialButton
-              label="Continue with Google"
-              Icon={Globe}
-              onPress={() => handleSocial('google')}
-            />
+            <SocialButton label="Continue with Apple · Soon" Icon={Apple} disabled />
+            <SocialButton label="Continue with Google · Soon" Icon={Globe} disabled />
           </AppView>
         )}
 
@@ -273,6 +253,7 @@ export default function AuthScreen({ mode }: AuthScreenProps) {
                 onPress={() => setShowPassword((s) => !s)}
                 androidRipple={false}
                 accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 style={{ paddingHorizontal: 4, paddingVertical: 4 }}
               >
                 {showPassword ? (
@@ -308,13 +289,19 @@ export default function AuthScreen({ mode }: AuthScreenProps) {
 
           {!isSignup ? (
             <AppView align="flex-end">
-              <AppPressableView onPress={handleForgot} androidRipple={false}>
+              <AppPressableView
+                disabled
+                androidRipple={false}
+                accessibilityLabel="Forgot password (coming soon)"
+                accessibilityState={{ disabled: true }}
+                style={{ opacity: 0.5 }}
+              >
                 <AppText
                   textVariant="bodyXs"
                   weight="semibold"
                   style={{ textDecorationLine: 'underline', color: tokens.text }}
                 >
-                  Forgot password?
+                  Forgot password? · Soon
                 </AppText>
               </AppPressableView>
             </AppView>
@@ -362,23 +349,24 @@ function SocialButton({
   label,
   Icon,
   compact,
-  onPress,
+  disabled,
 }: {
   label: string;
   Icon: ComponentType<{ size?: number; strokeWidth?: number; color?: string }>;
   compact?: boolean;
-  onPress: () => void;
+  disabled?: boolean;
 }) {
   const { tokens, scheme } = useThemeContext();
   const isDark = scheme === 'dark';
   return (
     <AppPressableView
-      onPress={onPress}
+      disabled={disabled}
+      accessibilityState={{ disabled }}
       row
       align="center"
       justify="center"
       gap={10}
-      androidRipple
+      androidRipple={!disabled}
       style={{
         flex: compact ? 1 : undefined,
         borderRadius: 14,
@@ -386,6 +374,7 @@ function SocialButton({
         borderColor: tokens.border,
         paddingVertical: compact ? 12 : 14,
         backgroundColor: isDark ? tokens.card : tokens.white,
+        opacity: disabled ? 0.5 : 1,
       }}
     >
       <Icon size={17} strokeWidth={2.2} color={tokens.text} />

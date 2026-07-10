@@ -28,9 +28,13 @@ export default function ProfileRecentlyViewed() {
     router.push('/recently-viewed');
   };
 
+  const openItem = (id: string) => {
+    router.push(`/item-detail/${id}`);
+  };
+
   return (
     <AppView gap={10}>
-      <AppView row align="center" justify="flex-end" px={16}>
+      <AppView row align="center" justify="flex-end" px="lg">
         <AppPressableView
           androidRipple={false}
           pressedOpacity={0.6}
@@ -56,6 +60,7 @@ export default function ProfileRecentlyViewed() {
             androidRipple={false}
             pressedOpacity={0.88}
             pressedScale={0.98}
+            onPress={() => openItem(item.id)}
             accessibilityRole="button"
             accessibilityLabel={`${item.name}, ${item.price}`}
             style={{

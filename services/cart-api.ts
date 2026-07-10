@@ -209,6 +209,6 @@ export class HttpCartTransport implements CartTransport {
 // ── Singleton ────────────────────────────────────────────────────────
 
 /** Flips automatically based on `EXPO_PUBLIC_API_BASE_URL`. */
-export const cartTransport: CartTransport = shouldUseHttpTransport()
+export const cartTransport: CartTransport = shouldUseHttpTransport('cart')
   ? new HttpCartTransport()
   : new MockCartTransport();

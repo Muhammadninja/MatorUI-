@@ -1,12 +1,12 @@
 import { Stack } from 'expo-router';
 
-import AuthScreen from '@/components/screens/auth-screen';
+import MatorSignInScreen from '@/components/screens/mator-sign-in-screen';
 
 export default function SignInRoute() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <AuthScreen mode="login" />
+      <MatorSignInScreen />
     </>
   );
 }

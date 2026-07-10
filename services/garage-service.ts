@@ -353,7 +353,7 @@ class GarageService {
 // (e.g. for a "switch to mock" debug toggle).
 
 function createGarageTransport(): GarageTransport {
-  return shouldUseHttpTransport() ? new HttpGarageTransport() : new MockGarageTransport();
+  return shouldUseHttpTransport('garage') ? new HttpGarageTransport() : new MockGarageTransport();
 }
 
 export const garageService = new GarageService(createGarageTransport());

@@ -1,20 +1,11 @@
 import { BlurView } from 'expo-blur';
 import {
-    Car,
     ChevronDown,
-    ChevronRight,
-    Gauge,
     MoreVertical,
-    Receipt,
     RefreshCw,
-    ScanSearch,
-    SlidersHorizontal,
     Sparkles,
-    Tag,
     ThumbsDown,
     ThumbsUp,
-    Wrench,
-    X,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -33,7 +24,6 @@ import { KeyboardStickyView } from 'react-native-keyboard-controller';
 
 import AiChatComposer from '@/components/screens-components/ai-chat/ai-chat-composer';
 import AiChatMessageBubble from '@/components/screens-components/ai-chat/ai-chat-message-bubble';
-import AiChatSuggestionChip from '@/components/screens-components/ai-chat/ai-chat-suggestion-chip';
 import AiChatTypingDots from '@/components/screens-components/ai-chat/ai-chat-typing-dots';
 import ComposerBlurWrapper from '@/components/screens-components/ai-chat/composer-blur-wrapper';
 import VehicleContextBar from '@/components/screens-components/ai-chat/vehicle-context-bar';
@@ -41,6 +31,7 @@ import ScreenShell from '@/components/screens-components/screen-shell';
 import { AppIconButton } from '@/components/shared/app-icon-button';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
+import { useActiveVehicle } from '@/contexts/active-vehicle.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import useGarage from '@/hooks/use-garage';
 import { useGlobalModal } from '@/hooks/use-global-modal';
@@ -56,13 +47,12 @@ import type {
 import { triggerHaptic } from '@/utils/haptics';
 import { router } from 'expo-router';
 
-const QUICK_PROMPTS = [
-  { key: 'fitment', label: 'Check part fitment', Icon: Wrench },
-  { key: 'orders', label: 'Track orders', Icon: Receipt },
-  { key: 'compare', label: 'Compare brands', Icon: SlidersHorizontal },
-  { key: 'upgrade', label: 'Upgrades for my build', Icon: Gauge },
-  { key: 'deals', label: 'Deals for my car', Icon: Tag },
-  { key: 'identify', label: 'Identify a part', Icon: ScanSearch },
+/** Handoff §16 suggestion chips — tap fills the composer. */
+const SUGGESTION_CHIPS = [
+  { key: 'brakes', label: 'Brakes squeaking' },
+  { key: 'oil', label: 'Need an oil filter' },
+  { key: 'engine', label: 'Check engine light' },
+  { key: 'spark', label: 'Best spark plugs' },
 ] as const;
 
 type StreamingReply = {
@@ -118,6 +108,7 @@ export default function AiChatbot() {
   const { tokens } = useThemeContext();
   const { openConfirm } = useGlobalModal();
   const { primaryVehicle } = useGarage();
+  const { currentActiveVehicle } = useActiveVehicle();
   const [historyItems, setHistoryItems] = useState<AiChatConversationSummary[]>([]);
 
   // Load conversations from the transport. Real backend pushes the full
@@ -154,6 +145,12 @@ export default function AiChatbot() {
   const [showScrollToLatest, setShowScrollToLatest] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
+  // Synchronous in-flight gate. `isSending` is derived from render state
+  // (streamingReply !== null) and is captured stale in the sendMessage
+  // closure, so two sends in the same tick both see false and race —
+  // overwriting abortRef and orphaning the first stream. This ref is the
+  // authoritative concurrency gate, set/cleared imperatively.
+  const sendingRef = useRef(false);
   const scrollRef = useRef<ScrollView | null>(null);
   const isAtBottomRef = useRef(true);
   const isSending = streamingReply !== null;
@@ -197,7 +194,9 @@ export default function AiChatbot() {
       options: { retryUserId?: string; replaceLastAssistant?: boolean } = {},
     ) => {
       const trimmed = text.trim();
-      if (!trimmed || isSending) return;
+      // Authoritative synchronous guard — see sendingRef declaration.
+      if (!trimmed || sendingRef.current) return;
+      sendingRef.current = true;
 
       const { retryUserId, replaceLastAssistant } = options;
       triggerHaptic('selection');
@@ -258,7 +257,7 @@ export default function AiChatbot() {
       try {
         let body = '';
         let replyId = replyDraft.id;
-        let title = 'Matorui Assistant';
+        let title = 'Mator AI';
         let createdAt = new Date().toISOString();
         let suggestions: string[] = [];
         let convoId = conversationId;
@@ -347,6 +346,9 @@ export default function AiChatbot() {
         if (abortRef.current === controller) {
           abortRef.current = null;
         }
+        // Release the synchronous gate so the next send is allowed once
+        // this stream completes or aborts.
+        sendingRef.current = false;
       }
     },
     [conversationId, isSending, scrollToEnd, vehicleContext],
@@ -443,7 +445,7 @@ export default function AiChatbot() {
   // component stays presentational.
   const handleAssistantAvatarPress = useCallback(() => {
     triggerHaptic('selection');
-    toastService.info('Matorui Copilot', {
+    toastService.info('Mator AI', {
       description: 'AI assistant for parts, fitment, and orders. Answers improve as the backend tools come online.',
     });
   }, []);
@@ -615,30 +617,76 @@ export default function AiChatbot() {
   // ── Render ──────────────────────────────────────────────────────────
   const hasMessages = messages.length > 0 || streamingReply !== null;
 
+  // Build the "fits your X" suffix from the real active vehicle.
+  // Only show the model name (not full year+make+model) to keep the
+  // header compact, matching handoff copy "● Online · fits your Camry".
+  const activeVehicleModel = currentActiveVehicle?.vehicle?.model ?? null;
+  const onlineLabel = activeVehicleModel
+    ? `fits your ${activeVehicleModel}`
+    : null;
+
   return (
     <ScreenShell>
       <AppView flex={1} pt={6}>
-        {/* Top bar */}
+        {/* Handoff §16 header: brand "AI" avatar + "Parts Assistant" + online status */}
         <AppView
           row
           align="center"
           justify="space-between"
-          px={16}
-          py={12}
+          px="lg"
+          py="md"
           borderBottomWidth={1}
           borderTopWidth={1}
           borderColor={tokens.border}
         >
-          <AppView row align="center" gap={6}>
-            <Sparkles size={16} strokeWidth={2.2} color={tokens.brand} />
-            <AppText
-              textVariant="bodySemibold"
-              family="heading"
-              weight="bold"
-              style={{ color: tokens.brand }}
+          <AppView row align="center" gap={10}>
+            {/* Brand "AI" avatar */}
+            <AppView
+              center
+              rounded={999}
+              style={{
+                width: 36,
+                height: 36,
+                backgroundColor: tokens.brand,
+              }}
             >
-              Matorist AI
-            </AppText>
+              <AppText
+                textVariant="caption"
+                family="accent"
+                weight="semibold"
+                style={{ color: tokens.onBrand, fontSize: 11, letterSpacing: 0.4 }}
+              >
+                AI
+              </AppText>
+            </AppView>
+
+            {/* Title + status row */}
+            <AppView gap={1}>
+              <AppText
+                textVariant="bodySemibold"
+                family="heading"
+                weight="bold"
+                colorName="text"
+                style={{ lineHeight: 18 }}
+              >
+                Parts Assistant
+              </AppText>
+              <AppView row align="center" gap={4}>
+                {/* Online dot */}
+                <AppView
+                  rounded={999}
+                  style={{ width: 7, height: 7, backgroundColor: tokens.success }}
+                />
+                <AppText
+                  textVariant="caption"
+                  family="accent"
+                  weight="semibold"
+                  style={{ color: tokens.success, lineHeight: 14 }}
+                >
+                  Online{onlineLabel ? ` · ${onlineLabel}` : ''}
+                </AppText>
+              </AppView>
+            </AppView>
           </AppView>
 
           <AppIconButton
@@ -676,14 +724,14 @@ export default function AiChatbot() {
           }}
           keyboardShouldPersistTaps="handled"
           onScroll={handleScroll}
-          scrollEventThrottle={64}
+          scrollEventThrottle={16}
           automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
           onContentSizeChange={() => {
             if (isAtBottomRef.current) scrollToEnd(false);
           }}
         >
           {!hasMessages ? (
-            <AppView gap={24}>
+            <AppView gap="xl">
               {/* Empty-state anchor + greeting */}
               <AppView gap={14} align="center">
                 <AppView
@@ -696,7 +744,7 @@ export default function AiChatbot() {
                 >
                   <Sparkles size={24} strokeWidth={2} color={tokens.brand} />
                 </AppView>
-                <AppView gap={4} align="center">
+                <AppView gap="xs" align="center">
                   <AppText
                     textVariant="h4"
                     family="heading"
@@ -704,7 +752,7 @@ export default function AiChatbot() {
                     colorName="text"
                     align="center"
                   >
-                    Hello! I&apos;m your Matorui copilot.
+                    Hello! I&apos;m your Mator AI assistant.
                   </AppText>
                   <AppText
                     textVariant="bodySm"
@@ -722,28 +770,46 @@ export default function AiChatbot() {
                 </AppView>
               </AppView>
 
-              {/* Single merged prompts row */}
-              <AppView gap={12}>
+              {/* Handoff §16 suggestion chips */}
+              <AppView gap="md">
                 <AppText
-                  textVariant="bodySemibold"
-                  family="heading"
-                  weight="bold"
-                  colorName="text"
+                  textVariant="bodySm"
+                  family="accent"
+                  weight="semibold"
+                  colorName="textMuted"
+                  style={{ textTransform: 'uppercase', letterSpacing: 0.6, fontSize: 11 }}
                 >
-                  Try a prompt
+                  Try asking
                 </AppText>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ gap: 10, paddingRight: 12 }}
+                  contentContainerStyle={{ gap: 8, paddingRight: 12 }}
                 >
-                  {QUICK_PROMPTS.map((item) => (
-                    <AiChatSuggestionChip
+                  {SUGGESTION_CHIPS.map((item) => (
+                    <AppPressableView
                       key={item.key}
-                      label={item.label}
-                      Icon={item.Icon}
+                      rounded={999}
+                      px="md"
+                      py={10}
                       onPress={() => fillDraft(item.label)}
-                    />
+                      accessibilityRole="button"
+                      accessibilityLabel={item.label}
+                      style={{
+                        borderWidth: 1,
+                        borderColor: tokens.border,
+                        backgroundColor: tokens.card,
+                      }}
+                    >
+                      <AppText
+                        textVariant="bodySm"
+                        weight="semibold"
+                        colorName="text"
+                        numberOfLines={1}
+                      >
+                        {item.label}
+                      </AppText>
+                    </AppPressableView>
                   ))}
                 </ScrollView>
               </AppView>
@@ -759,7 +825,7 @@ export default function AiChatbot() {
             </AppView>
           ) : (
             <AppView gap={14}>
-              <AppView gap={12}>
+              <AppView gap="md">
                 {timeline.map((entry) => {
                   if (entry.kind === 'date') {
                     return <DatePill key={entry.key} label={entry.label} />;
@@ -865,7 +931,7 @@ export default function AiChatbot() {
                   streamingReply.body || streamingReply.toolCalls.length > 0 ? (
                     <AiChatMessageBubble
                       role="assistant"
-                      title="Matorui Assistant"
+                      title="Mator AI"
                       body={streamingReply.body}
                       caption={streamingReply.body ? 'Typing' : undefined}
                       toolCalls={
@@ -881,7 +947,7 @@ export default function AiChatbot() {
                 ) : null}
 
                 {!streamingReply && lastSuggestions.length > 0 ? (
-                  <AppView gap={8} mt={6}>
+                  <AppView gap="sm" mt={6}>
                     <AppText textVariant="bodyXs" colorName="gray400">
                       Follow up
                     </AppText>
@@ -934,6 +1000,7 @@ export default function AiChatbot() {
               onPress={() => scrollToEnd()}
               accessibilityRole="button"
               accessibilityLabel="Scroll to latest message"
+              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               style={{
                 width: 36,
                 height: 36,
@@ -968,7 +1035,7 @@ export default function AiChatbot() {
             />
             {/* Persistent AI disclosure — visible across empty state AND
              *  active chat (issue #23 from UX critique). */}
-            <AppView px={12} pt={2} pb={4}>
+            <AppView px="md" pt={2} pb={4}>
               <AppText
                 textVariant="caption"
                 colorName="gray400"
@@ -1009,6 +1076,7 @@ function FeedbackButton({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={kind === 'up' ? 'Good response' : 'Bad response'}
+      hitSlop={{ top: 9, bottom: 9, left: 9, right: 9 }}
       style={{
         width: 26,
         height: 26,
@@ -1028,7 +1096,7 @@ function DatePill({ label }: { label: string }) {
     <AppView
       align="center"
       rounded={999}
-      px={12}
+      px="md"
       py={6}
       style={{
         borderWidth: 1,
@@ -1067,7 +1135,7 @@ function SystemDivider({ label }: { label: string }) {
 function AssistantTypingPlaceholder() {
   const { tokens } = useThemeContext();
   return (
-    <AppView row align="flex-end" gap={8} style={{ width: '100%' }}>
+    <AppView row align="flex-end" gap="sm" style={{ width: '100%' }}>
       <AppView
         center
         rounded={999}

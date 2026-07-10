@@ -62,7 +62,7 @@ type CellProps = { label: string; value: string };
 
 function Cell({ label, value }: CellProps) {
   return (
-    <AppView flex={1} gap={4}>
+    <AppView flex={1} gap="xs">
       <AppText
         textVariant="caption"
         family="accent"
@@ -96,9 +96,9 @@ function LiveStatusCell({ status }: LiveStatusCellProps) {
       <AppView
         row
         align="center"
-        gap={12}
+        gap="md"
         px={14}
-        py={12}
+        py="md"
         rounded={16}
         style={{ backgroundColor: tone.bg, borderWidth: 1, borderColor: tone.border }}
       >
