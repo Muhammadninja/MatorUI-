@@ -25,7 +25,7 @@ export default function MatorFitBanner() {
 
   return (
     <AppPressableView
-      onPress={() => router.push('/garage')}
+      onPress={() => router.navigate('/garage')}
       accessibilityRole="button"
       accessibilityLabel={`Showing fitment for ${label}. Change vehicle.`}
       androidRipple={false}

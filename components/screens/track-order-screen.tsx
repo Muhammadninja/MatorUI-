@@ -31,7 +31,7 @@ export default function TrackOrderScreen() {
 
   const goShopping = () => {
     triggerHaptic('selection');
-    router.push('/explore');
+    router.navigate('/explore');
   };
 
   return (

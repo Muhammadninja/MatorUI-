@@ -69,9 +69,10 @@ export default function TabLayout() {
                     : meta.label;
                 const Icon = meta.icon;
                 const { emphasized } = meta;
-                // Emphasized center button sits on a brand-filled circle, so
-                // its icon uses the on-brand (inverted) color at every state.
-                const emphasizedIconColor = tokens.onBrand;
+                // Emphasized center button sits on the indigo accent circle in
+                // both themes, so its icon stays white for contrast (not the
+                // theme-inverted on-brand color, which would be black in dark).
+                const emphasizedIconColor = tokens.white;
 
                 return {
                   key: route.name,

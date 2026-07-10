@@ -1,13 +1,5 @@
 import { router } from 'expo-router';
-import {
-  EyeOff,
-  Fingerprint,
-  Globe,
-  Lock,
-  Moon,
-  ShieldCheck,
-} from 'lucide-react-native';
-import { useState } from 'react';
+import { Globe, Lock } from 'lucide-react-native';
 import { Switch } from 'react-native';
 
 import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
@@ -26,23 +18,6 @@ export default function SettingsSecurityScreen() {
   const { signOut } = useUserContext();
   const toast = useToast();
   const isDark = scheme === 'dark';
-
-  // Security toggles (local UI state — no backend)
-  const [faceId, setFaceId] = useState(true);
-  const [twoFactor, setTwoFactor] = useState(true);
-  const [hideOrderHistory, setHideOrderHistory] = useState(false);
-
-  function makeSwitch(value: boolean, onChange: (v: boolean) => void) {
-    return (
-      <Switch
-        value={value}
-        onValueChange={onChange}
-        trackColor={{ false: tokens.switchTrackOff, true: tokens.switchTrackOn }}
-        thumbColor={value ? tokens.switchThumbOn : tokens.white}
-        ios_backgroundColor={tokens.switchTrackOff}
-      />
-    );
-  }
 
   return (
     <AppView flex={1} colorName="background">
@@ -131,42 +106,6 @@ export default function SettingsSecurityScreen() {
                 </AppText>
                 <ChevronRight />
               </AppPressableView>
-            </AppView>
-          </AppView>
-
-          {/* ── Security ────────────────────────────────────────────────── */}
-          <AppView px="lg" gap={8}>
-            <SectionLabel>Security</SectionLabel>
-
-            <AppView
-              rounded={14}
-              style={{
-                borderWidth: 1,
-                borderColor: tokens.border,
-                backgroundColor: tokens.card,
-                paddingHorizontal: 16,
-                paddingVertical: 4,
-                overflow: 'hidden',
-              }}
-            >
-              <ToggleRow
-                label="Face ID login"
-                value={faceId}
-                onChange={setFaceId}
-                border
-              />
-              <ToggleRow
-                label="Two-factor authentication"
-                value={twoFactor}
-                onChange={setTwoFactor}
-                border
-              />
-              <ToggleRow
-                label="Hide order history"
-                value={hideOrderHistory}
-                onChange={setHideOrderHistory}
-                border={false}
-              />
             </AppView>
           </AppView>
 

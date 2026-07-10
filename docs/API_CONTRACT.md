@@ -8,6 +8,10 @@ handoff docs (`mocks/*.txt`) disagree, **this document wins** — it reflects sh
 > ⚠️ **Read the "Conventions & gotchas" and "New endpoints needed" sections first** —
 > several things drifted from the original spec (tax rate, price-as-string, path-root
 > asymmetry, response wrappers, and a handful of screens with no backend at all).
+>
+> **Recent arch changes** (this revision): Catalog moved to **`/v1/catalog/parts`** with new
+> **region / GM / price-sort** filter params (§5); a new external **VIN Decode** integration
+> (NHTSA, §15) now powers the **VIN-only** garage Add-Vehicle flow (§13).
 
 ---
 
@@ -52,10 +56,13 @@ module load by `config/api.ts`:
    everywhere the UI renders. Numeric fields exist in a few places (`price_uzs`,
    `SearchResult.priceCents`) but the rendered rows use the string. The cart parses the
    string (`/[^0-9.]/g` stripped) to compute subtotal — keep line prices parseable.
-2. **Query-param casing is inconsistent** (real, not a typo):
-   - Catalog list: `pageSize` (camelCase).
-   - Catalog **parts** endpoint (used by Top Featured today): `page_size` (snake_case).
+2. **Query-param casing & strictness:**
+   - Catalog list + parts + Top Featured all hit **`/v1/catalog/parts`** with `page_size`
+     (snake_case). The old `/v1/catalog/items?pageSize` endpoint is **retired**.
    - Search: camelCase JSON body.
+   - **The parts endpoint strictly rejects unknown query params with `400`** — the filter
+     param names in §5 (`region`, `gm_only`, `sort`, …) must match the backend exactly, or
+     be added there before the app flips `catalog` to HTTP.
 3. **Response wrapper inconsistency:** cart item endpoints return `{ item: CartItem }`
    (wrapped); garage returns `{ vehicle }` / `{ vehicles }`; orders/addresses/payments
    return the **bare** object/array. Match each exactly.
@@ -123,21 +130,42 @@ type CatalogItem = {
   features: string[];
   category: string;          // slug: "sedan"|"suv"|"coupe"|"truck"
   oem?: string;
+  region?: 'china'|'europe'|'russia'|'korea'|'usa';  // market of origin (region filter)
 };
 ```
 
-### `GET /v1/catalog/items?page&pageSize[&category][&search][&sortBy]`
+### `GET /v1/catalog/parts` — list  (⚠ moved off `/v1/catalog/items`; snake_case, strict params)
 
-- Query: `page` (req), `pageSize` (req), `category` (if truthy), `search` (if truthy),
-  `sortBy` ∈ `featured|newest|price_asc|price_desc`.
-- Response: `{ items: CatalogItem[]; total; page; pageSize }`.
-- **UI (ProductRow) consumes:** `id, title, description, price, status, images[0], oem` + `total`.
-- Unused on rows: `badge, priceLabel, specs, features, category, images[1+]` (some used on detail).
+The Catalog list + Category + **Parts** screens now hit **`/v1/catalog/parts`** (the same
+endpoint Top Featured uses), NOT the old `/v1/catalog/items`. Param names are the single
+source of truth in `PARTS_PARAM` (`services/catalog-service.ts`). **Unknown params → 400**,
+so every name below must match exactly.
 
-### `GET /v1/catalog/items/:id`
+| App field | Query param | Notes |
+|---|---|---|
+| `page` | `page` | required |
+| `pageSize` | `page_size` | required |
+| `search` | `q` | free text |
+| `category` | `category` | system / category key |
+| `make` | `make` | from the Make → Model flow |
+| `model` | `model` | |
+| `brand` | `brand` | |
+| `regions[]` | `region` | **repeated** — `region=china&region=korea`; keys `china\|europe\|russia\|korea\|usa` |
+| `gmOnly` | `gm_only` | `"true"` when the GM-only filter is on (Chevrolet / Ravon / Daewoo …) |
+| `sortBy` | `sort` | `price_asc\|price_desc` (the price-range slider was **removed** — sort only) |
 
-- Response: `{ item: CatalogItem }`. **404 → treated as not-found** by the client.
-- Detail screen consumes the full item incl. `specs, features, badge, priceLabel, images`.
+- Response: `ApiCatalogPartsResponse` (see §7) mapped → `CatalogItem`. The mapper derives
+  `region` from the part's `region` field, else infers it from the brand, so the region
+  facet works even before the backend tags origin.
+- **Filter split:** `category / make / model / region / gm_only` go **server-side** (the
+  transport sends them; the server filters). `brand / sort / search / in-stock / OEM` are
+  refined **client-side** over the fetched page. `catalogListQueryKey` now includes
+  `make, model, brand, regions, gmOnly` so distinct filter combinations cache independently.
+
+### `GET /v1/catalog/parts/:id` — detail
+
+- Response: bare `ApiCatalogPart` → mapped to `{ item: CatalogItem }`. **404 → not-found.**
+- Detail screen consumes `specs, features, priceLabel, images, oem`.
 
 ---
 
@@ -376,6 +404,12 @@ type ServerVehicle = {
 
 Realtime `GarageSocketEvent` on `garage:vehicles` is typed but **not subscribed** yet.
 
+> **Add-Vehicle is now VIN-only.** The garage Add-Vehicle screen no longer takes manual
+> Make / Model / Year. The user scans or types a 17-char VIN, the app decodes it via the
+> **VIN Decode** integration (§15), and the resolved `make / model / year` populate the
+> `POST /v1/garage/vehicles` payload. Offline or an unresolvable VIN ⇒ cannot add (no manual
+> fallback today).
+
 ---
 
 ## 14. AI Chat — `services/chat-api.ts`
@@ -403,7 +437,44 @@ type ChatStreamEvent =
 
 ---
 
-## 15. Static / local-only (⚠ NO backend today) — NEW ENDPOINTS NEEDED
+## 15. VIN Decode — external provider (NHTSA vPIC) — `services/vin-decoder-service.ts`
+
+**Not a Mator endpoint** — a decoupled, provider-agnostic client the app calls directly to
+turn a 17-char VIN into a clean vehicle record. Used by the garage Add-Vehicle screen (§13)
+to auto-fill make / model / year. Provider is swappable via `VinDecodeTransport`.
+
+- **Provider (default):**
+  `GET https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/{vin}?format=json`
+  (public, keyless, global). `Results[0]` fields consumed: `Make, Model, ModelYear,
+  DisplacementL, FuelTypePrimary, ErrorCode`.
+- **Validation before any network call** (reuses `utils/vin`): trim/uppercase, exactly 17
+  chars, ISO 3779 alphabet (no I/O/Q). The position-9 check digit is validated but only
+  **enforced** when `requireChecksum` is on (default **off** — UZ-market Chevrolets ship
+  non-North-American check digits).
+- **Output contract:**
+  ```ts
+  interface DecodedVehicle {
+    make: string; model: string; year: number;
+    engineDisplacement: string | null; fuelType: string | null;
+    isVerified: boolean;   // ErrorCode "0" AND make+model+year all resolved
+    vin: string;           // normalized 17-char
+  }
+  ```
+- **Typed errors** `VinDecodeError { code }`: `INVALID_LENGTH | INVALID_CHARACTERS |
+  CHECKSUM_FAILED | NOT_FOUND | PROVIDER_ERROR | NETWORK_ERROR | TIMEOUT`. 10s timeout
+  (AbortController). `decodeSafe()` returns `{ ok, data|error }` (never throws);
+  `decodeMany(vins, concurrency=5)` for bulk catalog seeding.
+- **Entry points:** `VinDecoderService.decode(vin)` (static facade over a shared singleton),
+  `.decodeSafe`, `.decodeMany`, `.configure({ transport })`, and the `vinDecoder` singleton.
+
+> **Backend consideration:** decoding depends on a **third party** (NHTSA) reachable from the
+> device — no Mator server involvement today. For server-side/offline decode, caching,
+> rate-limit shielding, or a UZ-specific VIN database, stand up a **`GET /v1/vin/{vin}`**
+> proxy and point `VinDecodeTransport` at it (one-line `VinDecoderService.configure` swap).
+
+---
+
+## 16. Static / local-only (⚠ NO backend today) — NEW ENDPOINTS NEEDED
 
 These power live screens but have **no transport** — they're hardcoded constants or device
 storage. Each needs a backend endpoint to become real.
@@ -422,17 +493,19 @@ Also mock seed only (demo screens, not contract): `MATOR_PRODUCTS`, `MATOR_ADDRE
 
 ---
 
-## 16. Backend action-item summary
+## 17. Backend action-item summary
 
 1. **Confirm tax rate** — code uses **8.5%** (`0.085`); old handoff said 6%.
-2. **Fix/keep casing** — catalog list `pageSize` vs parts `page_size`. Pick one or document both.
+2. **Catalog is now `/v1/catalog/parts`** (snake_case `page_size`); retire `/v1/catalog/items`.
+   **Honor the filter params** in §5 exactly — `region` (repeated), `gm_only`, `sort`
+   (`price_asc|price_desc`), `make/model/brand/category/q` — and don't `400` on them, since
+   the endpoint strictly rejects unknown params.
 3. **Match response wrappers** — `{ item }` (cart), `{ vehicle(s) }` (garage), bare (orders/addresses/payments).
 4. **Match path roots** — account **reads** at `/v1/account/*`, **writes** at `/v1/addresses` & `/v1/payment-methods`.
 5. **Server owns pricing** on `POST /v1/orders`; re-validate, ignore client `totalLabel`.
 6. **Mirror the promo table** (`WELCOME10/RIDE25/FREESHIP`) or the client will diverge.
-7. **Stand up the 6 missing endpoints/systems** in §15 (dealers, categories+counts, brand catalog+logos, favorites, top-featured snapshot, realtime).
+7. **Stand up the 6 missing endpoints/systems** in §16 (dealers, categories+counts, brand catalog+logos, favorites, top-featured snapshot, realtime).
 8. **Payments:** add a tokenization field; today it sends raw `brand/last4/exp`.
-</content>
-
-</invoke>
-âº Update(components/screens-components/catalog/product-row.tsx)
+9. **(Optional) VIN proxy** — Add-Vehicle depends on the external NHTSA decoder (§15). If we
+   want server-side/offline decode, caching, or a UZ VIN DB, expose **`GET /v1/vin/{vin}`**
+   and repoint `VinDecodeTransport`.

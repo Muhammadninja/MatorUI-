@@ -32,7 +32,13 @@ export default function OrderConfirmationScreen() {
 
   const goShopping = () => {
     triggerHaptic('selection');
-    router.push('/explore');
+    // This screen lives on the Cart tab's stack ([cart → checkout → here]).
+    // Pop the whole checkout flow back to the cart root FIRST, so returning to
+    // the Cart tab shows the (now-empty) cart, not this receipt. Then jump to
+    // Explore with `navigate` (not `push`) so we land on the existing Explore
+    // root instead of stacking a duplicate.
+    if (router.canDismiss()) router.dismissAll();
+    router.navigate('/explore');
   };
 
   if (state === 'loading' || state === 'idle') {

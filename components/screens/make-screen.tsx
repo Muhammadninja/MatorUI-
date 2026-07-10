@@ -5,23 +5,19 @@ import { ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import BrandLogo, { hasBrandLogo, LOGO_BRANDS } from '@/components/screens-components/catalog/brand-logo';
-import { brandColor, categoryBody } from '@/components/screens-components/catalog/brand-meta';
+import { brandColor } from '@/components/screens-components/catalog/brand-meta';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
-import { CarIcon } from '@/components/shared/mator-icons';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { ListLoadingOverlay } from '@/components/shared/wheel-loader';
 import { useThemeContext } from '@/contexts/theme.context';
 import { UZ_BRANDS, UZ_MODELS } from '@/services/uz-vehicle-catalog';
 
 /** Catalog categories the listings are actually bucketed by. */
-const CATALOG_CATEGORIES = ['sedan', 'suv', 'coupe', 'truck'];
-
 /**
  * Make (`make`) — a branded hero + the real models for the chosen brand
- * (`UZ_BRANDS` / `UZ_MODELS`). Tapping a model opens the Category listing
- * filtered by the model's body style. Reachable from Explore's "Shop by
- * vehicle".
+ * (`UZ_BRANDS` / `UZ_MODELS`). Tapping a model opens the catalog systems
+ * screen for that make + model. Reachable from Explore's "Shop by vehicle".
  */
 export default function MakeScreen() {
   const { tokens } = useThemeContext();
@@ -42,13 +38,10 @@ export default function MakeScreen() {
     return () => clearTimeout(t);
   }, []);
 
-  const openModel = (modelLabel: string, bodyStyle: string) =>
+  const openModel = (modelLabel: string) =>
     router.push({
-      pathname: '/category',
-      params: {
-        cat: CATALOG_CATEGORIES.includes(bodyStyle) ? bodyStyle : 'All',
-        label: `${label} ${modelLabel}`,
-      },
+      pathname: '/catalog',
+      params: { make: label, model: modelLabel, brandId },
     });
 
   return (
@@ -110,34 +103,24 @@ export default function MakeScreen() {
           {models.map((m, i) => (
             <AppPressableView
               key={m.id}
-              onPress={() => openModel(m.label, m.bodyStyle)}
+              onPress={() => openModel(m.label)}
               androidRipple={false}
               accessibilityRole="button"
               accessibilityLabel={`${label} ${m.label}`}
               row
               align="center"
-              gap={14}
+              gap={12}
               style={{
-                paddingVertical: 15,
+                paddingVertical: 18,
                 borderBottomWidth: i < models.length - 1 ? 1 : 0,
                 borderBottomColor: tokens.divider,
               }}
             >
-              <AppView
-                center
-                rounded={11}
-                colorName="backgroundSecondary"
-                borderWidth={1}
-                borderName="border"
-                style={{ width: 40, height: 40 }}
-              >
-                <CarIcon body={categoryBody(m.bodyStyle)} size={26} color={color} />
-              </AppView>
               <AppView flex={1}>
-                <AppText family="default" weight="semibold" style={{ fontSize: 15, color: tokens.text }}>
+                <AppText family="heading" weight="bold" style={{ fontSize: 19, color: tokens.text }}>
                   {label} {m.label}
                 </AppText>
-                <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted, textTransform: 'capitalize' }}>
+                <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted, textTransform: 'capitalize' }}>
                   {m.bodyStyle}
                 </AppText>
               </AppView>

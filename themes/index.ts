@@ -197,7 +197,9 @@ export const darkTokens: ThemeTokens = {
   linkPressedOverlay: 'rgba(255, 255, 255, 0.10)',
   switchTrackOff: '#3a3a3a',
   switchTrackOn: '#ffffff',
-  switchThumbOn: '#ffffff',
+  // Dark ON-track is white, so the thumb must be dark (mirrors the light
+  // theme's black-track / white-thumb) — a white thumb here vanishes.
+  switchThumbOn: '#050505',
   listPressedOverlay: 'rgba(255, 255, 255, 0.05)',
   textPressed: '#f2f2f2',
   icon: '#ffffff',

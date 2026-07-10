@@ -33,8 +33,8 @@ function CategoryTile({ name, count, onPress }: CategoryTileProps) {
       borderName="border"
       style={{ width: '31.5%', paddingTop: 16, paddingBottom: 13, paddingHorizontal: 8, gap: 10 }}
     >
-      <AppView center style={{ width: 56, height: 56 }}>
-        <AutoPartIcon name={name} size={40} />
+      <AppView center style={{ width: 68, height: 68 }}>
+        <AutoPartIcon name={name} size={60} />
       </AppView>
       <AppView align="center">
         <AppText

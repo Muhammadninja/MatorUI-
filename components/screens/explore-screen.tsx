@@ -95,10 +95,6 @@ export default function ExploreScreen() {
               accessibilityLabel="Notifications"
               androidRipple={false}
               center
-              rounded={13}
-              borderWidth={1}
-              borderName="border"
-              colorName="card"
               style={{ width: 42, height: 42 }}
             >
               <Bell size={21} strokeWidth={2.2} color={tokens.text} />
@@ -208,7 +204,7 @@ export default function ExploreScreen() {
           <AppText family="heading" weight="bold" style={{ fontSize: 18, color: tokens.text }}>
             Shop by vehicle
           </AppText>
-          <AppPressableView onPress={() => router.push('/garage')} androidRipple={false} accessibilityRole="button">
+          <AppPressableView onPress={() => router.navigate('/garage')} androidRipple={false} accessibilityRole="button">
             <AppText family="accent" weight="semibold" style={{ fontSize: 13, color: tokens.textMuted }}>
               My garage ›
             </AppText>

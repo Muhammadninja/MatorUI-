@@ -12,7 +12,7 @@ export default function CartEmptyState() {
 
   const handleBrowse = () => {
     triggerHaptic('selection');
-    router.push('/explore');
+    router.navigate('/explore');
   };
 
   return (

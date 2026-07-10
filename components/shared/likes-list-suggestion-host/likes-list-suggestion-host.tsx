@@ -15,7 +15,7 @@ export default function LikesListSuggestionHost() {
     acknowledgeListSuggestion();
     // The Lists tab lives inside the Cart stack — once the user taps
     // Create-a-list we ship them straight there. They can refine.
-    router.push('/cart');
+    router.navigate('/cart');
   };
 
   return (

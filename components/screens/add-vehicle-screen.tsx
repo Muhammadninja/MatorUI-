@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { ScanLine } from 'lucide-react-native';
+import { ScanLine, Sparkles } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,78 +9,68 @@ import { AppButton } from '@/components/shared/app-button';
 import AppTextField from '@/components/shared/app-text-field';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
+import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useThemeContext } from '@/contexts/theme.context';
 import useGarage from '@/hooks/use-garage';
 import { toastService } from '@/services/toast-service';
+import { VinDecoderService, type DecodedVehicle } from '@/services/vin-decoder-service';
 import { triggerHaptic } from '@/utils/haptics';
 
 /**
  * Add Vehicle screen — faithful rebuild of the prototype's `scAddVehicle`.
  *
  * Fields: Make / Model (side by side), Year, "OR ENTER VIN" divider,
- * VIN input + "Scan VIN" button, and a "Save vehicle" CTA. Local state only.
+ * VIN input + "Scan VIN" button, and a "Save vehicle" CTA. Scanning or
+ * entering a full 17-char VIN runs it through `VinDecoderService`, which
+ * auto-fills Make / Model / Year from the NHTSA record. Local state only.
  */
 export default function AddVehicleScreen() {
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
   const { addVehicle, isMutating } = useGarage();
 
-  const [make, setMake] = useState('');
-  const [model, setModel] = useState('');
-  const [year, setYear] = useState('');
   const [vin, setVin] = useState('');
+  const [decoded, setDecoded] = useState<DecodedVehicle | null>(null);
   const [scannerVisible, setScannerVisible] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [errors, setErrors] = useState<{ make?: string; model?: string; year?: string }>({});
+  const [decoding, setDecoding] = useState(false);
 
-  // Save can only proceed with the three required fields filled and a
-  // parseable year — mirrors validate() so the CTA can disable itself.
-  const yearNum = parseInt(year, 10);
+  // This screen is VIN-only: Make / Model / Year come from the decoder, so Save
+  // is gated entirely on a successful decode that resolved all three.
   const canSave =
-    make.trim().length > 0 &&
-    model.trim().length > 0 &&
-    year.trim().length > 0 &&
-    !isNaN(yearNum) &&
-    yearNum >= 1900 &&
-    yearNum <= 2100;
+    !!decoded && decoded.make.length > 0 && decoded.model.length > 0 && decoded.year > 0;
 
-  const validate = useCallback(() => {
-    const e: typeof errors = {};
-    const yearNum = parseInt(year, 10);
-    if (!make.trim()) e.make = 'Required';
-    if (!model.trim()) e.model = 'Required';
-    if (!year.trim()) {
-      e.year = 'Required';
-    } else if (isNaN(yearNum) || yearNum < 1900 || yearNum > 2100) {
-      e.year = 'Enter a valid year';
-    }
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  }, [make, model, year]);
+  // Editing the VIN after a decode invalidates the preview.
+  const handleVinChange = useCallback((next: string) => {
+    setVin(next);
+    setDecoded((prev) => (prev && prev.vin !== next.trim().toUpperCase() ? null : prev));
+  }, []);
 
   const handleSave = useCallback(async () => {
-    if (!validate()) {
+    if (!decoded || !canSave) {
       triggerHaptic('warning');
+      toastService.info('Decode a VIN first', {
+        description: 'Scan or enter a 17-character VIN to identify the vehicle.',
+      });
       return;
     }
     triggerHaptic('success');
     setSaving(true);
     try {
-      // Add through the real garage layer. `setAsPrimary` makes it the
-      // active vehicle (turning on fitment UI across the app), mirroring
-      // the old mock behaviour. This screen's minimal form doesn't
-      // collect a color — default to 'midnight' (the wizard's default);
-      // the full add-vehicle wizard lets the user pick one.
+      // Add through the real garage layer. `setAsPrimary` makes it the active
+      // vehicle (turning on fitment UI across the app). This minimal form
+      // doesn't collect a color — default to 'midnight'; the full wizard lets
+      // the user pick one.
       await addVehicle({
-        make: make.trim(),
-        model: model.trim(),
-        year: parseInt(year, 10),
-        vin: vin.trim() || undefined,
+        make: decoded.make,
+        model: decoded.model,
+        year: decoded.year,
+        vin: decoded.vin || vin.trim() || undefined,
         color: 'midnight',
         setAsPrimary: true,
       });
       toastService.success('Vehicle added', {
-        description: `${year} ${make.trim()} ${model.trim()}`,
+        description: `${decoded.year} ${decoded.make} ${decoded.model}`,
       });
       router.back();
     } catch {
@@ -92,16 +82,48 @@ export default function AddVehicleScreen() {
     } finally {
       setSaving(false);
     }
-  }, [validate, year, make, model, vin, addVehicle]);
+  }, [decoded, canSave, vin, addVehicle]);
+
+  // Decode a VIN via the provider-agnostic VinDecoderService. Never throws —
+  // domain errors surface as a screen-local toast so a provider outage can't
+  // take the form down.
+  const applyDecodedVin = useCallback(async (rawVin: string) => {
+    if (rawVin.trim().length === 0) return;
+    setDecoding(true);
+    const result = await VinDecoderService.decodeSafe(rawVin);
+    setDecoding(false);
+
+    if (!result.ok) {
+      setDecoded(null);
+      triggerHaptic('warning');
+      toastService.danger('Couldn’t decode VIN', { description: result.error.message });
+      return;
+    }
+
+    setDecoded(result.data);
+    if (result.data.isVerified) {
+      triggerHaptic('success');
+      toastService.success('Vehicle identified', {
+        description: `${result.data.year} ${result.data.make} ${result.data.model}`.trim(),
+      });
+    } else {
+      triggerHaptic('warning');
+      toastService.info('Partial VIN match', {
+        description: 'We couldn’t fully identify this VIN — try another.',
+      });
+    }
+  }, []);
 
   const handleBarcodeScanned = useCallback(
     (raw: string) => {
       triggerHaptic('success');
       setVin(raw);
-      toastService.success('VIN detected', { description: raw });
       setScannerVisible(false);
+      toastService.success('VIN detected', { description: raw });
+      // Auto-decode the scan → identifies Make / Model / Year.
+      void applyDecodedVin(raw);
     },
-    [],
+    [applyDecodedVin],
   );
 
   return (
@@ -150,65 +172,15 @@ export default function AddVehicleScreen() {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Make / Model row */}
-          <AppView row gap={12}>
-            <AppView flex={1}>
-              <AppTextField
-                label="Make"
-                placeholder="Toyota"
-                value={make}
-                onChangeText={setMake}
-                autoCapitalize="words"
-                autoCorrect={false}
-                errorText={errors.make}
-                containerRounded={12}
-                containerColorName="backgroundSecondary"
-                containerBorderName="border"
-              />
-            </AppView>
-            <AppView flex={1}>
-              <AppTextField
-                label="Model"
-                placeholder="Corolla"
-                value={model}
-                onChangeText={setModel}
-                autoCapitalize="words"
-                autoCorrect={false}
-                errorText={errors.model}
-                containerRounded={12}
-                containerColorName="backgroundSecondary"
-                containerBorderName="border"
-              />
-            </AppView>
-          </AppView>
-
-          {/* Year */}
-          <AppTextField
-            label="Year"
-            placeholder="2022"
-            value={year}
-            onChangeText={setYear}
-            keyboardType="number-pad"
-            errorText={errors.year}
-            containerRounded={12}
-            containerColorName="backgroundSecondary"
-            containerBorderName="border"
-          />
-
-          {/* OR ENTER VIN divider */}
-          <AppView row align="center" gap={12} style={{ marginVertical: 4 }}>
-            <AppView flex={1} style={{ height: 1, backgroundColor: tokens.divider }} />
-            <AppText
-              family="accent"
-              weight="semibold"
-              colorName="textMuted"
-              style={{ fontSize: 12, letterSpacing: 1 }}
-              transform="uppercase"
-            >
-              Or enter VIN
-            </AppText>
-            <AppView flex={1} style={{ height: 1, backgroundColor: tokens.divider }} />
-          </AppView>
+          {/* Intro */}
+          <AppText
+            family="default"
+            colorName="textMuted"
+            style={{ fontSize: 13.5, lineHeight: 20 }}
+          >
+            Scan or enter your 17-character VIN — we’ll identify the make, model, and
+            year automatically.
+          </AppText>
 
           {/* VIN input + Scan VIN button */}
           <AppView row gap={10} align="flex-end">
@@ -217,7 +189,7 @@ export default function AddVehicleScreen() {
                 label="VIN"
                 placeholder="17-character VIN"
                 value={vin}
-                onChangeText={setVin}
+                onChangeText={handleVinChange}
                 autoCapitalize="characters"
                 autoCorrect={false}
                 containerRounded={12}
@@ -250,6 +222,95 @@ export default function AddVehicleScreen() {
               </AppText>
             </AppPressableView>
           </AppView>
+
+          {/* Decode action — appears once a full 17-char VIN is present */}
+          {vin.trim().length === 17 && !decoded ? (
+            <AppPressableView
+              row
+              align="center"
+              gap={8}
+              onPress={() => applyDecodedVin(vin)}
+              disabled={decoding}
+              androidRipple={false}
+              accessibilityRole="button"
+              accessibilityLabel="Identify vehicle from VIN"
+              style={{ alignSelf: 'flex-start', paddingVertical: 4 }}
+            >
+              {decoding ? (
+                <WheelLoader size={16} color={tokens.brand} />
+              ) : (
+                <Sparkles size={15} strokeWidth={2.2} color={tokens.brand} />
+              )}
+              <AppText
+                family="accent"
+                weight="semibold"
+                style={{ fontSize: 13, color: tokens.brand }}
+              >
+                {decoding ? 'Decoding VIN…' : 'Identify vehicle from VIN'}
+              </AppText>
+            </AppPressableView>
+          ) : null}
+
+          {/* Decoded vehicle preview */}
+          {decoded ? (
+            <AppView
+              rounded={14}
+              colorName="card"
+              style={{ borderWidth: 1, borderColor: tokens.border, padding: 16, gap: 12 }}
+            >
+              <AppView row align="center" justify="space-between">
+                <AppText
+                  family="accent"
+                  weight="bold"
+                  colorName="textMuted"
+                  style={{ fontSize: 11, letterSpacing: 0.7 }}
+                  transform="uppercase"
+                >
+                  Decoded vehicle
+                </AppText>
+                <AppView
+                  rounded={999}
+                  px={9}
+                  py={4}
+                  style={{
+                    backgroundColor: `${decoded.isVerified ? tokens.success : tokens.warning}22`,
+                  }}
+                >
+                  <AppText
+                    family="accent"
+                    weight="bold"
+                    style={{
+                      fontSize: 10,
+                      letterSpacing: 0.5,
+                      color: decoded.isVerified ? tokens.success : tokens.warning,
+                    }}
+                    transform="uppercase"
+                  >
+                    {decoded.isVerified ? 'Verified' : 'Partial'}
+                  </AppText>
+                </AppView>
+              </AppView>
+
+              <AppText family="heading" weight="bold" colorName="text" style={{ fontSize: 18 }}>
+                {[decoded.year > 0 ? decoded.year : null, decoded.make, decoded.model]
+                  .filter(Boolean)
+                  .join(' ') || 'Unidentified vehicle'}
+              </AppText>
+
+              {decoded.engineDisplacement || decoded.fuelType ? (
+                <AppView row gap={8} style={{ flexWrap: 'wrap' }}>
+                  {decoded.engineDisplacement ? (
+                    <SpecChip label={`${decoded.engineDisplacement} L`} />
+                  ) : null}
+                  {decoded.fuelType ? <SpecChip label={decoded.fuelType} /> : null}
+                </AppView>
+              ) : null}
+
+              <AppText family="mono" colorName="textMuted" style={{ fontSize: 12 }}>
+                {decoded.vin}
+              </AppText>
+            </AppView>
+          ) : null}
         </ScrollView>
 
         {/* Save button pinned to bottom */}
@@ -277,6 +338,17 @@ export default function AddVehicleScreen() {
         onClose={() => setScannerVisible(false)}
         onBarcodeScanned={handleBarcodeScanned}
       />
+    </AppView>
+  );
+}
+
+function SpecChip({ label }: { label: string }) {
+  const { tokens } = useThemeContext();
+  return (
+    <AppView rounded={8} px={10} py={5} colorName="backgroundSecondary" borderWidth={1} borderName="border">
+      <AppText family="default" weight="semibold" style={{ fontSize: 12.5, color: tokens.text }}>
+        {label}
+      </AppText>
     </AppView>
   );
 }

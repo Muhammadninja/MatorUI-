@@ -27,7 +27,7 @@ export default function SearchFitBanner() {
 
   const handlePress = () => {
     triggerHaptic('selection');
-    router.push('/garage');
+    router.navigate('/garage');
   };
 
   return (

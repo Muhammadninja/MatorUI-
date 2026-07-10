@@ -92,7 +92,7 @@ export default function CartScreen() {
           <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted, textAlign: 'center', maxWidth: 280 }}>
             Browse parts that fit your vehicle and add them here.
           </AppText>
-          <AppButton title="Start shopping" kind="brand" size="md" onPress={() => router.push('/explore')} />
+          <AppButton title="Start shopping" kind="brand" size="md" onPress={() => router.navigate('/explore')} />
         </AppView>
       </AppView>
     );

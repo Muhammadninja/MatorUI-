@@ -1,9 +1,8 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, CarFront } from 'lucide-react-native';
+import { ArrowLeft, CarFront, Trash2 } from 'lucide-react-native';
 import { ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import ProductCard from '@/components/screens-components/home/product-card';
 import AppImage from '@/components/shared/app-image';
 import { AppButton } from '@/components/shared/app-button';
 import { AppText } from '@/components/shared/app-text';
@@ -11,7 +10,6 @@ import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useActiveVehicle } from '@/contexts/active-vehicle.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import useGarage from '@/hooks/use-garage';
-import { MATOR_PRODUCTS } from '@/mocks/mator-catalog';
 import { toastService } from '@/services/toast-service';
 
 function formatMileage(km?: number): string {
@@ -29,13 +27,12 @@ function titleCase(s: string): string {
  * falling back to the primary vehicle.
  *
  * Shows the vehicle photo, year/make/model headline + ACTIVE pill,
- * trim·color subline, 2-col spec grid (VIN / Mileage / Trim / Color),
- * a "Compatible parts" grid (catalog mocks — parts search isn't wired
- * here yet), and "Set active" / "Delete" action buttons.
+ * trim·color subline, a 2-col spec grid (VIN / Mileage / Trim / Color),
+ * and a "Set active" action button.
  *
  * Setting active goes through `useActiveVehicle().setPrimaryVehicle` so
- * the parts-search scope stays in sync; delete goes through
- * `useGarage().removeVehicle`.
+ * the parts-search scope stays in sync; deleting goes through
+ * `useGarage().removeVehicle`, triggered by the trash icon in the header.
  */
 export default function VehicleDetailScreen() {
   const { tokens } = useThemeContext();
@@ -60,7 +57,6 @@ export default function VehicleDetailScreen() {
   }
 
   const isActive = currentActiveVehicle?.vehicleId === vehicle.id;
-  const parts = MATOR_PRODUCTS.slice(0, 4);
 
   const makeModel = `${vehicle.make} ${vehicle.model}`.toUpperCase();
   const headline = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
@@ -187,28 +183,9 @@ export default function VehicleDetailScreen() {
           </AppView>
         </AppView>
 
-        {/* Compatible parts */}
-        <AppView px={20} mb={16}>
-          <AppText
-            family="heading"
-            weight="bold"
-            colorName="text"
-            style={{ fontSize: 18, marginTop: 4, marginBottom: 12 }}
-          >
-            Compatible parts
-          </AppText>
-          <AppView row style={{ flexWrap: 'wrap', gap: 12 }}>
-            {parts.map((p) => (
-              <AppView key={p.id} style={{ width: '47%' }}>
-                <ProductCard product={p} />
-              </AppView>
-            ))}
-          </AppView>
-        </AppView>
-
         {/* Action buttons */}
-        <AppView px={20} gap={10} style={{ marginTop: 4 }}>
-          {!isActive ? (
+        {!isActive ? (
+          <AppView px={20} style={{ marginTop: 4 }}>
             <AppButton
               title="Set as active vehicle"
               kind="brand"
@@ -216,16 +193,8 @@ export default function VehicleDetailScreen() {
               fullWidth
               onPress={handleSetActive}
             />
-          ) : null}
-          <AppButton
-            title="Delete vehicle"
-            kind="error"
-            variant="outline"
-            size="lg"
-            fullWidth
-            onPress={handleRemove}
-          />
-        </AppView>
+          </AppView>
+        ) : null}
       </ScrollView>
 
       {/* Blur header */}
@@ -266,8 +235,16 @@ export default function VehicleDetailScreen() {
           {makeModel}
         </AppText>
 
-        {/* Right spacer */}
-        <AppView style={{ width: 20 }} />
+        {/* Delete vehicle */}
+        <AppPressableView
+          androidRipple={false}
+          onPress={handleRemove}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          accessibilityRole="button"
+          accessibilityLabel="Delete vehicle"
+        >
+          <Trash2 size={20} strokeWidth={2.2} color={tokens.error} />
+        </AppPressableView>
       </AppView>
     </AppView>
   );

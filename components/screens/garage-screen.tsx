@@ -40,7 +40,7 @@ export default function GarageScreen() {
   const openDetail = (id: string) =>
     router.push({ pathname: '/vehicle-detail', params: { id } });
   const openAdd = () => router.push('/add-vehicle');
-  const viewParts = () => router.push('/explore');
+  const viewParts = () => router.navigate('/explore');
 
   return (
     <AppView flex={1} colorName="background">

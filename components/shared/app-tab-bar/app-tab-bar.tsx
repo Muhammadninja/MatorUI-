@@ -28,6 +28,9 @@ export type AppTabBarProps = {
   activeKey?: string;
 };
 
+/** Soft indigo accent for the emphasized AI Assistant button (both themes). */
+const ASSISTANT_ACCENT = '#6366F1';
+
 const PREVIEW_ITEMS: AppTabBarItem[] = [
   { key: 'home', label: 'Home' },
   { key: 'discover', label: 'Discover' },
@@ -110,13 +113,19 @@ export default function AppTabBar({ items = PREVIEW_ITEMS, activeKey = 'home' }:
                   style={[
                     styles.emphasized,
                     {
-                      backgroundColor: scheme === 'dark' ? tokens.white : tokens.black,
+                      // The AI Assistant button gets its own soft indigo accent
+                      // (same in both themes) so it reads as "smart/AI" instead
+                      // of a hard black disc. Faint top-sheen rim + a gentle
+                      // color-tinted shadow keep it modern but modest.
+                      backgroundColor: ASSISTANT_ACCENT,
+                      borderWidth: 1,
+                      borderColor: 'rgba(255, 255, 255, 0.22)',
                       ...(isActive
                         ? {
-                            shadowColor: tokens.black,
-                            shadowOpacity: 0.5,
-                            shadowRadius: 16,
-                            shadowOffset: { width: 0, height: 6 },
+                            shadowColor: ASSISTANT_ACCENT,
+                            shadowOpacity: 0.45,
+                            shadowRadius: 14,
+                            shadowOffset: { width: 0, height: 5 },
                             elevation: 8,
                           }
                         : null),

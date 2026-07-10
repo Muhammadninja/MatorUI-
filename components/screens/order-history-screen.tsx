@@ -45,7 +45,7 @@ export default function OrderHistoryScreen() {
           <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted, textAlign: 'center' }}>
             You haven&apos;t placed any orders yet.
           </AppText>
-          <AppButton title="Start shopping" kind="brand" size="sm" onPress={() => router.push('/explore')} />
+          <AppButton title="Start shopping" kind="brand" size="sm" onPress={() => router.navigate('/explore')} />
         </AppView>
       ) : (
         <ScrollView

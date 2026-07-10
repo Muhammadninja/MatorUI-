@@ -1,5 +1,7 @@
 // ── Types ────────────────────────────────────────────────────────────
 
+import { brandRegion, isGmBrand, normalizeRegion, type CatalogRegion } from '@/constants/catalog-regions';
+
 export type CatalogItem = {
   id: string;
   /** Optional corner-ribbon label ("Hot pick", "New"). Items without
@@ -20,6 +22,10 @@ export type CatalogItem = {
    *  screen so shoppers can cross-reference against existing parts.
    *  Optional — items without a number simply omit the pill. */
   oem?: string;
+  /** Market of origin (China / Europe / Russia / Korea / USA), used by the
+   *  region filter. Backend-supplied when available, else inferred from the
+   *  brand at map time. */
+  region?: CatalogRegion;
 };
 
 export type CatalogItemSpec = {
@@ -30,9 +36,19 @@ export type CatalogItemSpec = {
 export type CatalogListRequest = {
   page: number;
   pageSize: number;
+  /** System / category key (from the catalog systems screen). */
   category?: string;
   search?: string | null;
-  sortBy?: 'featured' | 'newest' | 'price_asc' | 'price_desc';
+  sortBy?: 'featured' | 'newest' | 'price_asc' | 'price_desc' | 'relevance';
+  /** Vehicle-fit context from the Make → Model flow. */
+  make?: string;
+  model?: string;
+  /** Fine filters. */
+  brand?: string;
+  /** Market-of-origin regions (china/europe/russia/korea/usa); empty/undefined = all. */
+  regions?: string[];
+  /** Restrict to GM-family brands (Chevrolet / Ravon / Daewoo …). */
+  gmOnly?: boolean;
   /** Cancellation token. The HTTP transport must pass this to fetch.
    *  Mock transport honors it by aborting the simulated delay. */
   signal?: AbortSignal;
@@ -230,6 +246,27 @@ export function getCatalogMockList(request: CatalogListRequest): CatalogListResp
     );
   }
 
+  // Vehicle-fit + brand + region filters (mirror the HTTP query).
+  for (const term of [request.make, request.model, request.brand]) {
+    if (term) {
+      const t = term.toLowerCase();
+      items = items.filter(
+        (item) =>
+          item.title.toLowerCase().includes(t) || item.description.toLowerCase().includes(t),
+      );
+    }
+  }
+  if (request.regions?.length) {
+    const want = new Set(request.regions);
+    items = items.filter((item) => {
+      const region = item.region ?? brandRegion(item.title) ?? brandRegion(item.description);
+      return region != null && want.has(region);
+    });
+  }
+  if (request.gmOnly) {
+    items = items.filter((item) => isGmBrand(item.title) || isGmBrand(item.description));
+  }
+
   if (request.sortBy === 'price_asc') {
     items.sort((a, b) => parsePrice(a.price) - parsePrice(b.price));
   } else if (request.sortBy === 'price_desc') {
@@ -296,6 +333,8 @@ type ApiCatalogPart = {
   images?: string[];
   specs?: { label: string; value: string }[];
   features?: string[];
+  /** Market of origin, if the backend tags it (e.g. "china", "korea"). */
+  region?: string;
 };
 
 type ApiCatalogPartsResponse = {
@@ -321,15 +360,44 @@ function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
     features: p.features ?? [],
     category: p.category?.name ?? '',
     oem: p.oem_numbers?.[0],
+    // Prefer the backend's tagged region; fall back to brand inference.
+    region: normalizeRegion(p.region) ?? brandRegion(p.brand?.name),
   };
 }
+
+// Query-param names for GET /v1/catalog/parts. The backend STRICTLY rejects
+// unknown params (400 on `pageSize`), so these must match the backend's
+// Swagger exactly. Names below are the assumed snake_case set derived from the
+// endpoint's response facets (`brands`, `price_range_uzs`, `compatibility`).
+// If a filter 400s, correct the value here — it's the single source of truth.
+const PARTS_PARAM = {
+  page: 'page',
+  pageSize: 'page_size',
+  search: 'q',
+  category: 'category',
+  make: 'make',
+  model: 'model',
+  brand: 'brand',
+  region: 'region',
+  gmOnly: 'gm_only',
+  sort: 'sort',
+} as const;
 
 class HttpCatalogTransport implements CatalogTransport {
   async list(request: CatalogListRequest): Promise<CatalogListResponse> {
     const params = new URLSearchParams({
-      page: String(request.page),
-      page_size: String(request.pageSize),
+      [PARTS_PARAM.page]: String(request.page),
+      [PARTS_PARAM.pageSize]: String(request.pageSize),
     });
+    if (request.search) params.set(PARTS_PARAM.search, request.search);
+    if (request.category) params.set(PARTS_PARAM.category, request.category);
+    if (request.make) params.set(PARTS_PARAM.make, request.make);
+    if (request.model) params.set(PARTS_PARAM.model, request.model);
+    if (request.brand) params.set(PARTS_PARAM.brand, request.brand);
+    // Region is multi-select → repeated `region=` params (e.g. region=china&region=korea).
+    request.regions?.forEach((r) => params.append(PARTS_PARAM.region, r));
+    if (request.gmOnly) params.set(PARTS_PARAM.gmOnly, 'true');
+    if (request.sortBy) params.set(PARTS_PARAM.sort, request.sortBy);
     const res = await apiClient.get<ApiCatalogPartsResponse>(
       `${API_BASE}/parts?${params.toString()}`,
       { signal: request.signal },
