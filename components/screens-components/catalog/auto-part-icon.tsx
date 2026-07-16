@@ -1,35 +1,32 @@
-import type { FC } from 'react';
-import type { SvgProps } from 'react-native-svg';
+import { Image } from 'react-native';
 
-import AcCompressor from '@/assets/auto-parts/ac-compressor.svg';
-import AirFilter from '@/assets/auto-parts/air-filter.svg';
-import Battery from '@/assets/auto-parts/battery.svg';
-import BrakeRotor from '@/assets/auto-parts/brake-rotor.svg';
-import Clutch from '@/assets/auto-parts/clutch.svg';
-import HeadlightProjector from '@/assets/auto-parts/headlight-projector.svg';
-import OilBottle from '@/assets/auto-parts/oil-bottle.svg';
-import OilFilter from '@/assets/auto-parts/oil-filter.svg';
-import Piston from '@/assets/auto-parts/piston.svg';
-import Strut from '@/assets/auto-parts/strut.svg';
-import Wheel from '@/assets/auto-parts/wheel.svg';
-import Wiper from '@/assets/auto-parts/wiper.svg';
+import AirFilt from '../../../assets/3D _Icons/airfilt.png';
+import Alt from '../../../assets/3D _Icons/atlts.png';
+import Battery from '../../../assets/3D _Icons/battery.png';
+import Brake from '../../../assets/3D _Icons/brake.png';
+import Brake2 from '../../../assets/3D _Icons/brake2.png';
+import Disk from '../../../assets/3D _Icons/disk.png';
+import Light from '../../../assets/3D _Icons/light.png';
+import Oil from '../../../assets/3D _Icons/oil.png';
+import OilFilter from '../../../assets/3D _Icons/oilfilter.png';
+import P from '../../../assets/3D _Icons/p.png';
+import Susp from '../../../assets/3D _Icons/susp.png';
+import Wipe from '../../../assets/3D _Icons/wipe.png';
 
-/** Category display name → the realistic auto-part illustration in
- *  `assets/auto-parts/`. A few categories with no exact asset use the
- *  nearest mechanical part. */
-const PART_ICONS: Record<string, FC<SvgProps>> = {
-  Brakes: BrakeRotor,
+/** Category display name → the 3D PNG icon in `assets/3D _Icons/`. */
+const PART_ICONS: Record<string, any> = {
+  Brakes: Brake,
   Batteries: Battery,
-  Filters: AirFilter,
-  Ignition: Piston,
-  Engine: Clutch,
-  Electrical: AcCompressor,
-  'Oil & Fluids': OilBottle,
+  Filters: AirFilt,
+  Ignition: P,
+  Engine: Disk,
+  Electrical: Alt,
+  'Oil & Fluids': Oil,
   'Belts & Hoses': OilFilter,
-  Wipers: Wiper,
-  Lighting: HeadlightProjector,
-  Suspension: Strut,
-  Exterior: Wheel,
+  Wipers: Wipe,
+  Lighting: Light,
+  Suspension: Susp,
+  Exterior: Brake2,
 };
 
 export type AutoPartIconProps = {
@@ -39,12 +36,12 @@ export type AutoPartIconProps = {
 };
 
 /**
- * `AutoPartIcon` — renders the realistic auto-part illustration (SVG from
- * `assets/auto-parts/`) for a category, in the artwork's own colors. Used on
- * the Explore "Shop by category" grid. Renders nothing for an unknown name.
+ * `AutoPartIcon` — renders the 3D PNG illustration for a category. Keeps the
+ * same size API as before so tiles/styles don't need changes. Renders nothing
+ * for an unknown name.
  */
 export default function AutoPartIcon({ name, size = 36 }: AutoPartIconProps) {
-  const Icon = PART_ICONS[name];
-  if (!Icon) return null;
-  return <Icon width={size} height={size} />;
+  const src = PART_ICONS[name];
+  if (!src) return null;
+  return <Image source={src} style={{ width: size, height: size }} resizeMode="contain" />;
 }

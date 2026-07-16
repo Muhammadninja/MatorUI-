@@ -155,6 +155,7 @@ export const lightTokens: ThemeTokens = {
   value: '#4ade80',
   onValue: '#05310f',
   scrim: 'rgba(0, 0, 0, 0.55)',
+  scannerAccent: '#00e676',
   brandSoft: 'rgba(0, 0, 0, 0.12)',
 };
 
@@ -215,6 +216,7 @@ export const darkTokens: ThemeTokens = {
   value: '#15803d',
   onValue: '#05310f',
   scrim: 'rgba(0, 0, 0, 0.55)',
+  scannerAccent: '#00e676',
   brandSoft: 'rgba(255, 255, 255, 0.12)',
 };
 

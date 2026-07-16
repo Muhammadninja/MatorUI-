@@ -1,0 +1,58 @@
+# ═════════════════════════════════════════════════════════════════════════════
+# FLOW 9 — Search → Result → Item Detail  (Stage 9 / discovery)
+# ═════════════════════════════════════════════════════════════════════════════
+# From Explore, open Search, type a term, assert the mocked catalog search
+# returns matching parts, then open one into Item Detail.
+#
+# Mocked endpoint (../mock-server): GET /v1/catalog/parts?q=brake
+#   → title/brand substring match: [Brembo Front Brake Pads, Bosch Brake Rotor]
+#
+# testIDs: explore-search-entry (explore-screen) · search-screen / search-input
+#          (mator-search-screen) · part-card-<id> (product-row) ·
+#          item-detail-screen (item-detail-screen).
+# ═════════════════════════════════════════════════════════════════════════════
+appId: com.fotih12.mator
+name: flow-09-search
+tags:
+  - smoke
+  - catalog
+  - search
+---
+# ── Arrange: launch to Explore ───────────────────────────────────────────────
+- runFlow: ../subflows/launch-clean.yaml
+
+# ── Act: open Search and query ───────────────────────────────────────────────
+- tapOn:
+    id: "explore-search-entry"
+- extendedWaitUntil:
+    visible:
+      id: "search-screen"
+    timeout: 8000
+- tapOn:
+    id: "search-input"
+# Let the keyboard settle before typing (keyboard-controller intercepts dismiss).
+- waitForAnimationToEnd:
+    timeout: 2000
+- inputText: "brake"
+
+# ── Assert: the mocked search returns both brake parts ───────────────────────
+- extendedWaitUntil:
+    visible:
+      id: "part-card-brembo-fp"
+    timeout: 8000
+- assertVisible:
+    id: "part-card-bosch-rotor"
+- assertVisible:
+    text: ".*2 results.*"              # result-count line
+
+# ── Act + Assert: open a result → Item Detail ────────────────────────────────
+- tapOn:
+    id: "part-card-brembo-fp"
+- extendedWaitUntil:
+    visible:
+      id: "item-detail-screen"
+    timeout: 8000
+- assertVisible:
+    text: "Brembo Front Brake Pads"
+
+- takeScreenshot: artifacts/flow-09-search-results

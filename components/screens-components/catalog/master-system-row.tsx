@@ -20,6 +20,7 @@ function MasterSystemRow({ system, onPress }: MasterSystemRowProps) {
   const { tokens } = useThemeContext();
   return (
     <AppPressableView
+      testID={`system-item-${system.id}`}
       onPress={() => onPress(system)}
       androidRipple={false}
       accessibilityRole="button"

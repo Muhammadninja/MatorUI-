@@ -1,0 +1,317 @@
+================================================================================
+  MATOR — BACKEND DATA / SEED-CATALOG CHECKLIST
+  What reference & catalog data to populate in the backend database.
+  Generated: 2026-07-16
+  Source of truth (currently hardcoded on the frontend):
+    - services/uz-vehicle-catalog.ts     (brands / models / generations / trims / engines)
+    - constants/catalog-systems.ts       (master systems / core categories)
+    - constants/catalog-regions.ts       (market-of-origin regions + brand map)
+    - mocks/mator-catalog.ts             (products, part categories, dealers)
+    - services/quick-filters-service.ts  (search quick-filter chips)
+    - services/garage-service.ts         (vehicle enums)
+================================================================================
+
+HOW TO READ THIS
+  • "REFERENCE / LOOKUP DATA" = catalog tables you seed once and rarely change.
+    This is the "car brands / car models" data the request is about.
+  • "CATALOG CONTENT" = the actual products/parts inventory + supplier brands.
+  • "USER-GENERATED DATA" = created per-user at runtime (schema only, no seed).
+  • "ENUMS / VALUE SETS" = fixed value lists to enforce/validate against.
+  • Field names come straight from the current TypeScript types so the backend
+    contract matches the app with zero client changes.
+
+
+================================================================================
+  A.  REFERENCE / LOOKUP DATA  (seed these tables)
+================================================================================
+
+--------------------------------------------------------------------------------
+A1. VEHICLE BRANDS (makes)                       [table: vehicle_brands]
+--------------------------------------------------------------------------------
+Fields:
+  id            string  (slug, PK)          e.g. "chevrolet"
+  label         string  (display name)      e.g. "Chevrolet"
+  tier          enum    uz_top | uz_mid | global   (sort priority in pickers)
+  manufacturer  string? (local assembler)   e.g. "UzAuto Motors"
+  logoUrl       string? (CDN wordmark)
+  accentColor   string? (hex, tile/monogram) e.g. "#CD9834"
+
+Seed rows (9 in app today — extend with the full UZ market):
+  chevrolet   | Chevrolet | uz_top | UzAuto Motors | accent #CD9834
+  byd         | BYD       | uz_top | BYD Uzbekistan| accent #C3002F
+  kia         | Kia       | uz_top |               | accent #BB162B
+  chery       | Chery     | uz_top |               | accent #D7263D
+  hyundai     | Hyundai   | uz_top |               | accent #002C5E
+  lada        | Lada      | uz_top | AvtoVAZ       | accent #1F6FB2
+  toyota      | Toyota    | uz_mid |               | accent #EB0A1E
+  haval       | Haval     | uz_mid |               | accent #B01E28
+  nissan      | Nissan    | global |               | accent #C3002F
+  (also referenced: daewoo #1C6BBA, skoda #4BA82E, volkswagen #151F5D, leapmotor)
+
+--------------------------------------------------------------------------------
+A2. VEHICLE MODELS                               [table: vehicle_models]
+--------------------------------------------------------------------------------
+Fields:
+  id         string (slug, PK)     e.g. "cobalt"
+  brandId    string (FK->brands)   e.g. "chevrolet"
+  label      string                e.g. "Cobalt"
+  bodyStyle  enum                  sedan|hatchback|wagon|suv|coupe|truck|van|minivan
+  order      number? (picker sort within brand)
+
+Seed rows currently in app (24):
+  Chevrolet: Cobalt, Malibu, Nexia, Lacetti, Gentra, Spark, Tracker, Captiva, Onix, Damas
+  Daewoo:    Matiz, Tico
+  BYD:       Chazor, Song Plus, Han
+  Kia:       K5, Sportage, Rio
+  Chery:     Tiggo 7 Pro, Tiggo 8 Pro
+  Hyundai:   Sonata, Tucson, Creta
+  Lada:      Niva, Granta
+  (Extend to full model list per brand for the real catalog.)
+
+--------------------------------------------------------------------------------
+A3. VEHICLE GENERATIONS                           [table: vehicle_generations]
+--------------------------------------------------------------------------------
+Why it matters: OEM part numbers differ per generation, even for "the same"
+model. This is the fitment key parts-search filters on.
+Fields:
+  id            string (slug, PK)   e.g. "cobalt-p2"
+  modelId       string (FK->models)
+  label         string  (local name) e.g. "Position 2", "Nexia 3", "Malibu 2"
+  yearRange     [number, number]     e.g. [2016, 2018]  (use 2099 for "current")
+  internalCode  string? (mfr codename) e.g. "T250", "XL"
+  active        boolean (still sold new -> drives "discontinued" badge)
+
+Seed rows currently (19): Cobalt P1-P4, Malibu 1-2, Nexia 2-3, Lacetti,
+  Gentra, Spark M400, Tracker 3, Captiva 5, Onix, Damas 2, BYD Chazor/Song Plus/Han.
+
+--------------------------------------------------------------------------------
+A4. VEHICLE TRIMS                                 [table: vehicle_trims]
+--------------------------------------------------------------------------------
+Fields:
+  id          string (slug, PK)      e.g. "cobalt-p2-premier"
+  generationId string (FK->generations)
+  label       string                 e.g. "Premier", "Elegant", "LTZ", "LS"
+  engineIds   string[] (M:N->engines; a trim can offer multiple engines)
+
+Seed rows currently (~27): Elegant/Premier/LS/LTZ for Cobalt positions,
+  LT/LTZ/Premier for Malibu, Base/DLX/LS/LT for Nexia, SX (Lacetti),
+  Base/Elegant (Gentra), single trims for Spark/Tracker/Captiva/Onix/Damas,
+  Pro/Flagship/EV for BYD.
+
+--------------------------------------------------------------------------------
+A5. VEHICLE ENGINES                               [table: vehicle_engines]
+--------------------------------------------------------------------------------
+Fields:
+  id              string (slug, PK)  e.g. "b15d2-turbo"
+  label           string             e.g. "1.5L Turbo (B15D2)"
+  type            enum               na|turbo|hybrid|phev|ev|cng|lpg
+  displacement    number? (litres)   e.g. 1.5  (null for EV)
+  transmissions   enum[]             manual|automatic|cvt|dct|amt
+  oemCatalogScope string? (backend OEM-catalogue routing key) e.g. "gm-uz-b15d2-turbo"
+
+Seed rows currently (9): B15D2 na/turbo, B12D2, 1.3L LCV, Malibu 1.5T/2.0T,
+  Lacetti 1.6 F16D3, BYD Blade EV, BYD DM-i PHEV.
+
+--------------------------------------------------------------------------------
+A6. MASTER SYSTEMS / CORE PART CATEGORIES         [table: catalog_systems]
+--------------------------------------------------------------------------------
+The 8 top-level vehicle systems on the catalog landing. Bilingual EN + RU.
+Fields:
+  id           string (PK)     e.g. "brakes"
+  label        string (EN)     e.g. "Brake System"
+  labelRu      string (RU)     e.g. "Тормозная система"
+  categoryKey  string (parts-query filter key)
+  iconKey      string (icon name; app maps to a Lucide icon)
+
+Seed rows (8):
+  brakes        | Brake System          | Тормозная система        | icon Disc3
+  maintenance   | Maintenance & Fluids  | ТО и Жидкости            | icon Droplets
+  suspension    | Suspension & Steering | Ходовая и Рулевое        | icon Wrench
+  electrical    | Electrical & Lighting | Электрика и Оптика       | icon Zap
+  engine        | Engine                | Двигатель                | icon Cog
+  transmission  | Transmission          | Трансмиссия              | icon Settings2
+  climate       | Heating & Cooling     | Климат и Охлаждение      | icon Snowflake
+  tuning        | Tuning & Accessories  | Тюнинг и Стайлинг        | icon Sparkles
+
+Also add SUB-CATEGORIES (table: catalog_subcategories) under each system:
+  id, categoryId (FK), label, labelRu?   e.g. "Pads"/"Rotors" under Brakes.
+
+--------------------------------------------------------------------------------
+A7. CATEGORY TILES ("Shop by category" grid)      [table: catalog_category_tiles]
+--------------------------------------------------------------------------------
+Merchandising tiles for the Explore grid (12), each with a count + accent color.
+Fields: name, count (int), color (hex).
+Seed rows:
+  Brakes 128 #db4437 | Batteries 42 #0f9d58 | Filters 96 #4285f4 |
+  Ignition 74 #f4b400 | Engine 210 #7c4dff | Electrical 118 #f59e0b |
+  Oil & Fluids 65 #00acc1 | Belts & Hoses 53 #8e24aa | Wipers 31 #039be5 |
+  Lighting 88 #fb8c00 | Suspension 77 #e91e8c | Exterior 49 #3949ab
+  (counts should become live aggregates once inventory is seeded)
+
+--------------------------------------------------------------------------------
+A8. MARKET-OF-ORIGIN REGIONS                      [table: catalog_regions]
+--------------------------------------------------------------------------------
+Region filter for parts (where the brand originates).
+Fields: key, label.
+Seed rows (5): china | europe | russia | korea | usa
+
+Plus a BRAND -> REGION mapping (used to tag parts by origin). Store either as
+a column on vehicle_brands/part_brands or a lookup table:
+  usa    -> chevrolet, chevy, gmc, gm, ford, jeep, tesla, cadillac, ravon
+  korea  -> hyundai, kia, daewoo, genesis, ssangyong
+  europe -> volkswagen, vw, skoda, audi, bmw, mercedes, renault, peugeot,
+            opel, fiat, volvo, porsche, seat
+  russia -> lada, vaz, gaz, uaz, niva
+  china  -> byd, chery, haval, geely, changan, jac, exeed, omoda, jetour,
+            foton, dongfeng, great wall, gwm, jaecoo, xitoy
+
+GM BRAND FAMILY (first-class "GM only" quick filter):
+  chevrolet, chevy, ravon, daewoo, gmc, cadillac, buick, holden
+
+
+================================================================================
+  B.  CATALOG CONTENT  (products + supplier brands — the inventory)
+================================================================================
+
+--------------------------------------------------------------------------------
+B1. PARTS / PRODUCTS                              [table: products / catalog_items]
+--------------------------------------------------------------------------------
+The sellable auto-parts inventory. Combined shape from MatorProduct + CatalogItem:
+Fields:
+  id           string (PK)
+  title        string          e.g. "Ceramic Brake Pads — Front"
+  oem          string          OEM number, e.g. "GD1234-8Z", "90915-YZZE1"
+  brand        string          supplier/part brand (see B2)
+  categoryId   string (FK->catalog_systems / category)
+  region       enum? (china|europe|russia|korea|usa; else inferred from brand)
+  priceUzs     number          numeric price in som (for sort/range filtering)
+  priceLabel   string          e.g. "UZS 850,750" / "Starting at"
+  was          number?         struck-through original price (for SAVE %)
+  rating       number          e.g. 4.8
+  reviews      number          e.g. 214
+  inStock      boolean
+  isOem        boolean         drives "OEM" quick filter
+  featured     boolean
+  images       string[]        image URLs
+  specs        [{ label, value }]   key/value spec rows
+  fitment      { brandId, modelId?, generationId?, trimId?, engineId? }[]
+               (which vehicles this part fits — the critical join)
+
+Sample seed (10 demo parts today): Ceramic Brake Pads, Genuine Oil Filter,
+  Iridium TT Spark Plug, Cabin Air Filter, Wiper Blade Set, Alternator 130A,
+  Serpentine Drive Belt, Brake Rotor, Engine Air Filter, 12V AGM Battery.
+
+--------------------------------------------------------------------------------
+B2. SUPPLIER / PART BRANDS                        [table: part_brands]
+--------------------------------------------------------------------------------
+Component manufacturers (distinct from car makes). Referenced by products &
+the parts filter.
+Fields: id, name, logoUrl?, region?
+Seen in seed data: Bosch (QuietCast/Icon), Denso, Toyota OEM, Gates, Brembo,
+  K&N, Optima. (Populate the full supplier list.)
+
+--------------------------------------------------------------------------------
+B3. CERTIFIED DEALERS / STOREFRONTS               [table: dealers]
+--------------------------------------------------------------------------------
+"MATOR Certified" verified sellers row on Explore.
+Fields:
+  id, name, initial (monogram letter), color (hex),
+  orders (formatted lifetime count e.g. "18k+"), years (in business)
+Seed rows (4): AutoPro Parts, Prime Motors Supply, Genuine OEM Depot, TorqueLine Auto.
+
+--------------------------------------------------------------------------------
+B4. SEARCH QUICK-FILTER CHIPS                     [table: quick_filters]
+--------------------------------------------------------------------------------
+Chips on the Search landing. Can be derived from inventory, but seed initial set.
+Fields: id, label, slug, kind (e.g. "brand"), count, locale?
+Seed rows seen: Cobalt(1240), BYD(882), Lacetti(614), Tracker(503), Leapmotor(297).
+
+--------------------------------------------------------------------------------
+B5. PROMO BANNERS / SPONSORED PLACEMENTS          [table: promo_banners]
+--------------------------------------------------------------------------------
+Merchandising for Search home (see mocks/search-page-backend-fields.txt).
+Fields (recommended): id, imageUrl, title, subtitle, ctaLabel, deeplink,
+  placement, priority, active, startsAt, endsAt.
+
+--------------------------------------------------------------------------------
+B6. TOP-FEATURED FILTER GROUPS                    [table: top_featured_filters]
+--------------------------------------------------------------------------------
+Filter dimensions on the Top Featured screen (services/top-featured-service.ts).
+Fields: key, title, options[].
+Seed rows (4 groups):
+  model     | Model     | Sedan, SUV, Coupe, Truck
+  brand     | Brand     | Cobalt, BYD, Lacetti, Tracker, Leapmotor
+  color     | Color     | Black, White, Silver, Red
+  condition | Condition | New, OEM, Restored, Budget
+
+
+================================================================================
+  B'.  COMMERCE REFERENCE DATA  (checkout / cart lookups — seed these)
+================================================================================
+
+--------------------------------------------------------------------------------
+B'1. PROMO / DISCOUNT CODES                       [table: promo_codes]
+--------------------------------------------------------------------------------
+Discount codes applied at checkout (services/cart-math.ts).
+Fields: code, label, kind (percent|fixed|free_shipping), value, maxDiscount?
+Seed rows (3):
+  WELCOME10 | 10% off               | percent        | 0.10
+  RIDE25    | 25% off (max $200)    | percent        | 0.25 | maxDiscount 200
+  FREESHIP  | Free shipping         | free_shipping  | 0
+
+--------------------------------------------------------------------------------
+B'2. SHIPPING OPTIONS                             [table: shipping_options]
+--------------------------------------------------------------------------------
+Delivery methods at checkout (services/orders-api.ts).
+Fields: key, label, eta, price
+Seed rows (3):
+  standard | Standard | 3-5 business days | $0
+  express  | Express  | 1-2 business days | $9.99
+  same_day | Same day | By 9 PM today     | $19.99
+
+
+================================================================================
+  C.  ENUMS / VALUE SETS  (fixed lists to validate against)
+================================================================================
+  Body style:      sedan, hatchback, wagon, suv, coupe, truck, van, minivan
+  Engine type:     na, turbo, hybrid, phev, ev, cng, lpg
+  Transmission:    manual, automatic, cvt, dct, amt
+  Drivetrain:      fwd, rwd, awd, 4wd
+  Fuel type:       petrol, diesel, hybrid, phev, ev, cng, lpg
+  Market tier:     uz_top, uz_mid, global
+  Vehicle color:   midnight, graphite, pearl, matte  (legacy enum; prefer free hex)
+  Catalog region:  china, europe, russia, korea, usa
+  Sort options:    relevance, price_asc, price_desc, newest, featured
+  Part condition:  New, Used/Refurb (from top-featured filters)
+
+
+================================================================================
+  D.  USER-GENERATED DATA  (schema only — no seed; created at runtime)
+================================================================================
+  • Garage vehicles       (per user; make/model/year/trim/vin/plate/mileage/
+                            color/colorHex/transmission/drivetrain/fuelType/
+                            images/isPrimary + fitment ids brandId..engineId)
+  • Shipping addresses     (label, name, line, city, isDefault)
+  • Payment cards          (brand, last4, exp, isDefault)  [tokenize — no PAN!]
+  • Cart items             (productId, qty)
+  • Orders / order history
+  • Recently viewed / likes / recent searches
+  • Chatbot conversations & messages (see mocks/ai-chatbot-backend-spec.txt)
+  • User profile & settings (see mocks/profile-api-spec.txt)
+  • Vehicle live status     (realtime only — mechanic dashboard; not persisted)
+
+
+================================================================================
+  E.  PRIORITY ORDER FOR SEEDING
+================================================================================
+  1. Vehicle brands -> models -> generations -> trims -> engines  (the fitment core)
+  2. Master systems + subcategories + category tiles
+  3. Regions + brand->region map + GM family
+  4. Supplier/part brands
+  5. Products (with fitment + specs + images + OEM numbers)
+  6. Dealers, quick filters, promo banners
+  7. Enums enforced as DB constraints / validation
+
+  NOTE: The full-fidelity fitment taxonomy (A1–A5) already exists verbatim in
+  services/uz-vehicle-catalog.ts — export those arrays directly as the seed.
+================================================================================

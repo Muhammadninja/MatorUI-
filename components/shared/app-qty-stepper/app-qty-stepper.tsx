@@ -16,6 +16,9 @@ export type QtyStepperProps = {
   /** Control size — `md` (42px) on Item Detail, `sm` (30px) in Cart. */
   size?: 'sm' | 'md';
   disabled?: boolean;
+  /** When set, the − / + buttons expose `${testID}-dec` / `${testID}-inc`
+   *  testIDs (for E2E). */
+  testID?: string;
 };
 
 /**
@@ -30,6 +33,7 @@ export default function AppQtyStepper({
   max,
   size = 'md',
   disabled = false,
+  testID,
 }: QtyStepperProps) {
   const { tokens } = useThemeContext();
   const box = size === 'md' ? 42 : 30;
@@ -52,6 +56,7 @@ export default function AppQtyStepper({
       borderWidth={1}
       borderName="border"
       accessibilityRole="button"
+      testID={testID ? `${testID}-${kind}` : undefined}
       accessibilityLabel={kind === 'dec' ? 'Decrease quantity' : 'Increase quantity'}
       style={{ width: box, height: box, opacity: enabled ? 1 : 0.4 }}
     >

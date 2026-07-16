@@ -90,14 +90,21 @@ type RawAuthResponse = {
 };
 ```
 
+Auth is **passwordless OTP** (phone default, or email). Both sign-in and sign-up are
+a two-call flow: request a code, then verify it.
+
 | Method & path | Request | Response |
 |---|---|---|
-| `POST /v1/auth/sign-in` | `{ email, password }` | `RawAuthResponse` |
-| `POST /v1/auth/sign-up` | `{ email, password, firstName, lastName }` | `RawAuthResponse` |
+| `POST /v1/auth/otp/request` | `{ channel: 'phone'\|'email', identifier, purpose: 'sign-in'\|'sign-up', firstName?, lastName? }` | `{ otpToken, expiresIn /* s */, devCode? }` |
+| `POST /v1/auth/otp/verify` | `{ otpToken, code /* 6 digits */ }` | `RawAuthResponse` (invalid/expired code → `422`) |
 | `POST /v1/auth/refresh` | `{ refreshToken }` | `RawAuthResponse` (401/400 → client signs out) |
 | `POST /v1/auth/sign-out` | `{ refreshToken }` (auth header sent) | `204` (best-effort) |
 
-Client converts `expiresIn` → `expiresAt = now + expiresIn` (unix seconds).
+- `identifier` is an E.164 phone (`+998…`) or an email address; `channel` says which.
+- Sign-up captures `firstName`/`lastName` on the **request** call so `verify` can create the profile.
+- `devCode` is a **dev/demo-only** convenience (the code, so mock/E2E builds auto-fill it). A real
+  backend MUST NOT return it — the client then requires the user to type the code.
+- Client converts `expiresIn` → `expiresAt = now + expiresIn` (unix seconds).
 
 ---
 

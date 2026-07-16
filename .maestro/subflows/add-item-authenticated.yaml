@@ -1,0 +1,40 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Reusable subflow: put the Brembo brake pads in the cart as a signed-in user,
+# exercising the guest → auth-gate → sign-in → resume purchase path end-to-end.
+#
+# Precondition: launched + active vehicle seeded (on the systems grid).
+#
+# Steps replay the real gate: a guest taps Add-to-cart → item-detail pushes the
+# gated sign-in → we submit it → router.back() lands on item-detail (now
+# authenticated) → tap Add-to-cart again → item is added and the app
+# router.replace()s to the Cart tab.
+#
+# testIDs: add-to-cart-btn (item-detail) · sign-in-screen / auth-send-code-btn / auth-verify-btn
+#          (sign-in) · item-detail-screen · cart-screen (cart).
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.fotih12.mator
+---
+- runFlow: ./open-item-detail.yaml
+
+# Guest tap → purchase gate.
+- tapOn:
+    id: "add-to-cart-btn"
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-screen"
+    timeout: 8000
+
+# Authenticate (passwordless OTP: phone pre-filled + code auto-filled) → item-detail.
+- runFlow: ./sign-in-submit.yaml
+- extendedWaitUntil:
+    visible:
+      id: "item-detail-screen"
+    timeout: 8000
+
+# Now authenticated → add the item → app navigates to the Cart tab.
+- tapOn:
+    id: "add-to-cart-btn"
+- extendedWaitUntil:
+    visible:
+      id: "cart-screen"
+    timeout: 8000

@@ -1,0 +1,65 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Reusable subflow: launch the app fresh to a known-good start (Explore/tabs).
+#
+# DEV-CLIENT NOTES:
+#   - clearState wipes the dev client's cached JS bundle, FORCING a fresh
+#     download from Metro (so a newly-inlined EXPO_PUBLIC_API_BASE_URL actually
+#     takes effect). It also wipes the dev client's saved server, so relaunch
+#     drops to the dev launcher — handled below by tapping the "Mator" server.
+#   - clearState also wipes the language choice, so the first-launch gate always
+#     appears after the fresh bundle boots — handled below (English → Continue).
+#
+# For a RELEASE / preview build (recommended for CI) there is no launcher and the
+# base URL is baked at build time; this same flow still works.
+#
+# The app must have been BUILT/STARTED with EXPO_PUBLIC_API_BASE_URL pointing at
+# the mock server (Expo inlines EXPO_PUBLIC_* at bundle time). See README.
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.fotih12.mator
+---
+- stopApp
+- launchApp:
+    clearState: true
+- waitForAnimationToEnd:
+    timeout: 4000
+# DEV BUILD ONLY: if we landed on the Expo dev launcher, force the dev client to
+# (re)fetch the bundle straight from Metro, bypassing the on-device bundle cache
+# (this is what makes a freshly-inlined base URL take effect). A RELEASE / preview
+# build has no launcher, so this whole block is skipped and the baked-in URL is
+# used. localhost works because the simulator shares the host network.
+- runFlow:
+    when:
+      visible: "Enter URL manually"
+    commands:
+      - openLink: "mator://expo-development-client/?url=http://localhost:8081"
+      - waitForAnimationToEnd:
+          timeout: 8000
+# DEV BUILD ONLY: the openLink re-fetch re-triggers Expo's one-time "developer
+# menu" explainer as a NATIVE bottom sheet. Its text is NOT in Maestro's RN
+# hierarchy (can't tapOn "Continue"/close), and it overlays the language options
+# + CTA, so the gate assert would time out. The sheet is dismissable by tapping
+# the dimmed backdrop above it — but the sheet can appear LATE (after a cold JS
+# rebuild), so a couple of fixed taps race it. Instead POLL: while the language
+# gate isn't visible (sheet still up, or bundle still building), tap the backdrop
+# and wait. Once "English, English" shows we exit — so on a release build (no
+# sheet) the loop's first check passes and it never taps. Bounded by `times` so a
+# genuinely stuck boot fails fast instead of hanging.
+- repeat:
+    times: 45
+    while:
+      notVisible: "English, English"
+    commands:
+      - tapOn:
+          point: "50%,12%"
+      - waitForAnimationToEnd:
+          timeout: 2000
+# Final settle — the gate is up (loop exited on it) or this gives a cold boot the
+# last of its budget before we assert.
+- extendedWaitUntil:
+    visible: "English, English"
+    timeout: 30000
+- tapOn: "English, English"
+- tapOn: "Continue"
+# Land on Explore before the caller navigates onward.
+- waitForAnimationToEnd:
+    timeout: 5000

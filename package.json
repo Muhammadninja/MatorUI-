@@ -97,6 +97,8 @@
     "typecheck": "bash scripts/typecheck.sh",
     "test": "bash scripts/test.sh",
     "test:watch": "bash scripts/test.sh --watch",
+    "test:e2e": "bash scripts/e2e.sh",
+    "test:e2e:mock": "node .maestro/mock-server/standalone-server.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint:tokens": "node scripts/lint-tokens.mjs",

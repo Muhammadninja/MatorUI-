@@ -68,6 +68,7 @@ export default function CatalogFilterSheet({
   return (
     <AppBottomSheet visible={visible} onClose={onClose} heightFraction={0.82} expandable={false}>
       <ScrollView
+        testID="filter-sheet"
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 16, gap: 18 }}
@@ -134,7 +135,7 @@ export default function CatalogFilterSheet({
             <SectionLabel>Brands</SectionLabel>
             <AppView row wrap gap={8}>
               {brands.map((b) => (
-                <Pill key={b} label={b} active={draft.brands.includes(b)} onPress={() => toggleBrand(b)} />
+                <Pill key={b} testID={`filter-brand-${b}`} label={b} active={draft.brands.includes(b)} onPress={() => toggleBrand(b)} />
               ))}
             </AppView>
           </AppView>
@@ -142,6 +143,7 @@ export default function CatalogFilterSheet({
 
         <AppView gap={10} style={{ marginTop: 4 }}>
           <AppButton
+            testID="filter-apply-btn"
             title="Apply filters"
             kind="brand"
             size="lg"
@@ -151,7 +153,7 @@ export default function CatalogFilterSheet({
               onClose();
             }}
           />
-          <AppButton title="Reset" kind="secondary" variant="outline" size="md" fullWidth onPress={() => setDraft(reset)} />
+          <AppButton testID="filter-clear-btn" title="Reset" kind="secondary" variant="outline" size="md" fullWidth onPress={() => setDraft(reset)} />
         </AppView>
       </ScrollView>
     </AppBottomSheet>
@@ -171,10 +173,11 @@ function SectionLabel({ children }: { children: string }) {
   );
 }
 
-function Pill({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+function Pill({ label, active, onPress, testID }: { label: string; active: boolean; onPress: () => void; testID?: string }) {
   const { tokens } = useThemeContext();
   return (
     <AppPressableView
+      testID={testID}
       onPress={onPress}
       androidRipple={false}
       accessibilityRole="button"

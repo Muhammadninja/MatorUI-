@@ -1,0 +1,61 @@
+# ═════════════════════════════════════════════════════════════════════════════
+# FLOW 6 — Cart → Checkout → Order Placed  (Stage 6 / buy path)
+# ═════════════════════════════════════════════════════════════════════════════
+# The commercial finale: from a cart holding the part, go to Checkout (seeded
+# address + card + shipping from the in-memory orders mock), place the order,
+# and assert the Order Confirmation screen.
+#
+# Checkout + orders run on the tested MockOrdersTransport (seeded addresses /
+# payment methods / shipping options; createOrder mints an id and seeds the
+# detail row so the confirmation's useOrder(id) resolves). No server rules
+# needed for this leg — only the catalog detail is server-mocked.
+#
+# testIDs: cart-checkout-btn · checkout-screen · checkout-place-order-btn ·
+#          order-confirmation-screen.
+# ═════════════════════════════════════════════════════════════════════════════
+appId: com.fotih12.mator
+name: flow-06-checkout
+tags:
+  - buy
+  - checkout
+  - orders
+env:
+  FIXTURE_VIN: "1G1AK55F877123456"
+  FIXTURE_YEAR: "2022"
+  FIXTURE_MAKE: "CHEVROLET"
+  FIXTURE_MODEL: "Cobalt"
+---
+# ── Arrange: launch, seed vehicle, get an item into the cart (signed in) ──────
+- runFlow: ../subflows/launch-clean.yaml
+- runFlow: ../subflows/seed-active-vehicle.yaml
+- runFlow: ../subflows/add-item-authenticated.yaml
+
+# ── Act: Cart → Checkout ─────────────────────────────────────────────────────
+- tapOn:
+    id: "cart-checkout-btn"
+- extendedWaitUntil:
+    visible:
+      id: "checkout-screen"
+    timeout: 8000
+# Order summary reflects the part we added.
+- assertVisible:
+    text: ".*Brembo Front Brake Pads.*"
+- assertVisible:
+    id: "checkout-place-order-btn"
+
+# ── Act: place the order ─────────────────────────────────────────────────────
+- tapOn:
+    id: "checkout-place-order-btn"
+
+# ── Assert: order confirmation renders (createOrder resolved + detail seeded) ─
+- extendedWaitUntil:
+    visible:
+      id: "order-confirmation-screen"
+    timeout: 12000
+- assertVisible:
+    text: ".*Order placed.*"
+
+- takeScreenshot: artifacts/flow-06-order-confirmation
+
+# NOTE: the Cart→Checkout→Confirmation leg above is also factored into
+# ../subflows/complete-checkout.yaml, which flow-07 reuses.

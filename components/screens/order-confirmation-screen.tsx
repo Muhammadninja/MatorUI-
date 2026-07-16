@@ -68,7 +68,7 @@ export default function OrderConfirmationScreen() {
   }
 
   return (
-    <AppView flex={1} colorName="background">
+    <AppView flex={1} colorName="background" testID="order-confirmation-screen">
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
@@ -84,7 +84,7 @@ export default function OrderConfirmationScreen() {
           rounded={999}
           style={{ width: 88, height: 88, backgroundColor: tokens.success }}
         >
-          <Check size={46} strokeWidth={2.5} color="#fff" />
+          <Check size={46} strokeWidth={2.5} color={tokens.white} />
         </AppView>
 
         {/* Heading */}
@@ -203,6 +203,7 @@ export default function OrderConfirmationScreen() {
         {/* Buttons */}
         <AppView style={{ width: '100%', gap: 12, marginTop: 24 }}>
           <AppButton
+            testID="confirmation-track-btn"
             title="Track order"
             kind="brand"
             size="lg"

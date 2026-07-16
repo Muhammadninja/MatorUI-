@@ -1,0 +1,38 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Reusable subflow: from the vehicle-scoped systems grid, open the Brake System
+# parts directory and tap into the Brembo Front Brake Pads item-detail screen.
+#
+# Precondition: the app is launched AND an active vehicle is seeded (i.e. call
+# launch-clean.yaml + seed-active-vehicle.yaml first) so we start on the
+# systems grid. Mirrors Flow 3's real navigation, then presses one parts row.
+#
+# The item-detail screen fetches GET /v1/catalog/parts/brembo-fp from the mock
+# server (added for the buy path), so the real `useCatalogDetail` state machine
+# drives what renders.
+#
+# testIDs: system-item-brakes (master-system-row) · parts-directory-screen
+#          (catalog-parts-screen) · part-card-brembo-fp (product-row) ·
+#          item-detail-screen (item-detail-screen).
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.fotih12.mator
+---
+- tapOn:
+    id: "system-item-brakes"
+- assertVisible:
+    id: "parts-directory-screen"
+
+# The parts list is fetched from the mock — wait for the first row before tapping.
+- extendedWaitUntil:
+    visible:
+      id: "part-card-brembo-fp"
+    timeout: 8000
+- tapOn:
+    id: "part-card-brembo-fp"
+
+# Item Detail resolves its own GET /v1/catalog/parts/:id; block until it renders.
+- extendedWaitUntil:
+    visible:
+      id: "item-detail-screen"
+    timeout: 8000
+- assertVisible:
+    text: "Brembo Front Brake Pads"     # detail loaded the real (mocked) part

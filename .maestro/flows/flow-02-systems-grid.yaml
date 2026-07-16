@@ -1,0 +1,68 @@
+# ═════════════════════════════════════════════════════════════════════════════
+# FLOW 2 — Master Category Systems Grid  (Stage 2 / AutoZone flow)
+# ═════════════════════════════════════════════════════════════════════════════
+# With an active vehicle, assert all 8 core systems render, tap "Brake System"
+# (Тормозная система), assert navigation to the parts directory.
+#
+# The 8 systems are static config (constants/catalog-systems.ts):
+#   brakes · maintenance · suspension · electrical ·
+#   engine · transmission · climate · tuning
+#
+# testIDs: systems-grid + system-item-<id> (master-system-row.tsx),
+#          parts-directory-screen (catalog-parts-screen.tsx).
+# No network mock needed — the grid is local config.
+# ═════════════════════════════════════════════════════════════════════════════
+appId: com.fotih12.mator
+name: flow-02-systems-grid
+tags:
+  - stage2
+  - catalog
+# Per-flow env defaults (used by the seed subflow) so the flow runs standalone.
+env:
+  FIXTURE_VIN: "1G1AK55F877123456"
+  FIXTURE_YEAR: "2022"
+  FIXTURE_MAKE: "CHEVROLET"
+  FIXTURE_MODEL: "Cobalt"
+---
+# ── Arrange: launch + decode VIN + land on the systems grid ──────────────────
+- runFlow: ../subflows/launch-clean.yaml
+- runFlow: ../subflows/seed-active-vehicle.yaml
+
+# ── Assert: all 8 core systems are rendered ──────────────────────────────────
+# Structural testIDs so EN/RU copy changes never break this.
+- assertVisible: { id: "system-item-brakes" }
+# NOTE: brakes is "Тормозная система" in RU. We assert the STRUCTURAL testID, not
+# the translated label — per the spec's selector policy (resilient to copy /
+# translation changes), and because the row's EN+RU text share one a11y node.
+- assertVisible: { id: "system-item-maintenance" }
+- assertVisible: { id: "system-item-suspension" }
+- assertVisible: { id: "system-item-electrical" }
+- assertVisible: { id: "system-item-engine" }
+- assertVisible: { id: "system-item-transmission" }
+# The last two may be below the fold — scroll them into view.
+- scrollUntilVisible:
+    element:
+      id: "system-item-climate"
+    direction: DOWN
+    timeout: 5000
+- assertVisible: { id: "system-item-climate" }
+- assertVisible: { id: "system-item-tuning" }
+
+# ── Act: open the Brake System (scroll it back into view first) ──────────────
+- scrollUntilVisible:
+    element:
+      id: "system-item-brakes"
+    direction: UP
+    timeout: 5000
+- tapOn:
+    id: "system-item-brakes"
+
+# ── Assert: navigated to the parts directory ─────────────────────────────────
+- extendedWaitUntil:
+    visible:
+      id: "parts-directory-screen"
+    timeout: 8000
+- assertVisible:
+    text: ".*Brake System.*"          # header reflects the chosen system
+
+- takeScreenshot: artifacts/flow-02-brakes-directory

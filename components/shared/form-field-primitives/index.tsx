@@ -101,7 +101,16 @@ export function TextEntryField({
 }: BaseFieldProps &
   Pick<
     TextInputProps,
-    'onBlur' | 'onFocus' | 'autoCapitalize' | 'autoCorrect' | 'secureTextEntry' | 'accessibilityLabel'
+    | 'onBlur'
+    | 'onFocus'
+    | 'autoCapitalize'
+    | 'autoCorrect'
+    | 'secureTextEntry'
+    | 'accessibilityLabel'
+    | 'testID'
+    | 'maxLength'
+    | 'autoFocus'
+    | 'textContentType'
   > & {
     value?: string;
     onChangeText?: (value: string) => void;

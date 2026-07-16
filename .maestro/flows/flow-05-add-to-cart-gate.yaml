@@ -1,0 +1,40 @@
+# ═════════════════════════════════════════════════════════════════════════════
+# FLOW 5 — Add to Cart + Guest Auth Gate  (Stage 5 / buy path)
+# ═════════════════════════════════════════════════════════════════════════════
+# A guest taps Add-to-cart, gets sent to the purchase-gated Sign In, signs in,
+# and — back on Item Detail — adds the part and lands on a Cart that holds it.
+#
+# All of cart + auth run on the in-memory mock transports (no server rules
+# needed): auth accepts the pre-filled demo credentials, the cart is the
+# tested MockCartTransport. Only the catalog detail is server-mocked.
+#
+# testIDs: add-to-cart-btn · sign-in-screen · auth-send-code-btn · auth-verify-btn ·
+#          cart-screen · cart-checkout-btn.
+# ═════════════════════════════════════════════════════════════════════════════
+appId: com.fotih12.mator
+name: flow-05-add-to-cart-gate
+tags:
+  - buy
+  - cart
+  - auth
+env:
+  FIXTURE_VIN: "1G1AK55F877123456"
+  FIXTURE_YEAR: "2022"
+  FIXTURE_MAKE: "CHEVROLET"
+  FIXTURE_MODEL: "Cobalt"
+---
+# ── Arrange: launch, seed the active vehicle ─────────────────────────────────
+- runFlow: ../subflows/launch-clean.yaml
+- runFlow: ../subflows/seed-active-vehicle.yaml
+
+# ── Act: guest → gate → sign in → resume add-to-cart → Cart ──────────────────
+# (add-item-authenticated ends on the Cart screen after the full gate journey.)
+- runFlow: ../subflows/add-item-authenticated.yaml
+
+# ── Assert: the cart holds the item and offers checkout ──────────────────────
+- assertVisible:
+    text: "Brembo Front Brake Pads"
+- assertVisible:
+    id: "cart-checkout-btn"
+
+- takeScreenshot: artifacts/flow-05-cart-with-item

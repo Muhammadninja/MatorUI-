@@ -1,0 +1,44 @@
+# ═════════════════════════════════════════════════════════════════════════════
+# FLOW 7 — Order Tracking  (Stage 7 / post-purchase)
+# ═════════════════════════════════════════════════════════════════════════════
+# Place an order, then tap "Track order" on the confirmation and assert the
+# Track Order timeline renders the just-placed order (fetched via
+# GET /v1/orders/:id, the same stateful mock that seeds it on create).
+#
+# testIDs: confirmation-track-btn (order-confirmation-screen) ·
+#          track-order-screen (track-order-screen).
+# ═════════════════════════════════════════════════════════════════════════════
+appId: com.fotih12.mator
+name: flow-07-track-order
+tags:
+  - buy
+  - orders
+  - tracking
+env:
+  FIXTURE_VIN: "1G1AK55F877123456"
+  FIXTURE_YEAR: "2022"
+  FIXTURE_MAKE: "CHEVROLET"
+  FIXTURE_MODEL: "Cobalt"
+---
+# ── Arrange: place an order (reuses the full buy path) ───────────────────────
+- runFlow: ../subflows/launch-clean.yaml
+- runFlow: ../subflows/seed-active-vehicle.yaml
+- runFlow: ../subflows/add-item-authenticated.yaml
+- runFlow: ../subflows/complete-checkout.yaml
+
+# ── Act: from the confirmation, open Track Order ─────────────────────────────
+- tapOn:
+    id: "confirmation-track-btn"
+
+# ── Assert: the tracking timeline renders the placed order ───────────────────
+- extendedWaitUntil:
+    visible:
+      id: "track-order-screen"
+    timeout: 8000
+# statusLabel + first timeline step from the mocked OrderDetail.
+- assertVisible:
+    text: ".*Processing.*"
+- assertVisible:
+    text: ".*Order placed.*"
+
+- takeScreenshot: artifacts/flow-07-track-order

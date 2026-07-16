@@ -1,0 +1,41 @@
+# ═════════════════════════════════════════════════════════════════════════════
+# FLOW 4 — Browse → Item Detail  (Stage 4 / buy path)
+# ═════════════════════════════════════════════════════════════════════════════
+# From the vehicle-scoped brakes directory, open a part and assert the real
+# Item Detail screen renders from the mocked catalog-detail endpoint.
+#
+# Mocked endpoint (../mock-server): GET /v1/catalog/parts/brembo-fp
+#   res: ApiCatalogPart { title:"Brembo Front Brake Pads", oem_numbers, price_label, specs, … }
+#
+# testIDs: item-detail-screen · add-to-cart-btn (item-detail-screen.tsx),
+#          reached via part-card-brembo-fp (product-row.tsx).
+# ═════════════════════════════════════════════════════════════════════════════
+appId: com.fotih12.mator
+name: flow-04-item-detail
+tags:
+  - smoke
+  - buy
+  - catalog
+# Per-flow env defaults so the flow runs standalone (config.yaml env is skipped
+# on single-file runs).
+env:
+  FIXTURE_VIN: "1G1AK55F877123456"
+  FIXTURE_YEAR: "2022"
+  FIXTURE_MAKE: "CHEVROLET"
+  FIXTURE_MODEL: "Cobalt"
+---
+# ── Arrange: launch, seed the active vehicle, land on the systems grid ────────
+- runFlow: ../subflows/launch-clean.yaml
+- runFlow: ../subflows/seed-active-vehicle.yaml
+
+# ── Act + Assert: open the Brembo part → Item Detail renders ─────────────────
+- runFlow: ../subflows/open-item-detail.yaml
+
+# The item-detail subflow already asserts the screen + title loaded from the
+# mock; here we add the buy-affordances that the rest of the path depends on.
+- assertVisible:
+    text: ".*BREMBO P59049.*"           # OEM pill — proves the detail payload mapped
+- assertVisible:
+    id: "add-to-cart-btn"
+
+- takeScreenshot: artifacts/flow-04-item-detail

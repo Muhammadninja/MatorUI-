@@ -1,0 +1,41 @@
+# ═════════════════════════════════════════════════════════════════════════════
+# FLOW 10 — Order History  (Stage 10 / post-purchase)
+# ═════════════════════════════════════════════════════════════════════════════
+# Open Order History and assert the mocked order list renders. Reached via the
+# top-level route (mator://order-history — Expo Router omits the (tabs)/(profile)
+# groups from the path), so no Profile sign-in dance is needed.
+#
+# Mocked endpoint (../mock-server): GET /v1/orders → 5 seeded orders.
+#
+# testIDs: order-history-screen (order-history-screen); rows assert on the
+#          order ids (mono text) since order cards carry no per-row testID.
+# ═════════════════════════════════════════════════════════════════════════════
+appId: com.fotih12.mator
+name: flow-10-order-history
+tags:
+  - orders
+  - history
+---
+# ── Arrange: launch ──────────────────────────────────────────────────────────
+- runFlow: ../subflows/launch-clean.yaml
+
+# ── Act: deep-link straight to Order History ─────────────────────────────────
+- openLink: "mator://order-history"
+
+# ── Assert: the mocked order list renders ────────────────────────────────────
+- extendedWaitUntil:
+    visible:
+      id: "order-history-screen"
+    timeout: 8000
+# The list loads async (GET /v1/orders); wait for the first row rather than a
+# one-shot assert (the screen root renders during the loading state). Each card
+# is a button whose accessibilityLabel ("Order ORD-8821, Delivered") collapses
+# its child text, so match the id as a substring (regex), not exact.
+- extendedWaitUntil:
+    visible:
+      text: ".*ORD-8821.*"
+    timeout: 8000
+- assertVisible:
+    text: ".*ORD-8790.*"
+
+- takeScreenshot: artifacts/flow-10-order-history

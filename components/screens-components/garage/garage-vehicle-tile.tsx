@@ -1,10 +1,8 @@
-import { CarFront } from 'lucide-react-native';
+import { CarFront, MoreVertical } from 'lucide-react-native';
 
-import { RADIUS_PILL, RADIUS_SHEET } from '@/components/screens-components/search/radii';
 import AppImage from '@/components/shared/app-image';
-import { AppButton } from '@/components/shared/app-button';
 import { AppText } from '@/components/shared/app-text';
-import { AppView } from '@/components/shared/app-view';
+import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import type { Vehicle } from '@/services/garage-service';
 
@@ -13,8 +11,6 @@ const IMAGE_HEIGHT = 130;
 export type GarageVehicleTileProps = {
   vehicle: Vehicle;
   onOpenDetail?: (id: string) => void;
-  onSetPrimary?: (id: string) => void;
-  onFindParts?: (id: string) => void;
 };
 
 function formatMileage(km?: number): string {
@@ -29,8 +25,6 @@ function titleCase(s: string): string {
 export function GarageVehicleTile({
   vehicle,
   onOpenDetail,
-  onSetPrimary,
-  onFindParts,
 }: GarageVehicleTileProps) {
   const { tokens } = useThemeContext();
 
@@ -68,45 +62,38 @@ export function GarageVehicleTile({
         }
       />
 
-      {/* Vehicle info */}
-      <AppView px={16} pt={14} pb={16} gap={4}>
-        <AppText
-          family="heading"
-          weight="bold"
-          colorName="text"
-          numberOfLines={1}
-          style={{ fontSize: 18, lineHeight: 24 }}
-        >
-          {headline}
-        </AppText>
-        {subline ? (
-          <AppText textVariant="bodySm" colorName="textMuted" numberOfLines={1}>
-            {subline}
+      {/* Vehicle info + details (kebab) */}
+      <AppView row align="center" px={16} pt={14} pb={16} gap={12}>
+        <AppView flex={1} gap={4}>
+          <AppText
+            family="heading"
+            weight="bold"
+            colorName="text"
+            numberOfLines={1}
+            style={{ fontSize: 18, lineHeight: 24 }}
+          >
+            {headline}
           </AppText>
-        ) : null}
-      </AppView>
-
-      {/* Action buttons */}
-      <AppView row gap={10} px={16} pb={16}>
-        <AppView flex={1}>
-          <AppButton
-            title="Set active"
-            kind="brand"
-            size="md"
-            fullWidth
-            onPress={() => onSetPrimary?.(vehicle.id)}
-          />
+          {subline ? (
+            <AppText textVariant="bodySm" colorName="textMuted" numberOfLines={1}>
+              {subline}
+            </AppText>
+          ) : null}
         </AppView>
-        <AppView flex={1}>
-          <AppButton
-            title="Details"
-            kind="secondary"
-            variant="outline"
-            size="md"
-            fullWidth
-            onPress={() => onOpenDetail?.(vehicle.id)}
-          />
-        </AppView>
+        <AppPressableView
+          testID={`vehicle-details-${vehicle.id}`}
+          onPress={() => onOpenDetail?.(vehicle.id)}
+          center
+          rounded={999}
+          borderWidth={1}
+          borderName="border"
+          accessibilityRole="button"
+          accessibilityLabel="Vehicle details"
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          style={{ width: 40, height: 40 }}
+        >
+          <MoreVertical size={20} strokeWidth={2.2} color={tokens.text} />
+        </AppPressableView>
       </AppView>
     </AppView>
   );

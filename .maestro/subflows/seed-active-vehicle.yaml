@@ -1,0 +1,44 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Reusable subflow: decode the fixture VIN and land on the catalog systems grid
+# scoped to "2022 CHEVROLET Cobalt".
+#
+# Flows 2 & 3 need to start from the systems grid with a vehicle context. Rather
+# than re-author that navigation in two files, they call this. It replays Flow
+# 1's real path: deep-link into the (top-level, deep-link-reliable) VIN Finder,
+# decode via the mocked POST /v1/auth/decode-vin, then use the in-app
+# "Browse systems" hand-off (no fragile deep-link into nested tab routes).
+#
+# Precondition: the app is already launched (call launch-clean.yaml first).
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.fotih12.mator
+---
+- openLink: "mator://vin-finder"
+- assertVisible:
+    id: "vin-finder-screen"
+- waitForAnimationToEnd:
+    timeout: 3000
+
+- tapOn:
+    id: "vin-input-field"
+- waitForAnimationToEnd:
+    timeout: 2000
+- inputText: "${FIXTURE_VIN}"
+- assertVisible:
+    id: "vin-input-field"
+    text: "${FIXTURE_VIN}"            # fail fast if the field didn't take the input
+# No hideKeyboard — keyboard-controller intercepts Maestro's dismiss; the submit
+# button sits above the keyboard, so tap it directly.
+- tapOn:
+    id: "vin-submit-button"
+
+# Block until the mocked decode resolves.
+- extendedWaitUntil:
+    visible:
+      id: "vehicle-fitment-bar"
+    timeout: 10000
+
+# Hand off into the vehicle-scoped catalog systems grid.
+- tapOn:
+    id: "browse-systems-btn"
+- assertVisible:
+    id: "systems-grid"

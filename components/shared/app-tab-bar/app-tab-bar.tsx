@@ -2,9 +2,14 @@ import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { Keyboard, Platform, StyleSheet } from 'react-native';
 import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
+    Easing,
+    interpolate,
+    useAnimatedStyle,
+    useSharedValue,
+    withDelay,
+    withRepeat,
+    withSpring,
+    withTiming,
 } from 'react-native-reanimated';
 
 import { AppText } from '@/components/shared/app-text';
@@ -29,7 +34,10 @@ export type AppTabBarProps = {
 };
 
 /** Soft indigo accent for the emphasized AI Assistant button (both themes). */
-const ASSISTANT_ACCENT = '#6366F1';
+const ASSISTANT_ACCENT = '#000';
+
+/** Diameter of the emphasized Assistant button (drives the shine geometry). */
+const EMPHASIZED_SIZE = 46;
 
 const PREVIEW_ITEMS: AppTabBarItem[] = [
   { key: 'home', label: 'Home' },
@@ -55,6 +63,64 @@ function TabBarAnimatedIcon({ icon, isActive }: { icon: ReactNode; isActive: boo
   }));
 
   return <Animated.View style={animatedStyle}>{icon}</Animated.View>;
+}
+
+/**
+ * `AssistantShine` — a soft white gloss that periodically sweeps diagonally
+ * across the emphasized Assistant button (a "glint" that says the tab is the
+ * smart/AI one). Runs entirely on the UI thread (reanimated worklet), so it
+ * never competes with chat streaming on the JS thread. Meant to be rendered
+ * inside an `overflow: 'hidden'` round wrapper so the streak is clipped to the
+ * circle. Non-interactive.
+ */
+function AssistantShine({ size }: { size: number }) {
+  // 0 → 1 drives the streak from off the left edge to off the right edge, then
+  // waits (withDelay) before glinting again. reverse=false + a 0-opacity
+  // envelope at both ends hides the instant 1→0 reset.
+  const progress = useSharedValue(0);
+
+  useEffect(() => {
+    progress.value = withRepeat(
+      withDelay(1800, withTiming(1, { duration: 850, easing: Easing.inOut(Easing.ease) })),
+      -1,
+      false,
+    );
+  }, [progress]);
+
+  const streakStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0, 0.15, 0.85, 1], [0, 1, 1, 0]),
+    transform: [
+      { translateX: interpolate(progress.value, [0, 1], [-size * 0.85, size * 0.85]) },
+      { rotate: '22deg' },
+    ],
+  }));
+
+  return (
+    <AppView pointerEvents="none" style={StyleSheet.absoluteFill} center>
+      <Animated.View style={streakStyle}>
+        {/* Wide faint halo + narrow bright core = a soft-edged gloss. */}
+        <AppView center style={{ width: size * 0.5, height: size * 1.7 }}>
+          <AppView
+            style={{
+              position: 'absolute',
+              width: size * 0.5,
+              height: size * 1.7,
+              borderRadius: size,
+              backgroundColor: 'rgba(255, 255, 255, 0.10)',
+            }}
+          />
+          <AppView
+            style={{
+              width: size * 0.16,
+              height: size * 1.7,
+              borderRadius: size,
+              backgroundColor: 'rgba(255, 255, 255, 0.45)',
+            }}
+          />
+        </AppView>
+      </Animated.View>
+    </AppView>
+  );
 }
 
 export default function AppTabBar({ items = PREVIEW_ITEMS, activeKey = 'home' }: AppTabBarProps) {
@@ -122,10 +188,10 @@ export default function AppTabBar({ items = PREVIEW_ITEMS, activeKey = 'home' }:
                       borderColor: 'rgba(255, 255, 255, 0.22)',
                       ...(isActive
                         ? {
-                            shadowColor: ASSISTANT_ACCENT,
+                            shadowColor: tokens.gray400,
                             shadowOpacity: 0.45,
                             shadowRadius: 14,
-                            shadowOffset: { width: 0, height: 5 },
+                            shadowOffset: { width: 5, height: 5 },
                             elevation: 8,
                           }
                         : null),
@@ -133,6 +199,12 @@ export default function AppTabBar({ items = PREVIEW_ITEMS, activeKey = 'home' }:
                   ]}
                   hitSlop={10}
                 >
+                  {/* Clipped to the circle so the gloss sweep never escapes the
+                      disc. Separate from the button (which owns the shadow) —
+                      overflow:'hidden' on the shadowed view would clip it away. */}
+                  <AppView pointerEvents="none" style={styles.emphasizedClip}>
+                    <AssistantShine size={EMPHASIZED_SIZE} />
+                  </AppView>
                   {icon}
                 </AppPressableView>
               </AppView>
@@ -226,8 +298,17 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   emphasized: {
-    width: 46,
-    height: 46,
+    width: EMPHASIZED_SIZE,
+    height: EMPHASIZED_SIZE,
+  },
+  emphasizedClip: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 999,
+    overflow: 'hidden',
   },
   itemContent: {
     minHeight: 44,

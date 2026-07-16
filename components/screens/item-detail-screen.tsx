@@ -100,7 +100,7 @@ export default function ItemDetailScreen() {
   };
 
   return (
-    <AppView flex={1} colorName="background">
+    <AppView flex={1} colorName="background" testID="item-detail-screen">
       <AppScrollRegion insetTop={insets.top}>
         {/* Header: back + favorite */}
         <AppView row align="center" justify="space-between" px="lg" style={{ paddingTop: 6, paddingBottom: 14 }}>
@@ -241,7 +241,7 @@ export default function ItemDetailScreen() {
           </AppText>
         </AppView>
         <AppView flex={1}>
-          <AppButton title="Add to cart" kind="brand" size="lg" fullWidth onPress={addToCart} />
+          <AppButton testID="add-to-cart-btn" title="Add to cart" kind="brand" size="lg" fullWidth onPress={addToCart} />
         </AppView>
       </AppView>
     </AppView>

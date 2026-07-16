@@ -80,7 +80,7 @@ export function VinScannerModal({
       presentationStyle="fullScreen"
       statusBarTranslucent
     >
-      <AppView flex={1} style={{ backgroundColor: '#000000' }}>
+      <AppView flex={1} style={{ backgroundColor: tokens.black }}>
         {Platform.OS === 'android' ? (
           <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
         ) : (

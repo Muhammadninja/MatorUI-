@@ -1,0 +1,52 @@
+# ═════════════════════════════════════════════════════════════════════════════
+# FLOW 8 — Cart Operations  (Stage 8 / cart mutations)
+# ═════════════════════════════════════════════════════════════════════════════
+# With one item in the cart, exercise the quantity stepper (increment →
+# decrement, the header item-count reacts) and the remove action (→ empty
+# cart). All optimistic on the client cart context — no server mock needed.
+#
+# testIDs: cart-item-<id> · cart-qty-<id>-inc / -dec (AppQtyStepper) ·
+#          cart-remove-<id> (cart-screen).
+# ═════════════════════════════════════════════════════════════════════════════
+appId: com.fotih12.mator
+name: flow-08-cart-ops
+tags:
+  - cart
+env:
+  FIXTURE_VIN: "1G1AK55F877123456"
+  FIXTURE_YEAR: "2022"
+  FIXTURE_MAKE: "CHEVROLET"
+  FIXTURE_MODEL: "Cobalt"
+---
+# ── Arrange: land on the Cart with one Brembo item (qty 1) ───────────────────
+- runFlow: ../subflows/launch-clean.yaml
+- runFlow: ../subflows/seed-active-vehicle.yaml
+- runFlow: ../subflows/add-item-authenticated.yaml
+- assertVisible:
+    id: "cart-item-brembo-fp"
+- assertVisible:
+    text: ".*1 item.*"                 # "Cart · 1 item"
+
+# ── Act + Assert: increment → the item-count header reacts ───────────────────
+- tapOn:
+    id: "cart-qty-brembo-fp-inc"
+- assertVisible:
+    text: ".*2 items.*"                # "Cart · 2 items"
+
+# ── Act + Assert: decrement → back to one ────────────────────────────────────
+- tapOn:
+    id: "cart-qty-brembo-fp-dec"
+- assertVisible:
+    text: ".*1 item.*"
+
+# ── Act + Assert: remove → the cart empties ──────────────────────────────────
+- tapOn:
+    id: "cart-remove-brembo-fp"
+- extendedWaitUntil:
+    visible:
+      text: ".*cart is empty.*"
+    timeout: 6000
+- assertNotVisible:
+    id: "cart-item-brembo-fp"
+
+- takeScreenshot: artifacts/flow-08-cart-empty

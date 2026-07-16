@@ -24,7 +24,7 @@ export default function OrderHistoryScreen() {
   const { state, page, error, refresh } = useOrders();
 
   return (
-    <AppView flex={1} colorName="background">
+    <AppView flex={1} colorName="background" testID="order-history-screen">
       <AppSettingsHeader title="Order history" fallbackHref="/profile" />
 
       {state === 'loading' ? (

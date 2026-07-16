@@ -74,6 +74,10 @@ export type ThemeTokens = {
    *  not next to neutral chrome). Use instead of hardcoded
    *  `rgba(0,0,0,0.x)` values. */
   scrim: string;
+  /** Bright laser-green accent for the VIN scanner sweep line. Sits ON a
+   *  live camera feed (always dark), so it is theme-independent and stays
+   *  the same in light and dark mode. Use instead of a hardcoded hex. */
+  scannerAccent: string;
   /** Low-alpha brand tint (~12% opacity). Replaces the repeated
    *  `\`${tokens.brand}1F\`` pattern. Use for tinted fill backgrounds
    *  on brand-accented icons, badges, and highlights. */

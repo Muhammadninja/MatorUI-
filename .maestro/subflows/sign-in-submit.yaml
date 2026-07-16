@@ -1,0 +1,32 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Reusable subflow: complete the (purchase-gated) passwordless Sign In.
+#
+# Precondition: the app is showing the gated sign-in screen (reached by tapping
+# Add-to-cart / Checkout as a guest → router.push('/sign-in?gate=1')).
+#
+# The screen is passwordless OTP with two phases on ONE screen:
+#   1. entry — the phone field ships PRE-FILLED with a demo number, so we just
+#      tap "Send code" (no typing → sidesteps the keyboard-controller quirk).
+#   2. otp   — the mock returns a `devCode` that the screen AUTO-FILLS into the
+#      code field, so we just tap "Verify & continue".
+# On success the screen does router.back(), returning to wherever the gate fired.
+#
+# testIDs: sign-in-screen · auth-send-code-btn · auth-verify-btn.
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.fotih12.mator
+---
+- assertVisible:
+    id: "sign-in-screen"
+# Let the push transition settle so the button is hittable.
+- waitForAnimationToEnd:
+    timeout: 2000
+# Phase 1 — send the code (phone pre-filled).
+- tapOn:
+    id: "auth-send-code-btn"
+# Phase 2 — wait for the OTP phase, then verify (code auto-filled from devCode).
+- extendedWaitUntil:
+    visible:
+      id: "auth-verify-btn"
+    timeout: 8000
+- tapOn:
+    id: "auth-verify-btn"

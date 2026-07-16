@@ -32,8 +32,11 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
 
   return (
     <AppView row gap={14} rounded={16} borderColor={tokens.border} borderTopWidth={1} pt={ 4} pb={14}>
-      {/* Real product image */}
+      {/* Real product image — carries the row's testID so a tap lands on the
+          primary "open" affordance (the outer row container's centre is a
+          non-interactive gap, which Maestro's centre-tap would miss). */}
       <AppPressableView
+        testID={`part-card-${item.id}`}
         onPress={() => onOpen(item)}
         androidRipple={false}
         accessibilityRole="button"

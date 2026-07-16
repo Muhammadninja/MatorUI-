@@ -29,7 +29,7 @@ function VehicleMakeTile({ brandId, label, onPress }: VehicleMakeTileProps) {
       gap={8}
       style={{ width: 84 }}
     >
-      <AppView center rounded={20} style={{ width: 66, height: 66, backgroundColor: tokens.white }}>
+      <AppView center rounded={20} style={{ width: 65, height: 65, backgroundColor: tokens.white }}>
         <BrandLogo name={label} size={50} />
       </AppView>
     </AppPressableView>

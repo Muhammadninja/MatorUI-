@@ -68,7 +68,7 @@ export function VinScannerOverlay({ hint }: VinScannerOverlayProps) {
           <Animated.View
             style={[
               styles.sweepLine,
-              { backgroundColor: '#00e676' },
+              { backgroundColor: tokens.scannerAccent },
               sweepStyle,
             ]}
           />

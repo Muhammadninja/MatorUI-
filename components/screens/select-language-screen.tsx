@@ -66,6 +66,7 @@ export default function SelectLanguageScreen() {
 
   return (
     <AppView
+      testID="language-screen"
       flex={1}
       colorName="background"
       style={{
@@ -147,6 +148,7 @@ export default function SelectLanguageScreen() {
           return (
             <Pressable
               key={opt.code}
+              testID={`language-option-${opt.code}`}
               onPress={() => {
                 triggerHaptic('selection');
                 setPick(opt.code);
@@ -225,6 +227,7 @@ export default function SelectLanguageScreen() {
       </AppView>
 
       <AppButton
+        testID="language-continue-btn"
         title={ctaLabel}
         kind="brand"
         size="lg"

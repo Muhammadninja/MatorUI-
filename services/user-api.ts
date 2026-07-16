@@ -13,7 +13,7 @@
 
 import { shouldUseHttpTransport } from '@/config/api';
 import { apiClient } from '@/services/api-client';
-import type { UserSummary } from '@/services/auth-api';
+import { TEST_USER, type UserSummary } from '@/services/auth-api';
 
 export type UserPatch = Partial<Omit<UserSummary, 'id' | 'memberSince'>>;
 
@@ -28,16 +28,7 @@ export interface UserTransport {
 // `userTransport` singleton's lifetime. Sign-in via auth-api seeds the
 // initial state by calling `MockUserTransport.seed()`.
 
-const SEED_PROFILE: UserSummary = {
-  id: 'usr_mock_001',
-  firstName: 'Muhammad',
-  lastName: 'Abdullaev',
-  username: 'm.abdullaev',
-  email: 'muhammad@example.com',
-  phone: '+1 (215) 555-0139',
-  avatarUrl: null,
-  memberSince: '2024-03-15T00:00:00Z',
-};
+const SEED_PROFILE: UserSummary = { ...TEST_USER };
 
 class MockUserTransport implements UserTransport {
   private state: UserSummary = { ...SEED_PROFILE };

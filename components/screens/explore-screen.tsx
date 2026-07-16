@@ -115,6 +115,7 @@ export default function ExploreScreen() {
           </AppView>
 
           <AppPressableView
+            testID="explore-search-entry"
             onPress={() => router.push('/search')}
             accessibilityRole="search"
             accessibilityLabel="Search parts, brands, OEM number"
@@ -201,7 +202,7 @@ export default function ExploreScreen() {
 
         {/* ── Shop by vehicle ── */}
         <AppView row align="center" justify="space-between" style={{ marginTop: 2 }}>
-          <AppText family="heading" weight="bold" style={{ fontSize: 18, color: tokens.text }}>
+          <AppText family="heading" weight="bold" style={{ fontSize: 18}}>
             Shop by vehicle
           </AppText>
           <AppPressableView onPress={() => router.navigate('/garage')} androidRipple={false} accessibilityRole="button">

@@ -29,8 +29,9 @@ import {
 import { setUnauthorizedHandler } from '@/services/api-client';
 import {
   authTransport,
-  type SignInInput,
-  type SignUpInput,
+  type RequestOtpInput,
+  type RequestOtpResult,
+  type VerifyOtpInput,
   type UserSummary,
 } from '@/services/auth-api';
 import {
@@ -59,8 +60,10 @@ type UserContextValue = {
   error: string | null;
   refreshProfile: () => Promise<void>;
   updateProfile: (patch: Partial<Omit<UserProfile, 'id' | 'memberSince'>>) => Promise<void>;
-  signIn: (input: SignInInput) => Promise<void>;
-  signUp: (input: SignUpInput) => Promise<void>;
+  /** Passwordless: send a one-time code to the phone/email. Returns a handle for `verifyOtp`. */
+  requestOtp: (input: RequestOtpInput) => Promise<RequestOtpResult>;
+  /** Passwordless: verify the code, establish the session, and load the profile. */
+  verifyOtp: (input: VerifyOtpInput) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -102,34 +105,29 @@ export function UserProvider({ children }: PropsWithChildren) {
     }
   }, [persistSession]);
 
-  const signIn = useCallback(
-    async (input: SignInInput) => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const result = await authTransport.signIn(input);
-        await persistSession(result.session);
-        setProfile(result.user);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Sign-in failed.');
-        throw err;
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [persistSession],
-  );
+  const requestOtp = useCallback(async (input: RequestOtpInput) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      return await authTransport.requestOtp(input);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not send the code.');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
-  const signUp = useCallback(
-    async (input: SignUpInput) => {
+  const verifyOtp = useCallback(
+    async (input: VerifyOtpInput) => {
       setIsLoading(true);
       setError(null);
       try {
-        const result = await authTransport.signUp(input);
+        const result = await authTransport.verifyOtp(input);
         await persistSession(result.session);
         setProfile(result.user);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Sign-up failed.');
+        setError(err instanceof Error ? err.message : 'Verification failed.');
         throw err;
       } finally {
         setIsLoading(false);
@@ -243,8 +241,8 @@ export function UserProvider({ children }: PropsWithChildren) {
       error,
       refreshProfile,
       updateProfile,
-      signIn,
-      signUp,
+      requestOtp,
+      verifyOtp,
       signOut,
     }),
     [
@@ -254,8 +252,8 @@ export function UserProvider({ children }: PropsWithChildren) {
       error,
       refreshProfile,
       updateProfile,
-      signIn,
-      signUp,
+      requestOtp,
+      verifyOtp,
       signOut,
     ],
   );

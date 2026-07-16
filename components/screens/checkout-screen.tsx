@@ -109,7 +109,7 @@ export default function CheckoutScreen() {
   }
 
   return (
-    <AppView flex={1} colorName="background">
+    <AppView flex={1} colorName="background" testID="checkout-screen">
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: insets.top + 6, paddingBottom: 24 }}
@@ -199,6 +199,7 @@ export default function CheckoutScreen() {
       {/* Sticky place order */}
       <AppView colorName="background" px="lg" style={{ paddingTop: 14, paddingBottom: Math.max(insets.bottom, 20), borderTopWidth: 1, borderTopColor: tokens.divider }}>
         <AppButton
+          testID="checkout-place-order-btn"
           title={create.phase === 'placing' ? 'Placing order…' : `Place order · ${formatCurrency(grandTotal)}`}
           kind="brand"
           size="lg"

@@ -27,11 +27,9 @@ function CategoryTile({ name, count, onPress }: CategoryTileProps) {
       accessibilityRole="button"
       accessibilityLabel={`${name}, ${count} parts`}
       center
-      rounded={18}
-      colorName="card"
-      borderWidth={1}
+      borderBottomWidth={0.6}
       borderName="border"
-      style={{ width: '31.5%', paddingTop: 16, paddingBottom: 13, paddingHorizontal: 8, gap: 10 }}
+      style={{ width: '31.5%', paddingBottom: 5, gap: 10 }}
     >
       <AppView center style={{ width: 68, height: 68 }}>
         <AutoPartIcon name={name} size={60} />

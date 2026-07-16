@@ -80,7 +80,7 @@ export default function CartScreen() {
 
   if (items.length === 0) {
     return (
-      <AppView flex={1} colorName="background" style={{ paddingTop: insets.top + 8 }}>
+      <AppView flex={1} colorName="background" testID="cart-screen" style={{ paddingTop: insets.top + 8 }}>
         <AppText family="heading" weight="bold" style={{ fontSize: 26, lineHeight: 32, color: tokens.text, paddingHorizontal: 20, paddingTop: 6 }}>
           Cart
         </AppText>
@@ -99,7 +99,7 @@ export default function CartScreen() {
   }
 
   return (
-    <AppView flex={1} colorName="background">
+    <AppView flex={1} colorName="background" testID="cart-screen">
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: insets.top + 8, paddingHorizontal: 20, paddingBottom: 24, gap: 16 }}
@@ -123,6 +123,7 @@ export default function CartScreen() {
           return (
             <AppView
               key={item.id}
+              testID={`cart-item-${item.id}`}
               row
               gap={12}
               rounded={16}
@@ -149,6 +150,7 @@ export default function CartScreen() {
                     {formatCurrency(parsePrice(item.price) * item.quantity)}
                   </AppText>
                   <AppQtyStepper
+                    testID={`cart-qty-${item.id}`}
                     value={item.quantity}
                     onIncrement={() => incrementItem(item.id)}
                     onDecrement={() => decrementItem(item.id)}
@@ -158,6 +160,7 @@ export default function CartScreen() {
               </AppView>
               <AppPressableView
                 onPress={() => removeItem(item.id)}
+                testID={`cart-remove-${item.id}`}
                 accessibilityRole="button"
                 accessibilityLabel={`Remove ${item.title}`}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -181,7 +184,7 @@ export default function CartScreen() {
           <AppText family="accent" weight="bold" style={{ fontSize: 16, color: tokens.text }}>Total</AppText>
           <AppText family="heading" weight="bold" style={{ fontSize: 20, color: tokens.text }}>{formatCurrency(totals.total)}</AppText>
         </AppView>
-        <AppButton title="Checkout" kind="brand" size="lg" fullWidth onPress={goCheckout} />
+        <AppButton testID="cart-checkout-btn" title="Checkout" kind="brand" size="lg" fullWidth onPress={goCheckout} />
       </AppView>
     </AppView>
   );

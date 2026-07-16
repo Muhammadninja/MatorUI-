@@ -1,0 +1,47 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Maestro workspace config — Mator (matorui)
+# Docs: https://docs.maestro.dev/advanced/configuring-maestro
+#
+# Runs the offline E2E suite in a deterministic order. All network I/O is served
+# by the local Maestro Mock Server (see ./mock-server/rules.js), so the suite is
+# fully hermetic — no Supabase, no NHTSA, no internet required.
+#
+# Run the whole suite:      maestro test .maestro/
+# Run one flow:             maestro test .maestro/flows/flow-01-vin-lookup.yaml
+# Run by tag:               maestro test .maestro/ --include-tags=smoke
+# ─────────────────────────────────────────────────────────────────────────────
+
+flows:
+  - flows/*.yaml
+
+# Deterministic execution: Flow 1 seeds the active-vehicle context that Flows
+# 2 and 3 depend on. Each flow ALSO seeds its own context via a subflow, so any
+# flow is still runnable in isolation — this order just mirrors the user journey.
+executionOrder:
+  continueOnFailure: false
+  flowsOrder:
+    - flow-01-vin-lookup
+    - flow-02-systems-grid
+    - flow-03-parts-filter
+    # Buy path (Stage 4→6): browse → item detail → guest gate → cart → checkout.
+    - flow-04-item-detail
+    - flow-05-add-to-cart-gate
+    - flow-06-checkout
+    # Post-purchase + discovery (Stage 7→10).
+    - flow-07-track-order
+    - flow-08-cart-ops
+    - flow-09-search
+    - flow-10-order-history
+
+# Workspace-wide env. Overridable per-run with `-e KEY=value`.
+# NOTE: The app inlines EXPO_PUBLIC_* at BUNDLE time, so MOCK_BASE_URL below is
+# only consumed by Maestro flows/JS for assertions & the mock server — the app
+# itself must be built/started with EXPO_PUBLIC_API_BASE_URL pointing at the mock
+# (see .maestro/README.md § "Wiring the app to the mock server").
+env:
+  MOCK_BASE_URL: "http://localhost:8080"
+  # Canonical fixture the whole suite asserts against (single source of truth).
+  FIXTURE_VIN: "1G1AK55F877123456"
+  FIXTURE_YEAR: "2022"
+  FIXTURE_MAKE: "CHEVROLET"
+  FIXTURE_MODEL: "Cobalt"

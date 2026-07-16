@@ -1,0 +1,67 @@
+# ═════════════════════════════════════════════════════════════════════════════
+# FLOW 1 — VIN Lookup & Vehicle Selection  (Stage 1 / AutoZone flow)
+# ═════════════════════════════════════════════════════════════════════════════
+# Enter a 17-char VIN, intercept the decode with a hardcoded mock, assert the
+# dynamic fitment widget reflects the decoded vehicle.
+#
+# Mocked endpoint (../mock-server): POST /v1/auth/decode-vin
+#   res: { success: true, car: { make:"CHEVROLET", model:"Cobalt", year:2022 } }
+#
+# testIDs live in: app/vin-finder.tsx
+#   vin-finder-screen · vin-input-field · vin-submit-button ·
+#   vehicle-fitment-bar · fitment-status-indicator
+# ═════════════════════════════════════════════════════════════════════════════
+appId: com.fotih12.mator
+name: flow-01-vin-lookup
+tags:
+  - smoke
+  - stage1
+  - vin
+# Per-flow env defaults so the flow is self-contained when run directly
+# (`maestro test <file>` skips config.yaml env). config.yaml / -e still override.
+env:
+  FIXTURE_VIN: "1G1AK55F877123456"
+  FIXTURE_YEAR: "2022"
+  FIXTURE_MAKE: "CHEVROLET"
+  FIXTURE_MODEL: "Cobalt"
+---
+# ── Arrange: cold launch, open the VIN Finder via deep link ──────────────────
+- runFlow: ../subflows/launch-clean.yaml
+- openLink: "mator://vin-finder"
+- assertVisible:
+    id: "vin-finder-screen"
+# Let the slide-in animation finish so the TextInput can actually take focus.
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# ── Act: enter a valid 17-character VIN and submit ───────────────────────────
+- tapOn:
+    id: "vin-input-field"
+# Let the keyboard finish animating in before typing, else keystrokes are lost.
+- waitForAnimationToEnd:
+    timeout: 2000
+- inputText: "${FIXTURE_VIN}"          # 1G1AK55F877123456 — 17 chars, valid alphabet
+- assertVisible:
+    id: "vin-input-field"
+    text: "${FIXTURE_VIN}"             # guard: field holds exactly what we typed
+# NOTE: no hideKeyboard — this app's react-native-keyboard-controller intercepts
+# Maestro's standard dismiss. The submit button renders above the keyboard, so we
+# tap it directly (tapOn brings its own visibility handling).
+- tapOn:
+    id: "vin-submit-button"
+
+# ── Assert: the mocked decode drives the dynamic fitment widget ──────────────
+- extendedWaitUntil:
+    visible:
+      id: "vehicle-fitment-bar"
+    timeout: 10000
+
+# The 🟢 is a decorative status dot; asserting the emoji glyph is brittle across
+# platforms, so we split the check: the human-readable string (regex substring,
+# emoji-agnostic) + the status indicator as its own testID.
+- assertVisible:
+    text: ".*Fitting parts for: ${FIXTURE_YEAR} ${FIXTURE_MAKE} ${FIXTURE_MODEL}.*"
+- assertVisible:
+    id: "fitment-status-indicator"
+
+- takeScreenshot: artifacts/flow-01-vin-decoded

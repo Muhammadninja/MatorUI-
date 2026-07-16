@@ -1,5 +1,5 @@
 /**
- * auth-api — mock transport behavior tests.
+ * auth-api — mock transport behavior tests (passwordless OTP).
  *
  * The mock impl is intentionally deterministic-shaped (random ids, but
  * predictable structure) so the auth context can integrate against it
@@ -18,13 +18,25 @@ vi.mock('@/config/api', () => ({
 import { vi } from 'vitest';
 import { authTransport } from './auth-api';
 
-describe('auth-api mock', () => {
-  test('signIn returns session + user with stable shape', async () => {
-    const result = await authTransport.signIn({
-      email: 'a@b.com',
-      password: 'pw',
+describe('auth-api mock (OTP)', () => {
+  test('requestOtp returns a token + devCode for demo builds', async () => {
+    const result = await authTransport.requestOtp({
+      channel: 'phone',
+      identifier: '+998901234567',
+      purpose: 'sign-in',
     });
+    expect(result.otpToken).toMatch(/^otp_/);
+    expect(result.expiresIn).toBeGreaterThan(0);
+    expect(result.devCode).toMatch(/^\d{6}$/);
+  });
 
+  test('verifyOtp with a valid code returns session + user with stable shape', async () => {
+    const { otpToken, devCode } = await authTransport.requestOtp({
+      channel: 'email',
+      identifier: 'a@b.com',
+      purpose: 'sign-in',
+    });
+    const result = await authTransport.verifyOtp({ otpToken, code: devCode! });
     expect(result).toMatchObject({
       session: {
         accessToken: expect.stringMatching(/^mock_access_/),
@@ -43,15 +55,26 @@ describe('auth-api mock', () => {
     });
   });
 
-  test('signUp echoes provided firstName / lastName into the user', async () => {
-    const result = await authTransport.signUp({
-      email: 'c@d.com',
-      password: 'pw',
+  test('verifyOtp echoes the sign-up name into the user', async () => {
+    const { otpToken, devCode } = await authTransport.requestOtp({
+      channel: 'email',
+      identifier: 'c@d.com',
+      purpose: 'sign-up',
       firstName: 'Casey',
       lastName: 'Doe',
     });
+    const result = await authTransport.verifyOtp({ otpToken, code: devCode! });
     expect(result.user.firstName).toBe('Casey');
     expect(result.user.lastName).toBe('Doe');
+  });
+
+  test('verifyOtp rejects a non-6-digit code', async () => {
+    const { otpToken } = await authTransport.requestOtp({
+      channel: 'phone',
+      identifier: '+998901234567',
+      purpose: 'sign-in',
+    });
+    await expect(authTransport.verifyOtp({ otpToken, code: '12' })).rejects.toThrow();
   });
 
   test('refresh returns a fresh session (mock never fails)', async () => {
@@ -65,7 +88,12 @@ describe('auth-api mock', () => {
   });
 
   test('expiresAt is in the future', async () => {
-    const result = await authTransport.signIn({ email: 'a@b.com', password: 'pw' });
+    const { otpToken, devCode } = await authTransport.requestOtp({
+      channel: 'phone',
+      identifier: '+998901234567',
+      purpose: 'sign-in',
+    });
+    const result = await authTransport.verifyOtp({ otpToken, code: devCode! });
     expect(result.session.expiresAt).toBeGreaterThan(Math.floor(Date.now() / 1000));
   });
 });

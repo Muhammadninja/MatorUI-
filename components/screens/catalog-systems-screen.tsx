@@ -49,6 +49,7 @@ export default function CatalogSystemsScreen() {
     <AppView flex={1} colorName="background">
       <AppSettingsHeader title={vehicleLabel || 'Catalog'} fallbackHref="/explore" />
       <FlashList
+        testID="systems-grid"
         data={CATALOG_SYSTEMS}
         keyExtractor={(s) => s.id}
         renderItem={renderItem}

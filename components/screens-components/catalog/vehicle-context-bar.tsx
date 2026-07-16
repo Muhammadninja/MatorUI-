@@ -21,6 +21,7 @@ function VehicleContextBar() {
     const label = `${v.year} ${v.make} ${v.model} ${v.trim ?? ''}`.trim();
     return (
       <AppPressableView
+        testID="vehicle-fitment-bar"
         onPress={() => router.navigate('/garage')}
         androidRipple={false}
         accessibilityRole="button"
@@ -35,7 +36,7 @@ function VehicleContextBar() {
         borderWidth={1}
         borderName="border"
       >
-        <AppView rounded={999} style={{ width: 8, height: 8, backgroundColor: tokens.success }} />
+        <AppView testID="fitment-status-indicator" rounded={999} style={{ width: 8, height: 8, backgroundColor: tokens.success }} />
         <AppView flex={1}>
           <AppText
             family="accent"

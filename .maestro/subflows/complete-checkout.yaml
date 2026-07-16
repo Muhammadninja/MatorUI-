@@ -1,0 +1,27 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Reusable subflow: from a Cart holding at least one item, go through Checkout
+# and place the order, landing on Order Confirmation.
+#
+# Precondition: on the Cart screen, signed in, cart non-empty (call
+# add-item-authenticated.yaml first). Checkout runs on the mocked orders
+# contract (addresses / payment-methods / shipping quote / create order).
+#
+# testIDs: cart-checkout-btn · checkout-screen · checkout-place-order-btn ·
+#          order-confirmation-screen.
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.fotih12.mator
+---
+- tapOn:
+    id: "cart-checkout-btn"
+- extendedWaitUntil:
+    visible:
+      id: "checkout-screen"
+    timeout: 8000
+- assertVisible:
+    id: "checkout-place-order-btn"
+- tapOn:
+    id: "checkout-place-order-btn"
+- extendedWaitUntil:
+    visible:
+      id: "order-confirmation-screen"
+    timeout: 12000

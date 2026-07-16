@@ -1,0 +1,81 @@
+# ═════════════════════════════════════════════════════════════════════════════
+# FLOW 3 — Dynamic Parts Filtering  (Stage 3 / AutoZone flow)
+# ═════════════════════════════════════════════════════════════════════════════
+# Mock the brakes parts list (2 items), assert both render, open the floating
+# filter, apply a brand filter, assert the list reacts dynamically.
+#
+# Mocked endpoint (../mock-server): GET /v1/catalog/parts?systemId=brakes
+#   (the live app sends ?category=brakes — the mock matches both)
+#   res: { items: [Brembo Front Brake Pads, Bosch Brake Rotor], total: 2 }
+#
+# testIDs: parts-directory-screen · part-card-<id> · floating-filter-btn ·
+#          filter-sheet · filter-brand-<Brand> · filter-apply-btn · filter-clear-btn
+#
+# The filter sheet uses tappable brand CHIPS (not a text field), so the brand
+# criteria is applied by tapping filter-brand-Brembo.
+# ═════════════════════════════════════════════════════════════════════════════
+appId: com.fotih12.mator
+name: flow-03-parts-filter
+tags:
+  - stage3
+  - catalog
+  - filter
+# Per-flow env defaults (used by the seed subflow) so the flow runs standalone.
+env:
+  FIXTURE_VIN: "1G1AK55F877123456"
+  FIXTURE_YEAR: "2022"
+  FIXTURE_MAKE: "CHEVROLET"
+  FIXTURE_MODEL: "Cobalt"
+---
+# ── Arrange: launch, decode VIN, open the brakes parts directory ─────────────
+- runFlow: ../subflows/launch-clean.yaml
+- runFlow: ../subflows/seed-active-vehicle.yaml
+- tapOn: { id: "system-item-brakes" }
+- assertVisible:
+    id: "parts-directory-screen"
+
+# ── Assert: both mocked parts render ─────────────────────────────────────────
+- extendedWaitUntil:
+    visible:
+      id: "part-card-brembo-fp"
+    timeout: 8000
+- assertVisible: { id: "part-card-brembo-fp" }
+- assertVisible: { id: "part-card-bosch-rotor" }
+- assertVisible:
+    text: "Brembo Front Brake Pads"
+- assertVisible:
+    text: "Bosch Brake Rotor"
+
+# ── Act: open the floating filter and constrain to a single brand ────────────
+- tapOn:
+    id: "floating-filter-btn"
+- assertVisible:
+    id: "filter-sheet"
+# Brand chips are derived from the fetched page → "Bosch", "Brembo".
+- tapOn:
+    id: "filter-brand-Brembo"
+- tapOn:
+    id: "filter-apply-btn"
+
+# ── Assert: the list adjusts dynamically ─────────────────────────────────────
+# Brembo stays, Bosch drops out. The absence assertion is the real proof the
+# filter did something — presence alone could be a no-op.
+- assertVisible: { id: "part-card-brembo-fp" }
+- assertNotVisible:
+    id: "part-card-bosch-rotor"
+- assertNotVisible:
+    text: "Bosch Brake Rotor"
+- assertVisible:
+    text: ".*1 part.*"                 # result-count line reflects the single match
+
+- takeScreenshot: artifacts/flow-03-brand-filtered
+
+# ── Teardown: clear the filter, assert both parts return (list is reactive) ──
+- tapOn:
+    id: "floating-filter-btn"
+- tapOn:
+    id: "filter-clear-btn"
+- tapOn:
+    id: "filter-apply-btn"
+- assertVisible: { id: "part-card-brembo-fp" }
+- assertVisible: { id: "part-card-bosch-rotor" }

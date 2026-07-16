@@ -128,7 +128,7 @@ export default function CatalogPartsScreen() {
   );
 
   return (
-    <AppView flex={1} colorName="background">
+    <AppView testID="parts-directory-screen" flex={1} colorName="background">
       {/* Fixed header: back + search + quick filters */}
       <AppView style={{ paddingTop: insets.top + 6 }} px="lg" colorName="background">
         <AppView row align="center" gap={10}>
@@ -257,6 +257,7 @@ export default function CatalogPartsScreen() {
       {/* Sticky Filter & Sort bar */}
       <AppView center style={{ position: 'absolute', left: 0, right: 0, bottom: Math.max(insets.bottom, 16) }} pointerEvents="box-none">
         <AppPressableView
+          testID="floating-filter-btn"
           onPress={() => setSheetOpen(true)}
           accessibilityRole="button"
           accessibilityLabel="Filter and sort"

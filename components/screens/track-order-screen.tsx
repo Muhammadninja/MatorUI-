@@ -35,7 +35,7 @@ export default function TrackOrderScreen() {
   };
 
   return (
-    <AppView flex={1} colorName="background">
+    <AppView flex={1} colorName="background" testID="track-order-screen">
       <AppSettingsHeader title="Track order" fallbackHref="/explore" />
 
       {state === 'loading' || state === 'idle' ? (

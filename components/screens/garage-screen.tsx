@@ -12,7 +12,6 @@ import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
 import { AppButton } from '@/components/shared/app-button';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
-import { useActiveVehicle } from '@/contexts/active-vehicle.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import useGarage from '@/hooks/use-garage';
 
@@ -26,21 +25,18 @@ import useGarage from '@/hooks/use-garage';
  * the primary card + secondary tiles on success. The pinned header
  * stays put across every state.
  *
- * Setting the active vehicle goes through `useActiveVehicle().
- * setPrimaryVehicle(id)` so the parts-search scope stays in sync with
- * the garage primary (it flips the backend primary AND persists the
- * fitment for the search layer).
+ * Each card exposes a single kebab (⋮) affordance that opens the
+ * vehicle detail screen; managing the active vehicle / finding parts
+ * lives on that detail screen rather than inline on the cards.
  */
 export default function GarageScreen() {
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
   const { state, primaryVehicle, secondaryVehicles, error, refresh } = useGarage();
-  const { setPrimaryVehicle } = useActiveVehicle();
 
   const openDetail = (id: string) =>
     router.push({ pathname: '/vehicle-detail', params: { id } });
   const openAdd = () => router.push('/add-vehicle');
-  const viewParts = () => router.navigate('/explore');
 
   return (
     <AppView flex={1} colorName="background">
@@ -107,7 +103,6 @@ export default function GarageScreen() {
               vehicle={primaryVehicle}
               image={primaryVehicle.images?.[0]}
               onOpenDetail={openDetail}
-              onFindParts={viewParts}
             />
           ) : null}
 
@@ -127,8 +122,6 @@ export default function GarageScreen() {
                   key={v.id}
                   vehicle={v}
                   onOpenDetail={openDetail}
-                  onSetPrimary={(id) => setPrimaryVehicle(id)}
-                  onFindParts={viewParts}
                 />
               ))}
             </>

@@ -62,7 +62,7 @@ export default function MatorSearchScreen() {
   };
 
   return (
-    <AppView flex={1} colorName="background" style={{ paddingTop: insets.top + 6 }}>
+    <AppView flex={1} colorName="background" testID="search-screen" style={{ paddingTop: insets.top + 6 }}>
       {/* Header: back + search field */}
       <AppView row align="center" gap={10} px="lg" style={{ paddingBottom: 12 }}>
         <AppPressableView
@@ -92,6 +92,7 @@ export default function MatorSearchScreen() {
         >
           <Search size={20} strokeWidth={2.2} color={tokens.textMuted} />
           <TextInput
+            testID="search-input"
             value={query}
             onChangeText={setQuery}
             placeholder="Search parts, brands, OEM #"

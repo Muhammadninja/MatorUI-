@@ -33,6 +33,11 @@ yarn-error.*
 # local env files
 .env*.local
 
+# Maestro E2E run output (screenshots, junit reports)
+/artifacts
+maestro-report.xml
+mock.log
+
 # typescript
 *.tsbuildinfo
 
