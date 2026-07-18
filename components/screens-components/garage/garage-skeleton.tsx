@@ -17,8 +17,8 @@ const SECONDARY_COUNT = 2;
  *   - "Also in the garage" eyebrow placeholder
  *   - Two secondary tile placeholders (~96 tall each)
  *
- * Same pulse + radius conventions as `SearchCatalogueSkeleton` and
- * `SearchTopFeaturedSkeleton`. Native driver throughout so the screen
+ * Same pulse + radius conventions as `SearchCatalogueSkeleton`.
+ * Native driver throughout so the screen
  * stays at 60fps while a slow fetch resolves.
  */
 export default function GarageSkeleton() {

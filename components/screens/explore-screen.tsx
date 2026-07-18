@@ -16,8 +16,9 @@ import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useThemeContext } from '@/contexts/theme.context';
+import { useCategories } from '@/hooks/use-categories';
+import { useNotifications } from '@/hooks/use-notifications';
 import { useToast } from '@/hooks/use-toast';
-import { categoryRouteFor, MATOR_CAT_TILES } from '@/mocks/mator-catalog';
 import { triggerHaptic } from '@/utils/haptics';
 
 // Soft feather under the header so the frosted panel dissolves into the
@@ -40,21 +41,28 @@ export default function ExploreScreen() {
   const [headerHeight, setHeaderHeight] = useState(insets.top + 132);
   const toast = useToast();
 
+  // "Shop by category" grid — live from GET /v1/categories (per-domain HTTP
+  // gate), falling back to the bundled tiles on error so it never renders blank.
+  const { state: categoriesState, categories, refresh: refreshCategories } = useCategories();
+  // Unread count drives the red bell indicator — shown only when > 0.
+  const { unreadCount } = useNotifications();
+
   // Pull-to-refresh — a branded wheel bar replaces the stock spinner; on
-  // release it "refreshes" (~1.2s) then confirms with a toast.
+  // release it refetches the category grid, then confirms with a toast.
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => {
+    void refreshCategories().finally(() => {
       setRefreshing(false);
       toast.success('Prices & stock updated');
-    }, 1200);
-  }, [toast]);
+    });
+  }, [refreshCategories, toast]);
 
-  const openCategory = useCallback((name: string) => {
+  // Route by the backend category id (e.g. "ENGINE") so the Category listing
+  // filters /v1/catalog/parts correctly; the display name is the header label.
+  const openCategory = useCallback((id: string, label: string) => {
     triggerHaptic('selection');
-    const { cat, label } = categoryRouteFor(name);
-    router.push({ pathname: '/category', params: { cat, label } });
+    router.push({ pathname: '/category', params: { cat: id, label } });
   }, []);
   const openMake = useCallback((brandId: string) => {
     triggerHaptic('selection');
@@ -71,7 +79,6 @@ export default function ExploreScreen() {
         <BlurView
           intensity={dark ? 40 : 60}
           tint={dark ? 'dark' : 'light'}
-          blurMethod="dimezisBlurView"
           style={StyleSheet.absoluteFill}
         />
         <AppView
@@ -98,19 +105,21 @@ export default function ExploreScreen() {
               style={{ width: 42, height: 42 }}
             >
               <Bell size={21} strokeWidth={2.2} color={tokens.text} />
-              <AppView
-                style={{
-                  position: 'absolute',
-                  top: 9,
-                  right: 10,
-                  width: 8,
-                  height: 8,
-                  borderRadius: 999,
-                  backgroundColor: tokens.error,
-                  borderWidth: 2,
-                  borderColor: tokens.card,
-                }}
-              />
+              {unreadCount > 0 ? (
+                <AppView
+                  style={{
+                    position: 'absolute',
+                    top: 9,
+                    right: 10,
+                    width: 8,
+                    height: 8,
+                    borderRadius: 999,
+                    backgroundColor: tokens.error,
+                    borderWidth: 2,
+                    borderColor: tokens.card,
+                  }}
+                />
+              ) : null}
             </AppPressableView>
           </AppView>
 
@@ -229,11 +238,23 @@ export default function ExploreScreen() {
         <AppText family="heading" weight="bold" style={{ fontSize: 18, color: tokens.text, marginTop: 6 }}>
           Shop by category
         </AppText>
-        <AppView row wrap justify="space-between" style={{ rowGap: 12 }}>
-          {MATOR_CAT_TILES.map((c) => (
-            <CategoryTile key={c.name} name={c.name} count={c.count} onPress={openCategory} />
-          ))}
-        </AppView>
+        {categoriesState === 'loading' ? (
+          <AppView center style={{ height: 200 }}>
+            <WheelLoader size={26} color={tokens.textMuted} />
+          </AppView>
+        ) : (
+          <AppView row wrap justify="space-between" style={{ rowGap: 12 }}>
+            {categories.map((c) => (
+              <CategoryTile
+                key={c.id}
+                name={c.name}
+                iconKey={c.iconKey}
+                count={c.count}
+                onPress={() => openCategory(c.id, c.name)}
+              />
+            ))}
+          </AppView>
+        )}
       </ScrollView>
     </AppView>
   );

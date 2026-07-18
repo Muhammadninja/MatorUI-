@@ -42,6 +42,19 @@ const HEARTBEAT_TIMEOUT_MS = 45_000;
 const MAX_BACKOFF_MS = 30_000;
 const INITIAL_BACKOFF_MS = 1_000;
 
+/**
+ * Application close codes the realtime gateway sends (see backend WS spec).
+ * Reconnecting on these won't help, so we stop instead of hammering:
+ *   4400 invalid_channel · 4401 unauthorized · 4403 forbidden_channel
+ *   4408 too_many_connections (>15 sockets for this user)
+ * `4429 rate_limited` (>30 connects/60s per IP) is NOT terminal — we back
+ * off hard and try again rather than give up.
+ */
+const TERMINAL_CLOSE_CODES = new Set([4400, 4401, 4403, 4408]);
+const RATE_LIMITED_CLOSE_CODE = 4429;
+/** Floor backoff applied after a 4429 so we respect the gateway's window. */
+const RATE_LIMITED_BACKOFF_MS = 10_000;
+
 export class GarageRealtimeClient {
   private socket: WebSocket | null = null;
   private state: ConnectionState = 'idle';
@@ -145,14 +158,25 @@ export class GarageRealtimeClient {
       // Errors precede an onclose — let onclose drive reconnection.
     };
 
-    socket.onclose = () => {
+    socket.onclose = (event?: { code?: number }) => {
       this.stopHeartbeat();
       this.socket = null;
-      if (this.explicitClose) {
-        this.setState('closed');
+      this.setState('closed');
+      if (this.explicitClose) return;
+
+      const code = event?.code;
+      // Auth/channel/too-many-connections: retrying with the same token or
+      // over the same over-subscribed user won't recover — stop cleanly so
+      // the next explicit start() (re-auth, app foreground) tries again.
+      if (code != null && TERMINAL_CLOSE_CODES.has(code)) {
+        if (__DEV__) console.warn(`Realtime closed with terminal code ${code}; not reconnecting.`);
         return;
       }
-      this.setState('closed');
+      // Rate-limited: back off well past the gateway's per-IP window.
+      if (code === RATE_LIMITED_CLOSE_CODE) {
+        this.scheduleReconnect(RATE_LIMITED_BACKOFF_MS);
+        return;
+      }
       this.scheduleReconnect();
     };
   }
@@ -235,7 +259,7 @@ export class GarageRealtimeClient {
     }
   }
 
-  private scheduleReconnect(): void {
+  private scheduleReconnect(minDelayMs = 0): void {
     if (this.explicitClose) return;
     if (this.reconnectTimer) return;
     const base = Math.min(
@@ -243,7 +267,9 @@ export class GarageRealtimeClient {
       MAX_BACKOFF_MS,
     );
     const jitter = base * 0.25 * (Math.random() * 2 - 1);
-    const delay = Math.max(0, base + jitter);
+    // `minDelayMs` lets a rate-limited (4429) close enforce a longer floor
+    // than the current backoff step would otherwise pick.
+    const delay = Math.max(minDelayMs, Math.max(0, base + jitter));
     this.reconnectAttempt += 1;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
@@ -273,7 +299,15 @@ export class GarageRealtimeClient {
   private buildUrl(token: string | null): string {
     if (!this.config) return '';
     const url = new URL(this.config.url);
-    if (token) url.searchParams.set('access_token', token);
+    // Browser/RN `WebSocket` can't set an Authorization header on the
+    // handshake, so the token rides as a query param. The gateway reads
+    // `Authorization: Bearer` first and falls back to `?token=` (the
+    // documented fallback), so send `token`. `access_token` is kept as a
+    // legacy alias in case an older gateway build still reads it.
+    if (token) {
+      url.searchParams.set('token', token);
+      url.searchParams.set('access_token', token);
+    }
     url.searchParams.set('channel', this.buildChannelName());
     return url.toString();
   }

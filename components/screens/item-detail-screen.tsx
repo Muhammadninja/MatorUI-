@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import ImageBox from '@/components/screens-components/home/image-box';
 import { AppButton } from '@/components/shared/app-button';
+import AppImageViewer from '@/components/shared/app-image-viewer/app-image-viewer';
 import { AppOemPill } from '@/components/shared/app-oem-pill';
 import { AppQtyStepper } from '@/components/shared/app-qty-stepper';
 import { AppText } from '@/components/shared/app-text';
@@ -39,6 +40,7 @@ export default function ItemDetailScreen() {
   const { currentActiveVehicle } = useActiveVehicle();
   const { isAuthenticated } = useUserContext();
   const [qty, setQty] = useState(1);
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   const { state, detail, error, refresh } = useCatalogDetail(id ?? null);
   const item = detail?.item ?? null;
@@ -135,9 +137,25 @@ export default function ItemDetailScreen() {
           </AppPressableView>
         </AppView>
 
-        {/* Hero + dots */}
+        {/* Hero + dots — tap the image to open the full-screen viewer. */}
         <AppView px="lg">
-          <ImageBox label={item.title} uri={image} height={240} radius={20} />
+          <AppPressableView
+            onPress={() => image && setViewerOpen(true)}
+            androidRipple={false}
+            accessibilityRole="imagebutton"
+            accessibilityLabel={`View ${item.title} full screen`}
+          >
+            {/* `contain` on a white tile shows the whole part (no cropping),
+                since catalog photos are shot on white and vary in shape. */}
+            <ImageBox
+              label={item.title}
+              uri={image}
+              height={240}
+              radius={20}
+              contentFit="contain"
+              backgroundColor={tokens.white}
+            />
+          </AppPressableView>
           {item.images.length > 1 ? (
             <AppView row justify="center" gap={8} style={{ marginTop: 10 }}>
               {item.images.map((src, i) => (
@@ -171,7 +189,7 @@ export default function ItemDetailScreen() {
             {item.title}
           </AppText>
 
-          {item.oem ? <AppOemPill oem={item.oem} /> : null}
+          {item.oem || item.gm ? <AppOemPill oem={item.oem} gm={item.gm} /> : null}
 
           <AppText family="heading" weight="bold" style={{ fontSize: 30, lineHeight: 36, color: tokens.info }}>
             {item.price}
@@ -200,9 +218,6 @@ export default function ItemDetailScreen() {
           </AppText>
           <AppView row align="center" gap={18}>
             <AppQtyStepper value={qty} onIncrement={() => setQty((q) => q + 1)} onDecrement={() => setQty((q) => Math.max(1, q - 1))} size="md" />
-            <AppText family="default" style={{ fontSize: 13, color: tokens.success }}>
-              {item.status || 'In stock'}
-            </AppText>
           </AppView>
 
           {/* Spec table (from the catalog) */}
@@ -244,6 +259,16 @@ export default function ItemDetailScreen() {
           <AppButton testID="add-to-cart-btn" title="Add to cart" kind="brand" size="lg" fullWidth onPress={addToCart} />
         </AppView>
       </AppView>
+
+      {/* Full-screen image viewer — opened by tapping the hero. */}
+      <AppImageViewer
+        visible={viewerOpen}
+        images={item.images.map((uri) => ({ uri }))}
+        onClose={() => setViewerOpen(false)}
+        renderCaption={(i) =>
+          item.images.length > 1 ? `${i + 1} of ${item.images.length}` : null
+        }
+      />
     </AppView>
   );
 }

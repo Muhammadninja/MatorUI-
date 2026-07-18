@@ -314,18 +314,84 @@ function makeRequestId(): string {
 import { shouldUseHttpTransport } from '@/config/api';
 import { apiClient } from '@/services/api-client';
 
+// The live backend already speaks the SearchResponse contract, but each
+// result is minimal (`{id,title,price,category}`) and the required
+// `description`/`priceLabel`/`score` fields (plus nullable envelope fields)
+// need defaults so the search row never reads `undefined`. Typeahead uses
+// `type` where the app expects `kind`. We normalize both here.
+
+/** A live `/v1/search` result — everything past id/title is optional. */
+type RawSearchResult = Partial<SearchResult> & { id: string; title: string };
+
+/** The live `/v1/search` envelope — fields may be null / absent. */
+type RawSearchResponse = Partial<Omit<SearchResponse, 'results'>> & {
+  results?: RawSearchResult[] | null;
+};
+
+function normalizeSearchResult(r: RawSearchResult): SearchResult {
+  const price = r.price ?? '';
+  return {
+    id: r.id,
+    title: r.title,
+    description: r.description ?? '',
+    price,
+    priceLabel: r.priceLabel ?? price,
+    priceCents: r.priceCents,
+    category: r.category ?? '',
+    badge: r.badge,
+    accentTagKind: r.accentTagKind,
+    status: r.status,
+    rating: r.rating,
+    reviewCount: r.reviewCount,
+    score: r.score ?? 0,
+    explanation: r.explanation,
+  };
+}
+
+type RawTypeaheadSuggestion = {
+  text: string;
+  /** Live backend key; app uses `kind`. */
+  type?: string;
+  kind?: string;
+  productId?: string;
+};
+
 export class HttpSearchTransport implements SearchTransport {
-  search(req: SearchRequest): Promise<SearchResponse> {
+  async search(req: SearchRequest): Promise<SearchResponse> {
     const { signal, requestId, ...body } = req;
-    return apiClient.post<SearchResponse>('/v1/search', body, {
+    const raw = await apiClient.post<RawSearchResponse>('/v1/search', body, {
       signal,
       headers: requestId ? { 'X-Request-Id': requestId } : undefined,
     });
+    return {
+      query: raw.query ?? req.query.trim(),
+      requestId: raw.requestId ?? requestId ?? '',
+      results: (raw.results ?? []).map(normalizeSearchResult),
+      total: raw.total ?? 0,
+      // Backend returns `null` for "no next page"; the UI expects undefined.
+      nextPageToken: raw.nextPageToken ?? undefined,
+      didYouMean: raw.didYouMean ?? undefined,
+      suggestedRefinements: raw.suggestedRefinements,
+      facetCounts: raw.facetCounts,
+      appliedFilters: raw.appliedFilters,
+      suggestedCategories: raw.suggestedCategories,
+      durationMs: raw.durationMs ?? 0,
+    };
   }
 
-  typeahead(req: TypeaheadRequest): Promise<TypeaheadResponse> {
+  async typeahead(req: TypeaheadRequest): Promise<TypeaheadResponse> {
     const path = `/v1/typeahead?q=${encodeURIComponent(req.prefix)}&limit=${req.limit ?? 6}`;
-    return apiClient.get<TypeaheadResponse>(path, { signal: req.signal });
+    const raw = await apiClient.get<{ prefix?: string; suggestions?: RawTypeaheadSuggestion[] }>(
+      path,
+      { signal: req.signal },
+    );
+    const suggestions = (raw.suggestions ?? []).map((s) => ({
+      text: s.text,
+      // Map the live `type` onto the app's `kind`; default to a query chip.
+      kind: (s.kind ?? s.type) === 'product' ? 'product' : 'query',
+      productId: s.productId,
+    })) as TypeaheadResponse['suggestions'];
+    return { prefix: raw.prefix ?? req.prefix, suggestions };
   }
 }
 

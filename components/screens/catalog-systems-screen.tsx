@@ -1,23 +1,29 @@
 import { FlashList } from '@shopify/flash-list';
 import { router, useLocalSearchParams } from 'expo-router';
+import { ChevronRight } from 'lucide-react-native';
 import { useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import MasterSystemRow from '@/components/screens-components/catalog/master-system-row';
+import AutoPartIcon from '@/components/screens-components/catalog/auto-part-icon';
 import VehicleContextBar from '@/components/screens-components/catalog/vehicle-context-bar';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
-import { AppView } from '@/components/shared/app-view';
-import { CATALOG_SYSTEMS, type CatalogSystem } from '@/constants/catalog-systems';
+import { AppPressableView, AppView } from '@/components/shared/app-view';
+import { ListLoadingOverlay } from '@/components/shared/wheel-loader';
 import { useThemeContext } from '@/contexts/theme.context';
+import { useCategories } from '@/hooks/use-categories';
+import type { CategoryTileData } from '@/services/categories-service';
 import { triggerHaptic } from '@/utils/haptics';
 
 /**
- * Catalog (Stage 2) — the core vehicle-systems landing. Reached either from
- * Explore ("Browse by system") or from a make → model selection (which passes
- * `make`/`model`). A vehicle context bar over a FlashList of the 8 Master
- * Systems; tapping a system routes to the parts list, carrying the system +
- * the make/model context.
+ * Catalog (Stage 2) — the vehicle-systems landing. Reached from Explore
+ * ("Browse by system") or a make → model selection (which passes `make`/`model`).
+ *
+ * The systems list is the SAME taxonomy as the "Shop by category" grid — both
+ * come from `GET /v1/categories` (via `useCategories`) — so the id a seller
+ * tags a part with is exactly what a tap sends to `/v1/catalog/parts?category=`.
+ * Tapping a system carries the backend category **id** + label plus the
+ * make/model context to the parts list.
  */
 export default function CatalogSystemsScreen() {
   const { tokens } = useThemeContext();
@@ -28,21 +34,54 @@ export default function CatalogSystemsScreen() {
     brandId?: string;
   }>();
   const vehicleLabel = [make, model].filter(Boolean).join(' ');
+  const { state, categories } = useCategories();
 
   const openSystem = useCallback(
-    (system: CatalogSystem) => {
+    (category: CategoryTileData) => {
       triggerHaptic('selection');
       router.push({
         pathname: '/catalog/parts',
-        params: { systemId: system.id, make, model, brandId },
+        params: { categoryId: category.id, categoryLabel: category.name, make, model, brandId },
       });
     },
     [make, model, brandId],
   );
 
+  // Once a model is chosen the row is vehicle-scoped, so drop the category icon
+  // and let the (now larger) system name lead.
+  const hideIcon = Boolean(vehicleLabel);
+
   const renderItem = useCallback(
-    ({ item }: { item: CatalogSystem }) => <MasterSystemRow system={item} onPress={openSystem} />,
-    [openSystem],
+    ({ item }: { item: CategoryTileData }) => (
+      <AppPressableView
+        onPress={() => openSystem(item)}
+        androidRipple={false}
+        accessibilityRole="button"
+        accessibilityLabel={item.name}
+        row
+        align="center"
+        gap={14}
+        style={{ paddingVertical: 16 }}
+      >
+        {hideIcon ? null : (
+          <AppView center rounded={12} style={{ width: 44, height: 44, backgroundColor: tokens.backgroundSecondary }}>
+            <AutoPartIcon name={item.name} iconKey={item.iconKey} size={26} />
+          </AppView>
+        )}
+        <AppView flex={1}>
+          <AppText family="heading" weight="bold" style={{ fontSize: hideIcon ? 20 : 18, lineHeight: hideIcon ? 26 : 24, color: tokens.text }}>
+            {item.name}
+          </AppText>
+          {item.count > 0 ? (
+            <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted }}>
+              {item.count} part{item.count === 1 ? '' : 's'}
+            </AppText>
+          ) : null}
+        </AppView>
+        <ChevronRight size={22} strokeWidth={2.2} color={tokens.textMuted} />
+      </AppPressableView>
+    ),
+    [openSystem, tokens, hideIcon],
   );
 
   return (
@@ -50,8 +89,8 @@ export default function CatalogSystemsScreen() {
       <AppSettingsHeader title={vehicleLabel || 'Catalog'} fallbackHref="/explore" />
       <FlashList
         testID="systems-grid"
-        data={CATALOG_SYSTEMS}
-        keyExtractor={(s) => s.id}
+        data={categories}
+        keyExtractor={(c) => c.id}
         renderItem={renderItem}
         ListHeaderComponent={
           <AppView gap={12} style={{ paddingBottom: 12 }}>
@@ -65,6 +104,7 @@ export default function CatalogSystemsScreen() {
         contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: Math.max(insets.bottom + 24, 40) }}
         showsVerticalScrollIndicator={false}
       />
+      <ListLoadingOverlay visible={state === 'loading'} label="Loading systems…" />
     </AppView>
   );
 }

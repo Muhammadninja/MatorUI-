@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
+import { ApiError } from '@/services/api-client';
 import {
   fetchCatalogList,
   type CatalogItem,
@@ -28,6 +29,11 @@ export type UseCatalogListValue = {
   items: CatalogItem[];
   total: number;
   error: string | null;
+  /** True when the failure was a network / connection / timeout error
+   *  (couldn't reach the server) rather than a server-side error response.
+   *  Lets screens degrade offline failures to an empty state instead of a
+   *  scary error card. */
+  isOffline: boolean;
   /** Re-fire the request — invalidates the cache + refetches. */
   refresh: () => void;
 };
@@ -73,11 +79,15 @@ export function useCatalogList(
     else if (items.length === 0) state = 'empty';
     else state = 'success';
 
+    // A connection/timeout failure has no HTTP status (ApiError.status === 0).
+    const isOffline = query.error instanceof ApiError && query.error.isNetworkError;
+
     return {
       state,
       items,
       total,
       error: query.error instanceof Error ? query.error.message : null,
+      isOffline,
       refresh: () => {
         void query.refetch();
       },

@@ -16,9 +16,8 @@ export default function ProfileStackLayout() {
       <Stack.Screen name="edit-profile" options={{ headerShown: false }} />
       <Stack.Screen name="order-history" options={{ headerShown: false }} />
       <Stack.Screen name="payment-methods" options={{ headerShown: false }} />
-      <Stack.Screen name="recently-viewed" options={{ headerShown: false }} />
+      <Stack.Screen name="liked" options={{ headerShown: false }} />
       <Stack.Screen name="shipping-addresses" options={{ headerShown: false }} />
-      <Stack.Screen name="notification-settings" options={{ headerShown: false }} />
       <Stack.Screen name="settings-security" options={{ headerShown: false }} />
     </Stack>
   );

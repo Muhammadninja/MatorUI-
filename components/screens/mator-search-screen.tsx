@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, PackageOpen, Search, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Keyboard, ScrollView, TextInput } from 'react-native';
@@ -24,7 +24,10 @@ import { triggerHaptic } from '@/utils/haptics';
 export default function MatorSearchScreen() {
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
-  const [query, setQuery] = useState('');
+  // Optional `q` seeds the search (e.g. a "Certified Batteries" placement opens
+  // this screen pre-filled with "battery").
+  const { q: initialQuery } = useLocalSearchParams<{ q?: string }>();
+  const [query, setQuery] = useState(initialQuery ?? '');
   const q = query.trim();
 
   // Debounce the query so we hit the backend once the user pauses, not on
@@ -62,7 +65,7 @@ export default function MatorSearchScreen() {
   };
 
   return (
-    <AppView flex={1} colorName="background" testID="search-screen" style={{ paddingTop: insets.top + 6 }}>
+    <AppView flex={1} colorName="card" testID="search-screen" style={{ paddingTop: insets.top + 6 }}>
       {/* Header: back + search field */}
       <AppView row align="center" gap={10} px="lg" style={{ paddingBottom: 12 }}>
         <AppPressableView
@@ -147,13 +150,13 @@ export default function MatorSearchScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 28, gap: 14 }}
+          contentContainerStyle={{ paddingBottom: 28, gap: 8 }}
         >
           <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted, paddingTop: 4 }}>
             {total || items.length} result{(total || items.length) === 1 ? '' : 's'}
             {debouncedQ ? ` for “${debouncedQ}”` : ''}
           </AppText>
-          <AppView>
+          <AppView gap={12}>
             {items.map((it) => (
               <ProductRow key={it.id} item={it} onOpen={openItem} onAdd={addToCart} />
             ))}

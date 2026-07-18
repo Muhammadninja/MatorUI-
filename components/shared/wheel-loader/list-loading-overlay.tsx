@@ -32,7 +32,6 @@ export default function ListLoadingOverlay({ visible, label }: ListLoadingOverla
       <BlurView
         intensity={dark ? 30 : 45}
         tint={dark ? 'dark' : 'light'}
-        blurMethod="dimezisBlurView"
         style={StyleSheet.absoluteFill}
       />
       <AppView

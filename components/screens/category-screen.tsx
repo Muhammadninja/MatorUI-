@@ -1,9 +1,8 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { AlertCircle, PackageOpen } from 'lucide-react-native';
+import { PackageOpen } from 'lucide-react-native';
 import { ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import MatorFitBanner from '@/components/screens-components/catalog/mator-fit-banner';
 import ProductRow from '@/components/screens-components/catalog/product-row';
 import { AppButton } from '@/components/shared/app-button';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
@@ -32,11 +31,16 @@ export default function CategoryScreen() {
   const cat = params.cat ?? 'All';
   const label = params.label ?? cat;
 
-  const { state, items, total, error, refresh } = useCatalogList({
+  const { state, items, total, refresh } = useCatalogList({
     page: 1,
     pageSize: 24,
     category: cat && cat !== 'All' ? cat : undefined,
   });
+
+  // Any load failure (offline, timeout, or a server error) degrades to the
+  // empty state — a browse screen should never show a scary error card. The
+  // empty state keeps a Retry so it isn't a dead-end when the network returns.
+  const showEmpty = state === 'empty' || state === 'error';
 
   const { addItem } = useCartContext();
   const { isAuthenticated } = useUserContext();
@@ -58,42 +62,23 @@ export default function CategoryScreen() {
   };
 
   return (
-    <AppView flex={1} colorName="background">
+    <AppView flex={1} colorName="card">
       <AppSettingsHeader title={label} fallbackHref="/explore" />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
-          paddingHorizontal: 20,
-          paddingTop: 4,
+          paddingTop: 0,
           paddingBottom: Math.max(insets.bottom + 24, 40),
-          gap: 16,
+          gap: 8,
         }}
       >
-        <MatorFitBanner />
-
         {state === 'success' ? (
           <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>
             {total || items.length} result{(total || items.length) === 1 ? '' : 's'}
           </AppText>
         ) : null}
 
-        {state === 'error' ? (
-          <AppView center py={40} gap={12}>
-            <AlertCircle size={30} strokeWidth={2} color={tokens.error} />
-            <AppView align="center" gap={4}>
-              <AppText family="heading" weight="bold" style={{ fontSize: 17, color: tokens.text }}>
-                Couldn&apos;t load results
-              </AppText>
-              <AppText
-                family="default"
-                style={{ fontSize: 13, color: tokens.textMuted, textAlign: 'center', maxWidth: 280 }}
-              >
-                {error ?? 'Something went wrong. Please try again.'}
-              </AppText>
-            </AppView>
-            <AppButton title="Retry" kind="secondary" size="sm" onPress={refresh} />
-          </AppView>
-        ) : state === 'empty' ? (
+        {showEmpty ? (
           <AppView center py={40} gap={12}>
             <PackageOpen size={30} strokeWidth={2} color={tokens.textMuted} />
             <AppView align="center" gap={4}>
@@ -107,9 +92,10 @@ export default function CategoryScreen() {
                 We couldn&apos;t find anything for {label}. Try another category.
               </AppText>
             </AppView>
+            <AppButton title="Retry" kind="secondary" size="sm" onPress={refresh} />
           </AppView>
         ) : state === 'success' ? (
-          <AppView>
+          <AppView gap={12}>
             {items.map((it) => (
               <ProductRow key={it.id} item={it} onOpen={openItem} onAdd={addToCart} />
             ))}

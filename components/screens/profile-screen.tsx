@@ -3,9 +3,8 @@ import { Image } from 'react-native';
 
 import { router } from 'expo-router';
 import {
-  Bell,
   CreditCard,
-  History,
+  Heart,
   MapPin,
   ReceiptText,
   Shield,
@@ -21,7 +20,9 @@ import { AppButton } from '@/components/shared/app-button';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
+import { useLikesContext } from '@/contexts/likes.context';
 import { useToast } from '@/hooks/use-toast';
+import useGarage from '@/hooks/use-garage';
 import { useUserContext, type UserProfile } from '@/contexts/user.context';
 
 const SECTION_RADIUS = 16;
@@ -50,7 +51,7 @@ const ACCOUNT_ITEMS: AccountItem[] = [
   {
     key: 'orders',
     title: 'Order history',
-    subtitle: '12 past orders',
+    subtitle: 'View your orders',
     leading: <AppIconBox Icon={ReceiptText} rounded={11} />,
     rightChevron: true,
     onPress: () => router.push('/order-history'),
@@ -58,7 +59,7 @@ const ACCOUNT_ITEMS: AccountItem[] = [
   {
     key: 'addresses',
     title: 'Shipping addresses',
-    subtitle: '2 saved',
+    subtitle: 'Manage delivery addresses',
     leading: <AppIconBox Icon={MapPin} rounded={11} />,
     rightChevron: true,
     onPress: () => router.push('/shipping-addresses'),
@@ -66,26 +67,18 @@ const ACCOUNT_ITEMS: AccountItem[] = [
   {
     key: 'payments',
     title: 'Payment methods',
-    subtitle: 'Visa ···· 4821',
+    subtitle: 'Manage payment options',
     leading: <AppIconBox Icon={CreditCard} rounded={11} />,
     rightChevron: true,
     onPress: () => router.push('/payment-methods'),
   },
   {
-    key: 'recently-viewed',
-    title: 'Recently viewed',
-    subtitle: 'Pick up where you left off',
-    leading: <AppIconBox Icon={History} rounded={11} />,
+    key: 'liked',
+    title: 'Liked',
+    subtitle: 'Parts you saved',
+    leading: <AppIconBox Icon={Heart} rounded={11} />,
     rightChevron: true,
-    onPress: () => router.push('/recently-viewed'),
-  },
-  {
-    key: 'notifications',
-    title: 'Notifications',
-    subtitle: 'Push, email & SMS',
-    leading: <AppIconBox Icon={Bell} rounded={11} />,
-    rightChevron: true,
-    onPress: () => router.push('/notification-settings'),
+    onPress: () => router.push('/liked'),
   },
   {
     key: 'settings',
@@ -102,6 +95,9 @@ const ACCOUNT_ITEMS: AccountItem[] = [
 export default function ProfileScreen() {
   const toast = useToast();
   const { profile, isAuthenticated, isHydrating, signOut } = useUserContext();
+  // Real counts for the stat cards (no mock numbers).
+  const { vehicles } = useGarage();
+  const { likedIds } = useLikesContext();
 
   const handleSignOut = async () => {
     await signOut();
@@ -139,11 +135,13 @@ export default function ProfileScreen() {
           {/* Handoff §17: 64px avatar, name 21/700, email, Pro pill */}
           <ProfileHeader profile={profile} />
 
-          {/* Handoff §17: 3-equal stats cards — Orders · Vehicles · Saved */}
+          {/* 3-equal stats cards — real counts (0 = the honest empty state).
+              Orders has no working data source yet (orders integration is
+              backend-blocked), so it stays 0 until that lands. */}
           <AppView row gap="sm" px="lg">
-            <StatCard label="Orders" value="12" />
-            <StatCard label="Vehicles" value="2" />
-            <StatCard label="Saved" value="$1.2k" />
+            <StatCard label="Orders" value="0" />
+            <StatCard label="Vehicles" value={String(vehicles.length)} />
+            <StatCard label="Saved" value={String(likedIds.size)} />
           </AppView>
 
           {/* Handoff §17: list rows with icon tile 11-radius + title + sub + chevron */}
@@ -229,34 +227,8 @@ function ProfileHeader({ profile }: { profile: UserProfile }) {
           family="default"
           style={{ fontSize: 13, color: tokens.textMuted, marginTop: 2 }}
         >
-          {profile.email}
+          {profile.email || profile.phone || ''}
         </AppText>
-
-        {/* "★ Mator Pro member" pill — accolade gold tint */}
-        <AppView
-          row
-          align="center"
-          gap={5}
-          style={{
-            marginTop: 5,
-            alignSelf: 'flex-start',
-            backgroundColor: tokens.backgroundSecondary,
-            borderWidth: 1,
-            borderColor: tokens.border,
-            borderRadius: 999,
-            paddingHorizontal: 9,
-            paddingVertical: 3,
-          }}
-        >
-          <AppText style={{ fontSize: 11, color: tokens.accolade }}>★</AppText>
-          <AppText
-            family="accent"
-            weight="bold"
-            style={{ fontSize: 11, color: tokens.text }}
-          >
-            Mator Pro member
-          </AppText>
-        </AppView>
       </AppView>
     </AppView>
   );

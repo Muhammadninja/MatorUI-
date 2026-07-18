@@ -12,24 +12,18 @@ export default function AuthStackLayout() {
         contentStyle: { backgroundColor: tokens.background },
       }}
     >
+      {/* Auth is a single unified phone-OTP bottom sheet presented OVER the
+          screen that triggered it (transparent modal so that screen stays
+          visible behind the scrim). There is no separate sign-up screen. */}
       <Stack.Screen
         name="sign-in"
         options={{
           headerShown: false,
-          animation: 'slide_from_bottom',
+          presentation: 'transparentModal',
+          animation: 'fade',
           animationDuration: 180,
-          gestureEnabled: true,
-          gestureDirection: 'vertical',
-        }}
-      />
-      <Stack.Screen
-        name="sign-up"
-        options={{
-          headerShown: false,
-          animation: 'slide_from_bottom',
-          animationDuration: 180,
-          gestureEnabled: true,
-          gestureDirection: 'vertical',
+          gestureEnabled: false,
+          contentStyle: { backgroundColor: 'transparent' },
         }}
       />
       <Stack.Screen

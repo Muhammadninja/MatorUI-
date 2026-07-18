@@ -66,7 +66,8 @@ export default function VehicleDetailScreen() {
   const subline = [vehicle.trim, vehicle.color ? titleCase(vehicle.color) : undefined]
     .filter(Boolean)
     .join(' · ');
-  const imageSource = vehicle.images?.[0] ?? `https://picsum.photos/seed/${vehicle.id}/800/400`;
+  // Real photo only; when absent, AppImage renders the car-placeholder fallback.
+  const imageSource = vehicle.images?.[0];
   // Capture the id so the async handlers below keep the narrowed
   // (non-undefined) reference past the early-return guard above.
   const vehicleId = vehicle.id;

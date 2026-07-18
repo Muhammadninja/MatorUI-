@@ -8,7 +8,7 @@ export type ToastInput = {
   title: string;
   /** Optional second line. */
   description?: string;
-  /** Auto-dismiss delay in ms. Pass 0 to disable. Default 3500. */
+  /** Auto-dismiss delay in ms. Pass 0 to disable. Default 400. */
   duration?: number;
   /** Optional action label rendered on the right. */
   actionLabel?: string;
@@ -21,7 +21,7 @@ export type Toast = Required<Pick<ToastInput, 'id' | 'kind' | 'title' | 'duratio
 
 type ToastListener = (toasts: readonly Toast[]) => void;
 
-const DEFAULT_DURATION = 3500;
+const DEFAULT_DURATION = 400;
 /** Hard cap on simultaneous toasts. Beyond this, the oldest is dropped
  *  from the queue when a new one comes in. Prevents a stream of
  *  add-to-cart confirmations from blanketing the screen. */

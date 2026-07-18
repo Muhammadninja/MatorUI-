@@ -147,34 +147,108 @@ export class MockCartTransport implements CartTransport {
   }
 }
 
-// ── HTTP transport (stub) ────────────────────────────────────────────
+// ── HTTP transport (live /v1/cart, auth-gated) ───────────────────────
 
 /**
- * Drop-in HTTP transport. Wire the auth header strategy
- * (`Authorization: Bearer <token>` from the user context) and set
- * the base URL via env (`EXPO_PUBLIC_API_BASE_URL`). Then swap
- * `cartTransport` below for an instance of this.
+ * Live cart transport, verified against the backend at
+ * `EXPO_PUBLIC_API_BASE_URL`. All endpoints require a bearer token
+ * (`apiClient` injects it) and every mutation returns the FULL canonical
+ * cart:
  *
- * Suggested REST surface (mirrors the interface 1:1):
- *   GET    /v1/cart                        → CartSnapshot
- *   POST   /v1/cart/items                  → CartItem        (body: AddItemInput)
- *   PATCH  /v1/cart/items/:itemId          → CartItem        (body: { quantity })
- *   DELETE /v1/cart/items/:itemId          → 204
- *   POST   /v1/cart/clear                  → 204
- *   POST   /v1/cart/promo                  → PromoResult     (body: { code })
- *   DELETE /v1/cart/promo                  → 204
+ *   GET    /v1/cart                 → ApiCart
+ *   POST   /v1/cart/items           → ApiCart   (body: { part_id, quantity })
+ *   PATCH  /v1/cart/items/:lineId   → ApiCart   (body: { quantity })
+ *   DELETE /v1/cart/items/:lineId   → ApiCart
+ *   POST   /v1/cart/clear           → ApiCart
+ *   POST   /v1/cart/promo           → ApiCart   (body: { code })
+ *   DELETE /v1/cart/promo           → ApiCart
+ *
+ * Two id spaces: the backend keys each line by its own `id`
+ * (`item_01K…`) while the app/provider keys by the product's `part_id`.
+ * We expose `CartItem.id = part_id` (so the provider's optimistic model
+ * is unchanged) and keep an internal `part_id → line_id` map — rebuilt
+ * from every response — to translate update/remove onto the right line.
  */
 import { shouldUseHttpTransport } from '@/config/api';
 import { apiClient } from '@/services/api-client';
+import { PROMO_CODES } from '@/services/cart-math';
+
+/** A cart line as the backend returns it (snake_case, line-keyed). */
+type ApiCartItem = {
+  id: string; // cart-line id (item_01K…)
+  part_id: string;
+  service_id?: string | null;
+  title?: string;
+  price?: string;
+  price_uzs?: number;
+  quantity: number;
+  imageUrl?: string | null;
+  scheduled_at?: string | null;
+};
+
+type ApiCart = {
+  items?: ApiCartItem[] | null;
+  promo?: { code?: string; discountUzs?: number; isValid?: boolean } | null;
+  subtotal_uzs?: number;
+  total_uzs?: number;
+};
+
+/** Server-enforced max quantity per cart line — the backend 400s above this,
+ *  so clamp client-side to keep the stepper from hitting a hard error. */
+const MAX_CART_QUANTITY = 999;
 
 export class HttpCartTransport implements CartTransport {
-  fetch(): Promise<CartSnapshot> {
-    return apiClient.get<CartSnapshot>('/v1/cart');
+  /** part_id → cart-line id, rebuilt from every server response. */
+  private lineIdByPart = new Map<string, string>();
+
+  private mapItem(i: ApiCartItem): CartItem {
+    return {
+      id: i.part_id, // the provider keys by product id, not the line id
+      title: i.title ?? '',
+      description: '',
+      price:
+        i.price ??
+        (i.price_uzs != null ? `UZS ${i.price_uzs.toLocaleString('ru-RU')}` : ''),
+      imageUrl: i.imageUrl ?? undefined,
+      quantity: i.quantity,
+    };
+  }
+
+  /** Fold a full-cart response into a CartSnapshot and refresh the id map. */
+  private ingest(cart: ApiCart | undefined): CartSnapshot {
+    this.lineIdByPart.clear();
+    const items = (cart?.items ?? []).map((i) => {
+      this.lineIdByPart.set(i.part_id, i.id);
+      return this.mapItem(i);
+    });
+    return { items, appliedPromoCode: cart?.promo?.code ?? null };
+  }
+
+  async fetch(): Promise<CartSnapshot> {
+    return this.ingest(await apiClient.get<ApiCart>('/v1/cart'));
   }
 
   async addItem(input: AddItemInput): Promise<CartItem> {
-    const { item } = await apiClient.post<{ item: CartItem }>('/v1/cart/items', input);
-    return item;
+    const cart = await apiClient.post<ApiCart>('/v1/cart/items', {
+      part_id: input.productId,
+      quantity: 1,
+    });
+    const snap = this.ingest(cart);
+    // Return the reconciled server line; fall back to the optimistic input
+    // if the server omitted it (shouldn't happen, but keeps the type honest).
+    return (
+      snap.items.find((i) => i.id === input.productId) ?? {
+        id: input.productId,
+        title: input.title,
+        description: input.description,
+        price: input.price,
+        priceLabel: input.priceLabel,
+        badge: input.badge,
+        status: input.status,
+        imageUrl: input.imageUrl,
+        quantity: 1,
+      }
+    );
   }
 
   async updateQuantity(itemId: string, quantity: number): Promise<CartItem | null> {
@@ -182,27 +256,39 @@ export class HttpCartTransport implements CartTransport {
       await this.removeItem(itemId);
       return null;
     }
-    const { item } = await apiClient.patch<{ item: CartItem }>(
-      `/v1/cart/items/${encodeURIComponent(itemId)}`,
-      { quantity },
+    const lineId = this.lineIdByPart.get(itemId) ?? itemId;
+    const cart = await apiClient.patch<ApiCart>(
+      `/v1/cart/items/${encodeURIComponent(lineId)}`,
+      { quantity: Math.min(quantity, MAX_CART_QUANTITY) },
     );
-    return item;
+    const snap = this.ingest(cart);
+    return snap.items.find((i) => i.id === itemId) ?? null;
   }
 
   async removeItem(itemId: string): Promise<void> {
-    await apiClient.delete(`/v1/cart/items/${encodeURIComponent(itemId)}`);
+    const lineId = this.lineIdByPart.get(itemId) ?? itemId;
+    const cart = await apiClient.delete<ApiCart>(
+      `/v1/cart/items/${encodeURIComponent(lineId)}`,
+    );
+    // DELETE returns the updated cart; refresh the map from it.
+    this.ingest(cart);
   }
 
   async clear(): Promise<void> {
-    await apiClient.post('/v1/cart/clear');
+    this.ingest(await apiClient.post<ApiCart>('/v1/cart/clear'));
   }
 
-  applyPromo(code: string): Promise<PromoResult> {
-    return apiClient.post<PromoResult>('/v1/cart/promo', { code });
+  async applyPromo(code: string): Promise<PromoResult> {
+    const cart = await apiClient.post<ApiCart>('/v1/cart/promo', { code });
+    this.ingest(cart);
+    // The provider applies promos optimistically from its own PROMO_CODES
+    // table and discards this return; we still echo an honest result.
+    const applied = cart?.promo?.code ? PROMO_CODES[cart.promo.code] : undefined;
+    return applied ? { ok: true, promo: applied } : { ok: false, reason: 'invalid' };
   }
 
   async removePromo(): Promise<void> {
-    await apiClient.delete('/v1/cart/promo');
+    this.ingest(await apiClient.delete<ApiCart>('/v1/cart/promo'));
   }
 }
 

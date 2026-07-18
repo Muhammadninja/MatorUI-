@@ -108,27 +108,34 @@ function orderDetail(id, totalLabel) {
   };
 }
 
-// ── AUTH: passwordless OTP ───────────────────────────────────────────────────
-// request() stores the pending request by token; verify() accepts any 6-digit
-// code and returns a RawAuthResponse the app's auth context reads. `devCode` lets
-// demo/E2E builds auto-fill the code so the suite stays buttons-only.
+// ── AUTH: passwordless phone OTP (backend.json wire shape) ───────────────────
+// request-otp stores the pending request by request_id; verify-otp accepts any
+// 6-digit code and returns { user, tokens }. `dev_otp_code` lets demo/E2E builds
+// auto-fill the code so the suite stays buttons-only.
 const pendingOtps = new Map();
 const OTP_DEV_CODE = '123456';
+
+function authTokens(id) {
+  return {
+    access_token: `srv_access_${id}`,
+    access_token_expires_at: new Date(Date.now() + 3600000).toISOString(),
+    refresh_token: `srv_refresh_${id}`,
+    refresh_token_expires_at: new Date(Date.now() + 7776000000).toISOString(),
+    token_type: 'Bearer',
+  };
+}
 
 function authUser(pending) {
   const id = `usr_${Math.random().toString(36).slice(2, 10)}`;
   const p = pending || {};
-  const isEmail = p.channel === 'email';
-  const identifier = p.identifier || '';
   return {
     id,
-    email: isEmail ? identifier : 'test@mator.uz',
-    phone: p.channel === 'phone' ? identifier : '+998 90 123 45 67',
-    firstName: p.firstName || 'Sardor',
-    lastName: p.lastName || 'Karimov',
-    username: (isEmail ? (identifier.split('@')[0] || 'sardor') : 'sardor'),
-    avatarUrl: null,
-    memberSince: '2026-01-01T00:00:00.000Z',
+    phone_e164: p.phone_e164 || '+998901234567',
+    display_name: null,
+    avatar_url: null,
+    myid_status: 'not_verified',
+    transaction_limit_uzs: 0,
+    created_at: '2026-01-01T00:00:00.000Z',
   };
 }
 
@@ -225,36 +232,46 @@ const server = http.createServer(async (req, res) => {
     return send(res, 200, { success: true, car: { ...SEEDED_CAR } });
   }
 
-  // AUTH — POST /v1/auth/otp/request → { otpToken, expiresIn, devCode }
-  if (req.method === 'POST' && pathname === '/v1/auth/otp/request') {
+  // AUTH — POST /v1/auth/phone/request-otp → { request_id, ..., dev_otp_code }
+  if (req.method === 'POST' && pathname === '/v1/auth/phone/request-otp') {
     const body = await readBody(req);
-    const otpToken = `otp_${Math.random().toString(36).slice(2, 12)}`;
-    pendingOtps.set(otpToken, {
-      channel: body.channel,
-      identifier: body.identifier,
-      purpose: body.purpose,
-      firstName: body.firstName,
-      lastName: body.lastName,
+    const requestId = `otp_${Math.random().toString(36).slice(2, 12)}`;
+    pendingOtps.set(requestId, { phone_e164: body.phone_e164 });
+    return send(res, 200, {
+      request_id: requestId,
+      phone_e164: body.phone_e164 || '+998901234567',
+      expires_at: new Date(Date.now() + 300000).toISOString(),
+      resend_after_seconds: 60,
+      otp_length: 6,
+      delivery_channel: 'sms',
+      is_existing_user: true,
+      next_screen: 'AuthOtpVerifyScreen',
+      dev_otp_code: OTP_DEV_CODE, // MOCK ONLY — the real backend omits this.
     });
-    return send(res, 200, { otpToken, expiresIn: 300, devCode: OTP_DEV_CODE });
   }
 
-  // AUTH — POST /v1/auth/otp/verify → RawAuthResponse (any 6-digit code passes).
-  if (req.method === 'POST' && pathname === '/v1/auth/otp/verify') {
+  // AUTH — POST /v1/auth/phone/verify-otp → { user, tokens } (any 6-digit code).
+  if (req.method === 'POST' && pathname === '/v1/auth/phone/verify-otp') {
     const body = await readBody(req);
-    const code = typeof body.code === 'string' ? body.code.trim() : '';
+    const code = typeof body.otp_code === 'string' ? body.otp_code.trim() : '';
     if (!/^\d{6}$/.test(code)) {
       return send(res, 422, { error: { code: 'INVALID_CODE', message: 'Enter the 6-digit code.' } });
     }
-    const pending = pendingOtps.get(body.otpToken);
-    pendingOtps.delete(body.otpToken);
+    const pending = pendingOtps.get(body.request_id);
+    pendingOtps.delete(body.request_id);
     const user = authUser(pending);
     return send(res, 200, {
-      accessToken: `srv_access_${user.id}`,
-      refreshToken: `srv_refresh_${user.id}`,
-      expiresIn: 3600,
       user,
+      tokens: authTokens(user.id),
+      requires_myid_verification: false,
+      next_screen: 'Tabs',
     });
+  }
+
+  // AUTH — POST /v1/auth/token/refresh → { tokens }
+  if (req.method === 'POST' && pathname === '/v1/auth/token/refresh') {
+    const id = `usr_${Math.random().toString(36).slice(2, 10)}`;
+    return send(res, 200, { tokens: authTokens(id) });
   }
 
   // FLOW 3 / 9 — GET /v1/catalog/parts

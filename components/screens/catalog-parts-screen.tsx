@@ -11,7 +11,6 @@ import VehicleContextBar from '@/components/screens-components/catalog/vehicle-c
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { WheelLoader } from '@/components/shared/wheel-loader';
-import { catalogSystemById } from '@/constants/catalog-systems';
 import { useCartContext } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useUserContext } from '@/contexts/user.context';
@@ -25,15 +24,16 @@ import { triggerHaptic } from '@/utils/haptics';
 const DEFAULT_FILTER: FilterState = {
   brands: [],
   regions: [],
-  inStockOnly: false,
   oemOnly: false,
   gmOnly: false,
   sortBy: 'relevance',
 };
 
-/** Brand shown on a part = the first segment of its "brand · category" description. */
+/** Brand shown on a part = the part manufacturer (`CatalogItem.brand`, e.g.
+ *  "Gates"), falling back to the first segment of its "brand · category"
+ *  description for items mapped before `brand` was populated. */
 function brandOf(item: CatalogItem): string {
-  return item.description?.split('·')[0]?.trim() ?? '';
+  return item.brand?.trim() || item.description?.split('·')[0]?.trim() || '';
 }
 
 /**
@@ -46,16 +46,31 @@ function brandOf(item: CatalogItem): string {
 export default function CatalogPartsScreen() {
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
-  const { systemId, make, model } = useLocalSearchParams<{
-    systemId?: string;
+  // `categoryId` is the real backend category id (e.g. "cat_engine_belts")
+  // handed down from the unified /v1/categories systems screen; `categoryLabel`
+  // is its display name. These flow straight into the catalog filter so the
+  // seller-selected system maps 1:1 to the listing.
+  const { categoryId, categoryLabel, make, model, certified, q } = useLocalSearchParams<{
+    categoryId?: string;
+    categoryLabel?: string;
     make?: string;
     model?: string;
+    /** Premium "MATOR Certified" preset — filters by part quality across ALL
+     *  systems (not a car-system category): 'oem' → all OEM parts, 'gm' → all GM. */
+    certified?: 'oem' | 'gm';
+    /** Optional initial search term (e.g. a certified "Batteries" collection). */
+    q?: string;
   }>();
-  const system = catalogSystemById(systemId);
   const vehicleLabel = [make, model].filter(Boolean).join(' ');
 
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<FilterState>(DEFAULT_FILTER);
+  const [search, setSearch] = useState(q ?? '');
+  // Seed the filter from a certified preset so the premium catalogue opens
+  // already scoped to all-OEM or all-GM parts.
+  const [filter, setFilter] = useState<FilterState>(() => ({
+    ...DEFAULT_FILTER,
+    oemOnly: certified === 'oem',
+    gmOnly: certified === 'gm',
+  }));
   const [sheetOpen, setSheetOpen] = useState(false);
 
   // Flow context + the coarse catalog facets (region, GM) go to the backend so
@@ -64,7 +79,7 @@ export default function CatalogPartsScreen() {
   const { state, items, refresh } = useCatalogList({
     page: 1,
     pageSize: 50,
-    category: system?.categoryKey,
+    category: categoryId || undefined,
     make: make || undefined,
     model: model || undefined,
     regions: filter.regions.length ? filter.regions : undefined,
@@ -87,7 +102,6 @@ export default function CatalogPartsScreen() {
     const q = search.trim().toLowerCase();
     let list = items.filter((it) => {
       if (q && !(it.title.toLowerCase().includes(q) || it.oem?.toLowerCase().includes(q))) return false;
-      if (filter.inStockOnly && it.status === 'Out of stock') return false;
       if (filter.oemOnly && !it.oem) return false;
       if (filter.brands.length && !filter.brands.includes(brandOf(it))) return false;
       return true;
@@ -100,7 +114,6 @@ export default function CatalogPartsScreen() {
   const activeFilterCount =
     filter.brands.length +
     filter.regions.length +
-    (filter.inStockOnly ? 1 : 0) +
     (filter.oemOnly ? 1 : 0) +
     (filter.gmOnly ? 1 : 0);
 
@@ -128,7 +141,7 @@ export default function CatalogPartsScreen() {
   );
 
   return (
-    <AppView testID="parts-directory-screen" flex={1} colorName="background">
+    <AppView testID="parts-directory-screen" flex={1} colorName="card">
       {/* Fixed header: back + search + quick filters */}
       <AppView style={{ paddingTop: insets.top + 6 }} px="lg" colorName="background">
         <AppView row align="center" gap={10}>
@@ -160,7 +173,7 @@ export default function CatalogPartsScreen() {
             <TextInput
               value={search}
               onChangeText={setSearch}
-              placeholder={system ? `Search ${system.label}` : 'Search parts'}
+              placeholder={categoryLabel ? `Search ${categoryLabel}` : 'Search parts'}
               placeholderTextColor={tokens.textMuted}
               autoCorrect={false}
               autoCapitalize="none"
@@ -185,7 +198,6 @@ export default function CatalogPartsScreen() {
           contentContainerStyle={{ paddingVertical: 12 }}
           renderItem={({ item: f }) => {
             const active =
-              (f.key === 'inStock' && filter.inStockOnly) ||
               (f.key === 'oem' && filter.oemOnly) ||
               (f.key === 'gm' && filter.gmOnly) ||
               (f.key === 'brand' && filter.brands.length > 0) ||
@@ -196,8 +208,7 @@ export default function CatalogPartsScreen() {
                 active={active}
                 onPress={() => {
                   triggerHaptic('selection');
-                  if (f.key === 'inStock') setFilter((s) => ({ ...s, inStockOnly: !s.inStockOnly }));
-                  else if (f.key === 'oem') setFilter((s) => ({ ...s, oemOnly: !s.oemOnly }));
+                  if (f.key === 'oem') setFilter((s) => ({ ...s, oemOnly: !s.oemOnly }));
                   else if (f.key === 'gm') setFilter((s) => ({ ...s, gmOnly: !s.gmOnly }));
                   else setSheetOpen(true); // brand / region open the sheet
                 }}
@@ -238,17 +249,18 @@ export default function CatalogPartsScreen() {
           data={results}
           keyExtractor={(it) => it.id}
           renderItem={renderItem}
+          ItemSeparatorComponent={() => <AppView style={{ height: 12 }} />}
           ListHeaderComponent={
             <AppView gap={12} style={{ paddingBottom: 4 }}>
               <VehicleContextBar />
               <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>
-                {system ? `${system.label} · ` : ''}
+                {categoryLabel ? `${categoryLabel} · ` : ''}
                 {vehicleLabel ? `${vehicleLabel} · ` : ''}
                 {results.length} part{results.length === 1 ? '' : 's'}
               </AppText>
             </AppView>
           }
-          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: insets.bottom + 96 }}
+          contentContainerStyle={{ paddingTop: 4, paddingBottom: insets.bottom + 96 }}
           showsVerticalScrollIndicator={false}
           keyboardDismissMode="on-drag"
         />
@@ -292,7 +304,6 @@ const QUICK_FILTERS: { key: string; label: string }[] = [
   { key: 'gm', label: 'GM' },
   { key: 'brand', label: 'Brand' },
   { key: 'region', label: 'Region' },
-  { key: 'inStock', label: 'In Stock' },
   { key: 'oem', label: 'OEM Quality' },
 ];
 

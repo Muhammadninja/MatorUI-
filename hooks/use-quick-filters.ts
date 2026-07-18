@@ -10,7 +10,7 @@ import {
 
 /**
  * Quick-filter chip row hook — same five-state machine as
- * `useCatalogList` / `useTopFeaturedList`, with two integration-mode
+ * `useCatalogList`, with two integration-mode
  * niceties:
  *
  *   1. `items` is ALWAYS a non-empty array. When the API is still

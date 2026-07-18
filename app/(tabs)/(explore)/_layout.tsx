@@ -41,14 +41,6 @@ export default function ExploreStackLayout() {
           gestureEnabled: true,
         }}
       />
-      <Stack.Screen
-        name="top-featured"
-        options={{
-          headerShown: false,
-          animation: 'slide_from_right',
-          gestureEnabled: true,
-        }}
-      />
     </Stack>
   );
 }

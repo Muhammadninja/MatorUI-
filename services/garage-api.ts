@@ -82,7 +82,9 @@ function makeId(): string {
 export class MockGarageTransport implements GarageTransport {
   private vehicles: Vehicle[];
 
-  constructor(seed: Vehicle[] = SEED_VEHICLES) {
+  // Start empty so the garage shows the real "no vehicles" empty state
+  // instead of test cars. Pass `SEED_VEHICLES` explicitly for a UI demo.
+  constructor(seed: Vehicle[] = []) {
     this.vehicles = [...seed];
   }
 
@@ -241,8 +243,10 @@ export function toClientVehicle(raw: ServerVehicle): Vehicle {
   return {
     id: raw.id,
     year: raw.year,
-    make: raw.make.name,
-    model: raw.model.name,
+    // Optional-chain make/model — a partial payload (e.g. a `vehicle.updated`
+    // realtime event, or an unresolved make_id) can ship them null.
+    make: raw.make?.name ?? '',
+    model: raw.model?.name ?? '',
     trim: raw.trim?.name ?? undefined,
     nickname: raw.nickname ?? undefined,
     vin: raw.vin ?? undefined,
@@ -251,8 +255,8 @@ export function toClientVehicle(raw: ServerVehicle): Vehicle {
     color: colorHexToEnum(raw.color_hex),
     isPrimary: raw.is_primary,
     addedAt: Number.isFinite(addedAt) ? addedAt : 0,
-    brandId: raw.make.id,
-    modelId: raw.model.id,
+    brandId: raw.make?.id ?? '',
+    modelId: raw.model?.id ?? '',
     trimId: raw.trim?.id,
     engineId: raw.engine?.id ?? undefined,
     colorHex: raw.color_hex,
@@ -260,7 +264,7 @@ export function toClientVehicle(raw: ServerVehicle): Vehicle {
     drivetrain: raw.drivetrain,
     fuelType: raw.fuel_type ?? raw.engine?.fuel_type,
     engineDisplacementCc: raw.engine?.displacement_cc,
-    brandLogoUrl: raw.make.logo_url ?? undefined,
+    brandLogoUrl: raw.make?.logo_url ?? undefined,
     registrationRegionCode: raw.registration_region_code ?? undefined,
     model3d: raw.model_3d ? mapModel3d(raw.model_3d) : undefined,
   };
@@ -345,16 +349,18 @@ export function toServerVehiclePatchPayload(
  */
 export class HttpGarageTransport implements GarageTransport {
   async list(signal?: AbortSignal): Promise<Vehicle[]> {
-    const { vehicles } = await apiClient.get<{ vehicles: ServerVehicle[] }>(
+    const { vehicles } = await apiClient.get<{ vehicles?: ServerVehicle[] | null }>(
       `${API_BASE}/vehicles`,
       { signal },
     );
-    return vehicles.map(toClientVehicle);
+    // Guard: an empty garage / `{}` body must yield [] rather than crash.
+    return (vehicles ?? []).map(toClientVehicle);
   }
 
   async get(id: string, signal?: AbortSignal): Promise<Vehicle | null> {
     try {
-      const { vehicle } = await apiClient.get<{ vehicle: ServerVehicle }>(
+      // Live backend returns the vehicle DIRECTLY (not wrapped in `{ vehicle }`).
+      const vehicle = await apiClient.get<ServerVehicle>(
         `${API_BASE}/vehicles/${encodeURIComponent(id)}`,
         { signal },
       );
@@ -367,7 +373,8 @@ export class HttpGarageTransport implements GarageTransport {
 
   async create(input: VehicleInput, signal?: AbortSignal): Promise<Vehicle> {
     const payload = toServerVehicleCreatePayload(input);
-    const { vehicle } = await apiClient.post<{ vehicle: ServerVehicle }>(
+    // POST returns the created vehicle DIRECTLY (201, not wrapped).
+    const vehicle = await apiClient.post<ServerVehicle>(
       `${API_BASE}/vehicles`,
       payload,
       { signal },
@@ -377,7 +384,8 @@ export class HttpGarageTransport implements GarageTransport {
 
   async update(id: string, patch: VehiclePatch, signal?: AbortSignal): Promise<Vehicle> {
     const payload = toServerVehiclePatchPayload(patch);
-    const { vehicle } = await apiClient.patch<{ vehicle: ServerVehicle }>(
+    // PATCH returns the updated vehicle DIRECTLY (not wrapped).
+    const vehicle = await apiClient.patch<ServerVehicle>(
       `${API_BASE}/vehicles/${encodeURIComponent(id)}`,
       payload,
       { signal },
@@ -390,11 +398,13 @@ export class HttpGarageTransport implements GarageTransport {
   }
 
   async setPrimary(id: string, signal?: AbortSignal): Promise<Vehicle[]> {
-    const { vehicles } = await apiClient.post<{ vehicles: ServerVehicle[] }>(
+    // Backend returns only the single updated vehicle, so re-fetch the full
+    // list afterwards to reflect the new primary across the whole garage.
+    await apiClient.post<ServerVehicle>(
       `${API_BASE}/vehicles/${encodeURIComponent(id)}/set-primary`,
       undefined,
       { signal },
     );
-    return vehicles.map(toClientVehicle);
+    return this.list(signal);
   }
 }

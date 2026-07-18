@@ -42,6 +42,8 @@ export default function CartScreen() {
     refresh,
   } = useCartContext();
 
+  // Guests can browse the cart freely; auth is only required to check out. The
+  // phone-auth bottom sheet is presented on the "Proceed to checkout" tap below.
   const goCheckout = () => {
     if (!isAuthenticated) {
       router.push('/sign-in');
@@ -55,17 +57,17 @@ export default function CartScreen() {
   if (!isHydrated) {
     return (
       <AppView flex={1} colorName="background" style={{ paddingTop: insets.top + 8 }}>
-        <AppText family="heading" weight="bold" style={{ fontSize: 26, lineHeight: 32, color: tokens.text, paddingHorizontal: 20, paddingTop: 6 }}>
+        <AppText family="heading" colorName="text" style={{ fontSize: 26, lineHeight: 32, paddingHorizontal: 20, paddingTop: 6 }}>
           Cart
         </AppText>
         <AppView flex={1} center gap={14} px="xl">
           {error ? (
             <>
               <AlertCircle size={30} strokeWidth={2} color={tokens.error} />
-              <AppText family="heading" weight="bold" style={{ fontSize: 18, color: tokens.text }}>
+              <AppText family="heading" colorName="text" style={{ fontSize: 18, lineHeight: 24 }}>
                 Couldn&apos;t load your cart
               </AppText>
-              <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted, textAlign: 'center', maxWidth: 280 }}>
+              <AppText family="default" colorName="textMuted" style={{ fontSize: 13, lineHeight: 18, textAlign: 'center', maxWidth: 280 }}>
                 {error}
               </AppText>
               <AppButton title="Retry" kind="secondary" size="sm" onPress={refresh} />
@@ -81,15 +83,15 @@ export default function CartScreen() {
   if (items.length === 0) {
     return (
       <AppView flex={1} colorName="background" testID="cart-screen" style={{ paddingTop: insets.top + 8 }}>
-        <AppText family="heading" weight="bold" style={{ fontSize: 26, lineHeight: 32, color: tokens.text, paddingHorizontal: 20, paddingTop: 6 }}>
+        <AppText family="heading" colorName="text" style={{ fontSize: 26, lineHeight: 32, paddingHorizontal: 20, paddingTop: 6 }}>
           Cart
         </AppText>
         <AppView flex={1} center gap={14} px="xl">
           <AppView center rounded={999} style={{ width: 72, height: 72, backgroundColor: tokens.backgroundSecondary }}>
             <ShoppingBag size={30} strokeWidth={1.8} color={tokens.textMuted} />
           </AppView>
-          <AppText family="heading" weight="bold" style={{ fontSize: 20, color: tokens.text }}>Your cart is empty</AppText>
-          <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted, textAlign: 'center', maxWidth: 280 }}>
+          <AppText family="heading" colorName="text" style={{ fontSize: 20, lineHeight: 26 }}>Your cart is empty</AppText>
+          <AppText family="default" colorName="textMuted" style={{ fontSize: 14, lineHeight: 20, textAlign: 'center', maxWidth: 280 }}>
             Browse parts that fit your vehicle and add them here.
           </AppText>
           <AppButton title="Start shopping" kind="brand" size="md" onPress={() => router.navigate('/explore')} />

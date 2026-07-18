@@ -7,12 +7,10 @@ import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import type { Vehicle } from '@/services/garage-service';
 
-const IMAGE_HEIGHT = 130;
-
 export type GaragePrimaryVehicleCardProps = {
   vehicle: Vehicle;
   onOpenDetail?: (id: string) => void;
-  /** Hero image URL. When omitted, falls back to a seeded Picsum placeholder. */
+  /** Real vehicle photo URL. When absent, a car placeholder icon is shown. */
   image?: string;
 };
 
@@ -23,6 +21,16 @@ function formatMileage(km?: number): string {
 
 function titleCase(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** Neutral tile with a centered car icon — used when the vehicle has no real
+ *  photo (and as the image load-failure fallback). */
+function CarPlaceholder({ color }: { color: string }) {
+  return (
+    <AppView flex={1} center colorName="backgroundSecondary">
+      <CarFront size={34} strokeWidth={1.8} color={color} />
+    </AppView>
+  );
 }
 
 export function GaragePrimaryVehicleCard({
@@ -39,77 +47,64 @@ export function GaragePrimaryVehicleCard({
     formatMileage(vehicle.mileage) || undefined,
   ].filter(Boolean);
   const subline = subParts.join(' · ');
-
-  const source =
-    image && image.length > 0
-      ? image
-      : `https://picsum.photos/seed/${vehicle.id}/800/400`;
+  const hasImage = !!(image && image.length > 0);
 
   return (
     <AppView
+      row
       rounded={18}
       colorName="card"
       borderName="border"
       borderWidth={1}
       style={{ overflow: 'hidden' }}
     >
-      {/* Image with ACTIVE pill overlay */}
-      <AppView style={{ position: 'relative' }}>
-        <AppImage
-          source={source}
-          height={IMAGE_HEIGHT}
-          contentFit="cover"
-          priority="high"
-          cachePolicy="memory-disk"
-          transition={180}
-          alt={`${vehicle.year} ${vehicle.make} ${vehicle.model} photo`}
-          fallback={
-            <AppView flex={1} center colorName="backgroundSecondary">
-              <CarFront size={36} strokeWidth={2} color={tokens.gray400} />
-            </AppView>
-          }
-        />
-        {/* ACTIVE pill overlay */}
-        <AppView
-          style={{
-            position: 'absolute',
-            top: 10,
-            left: 10,
-          }}
-        >
-          <AppView
-            rounded={RADIUS_PILL}
-            px={10}
-            py={4}
-            colorName="brand"
-          >
-            <AppText
-              family="accent"
-              weight="bold"
-              colorName="onBrand"
-              style={{ fontSize: 10, letterSpacing: 0.8 }}
-              transform="uppercase"
-            >
-              Active
-            </AppText>
-          </AppView>
-        </AppView>
+      {/* Image — left column, ~30% of the card width. Car placeholder when the
+          vehicle has no real photo. */}
+      <AppView style={{ width: '30%', minHeight: 120 }}>
+        {hasImage ? (
+          <AppImage
+            source={image}
+            width="100%"
+            height="100%"
+            contentFit="cover"
+            priority="high"
+            cachePolicy="memory-disk"
+            transition={180}
+            alt={`${vehicle.year} ${vehicle.make} ${vehicle.model} photo`}
+            fallback={<CarPlaceholder color={tokens.gray400} />}
+          />
+        ) : (
+          <CarPlaceholder color={tokens.gray400} />
+        )}
       </AppView>
 
-      {/* Vehicle info + details (kebab) */}
-      <AppView row align="center" px={16} pt={14} pb={16} gap={12}>
-        <AppView flex={1} gap={4}>
+      {/* Details — right column: Active pill, headline, subline, kebab. */}
+      <AppView flex={1} row px={14} py={14} gap={10}>
+        <AppView flex={1} gap={6}>
+          <AppView row>
+            <AppView rounded={RADIUS_PILL} px={10} py={4} colorName="brand">
+              <AppText
+                family="accent"
+                weight="bold"
+                colorName="onBrand"
+                style={{ fontSize: 10, letterSpacing: 0.8 }}
+                transform="uppercase"
+              >
+                Active
+              </AppText>
+            </AppView>
+          </AppView>
           <AppText
             family="heading"
             weight="bold"
             colorName="text"
-            numberOfLines={1}
-            style={{ fontSize: 18, lineHeight: 24 }}
+            numberOfLines={2}
+            style={{ fontSize: 17, lineHeight: 22 }}
           >
             {headline}
           </AppText>
           {subline ? (
-            <AppText textVariant="bodySm" colorName="textMuted" numberOfLines={1}>
+            <AppText textVariant="bodySm" colorName="textMuted" numberOfLines={2}>
               {subline}
             </AppText>
           ) : null}

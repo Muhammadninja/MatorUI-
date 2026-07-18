@@ -200,26 +200,72 @@ export function makeByName(name: string | undefined): MatorMake {
   return MATOR_MAKES.find((m) => m.name === name) ?? MATOR_MAKES[0];
 }
 
-// ---- MATOR Certified (verified dealers / storefronts) ----
+// ---- MATOR Certified (sponsored / sellable placements) ----
+//
+// The Explore "MATOR Certified" row is a MONETIZABLE placement slot — it holds
+// more than dealers: certified product categories ("Certified Batteries"),
+// promoted storefronts, and sold ad units. Each entry is a generic placement
+// with a `target` that says where a tap goes. Hardcoded seed for now; this maps
+// 1:1 onto a future `GET /v1/placements` (or `/promotions`) endpoint.
 
-/** A certified dealer/storefront shown in the Explore "MATOR Certified" row. */
-export type MatorDealer = {
+/** Where tapping a certified placement routes. */
+export type CertifiedTarget =
+  // The premium "MATOR Certified" catalogue view (catalog-parts-screen): a
+  // curated cross-system collection, filtered by part QUALITY (all OEM / all
+  // GM) — NOT by a car system/category. `query` optionally scopes it (e.g. a
+  // "Certified Batteries" collection) while keeping the premium catalogue UI.
+  | { kind: 'catalogue'; label: string; certified?: 'oem' | 'gm'; query?: string }
+  | { kind: 'category'; id: string; label: string } // a catalog category (backend category id)
+  | { kind: 'dealer'; id: string; label: string } // a verified storefront/dealer
+  | { kind: 'search'; query: string } // a pre-filled catalog search
+  | { kind: 'url'; href: string }; // an external / sponsor link
+
+/** One card in the MATOR Certified row. */
+export type MatorCertifiedPlacement = {
   id: string;
-  name: string;
-  /** Single-letter monogram for the logo tile. */
-  initial: string;
-  /** Brand color for the banner + logo initial. */
-  color: string;
-  /** Lifetime order count, pre-formatted (e.g. "18k+"). */
-  orders: string;
-  /** Years in business. */
-  years: number;
+  /** Primary line, e.g. "Certified Batteries", "AutoPro Parts". */
+  title: string;
+  /** Secondary line, e.g. "18k+ orders · 12y" or "Genuine · 2-year warranty". */
+  subtitle?: string;
+  /** Badge chips under the banner. Defaults to the standard certified badges. */
+  badges?: string[];
+  /** Banner visual: a letter monogram OR an image, over an accent color. */
+  visual: { monogram?: string; imageUrl?: string; color: string };
+  /** Where a tap goes. */
+  target: CertifiedTarget;
+  /** Set when this slot is a sold/sponsored placement (for a "Sponsored" tag). */
+  sponsor?: { name: string; sponsored: boolean };
 };
 
-/** Seed certified dealers (verbatim from the prototype's `dealers`). */
-export const MATOR_DEALERS: MatorDealer[] = [
-  { id: 'd1', name: 'AutoPro Parts', initial: 'A', color: '#2A6FDB', orders: '18k+', years: 12 },
-  { id: 'd2', name: 'Prime Motors Supply', initial: 'P', color: '#1F8A5B', orders: '9.4k+', years: 8 },
-  { id: 'd3', name: 'Genuine OEM Depot', initial: 'G', color: '#D97757', orders: '5.1k+', years: 6 },
-  { id: 'd4', name: 'TorqueLine Auto', initial: 'T', color: '#7c4dff', orders: '7.8k+', years: 10 },
+/** Seed certified placements — premium cross-system catalogues (all OEM / all
+ *  GM / a certified collection) plus verified dealers. All open the premium
+ *  "MATOR Certified" catalogue view, never a plain car-system listing. */
+export const MATOR_CERTIFIED: MatorCertifiedPlacement[] = [
+  {
+    id: 'c_oem',
+    title: 'Certified OEM Parts',
+    subtitle: 'Genuine OEM · guaranteed fit',
+    visual: { monogram: 'O', color: '#2A6FDB' },
+    target: { kind: 'catalogue', label: 'MATOR Certified · OEM', certified: 'oem' },
+  },
+  {
+    id: 'c_gm',
+    title: 'Certified GM Parts',
+    subtitle: 'Chevrolet · Ravon · Daewoo',
+    visual: { monogram: 'G', color: '#D97757' },
+    target: { kind: 'catalogue', label: 'MATOR Certified · GM', certified: 'gm' },
+  },
+  {
+    id: 'c_batteries',
+    title: 'Certified Batteries',
+    subtitle: 'Genuine · 2-year warranty',
+    visual: { monogram: 'B', color: '#0f9d58' },
+    target: { kind: 'catalogue', label: 'MATOR Certified Batteries', query: 'battery' },
+  },
+  { id: 'd1', title: 'AutoPro Parts', subtitle: '18k+ orders · 12y', visual: { monogram: 'A', color: '#1F8A5B' }, target: { kind: 'dealer', id: 'd1', label: 'AutoPro Parts' } },
+  { id: 'd2', title: 'Prime Motors Supply', subtitle: '9.4k+ orders · 8y', visual: { monogram: 'P', color: '#7c4dff' }, target: { kind: 'dealer', id: 'd2', label: 'Prime Motors Supply' } },
 ];
+
+/** Default certified badges when a placement doesn't override them. */
+export const DEFAULT_CERTIFIED_BADGES = ['MATOR CERTIFIED', 'LOWEST PRICE'] as const;
+

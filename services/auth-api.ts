@@ -1,24 +1,28 @@
 /**
- * Auth transport — passwordless OTP: request-code / verify-code / refresh / sign-out.
+ * Auth transport — passwordless phone OTP.
  *
  * Same shape as the other transports: an interface, a Mock impl that fakes the
- * round-trip, an HTTP impl that calls real endpoints through the unified
+ * round-trip, an HTTP impl that calls the real endpoints through the unified
  * `apiClient`. The auth flow never goes through `apiClient` for request/verify
- * (no token yet) — we use `skipAuth: true` so the endpoints don't 401 the
- * bootstrap call.
+ * (no token yet) — we use `skipAuth: true` so the endpoints don't 401.
  *
- * Backend contract assumed:
- *   POST /v1/auth/otp/request  { channel, identifier, purpose, firstName?, lastName? }
- *                                → { otpToken, expiresIn, devCode? }
- *   POST /v1/auth/otp/verify   { otpToken, code }   → AuthResult
- *   POST /v1/auth/refresh      { refreshToken }     → AuthResult
- *   POST /v1/auth/sign-out     { refreshToken }     → 204
+ * The HTTP impl mirrors the backend contract in `text/backend.json`
+ * (§AuthPhoneEntryScreen / AuthOtpVerifyScreen). It maps between the app's
+ * channel-agnostic internal types and the backend's phone-native wire shape:
  *
- * AuthResult = { accessToken, refreshToken, expiresIn?, user }
+ *   POST /v1/auth/phone/request-otp  { phone_e164, country_iso2, channel:'sms' }
+ *                                      → { request_id, phone_e164, expires_at,
+ *                                          resend_after_seconds, otp_length,
+ *                                          is_existing_user, next_screen }
+ *   POST /v1/auth/phone/verify-otp   { request_id, phone_e164, otp_code }
+ *                                      → { user, tokens }
+ *   POST /v1/auth/token/refresh      { refresh_token } → { user?, tokens }
+ *   (Sign-out has no token-revoke endpoint; the session is cleared locally and
+ *    the device is unbound via /v1/devices/unregister — see device-api.)
  *
  * `devCode` is a DEV/DEMO convenience: the mock transport (and the offline mock
- * server) return the just-generated code so demo/E2E builds can auto-fill it.
- * A real backend must NOT return it — the screen falls back to manual entry.
+ * server, via a `dev_otp_code` field) return the just-generated code so demo/E2E
+ * builds can auto-fill it. A real backend omits it — the user types the code.
  */
 
 import { apiClient } from '@/services/api-client';
@@ -173,69 +177,175 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// ── HTTP transport ─────────────────────────────────────────────────────
+// ── HTTP transport (backend.json wire shape) ────────────────────────────
+
+/** Strip spaces / dashes / parens so "+998 90 123 45 67" → "+998901234567". */
+function toE164(raw: string): string {
+  return raw.replace(/[^\d+]/g, '');
+}
+
+/** Unix seconds from an ISO timestamp; undefined when absent/invalid. */
+function epochFromIso(iso?: string): number | undefined {
+  if (!iso) return undefined;
+  const ms = Date.parse(iso);
+  return Number.isNaN(ms) ? undefined : Math.floor(ms / 1000);
+}
 
 type RawRequestOtpResponse = {
-  otpToken: string;
-  expiresIn: number;
-  devCode?: string;
+  request_id: string;
+  phone_e164?: string;
+  expires_at?: string; // ISO
+  resend_after_seconds?: number;
+  otp_length?: number;
+  delivery_channel?: string;
+  is_existing_user?: boolean;
+  next_screen?: string;
+  /** MOCK/DEV ONLY — the code, so offline/E2E builds can auto-fill it. */
+  dev_otp_code?: string;
 };
 
-type RawAuthResponse = {
-  accessToken: string;
-  refreshToken: string;
-  expiresIn?: number; // seconds
-  user: UserSummary;
+/**
+ * The backend's phone-native user object (backend.json §AuthOtpVerifyScreen and
+ * GET /v1/me). Tolerant of both the spec's snake_case and the camelCase variant
+ * seen in real responses, and of an optional `email` some deployments include.
+ * Shared with `user-api.ts` so auth and /me map identically.
+ */
+export type RawBackendUser = {
+  id: string;
+  phone_e164?: string | null;
+  phoneE164?: string | null;
+  email?: string | null;
+  display_name?: string | null;
+  displayName?: string | null;
+  /** Live `/v1/me` returns dedicated first/last name fields (snake) and
+   *  `/v1/auth/me` returns the camelCase variant. Prefer these over splitting
+   *  `display_name`. */
+  first_name?: string | null;
+  last_name?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  avatar_url?: string | null;
+  avatarUrl?: string | null;
+  /** MyID verification status on the user record. MyID was dropped from the
+   *  onboarding flow (2026-07-17) but this field may still ride on /me — kept
+   *  for documentation; nothing in the app reads it. */
+  myid_status?: string;
+  transaction_limit_uzs?: number | string;
+  created_at?: string;
+  createdAt?: string;
 };
+
+type RawTokens = {
+  access_token: string;
+  access_token_expires_at?: string; // ISO
+  refresh_token: string;
+  refresh_token_expires_at?: string;
+  token_type?: string;
+};
+
+type RawVerifyResponse = {
+  user: RawBackendUser;
+  tokens: RawTokens;
+};
+
+/** Map the backend's phone-native user onto the app's `UserSummary`. Shared by
+ *  auth verify/refresh and `user-api`'s GET/PATCH /v1/me so the whole user
+ *  surface is consistent. */
+export function mapBackendUser(u: RawBackendUser): UserSummary {
+  const phone = u.phone_e164 ?? u.phoneE164 ?? null;
+  // Prefer dedicated first/last name fields; fall back to splitting the
+  // legacy `display_name` when they're absent.
+  let firstName = (u.first_name ?? u.firstName ?? '').trim();
+  let lastName = (u.last_name ?? u.lastName ?? '').trim();
+  if (!firstName && !lastName) {
+    const name = (u.display_name ?? u.displayName ?? '').trim();
+    const sep = name.indexOf(' ');
+    firstName = sep === -1 ? name : name.slice(0, sep);
+    lastName = sep === -1 ? '' : name.slice(sep + 1).trim();
+  }
+  return {
+    id: u.id,
+    firstName,
+    lastName,
+    email: u.email ?? '',
+    username: phone ?? '',
+    phone,
+    avatarUrl: u.avatar_url ?? u.avatarUrl ?? null,
+    memberSince: u.created_at ?? u.createdAt ?? '',
+  };
+}
+
+function tokensToSession(t: RawTokens): AuthSession {
+  return {
+    accessToken: t.access_token,
+    refreshToken: t.refresh_token,
+    expiresAt: epochFromIso(t.access_token_expires_at),
+  };
+}
 
 class HttpAuthTransport implements AuthTransport {
+  // verify-otp / resend need the phone_e164 that seeded the request, but the
+  // app's VerifyOtpInput only carries the opaque token — remember it per id.
+  private phoneByRequest = new Map<string, string>();
+
   async requestOtp(input: RequestOtpInput, signal?: AbortSignal): Promise<RequestOtpResult> {
-    return apiClient.post<RawRequestOtpResponse>('/v1/auth/otp/request', input, {
-      signal,
-      skipAuth: true,
-    });
+    const phone_e164 = toE164(input.identifier);
+    const r = await apiClient.post<RawRequestOtpResponse>(
+      '/v1/auth/phone/request-otp',
+      { phone_e164, country_iso2: 'UZ', channel: 'sms' },
+      { signal, skipAuth: true },
+    );
+    this.phoneByRequest.set(r.request_id, r.phone_e164 ?? phone_e164);
+    const expiresAt = epochFromIso(r.expires_at);
+    return {
+      otpToken: r.request_id,
+      expiresIn: expiresAt
+        ? Math.max(0, expiresAt - Math.floor(Date.now() / 1000))
+        : (r.resend_after_seconds ?? 300),
+      devCode: r.dev_otp_code, // undefined on the real backend
+    };
   }
 
   async verifyOtp(input: VerifyOtpInput, signal?: AbortSignal): Promise<AuthResult> {
-    const r = await apiClient.post<RawAuthResponse>('/v1/auth/otp/verify', input, {
-      signal,
-      skipAuth: true,
-    });
-    return toResult(r);
+    const phone_e164 = this.phoneByRequest.get(input.otpToken);
+    const r = await apiClient.post<RawVerifyResponse>(
+      '/v1/auth/phone/verify-otp',
+      { request_id: input.otpToken, phone_e164, otp_code: input.code },
+      { signal, skipAuth: true },
+    );
+    this.phoneByRequest.delete(input.otpToken);
+    // MyID verification was removed from the onboarding flow (backend
+    // 2026-07-17): verify-otp always lands the user on the garage, so there's
+    // no post-OTP consent branch to surface here.
+    return { session: tokensToSession(r.tokens), user: mapBackendUser(r.user) };
   }
 
   async refresh(refreshToken: string, signal?: AbortSignal): Promise<AuthResult | null> {
     try {
-      const r = await apiClient.post<RawAuthResponse>(
-        '/v1/auth/refresh',
-        { refreshToken },
+      const r = await apiClient.post<{ user?: RawBackendUser; tokens: RawTokens }>(
+        '/v1/auth/token/refresh',
+        { refresh_token: refreshToken },
         { signal, skipAuth: true, maxRetries: 0 },
       );
-      return toResult(r);
+      return {
+        session: tokensToSession(r.tokens),
+        // Refresh may omit the user; the auth context only reads `.session` here.
+        user: r.user
+          ? mapBackendUser(r.user)
+          : { id: '', firstName: '', lastName: '', email: '', username: '', avatarUrl: null, memberSince: '' },
+      };
     } catch {
-      // A 401/400 on refresh means the refresh token itself is no longer
-      // valid. Return null so the auth context signs the user out.
+      // A 401/400 on refresh means the refresh token is no longer valid. Return
+      // null so the auth context signs the user out.
       return null;
     }
   }
 
-  async signOut(refreshToken: string, signal?: AbortSignal): Promise<void> {
-    await apiClient.post('/v1/auth/sign-out', { refreshToken }, { signal });
+  async signOut(_refreshToken: string, _signal?: AbortSignal): Promise<void> {
+    // The backend exposes no token-revoke endpoint; sign-out clears the local
+    // session (auth context) and unbinds the device via /v1/devices/unregister
+    // (device-api). Nothing to call here.
   }
-}
-
-function toResult(r: RawAuthResponse): AuthResult {
-  return {
-    session: {
-      accessToken: r.accessToken,
-      refreshToken: r.refreshToken,
-      expiresAt:
-        r.expiresIn !== undefined
-          ? Math.floor(Date.now() / 1000) + r.expiresIn
-          : undefined,
-    },
-    user: r.user,
-  };
 }
 
 // ── Singleton ──────────────────────────────────────────────────────────

@@ -497,7 +497,7 @@ function AuthRequiredModal({ payload }: { payload: AuthRequiredPayload }) {
 
   const {
     title = 'Sign in to continue',
-    message = 'You must sign up or log in before you can place an order. Your cart will stay saved.',
+    message = 'Log in or sign up with your phone before you can place an order. Your cart will stay saved.',
     onCancel,
     redirectTo,
   } = payload;
@@ -507,14 +507,11 @@ function AuthRequiredModal({ payload }: { payload: AuthRequiredPayload }) {
     modalService.closeModal();
   };
 
-  const goToAuth = (target: '/sign-in' | '/sign-up') => {
+  const handleContinue = () => {
     modalService.closeModal();
     const query = redirectTo ? `?next=${encodeURIComponent(redirectTo)}` : '';
-    router.push(`${target}${query}` as never);
+    router.push(`/sign-in${query}` as never);
   };
-
-  const handleLogin = () => goToAuth('/sign-in');
-  const handleSignUp = () => goToAuth('/sign-up');
 
   return (
     <Modal transparent animationType="fade" visible onRequestClose={handleClose}>
@@ -588,19 +585,11 @@ function AuthRequiredModal({ payload }: { payload: AuthRequiredPayload }) {
 
             <AppView gap={10} style={{ width: '100%' }}>
               <AppButton
-                title="Log in"
+                title="Continue with phone"
                 kind="brand"
                 size="md"
                 fullWidth
-                onPress={handleLogin}
-              />
-              <AppButton
-                title="Sign up"
-                kind="secondary"
-                variant="outline"
-                size="md"
-                fullWidth
-                onPress={handleSignUp}
+                onPress={handleContinue}
               />
               <AppButton
                 title="Not now"

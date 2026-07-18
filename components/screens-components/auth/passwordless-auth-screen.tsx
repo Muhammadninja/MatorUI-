@@ -1,49 +1,63 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft } from 'lucide-react-native';
+import { router } from 'expo-router';
+import { ArrowLeft, X } from 'lucide-react-native';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AppLogo } from '@/components/shared/app-logo';
 import { AppButton } from '@/components/shared/app-button';
 import AppTextField from '@/components/shared/app-text-field';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useUserContext } from '@/contexts/user.context';
-import type { OtpChannel } from '@/services/auth-api';
 import { useToast } from '@/hooks/use-toast';
+import { ApiError } from '@/services/api-client';
 import { triggerHaptic } from '@/utils/haptics';
 
-export type PasswordlessAuthMode = 'sign-in' | 'sign-up';
+/** Turn a request/verify failure into a user-facing description. A 429
+ *  (global rate limit) gets an explicit "too many attempts" message that
+ *  honors the server's `Retry-After` cooldown; everything else surfaces the
+ *  backend's own message. */
+function describeAuthError(err: unknown): string | undefined {
+  if (err instanceof ApiError && err.isRateLimited) {
+    return err.retryAfterSeconds
+      ? `Too many attempts. Try again in ${err.retryAfterSeconds}s.`
+      : 'Too many attempts. Please wait a moment and try again.';
+  }
+  return err instanceof Error ? err.message : undefined;
+}
+
+/** DEMO/E2E prefill so the offline Maestro suite stays buttons-only (no typing).
+ *  Clear for the real backend build. */
+const DEMO_PHONE = '+998 90 123 45 67';
+
+/** Leave the auth sheet, returning to whatever screen pushed it. */
+function dismiss() {
+  if (router.canGoBack()) router.back();
+  else router.replace('/explore');
+}
 
 /**
- * Passwordless auth — phone (default) or email + a one-time code, used by both
- * Sign In and Sign Up. A single screen with two phases (enter identifier → enter
- * code) so the `?gate=1` purchase gate keeps working: on success we `router.back()`
- * to wherever the gate fired (item detail / cart), exactly as before.
+ * Unified phone-number auth, presented as a small bottom sheet (the route is a
+ * `transparentModal`, see `app/(auth)/_layout.tsx`). One flow for everyone — no
+ * separate "sign in" vs "create account": the user enters their phone, taps
+ * Next, and we text a one-time code. Existing numbers are matched to their
+ * account; new numbers get one created (backend decides from `purpose`).
  *
- * DEMO/E2E: the mock `requestOtp` returns a `devCode`, which we auto-fill into the
- * code field so the offline suite stays buttons-only. A real backend omits it and
- * the user types the code they receive. The phone field is likewise pre-filled with
- * a demo number in this mock build — remove both once the real backend is wired.
+ * Two phases in the same sheet: phone → code. On success we `router.back()` to
+ * wherever the flow was triggered (e.g. the purchase gate returns to the item).
+ *
+ * DEMO/E2E: the mock `requestOtp` returns a `devCode` we auto-fill so the offline
+ * suite stays buttons-only; a real backend omits it and the user types the code.
  */
-export default function PasswordlessAuthScreen({ mode }: { mode: PasswordlessAuthMode }) {
-  const { tokens } = useThemeContext();
+export default function PasswordlessAuthScreen() {
+  const { tokens, scheme } = useThemeContext();
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const { requestOtp, verifyOtp, isLoading } = useUserContext();
-  const { gate } = useLocalSearchParams<{ gate?: string }>();
-  const gated = gate === '1';
-  const isSignUp = mode === 'sign-up';
 
-  const [phase, setPhase] = useState<'entry' | 'otp'>('entry');
-  const [channel, setChannel] = useState<OtpChannel>('phone'); // phone is the default
-  const [name, setName] = useState('');
-  // DEMO prefill (see file header) — a valid-looking UZ number so the E2E flow
-  // can send without typing. Clear this for the real backend build.
-  const [phone, setPhone] = useState('+998 90 123 45 67');
-  const [email, setEmail] = useState('');
+  const [phase, setPhase] = useState<'phone' | 'otp'>('phone');
+  const [phone, setPhone] = useState(DEMO_PHONE);
   const [code, setCode] = useState('');
   const [otpToken, setOtpToken] = useState<string | null>(null);
 
@@ -53,49 +67,20 @@ export default function PasswordlessAuthScreen({ mode }: { mode: PasswordlessAut
     containerBorderName: 'border' as const,
   };
 
-  const identifier = channel === 'phone' ? phone.trim() : email.trim();
-
-  const handleBack = () => {
-    triggerHaptic('selection');
-    if (phase === 'otp') {
-      setPhase('entry');
-      return;
-    }
-    if (router.canGoBack()) router.back();
-    else router.replace('/explore');
-  };
-
-  const finish = () => {
-    if (router.canGoBack()) router.back();
-    else router.replace('/explore');
-  };
-
-  const nameParts = () => {
-    const trimmed = name.trim();
-    const sep = trimmed.indexOf(' ');
-    return sep === -1
-      ? { firstName: trimmed, lastName: '' }
-      : { firstName: trimmed.slice(0, sep), lastName: trimmed.slice(sep + 1).trim() };
-  };
-
   const sendCode = async () => {
     if (isLoading) return;
-    if (isSignUp && name.trim().length < 2) {
-      triggerHaptic('error');
-      toast.danger('Tell us your name first');
-      return;
-    }
+    const identifier = phone.trim();
     if (!identifier) {
       triggerHaptic('error');
-      toast.danger(channel === 'phone' ? 'Enter your phone number' : 'Enter your email');
+      toast.danger('Enter your phone number');
       return;
     }
     try {
       const { otpToken: token, devCode } = await requestOtp({
-        channel,
+        channel: 'phone',
         identifier,
-        purpose: mode,
-        ...(isSignUp ? nameParts() : {}),
+        // Unified flow: the backend upserts by phone. See file header.
+        purpose: 'sign-in',
       });
       triggerHaptic('success');
       setOtpToken(token);
@@ -105,9 +90,7 @@ export default function PasswordlessAuthScreen({ mode }: { mode: PasswordlessAut
       toast.info(`Code sent to ${identifier}`);
     } catch (err) {
       triggerHaptic('error');
-      toast.danger('Could not send the code', {
-        description: err instanceof Error ? err.message : undefined,
-      });
+      toast.danger('Could not send the code', { description: describeAuthError(err) });
     }
   };
 
@@ -116,12 +99,10 @@ export default function PasswordlessAuthScreen({ mode }: { mode: PasswordlessAut
     try {
       await verifyOtp({ otpToken, code: code.trim() });
       triggerHaptic('success');
-      finish();
+      dismiss();
     } catch (err) {
       triggerHaptic('error');
-      toast.danger('That code did not work', {
-        description: err instanceof Error ? err.message : undefined,
-      });
+      toast.danger('That code did not work', { description: describeAuthError(err) });
     }
   };
 
@@ -129,310 +110,171 @@ export default function PasswordlessAuthScreen({ mode }: { mode: PasswordlessAut
     if (isLoading) return;
     try {
       const { otpToken: token, devCode } = await requestOtp({
-        channel,
-        identifier,
-        purpose: mode,
-        ...(isSignUp ? nameParts() : {}),
+        channel: 'phone',
+        identifier: phone.trim(),
+        purpose: 'sign-in',
       });
       setOtpToken(token);
       setCode(devCode ?? '');
       toast.info('New code sent');
-    } catch {
-      toast.danger('Could not resend the code');
+    } catch (err) {
+      toast.danger('Could not resend the code', { description: describeAuthError(err) });
     }
   };
 
+  const onBack = () => {
+    triggerHaptic('selection');
+    if (phase === 'otp') setPhase('phone');
+    else dismiss();
+  };
+
   return (
-    <AppView flex={1} colorName="background" testID={`${mode}-screen`}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top + 20, paddingHorizontal: 24, paddingBottom: insets.bottom + 24 }}
+    <AppView flex={1} justify="flex-end" testID="sign-in-screen" style={{ backgroundColor: 'rgba(0, 0, 0, 0.45)' }}>
+      {/* Backdrop — tap to dismiss. */}
+      <Pressable
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        onPress={dismiss}
+        accessibilityLabel="Dismiss"
+      />
+
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <AppView
+          roundedTop={28}
+          px={20}
+          pt={10}
+          gap={16}
+          style={{
+            width: '100%',
+            borderWidth: 1,
+            borderBottomWidth: 0,
+            borderColor: tokens.border,
+            backgroundColor: scheme === 'dark' ? tokens.card : tokens.white,
+            paddingBottom: insets.bottom + 20,
+          }}
         >
-          {gated || phase === 'otp' ? (
+          {/* Drag handle */}
+          <AppView center>
+            <AppView rounded={999} style={{ width: 44, height: 5, backgroundColor: tokens.divider }} />
+          </AppView>
+
+          {/* Header row: back (otp phase only) + close */}
+          <AppView row justify="space-between" align="center">
+            {phase === 'otp' ? (
+              <AppPressableView
+                onPress={onBack}
+                center
+                rounded={999}
+                accessibilityRole="button"
+                accessibilityLabel="Back"
+                style={{ width: 34, height: 34, borderWidth: 1, borderColor: tokens.border }}
+              >
+                <ArrowLeft size={18} strokeWidth={2.2} color={tokens.text} />
+              </AppPressableView>
+            ) : (
+              <AppView />
+            )}
             <AppPressableView
-              onPress={handleBack}
+              testID="auth-close-btn"
+              onPress={() => {
+                triggerHaptic('selection');
+                dismiss();
+              }}
               center
-              rounded={12}
-              borderWidth={1}
-              borderName="border"
+              rounded={999}
               accessibilityRole="button"
-              accessibilityLabel="Back"
-              style={{ width: 40, height: 40, marginBottom: 20 }}
+              accessibilityLabel="Close"
+              style={{ width: 34, height: 34, borderWidth: 1, borderColor: tokens.border }}
             >
-              <ArrowLeft size={22} strokeWidth={2.2} color={tokens.text} />
+              <X size={16} strokeWidth={2.2} color={tokens.text} />
             </AppPressableView>
+          </AppView>
+
+          {phase === 'phone' ? (
+            <>
+              <AppView gap={6}>
+                <AppText family="heading" weight="bold" style={{ fontSize: 22, lineHeight: 28, color: tokens.text }}>
+                  Log in or sign up
+                </AppText>
+                <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted }}>
+                  Enter your phone number — we’ll text you a code.
+                </AppText>
+              </AppView>
+
+              <AppTextField
+                testID="auth-phone-field"
+                label="Phone number"
+                placeholder="+998 90 123 45 67"
+                value={phone}
+                onChangeText={setPhone}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="phone-pad"
+                textContentType="telephoneNumber"
+                {...field}
+              />
+
+              <AppButton
+                testID="auth-send-code-btn"
+                title={isLoading ? 'Sending code…' : 'Next'}
+                kind="brand"
+                size="lg"
+                fullWidth
+                disabled={isLoading}
+                onPress={sendCode}
+              />
+              <AppText family="default" style={{ fontSize: 11, color: tokens.textMuted, textAlign: 'center', lineHeight: 16 }}>
+                By continuing you agree to the Terms of Service and Privacy Policy.
+              </AppText>
+            </>
           ) : (
-            <AppView style={{ marginBottom: 36 }}>
-              <AppLogo size={26} />
-            </AppView>
+            <>
+              <AppView gap={6}>
+                <AppText family="heading" weight="bold" style={{ fontSize: 22, lineHeight: 28, color: tokens.text }}>
+                  Enter the code
+                </AppText>
+                <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted }}>
+                  We sent a 6-digit code to {phone.trim()}.
+                </AppText>
+              </AppView>
+
+              <AppTextField
+                testID="auth-otp-field"
+                label="Verification code"
+                placeholder="123456"
+                value={code}
+                onChangeText={(v: string) => setCode(v.replace(/\D/g, '').slice(0, 6))}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="number-pad"
+                textContentType="oneTimeCode"
+                {...field}
+              />
+
+              <AppButton
+                testID="auth-verify-btn"
+                title={isLoading ? 'Verifying…' : 'Verify & continue'}
+                kind="brand"
+                size="lg"
+                fullWidth
+                disabled={isLoading || code.length < 6}
+                onPress={verify}
+              />
+
+              <AppPressableView
+                onPress={resend}
+                disabled={isLoading}
+                center
+                accessibilityRole="button"
+                accessibilityLabel="Resend code"
+              >
+                <AppText family="accent" weight="semibold" style={{ fontSize: 13, color: tokens.textMuted }}>
+                  Didn’t get it? Resend code
+                </AppText>
+              </AppPressableView>
+            </>
           )}
-
-          {phase === 'entry' ? (
-            <EntryPhase
-              mode={mode}
-              gated={gated}
-              channel={channel}
-              onChannel={setChannel}
-              name={name}
-              onName={setName}
-              phone={phone}
-              onPhone={setPhone}
-              email={email}
-              onEmail={setEmail}
-              field={field}
-              isLoading={isLoading}
-              onSend={sendCode}
-            />
-          ) : (
-            <OtpPhase
-              identifier={identifier}
-              code={code}
-              onCode={setCode}
-              field={field}
-              isLoading={isLoading}
-              onVerify={verify}
-              onResend={resend}
-            />
-          )}
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </AppView>
-  );
-}
-
-function EntryPhase({
-  mode,
-  gated,
-  channel,
-  onChannel,
-  name,
-  onName,
-  phone,
-  onPhone,
-  email,
-  onEmail,
-  field,
-  isLoading,
-  onSend,
-}: {
-  mode: PasswordlessAuthMode;
-  gated: boolean;
-  channel: OtpChannel;
-  onChannel: (c: OtpChannel) => void;
-  name: string;
-  onName: (v: string) => void;
-  phone: string;
-  onPhone: (v: string) => void;
-  email: string;
-  onEmail: (v: string) => void;
-  field: Record<string, unknown>;
-  isLoading: boolean;
-  onSend: () => void;
-}) {
-  const { tokens } = useThemeContext();
-  const isSignUp = mode === 'sign-up';
-
-  return (
-    <>
-      <AppText family="heading" weight="bold" style={{ fontSize: 28, lineHeight: 34, color: tokens.text }}>
-        {isSignUp ? 'Create account' : 'Welcome back'}
-      </AppText>
-      <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted, marginTop: 8, marginBottom: 24 }}>
-        {gated
-          ? 'Sign in to add parts and check out.'
-          : channel === 'phone'
-            ? 'We’ll text you a code to sign in — no password needed.'
-            : 'We’ll email you a code to sign in — no password needed.'}
-      </AppText>
-
-      <AppView gap={16} style={{ flex: 1 }}>
-        {isSignUp ? (
-          <AppTextField label="Full name" placeholder="Alex Marino" value={name} onChangeText={onName} autoCapitalize="words" {...field} />
-        ) : null}
-
-        <ChannelToggle channel={channel} onChannel={onChannel} />
-
-        {channel === 'phone' ? (
-          <AppTextField
-            testID="auth-phone-field"
-            label="Phone number"
-            placeholder="+998 90 123 45 67"
-            value={phone}
-            onChangeText={onPhone}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="phone-pad"
-            {...field}
-          />
-        ) : (
-          <AppTextField
-            testID="auth-email-field"
-            label="Email"
-            placeholder="you@email.com"
-            value={email}
-            onChangeText={onEmail}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="email-address"
-            {...field}
-          />
-        )}
-      </AppView>
-
-      <AppView gap={14} style={{ marginTop: 20 }}>
-        <AppText family="default" style={{ fontSize: 11, color: tokens.textMuted, textAlign: 'center', lineHeight: 16 }}>
-          By continuing you agree to the Terms of Service and Privacy Policy.
-        </AppText>
-        <AppButton
-          testID="auth-send-code-btn"
-          title={isLoading ? 'Sending code…' : 'Send code'}
-          kind="brand"
-          size="lg"
-          fullWidth
-          disabled={isLoading}
-          onPress={onSend}
-        />
-        <AppView row justify="center" align="center" gap={6}>
-          <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted }}>
-            {isSignUp ? 'Already have an account?' : 'New to Mator?'}
-          </AppText>
-          <AppPressableView
-            onPress={() => router.replace(isSignUp ? '/sign-in' : '/sign-up')}
-            accessibilityRole="button"
-            accessibilityLabel={isSignUp ? 'Log in' : 'Create account'}
-          >
-            <AppText family="accent" weight="bold" style={{ fontSize: 14, color: tokens.text }}>
-              {isSignUp ? 'Log in' : 'Create account'}
-            </AppText>
-          </AppPressableView>
         </AppView>
-      </AppView>
-    </>
-  );
-}
-
-function OtpPhase({
-  identifier,
-  code,
-  onCode,
-  field,
-  isLoading,
-  onVerify,
-  onResend,
-}: {
-  identifier: string;
-  code: string;
-  onCode: (v: string) => void;
-  field: Record<string, unknown>;
-  isLoading: boolean;
-  onVerify: () => void;
-  onResend: () => void;
-}) {
-  const { tokens } = useThemeContext();
-
-  return (
-    <>
-      <AppText family="heading" weight="bold" style={{ fontSize: 28, lineHeight: 34, color: tokens.text }}>
-        Enter the code
-      </AppText>
-      <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted, marginTop: 8, marginBottom: 24 }}>
-        We sent a 6-digit code to {identifier}.
-      </AppText>
-
-      <AppView gap={16} style={{ flex: 1 }}>
-        <AppTextField
-          testID="auth-otp-field"
-          label="Verification code"
-          placeholder="123456"
-          value={code}
-          onChangeText={(v: string) => onCode(v.replace(/\D/g, '').slice(0, 6))}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="number-pad"
-          {...field}
-        />
-        <AppPressableView
-          onPress={onResend}
-          disabled={isLoading}
-          style={{ alignSelf: 'flex-start' }}
-          accessibilityRole="button"
-          accessibilityLabel="Resend code"
-        >
-          <AppText family="accent" weight="semibold" style={{ fontSize: 13, color: tokens.textMuted }}>
-            Didn’t get it? Resend code
-          </AppText>
-        </AppPressableView>
-      </AppView>
-
-      <AppView gap={14} style={{ marginTop: 20 }}>
-        <AppButton
-          testID="auth-verify-btn"
-          title={isLoading ? 'Verifying…' : 'Verify & continue'}
-          kind="brand"
-          size="lg"
-          fullWidth
-          disabled={isLoading || code.length < 6}
-          onPress={onVerify}
-        />
-      </AppView>
-    </>
-  );
-}
-
-function ChannelToggle({
-  channel,
-  onChannel,
-}: {
-  channel: OtpChannel;
-  onChannel: (c: OtpChannel) => void;
-}) {
-  const { tokens } = useThemeContext();
-  const options: { key: OtpChannel; label: string }[] = [
-    { key: 'phone', label: 'Phone' },
-    { key: 'email', label: 'Email' },
-  ];
-  return (
-    <AppView
-      row
-      gap={4}
-      rounded={12}
-      p={4}
-      colorName="backgroundSecondary"
-      borderWidth={1}
-      borderName="border"
-    >
-      {options.map((opt) => {
-        const selected = opt.key === channel;
-        return (
-          <AppPressableView
-            key={opt.key}
-            testID={`auth-channel-${opt.key}`}
-            onPress={() => {
-              triggerHaptic('selection');
-              onChannel(opt.key);
-            }}
-            center
-            rounded={9}
-            accessibilityRole="button"
-            accessibilityState={{ selected }}
-            style={{
-              flex: 1,
-              paddingVertical: 10,
-              backgroundColor: selected ? tokens.brand : 'transparent',
-            }}
-          >
-            <AppText
-              family="accent"
-              weight="semibold"
-              style={{ fontSize: 14, color: selected ? tokens.onBrand : tokens.textMuted }}
-            >
-              {opt.label}
-            </AppText>
-          </AppPressableView>
-        );
-      })}
+      </KeyboardAvoidingView>
     </AppView>
   );
 }

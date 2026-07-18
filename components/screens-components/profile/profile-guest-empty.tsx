@@ -1,8 +1,7 @@
 import { router } from 'expo-router';
-import { ChevronRight, LogIn, Settings } from 'lucide-react-native';
+import { ChevronRight, LogIn, Settings, UserRound } from 'lucide-react-native';
 import { Platform } from 'react-native';
 
-import { AppLogo } from '@/components/shared/app-logo';
 import { AppButton } from '@/components/shared/app-button';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
@@ -70,7 +69,7 @@ export default function ProfileGuestEmpty() {
             borderColor: tokens.border,
           }}
         >
-          <AppLogo size={30} />
+          <UserRound size={40} strokeWidth={1.8} color={tokens.textMuted} />
         </AppView>
 
         <AppView align="center" gap={6}>

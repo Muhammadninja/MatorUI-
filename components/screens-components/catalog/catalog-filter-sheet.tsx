@@ -26,7 +26,7 @@ export type CatalogFilterSheetProps = {
 
 /**
  * `CatalogFilterSheet` — the parts-screen "Filter & Sort" bottom sheet: price
- * sort, region (market of origin) multi-select, in-stock / OEM toggles, and a
+ * sort, region (market of origin) multi-select, OEM / GM toggles, and a
  * brand multi-select. Edits a local draft; commits on Apply.
  */
 export default function CatalogFilterSheet({
@@ -59,7 +59,6 @@ export default function CatalogFilterSheet({
   const reset: FilterState = {
     brands: [],
     regions: [],
-    inStockOnly: false,
     oemOnly: false,
     gmOnly: false,
     sortBy: 'relevance',
@@ -112,11 +111,6 @@ export default function CatalogFilterSheet({
 
         {/* Toggles */}
         <AppView gap={10}>
-          <ToggleRow
-            label="In stock only"
-            checked={draft.inStockOnly}
-            onToggle={() => setDraft((d) => ({ ...d, inStockOnly: !d.inStockOnly }))}
-          />
           <ToggleRow
             label="OEM quality only"
             checked={draft.oemOnly}

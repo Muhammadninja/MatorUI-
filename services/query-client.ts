@@ -1,7 +1,7 @@
 /**
  * App-wide React Query client. Defaults tuned for a mobile data layer:
  *
- *   - 5-min staleTime — most reads (catalog, orders, top-featured) don't
+ *   - 5-min staleTime — most reads (catalog, orders) don't
  *     need to refetch on every screen focus. Hooks can override per-call.
  *   - 15-min gcTime — keep results around so navigating back to a screen
  *     is instant.

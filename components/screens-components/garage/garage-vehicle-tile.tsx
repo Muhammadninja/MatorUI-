@@ -36,7 +36,7 @@ export function GarageVehicleTile({
   ].filter(Boolean);
   const subline = subParts.join(' · ');
 
-  const source = `https://picsum.photos/seed/${vehicle.id}/800/400`;
+  const image = vehicle.images?.[0];
 
   return (
     <AppView
@@ -46,21 +46,27 @@ export function GarageVehicleTile({
       borderWidth={1}
       style={{ overflow: 'hidden' }}
     >
-      {/* Image area — no ACTIVE pill for secondary vehicles */}
-      <AppImage
-        source={source}
-        height={IMAGE_HEIGHT}
-        contentFit="cover"
-        priority="normal"
-        cachePolicy="memory-disk"
-        transition={180}
-        alt={`${vehicle.year} ${vehicle.make} ${vehicle.model} photo`}
-        fallback={
-          <AppView flex={1} center colorName="backgroundSecondary">
-            <CarFront size={36} strokeWidth={2} color={tokens.gray400} />
-          </AppView>
-        }
-      />
+      {/* Image area — real photo, or a car placeholder icon (no mock image) */}
+      {image ? (
+        <AppImage
+          source={image}
+          height={IMAGE_HEIGHT}
+          contentFit="cover"
+          priority="normal"
+          cachePolicy="memory-disk"
+          transition={180}
+          alt={`${vehicle.year} ${vehicle.make} ${vehicle.model} photo`}
+          fallback={
+            <AppView flex={1} center colorName="backgroundSecondary">
+              <CarFront size={36} strokeWidth={2} color={tokens.gray400} />
+            </AppView>
+          }
+        />
+      ) : (
+        <AppView style={{ height: IMAGE_HEIGHT }} center colorName="backgroundSecondary">
+          <CarFront size={36} strokeWidth={2} color={tokens.gray400} />
+        </AppView>
+      )}
 
       {/* Vehicle info + details (kebab) */}
       <AppView row align="center" px={16} pt={14} pb={16} gap={12}>

@@ -90,10 +90,10 @@ export function LikesProvider({ children }: PropsWithChildren) {
         }
         return next;
       });
-      // First-ever like triggers the list-creation suggestion.
+      // Record the first-ever like for persistence, but no longer pop the
+      // list-creation suggestion sheet on like (removed per product decision).
       if (nextLiked && !hasEverLiked) {
         setHasEverLiked(true);
-        setShouldSuggestList(true);
       }
       return nextLiked;
     },

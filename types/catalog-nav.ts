@@ -51,7 +51,6 @@ export interface FilterState {
   brands: string[];
   /** Selected market-of-origin regions; empty = all. */
   regions: CatalogRegion[];
-  inStockOnly: boolean;
   oemOnly: boolean;
   /** Restrict to General Motors brands (Chevrolet / Ravon / Daewoo …). */
   gmOnly: boolean;

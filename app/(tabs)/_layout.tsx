@@ -104,6 +104,10 @@ export default function TabLayout() {
         // Disable the static render of the header on web
         // to prevent a hydration error in React Navigation v6.
         headerShown: useClientOnlyValue(false, true),
+        // Keep inactive tab screens rendered (don't freeze on blur) so
+        // returning to a tab is instant instead of showing a brief blank
+        // while the frozen screen re-renders.
+        freezeOnBlur: false,
       }}
     >
       <Tabs.Screen

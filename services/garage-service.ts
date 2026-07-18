@@ -73,8 +73,8 @@ export type Vehicle = {
   isPrimary: boolean;
   addedAt: number;
   /** Optional vehicle photo URLs (user-uploaded or VIN-decoded stock).
-   *  Cards prefer `images[0]`; when missing or empty, fall back to the
-   *  seeded Picsum placeholder so the dev surface still gets variety. */
+   *  Cards prefer `images[0]`; when missing or empty, they show a car
+   *  placeholder icon (no mock/stock image). */
   images?: string[];
   /** Fitment ids from the UZ catalog (`services/uz-vehicle-catalog.ts`).
    *  Optional during the migration — older vehicles created before the
@@ -125,9 +125,9 @@ export type VehiclePatch = Partial<Omit<Vehicle, 'id' | 'addedAt'>>;
 
 // ── Realtime contract ────────────────────────────────────────────────
 //
-// Same shape as `CatalogSocketEvent` / `TopFeaturedSocketEvent` so a
-// single shared socket-subscription module can dispatch events to all
-// three services without per-domain wiring. No client-side subscriber
+// Same shape as `CatalogSocketEvent` so a single shared
+// socket-subscription module can dispatch events to all
+// services without per-domain wiring. No client-side subscriber
 // is built yet — these types document the backend contract so the
 // realtime channel can be added in a single follow-up phase.
 

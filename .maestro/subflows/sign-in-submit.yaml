@@ -1,23 +1,26 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# Reusable subflow: complete the (purchase-gated) passwordless Sign In.
+# Reusable subflow: complete the (purchase-gated) phone auth bottom sheet.
 #
-# Precondition: the app is showing the gated sign-in screen (reached by tapping
-# Add-to-cart / Checkout as a guest → router.push('/sign-in?gate=1')).
+# Precondition: the app is showing the gated auth sheet (reached by tapping
+# Add-to-cart / Checkout as a guest → router.push('/sign-in?gate=1')). Auth is a
+# single unified phone-OTP bottom sheet (no separate sign-up) presented as a
+# transparentModal, so the triggering screen stays visible behind the scrim.
 #
-# The screen is passwordless OTP with two phases on ONE screen:
-#   1. entry — the phone field ships PRE-FILLED with a demo number, so we just
-#      tap "Send code" (no typing → sidesteps the keyboard-controller quirk).
-#   2. otp   — the mock returns a `devCode` that the screen AUTO-FILLS into the
+# Two phases in the sheet:
+#   1. phone — the phone field ships PRE-FILLED with a demo number, so we just
+#      tap "Next" (no typing → sidesteps the keyboard-controller quirk).
+#   2. otp   — the mock returns a `devCode` that the sheet AUTO-FILLS into the
 #      code field, so we just tap "Verify & continue".
-# On success the screen does router.back(), returning to wherever the gate fired.
+# On success the sheet does router.back(). We wait for it to disappear so the
+# caller can safely tap the (now-authenticated) screen beneath it.
 #
-# testIDs: sign-in-screen · auth-send-code-btn · auth-verify-btn.
+# testIDs: sign-in-screen · auth-phone-field · auth-send-code-btn · auth-verify-btn.
 # ─────────────────────────────────────────────────────────────────────────────
 appId: com.fotih12.mator
 ---
 - assertVisible:
     id: "sign-in-screen"
-# Let the push transition settle so the button is hittable.
+# Let the sheet transition settle so the button is hittable.
 - waitForAnimationToEnd:
     timeout: 2000
 # Phase 1 — send the code (phone pre-filled).
@@ -30,3 +33,8 @@ appId: com.fotih12.mator
     timeout: 8000
 - tapOn:
     id: "auth-verify-btn"
+# Auth done → the sheet dismisses. Wait for it to be gone before returning.
+- extendedWaitUntil:
+    notVisible:
+      id: "sign-in-screen"
+    timeout: 8000

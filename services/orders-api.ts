@@ -203,10 +203,14 @@ export class MockOrdersTransport implements OrdersTransport {
   private paymentMethods: PaymentMethod[];
 
   constructor(seedOrders: OrderListPage = SEED_ORDERS, seedDetails = ORDER_DETAILS) {
-    this.orders = { ...seedOrders, items: [...seedOrders.items] };
+    // Start with NO orders / addresses / payment methods — the screens show
+    // their real empty states instead of mock data. Real data comes from the
+    // HTTP transport (GET /v1/orders, /v1/account/*) when the `orders` domain
+    // is enabled.
+    this.orders = { page: 1, pageSize: seedOrders.pageSize, total: 0, items: [] };
     this.details = { ...seedDetails };
-    this.addresses = SEED_ADDRESSES.map((a) => ({ ...a }));
-    this.paymentMethods = SEED_PAYMENT_METHODS.map((p) => ({ ...p }));
+    this.addresses = [];
+    this.paymentMethods = [];
   }
 
   async listOrders(

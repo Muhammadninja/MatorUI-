@@ -34,6 +34,9 @@ export class ApiError extends Error {
     public readonly code: string,
     message: string,
     public readonly response?: unknown,
+    /** Seconds to wait before retrying, parsed from the `Retry-After`
+     *  header on a 429. Undefined when the header is absent/unparseable. */
+    public readonly retryAfterSeconds?: number,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -43,6 +46,12 @@ export class ApiError extends Error {
    *  status returned). Useful for "you're offline" UI. */
   get isNetworkError(): boolean {
     return this.status === 0;
+  }
+
+  /** True when the server throttled the client (global rate limit).
+   *  Callers should back off and respect `retryAfterSeconds`. */
+  get isRateLimited(): boolean {
+    return this.status === 429;
   }
 
   /** True when retrying with the same request might succeed. */
@@ -150,7 +159,9 @@ async function request<T>(
         }
         const code = extractCode(parsed) ?? `HTTP_${res.status}`;
         const message = extractMessage(parsed) ?? `Request failed (${res.status}).`;
-        const err = new ApiError(res.status, code, message, parsed);
+        const retryAfter =
+          res.status === 429 ? parseRetryAfter(res.headers.get('Retry-After')) : undefined;
+        const err = new ApiError(res.status, code, message, parsed, retryAfter);
         // 5xx is retryable on idempotent methods; throw to retry loop.
         if (err.isTransient && isIdempotent && attempt < maxRetries) {
           lastError = err;
@@ -229,6 +240,17 @@ function backoff(attempt: number): Promise<void> {
 function pseudoRandom(seed: number): number {
   const x = Math.sin(seed * 9301 + 49297) * 233280;
   return x - Math.floor(x);
+}
+
+/** Parse a `Retry-After` header. Supports the delta-seconds form ("30")
+ *  and the HTTP-date form; returns whole seconds from now, or undefined. */
+function parseRetryAfter(raw: string | null): number | undefined {
+  if (!raw) return undefined;
+  const secs = Number(raw);
+  if (Number.isFinite(secs)) return Math.max(0, Math.round(secs));
+  const when = Date.parse(raw);
+  if (Number.isNaN(when)) return undefined;
+  return Math.max(0, Math.round((when - Date.now()) / 1000));
 }
 
 function safeJsonParse(text: string): unknown {

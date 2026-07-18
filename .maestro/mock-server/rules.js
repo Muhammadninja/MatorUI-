@@ -45,43 +45,73 @@ router.post('/v1/auth/decode-vin', (req, res) => {
   };
 });
 
-// ── AUTH: passwordless OTP ───────────────────────────────────────────────────
-// request() hands back a token + devCode (so demo/E2E builds auto-fill); verify()
-// accepts any 6-digit code and returns a RawAuthResponse the auth context reads.
-const pendingOtps = {}; // otpToken → { channel, identifier, purpose, firstName, lastName }
-router.post('/v1/auth/otp/request', (req, res) => {
+// ── AUTH: passwordless phone OTP (backend.json wire shape) ───────────────────
+// request-otp hands back a request_id + dev_otp_code (so offline/E2E builds
+// auto-fill); verify-otp accepts any 6-digit code and returns { user, tokens }.
+const pendingOtps = {}; // request_id → { phone_e164 }
+router.post('/v1/auth/phone/request-otp', (req, res) => {
   const body = req.body || {};
-  const otpToken = `otp_${Math.random().toString(36).slice(2, 12)}`;
-  pendingOtps[otpToken] = {
-    channel: body.channel, identifier: body.identifier, purpose: body.purpose,
-    firstName: body.firstName, lastName: body.lastName,
-  };
+  const requestId = `otp_${Math.random().toString(36).slice(2, 12)}`;
+  pendingOtps[requestId] = { phone_e164: body.phone_e164 };
   res.status = 200; res.headers = { 'Content-Type': 'application/json' };
-  res.body = { otpToken, expiresIn: 300, devCode: '123456' };
+  res.body = {
+    request_id: requestId,
+    phone_e164: body.phone_e164 || '+998901234567',
+    expires_at: new Date(Date.now() + 300000).toISOString(),
+    resend_after_seconds: 60,
+    otp_length: 6,
+    delivery_channel: 'sms',
+    is_existing_user: true,
+    next_screen: 'AuthOtpVerifyScreen',
+    dev_otp_code: '123456', // MOCK ONLY — the real backend omits this.
+  };
 });
-router.post('/v1/auth/otp/verify', (req, res) => {
+router.post('/v1/auth/phone/verify-otp', (req, res) => {
   const body = req.body || {};
-  const code = typeof body.code === 'string' ? body.code.trim() : '';
+  const code = typeof body.otp_code === 'string' ? body.otp_code.trim() : '';
   res.headers = { 'Content-Type': 'application/json' };
   if (!/^\d{6}$/.test(code)) {
     res.status = 422; res.body = { error: { code: 'INVALID_CODE', message: 'Enter the 6-digit code.' } };
     return;
   }
-  const p = pendingOtps[body.otpToken] || {};
-  delete pendingOtps[body.otpToken];
+  const p = pendingOtps[body.request_id] || {};
+  delete pendingOtps[body.request_id];
   const id = `usr_${Math.random().toString(36).slice(2, 10)}`;
-  const isEmail = p.channel === 'email';
-  const identifier = p.identifier || '';
-  const user = {
-    id,
-    email: isEmail ? identifier : 'test@mator.uz',
-    phone: p.channel === 'phone' ? identifier : '+998 90 123 45 67',
-    firstName: p.firstName || 'Sardor', lastName: p.lastName || 'Karimov',
-    username: (isEmail ? (identifier.split('@')[0] || 'sardor') : 'sardor'),
-    avatarUrl: null, memberSince: '2026-01-01T00:00:00.000Z',
-  };
   res.status = 200;
-  res.body = { accessToken: `srv_access_${id}`, refreshToken: `srv_refresh_${id}`, expiresIn: 3600, user };
+  res.body = {
+    user: {
+      id,
+      phone_e164: p.phone_e164 || body.phone_e164 || '+998901234567',
+      display_name: null,
+      avatar_url: null,
+      myid_status: 'not_verified',
+      transaction_limit_uzs: 0,
+      created_at: '2026-01-01T00:00:00.000Z',
+    },
+    tokens: {
+      access_token: `srv_access_${id}`,
+      access_token_expires_at: new Date(Date.now() + 3600000).toISOString(),
+      refresh_token: `srv_refresh_${id}`,
+      refresh_token_expires_at: new Date(Date.now() + 7776000000).toISOString(),
+      token_type: 'Bearer',
+    },
+    requires_myid_verification: false,
+    next_screen: 'Tabs',
+  };
+});
+router.post('/v1/auth/token/refresh', (req, res) => {
+  res.headers = { 'Content-Type': 'application/json' };
+  const id = `usr_${Math.random().toString(36).slice(2, 10)}`;
+  res.status = 200;
+  res.body = {
+    tokens: {
+      access_token: `srv_access_${id}`,
+      access_token_expires_at: new Date(Date.now() + 3600000).toISOString(),
+      refresh_token: `srv_refresh_${id}`,
+      refresh_token_expires_at: new Date(Date.now() + 7776000000).toISOString(),
+      token_type: 'Bearer',
+    },
+  };
 });
 
 // ── FLOW 3 ───────────────────────────────────────────────────────────────────

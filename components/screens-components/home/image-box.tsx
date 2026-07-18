@@ -1,3 +1,4 @@
+import { type ImageContentFit } from 'expo-image';
 import { memo } from 'react';
 import { Image, type DimensionValue } from 'react-native';
 
@@ -16,6 +17,16 @@ export type ImageBoxProps = {
   width?: DimensionValue;
   radius?: number;
   small?: boolean;
+  /**
+   * How the photo fills the box. Default 'cover' (fills + crops). Use
+   * 'contain' for catalog parts whose photos vary wildly in shape/size — it
+   * shows the WHOLE part (no cropping) and letterboxes onto `backgroundColor`.
+   */
+  contentFit?: ImageContentFit;
+  /** Tile / letterbox color behind the photo. Product photos are shot on
+   *  white, so pass white here with `contentFit='contain'` for a clean,
+   *  fully-visible part in both light and dark mode. */
+  backgroundColor?: string;
 };
 
 /**
@@ -23,9 +34,21 @@ export type ImageBoxProps = {
  * bundled test image so every product slot has a photo until the backend
  * ships imagery.
  */
-function ImageBox({ label, uri, height, width = '100%', radius = 14 }: ImageBoxProps) {
+function ImageBox({
+  label,
+  uri,
+  height,
+  width = '100%',
+  radius = 0,
+  contentFit = 'cover',
+  backgroundColor,
+}: ImageBoxProps) {
   const testImage = (
-    <Image source={TEST_IMAGE} style={{ width, height, borderRadius: radius }} resizeMode="cover" />
+    <Image
+      source={TEST_IMAGE}
+      style={{ width, height, borderRadius: radius, backgroundColor }}
+      resizeMode={contentFit === 'contain' ? 'contain' : 'cover'}
+    />
   );
 
   if (uri) {
@@ -37,6 +60,8 @@ function ImageBox({ label, uri, height, width = '100%', radius = 14 }: ImageBoxP
         rounded={radius}
         alt={label}
         fallback={testImage}
+        contentFit={contentFit}
+        placeholderColor={backgroundColor}
       />
     );
   }

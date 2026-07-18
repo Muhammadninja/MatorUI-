@@ -1,6 +1,6 @@
 /**
  * App-wide API configuration. Read by every transport (garage, catalog,
- * top-featured, search) so the swap from mock → HTTP is a single env-var
+ * search) so the swap from mock → HTTP is a single env-var
  * flip plus one helper rewrite for auth.
  *
  * Env contract:
@@ -31,7 +31,7 @@ export function getApiBaseUrl(): string | null {
  * base URL is configured AND its domain is enabled.
  *
  * `EXPO_PUBLIC_HTTP_DOMAINS` is an optional comma-separated allowlist of
- * domain keys (e.g. "top-featured,garage"). When set, ONLY those domains
+ * domain keys (e.g. "catalog,garage"). When set, ONLY those domains
  * use HTTP and every other transport stays on its mock — so endpoints can
  * be brought online one at a time as the backend seeds/verifies them,
  * instead of an all-or-nothing flip. When the var is unset/empty, the base

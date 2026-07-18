@@ -1,6 +1,7 @@
 // ── Types ────────────────────────────────────────────────────────────
 
-import { brandRegion, isGmBrand, normalizeRegion, type CatalogRegion } from '@/constants/catalog-regions';
+import { brandRegion, CATALOG_REGIONS, isGmBrand, normalizeRegion, type CatalogRegion } from '@/constants/catalog-regions';
+import { cleanCategoryName } from '@/utils/category-label';
 
 export type CatalogItem = {
   id: string;
@@ -17,11 +18,22 @@ export type CatalogItem = {
   specs: CatalogItemSpec[];
   features: string[];
   category: string;
+  /** Part manufacturer brand (e.g. "Gates", "Dayco"), from the backend `brand`
+   *  entity — NOT the car make (the vehicle lives in `title` + the make/model
+   *  query filters + per-row compatibility). Shown as the card subtitle (via
+   *  `description`) and drives the client-side Brand filter. */
+  brand?: string;
   /** Manufacturer / OEM part number ("GM 15823942", "BYD-1090012",
    *  etc.). Rendered as a small gray pill on the card and detail
    *  screen so shoppers can cross-reference against existing parts.
    *  Optional — items without a number simply omit the pill. */
   oem?: string;
+  /** GM (General Motors) cross-reference number, when the part carries
+   *  one. Shown alongside the OEM number on the product row. */
+  gm?: string;
+  /** Estimated delivery window in days, when the backend provides it. */
+  deliveryEtaMinDays?: number;
+  deliveryEtaMaxDays?: number;
   /** Market of origin (China / Europe / Russia / Korea / USA), used by the
    *  region filter. Backend-supplied when available, else inferred from the
    *  brand at map time. */
@@ -325,17 +337,73 @@ type ApiCatalogPart = {
   title: string;
   brand?: { id: string; name: string } | null;
   category?: { id: string; name: string } | null;
+  /** Canonical part system, uppercase enum (e.g. "BRAKES", "ENGINE"). */
+  main_category?: string;
+  /** Denormalized brand label the backend attaches to the part. */
+  part_brand_name?: string | null;
   oem_numbers?: string[];
+  gm_numbers?: string[];
+  /** How the part number is classified ("OEM" | "GM" | "UNKNOWN"). */
+  part_number_type?: string;
   price_uzs?: number;
   price_label?: string;
   in_stock?: boolean;
-  stock_qty?: number;
   images?: string[];
   specs?: { label: string; value: string }[];
   features?: string[];
-  /** Market of origin, if the backend tags it (e.g. "china", "korea"). */
+  /** Estimated delivery window in days (either can be null). */
+  delivery_eta_days_min?: number | null;
+  delivery_eta_days_max?: number | null;
+  /** Seller storefront that lists the part. */
+  seller?: { id: string; name: string; rating_avg?: number } | null;
+  /** Market of origin, uppercase enum on the live backend ("USA", "KOREA"). */
+  origin_region?: string;
+  /** Legacy alias some deployments used before `origin_region`. */
   region?: string;
 };
+
+/** "BRAKES" / "BRAKE_SYSTEM" → "Brakes" / "Brake system" for display. */
+function prettyEnum(v: string): string {
+  return v
+    .toLowerCase()
+    .split('_')
+    .map((w, i) => (i === 0 ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+    .join(' ');
+}
+
+/**
+ * Build a spec table from the part's structured fields when the backend
+ * doesn't ship an explicit `specs` array — so the detail screen shows real
+ * data (brand, origin, OEM/GM numbers, stock, seller) instead of nothing.
+ */
+/** The single OEM|GM number row for the detail spec table — same GM-xor-OEM
+ *  precedence as `resolvePartNumber`, but showing every number of that type. */
+function partNumberSpec(p: ApiCatalogPart): CatalogItemSpec | undefined {
+  const gm = p.gm_numbers?.length ? p.gm_numbers.join(', ') : undefined;
+  const oem = p.oem_numbers?.length ? p.oem_numbers.join(', ') : undefined;
+  const type = (p.part_number_type ?? '').toUpperCase();
+  if (type === 'GM' && (gm ?? oem)) return { label: 'GM number', value: (gm ?? oem)! };
+  if (type === 'OEM' && (oem ?? gm)) return { label: 'OEM number', value: (oem ?? gm)! };
+  if (gm) return { label: 'GM number', value: gm };
+  if (oem) return { label: 'OEM number', value: oem };
+  return undefined;
+}
+
+function deriveSpecs(p: ApiCatalogPart): CatalogItemSpec[] {
+  const specs: CatalogItemSpec[] = [];
+  const brand = p.part_brand_name ?? p.brand?.name;
+  if (brand) specs.push({ label: 'Brand', value: brand });
+  const category = p.main_category ? cleanCategoryName(prettyEnum(p.main_category)) : undefined;
+  if (category) specs.push({ label: 'Category', value: category });
+  const region = normalizeRegion(p.origin_region ?? p.region);
+  const regionLabel = region && CATALOG_REGIONS.find((r) => r.key === region)?.label;
+  if (regionLabel) specs.push({ label: 'Origin', value: regionLabel });
+  // A part is GM xor OEM — show only the matching number row (the label already
+  // conveys the type), never both.
+  const partNumber = partNumberSpec(p);
+  if (partNumber) specs.push(partNumber);
+  return specs;
+}
 
 type ApiCatalogPartsResponse = {
   items: ApiCatalogPart[];
@@ -345,23 +413,53 @@ type ApiCatalogPartsResponse = {
   next_page: number | null;
 };
 
+/**
+ * A part carries exactly ONE cross-reference number, tagged by the seller as
+ * either OEM or GM — never both. Resolve that single number + its label so the
+ * card and detail show the GM pill for a GM part and the OEM pill for an OEM
+ * part, and never both at once.
+ *
+ * Precedence: the explicit `part_number_type` wins (the seller's choice); with
+ * no type we fall back to whichever number array is populated (GM first), so a
+ * GM part is never mislabeled "OEM".
+ */
+function resolvePartNumber(p: ApiCatalogPart): { oem?: string; gm?: string } {
+  const gm = p.gm_numbers?.[0];
+  const oem = p.oem_numbers?.[0];
+  const type = (p.part_number_type ?? '').toUpperCase();
+  if (type === 'GM') return { gm: gm ?? oem };
+  if (type === 'OEM') return { oem: oem ?? gm };
+  if (gm) return { gm };
+  if (oem) return { oem };
+  return {};
+}
+
 function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
+  const partNumber = resolvePartNumber(p);
   return {
     id: p.id,
     status: p.in_stock === false ? 'Out of stock' : 'In stock',
     title: p.title,
-    description: [p.brand?.name, p.category?.name].filter(Boolean).join(' · '),
+    description: [p.brand?.name, cleanCategoryName(p.category?.name)].filter(Boolean).join(' · '),
     price:
       p.price_label ??
       (p.price_uzs != null ? `UZS ${p.price_uzs.toLocaleString('ru-RU')}` : ''),
     priceLabel: '',
     images: p.images ?? [],
-    specs: p.specs ?? [],
+    // Prefer an explicit spec array; otherwise synthesize one from the
+    // part's structured fields so the detail screen isn't blank.
+    specs: p.specs?.length ? p.specs : deriveSpecs(p),
     features: p.features ?? [],
-    category: p.category?.name ?? '',
-    oem: p.oem_numbers?.[0],
-    // Prefer the backend's tagged region; fall back to brand inference.
-    region: normalizeRegion(p.region) ?? brandRegion(p.brand?.name),
+    category: cleanCategoryName(p.category?.name) ?? '',
+    brand: p.part_brand_name ?? p.brand?.name ?? undefined,
+    // Exactly one of these is ever set — a part is GM xor OEM (see resolvePartNumber).
+    oem: partNumber.oem,
+    gm: partNumber.gm,
+    deliveryEtaMinDays: p.delivery_eta_days_min ?? undefined,
+    deliveryEtaMaxDays: p.delivery_eta_days_max ?? undefined,
+    // Prefer the backend's tagged origin (`origin_region`, uppercase enum),
+    // then the legacy `region` alias, then brand inference.
+    region: normalizeRegion(p.origin_region ?? p.region) ?? brandRegion(p.brand?.name),
   };
 }
 
@@ -403,10 +501,12 @@ class HttpCatalogTransport implements CatalogTransport {
       { signal: request.signal },
     );
     return {
-      items: res.items.map(mapPartToCatalogItem),
-      total: res.total,
-      page: res.page,
-      pageSize: res.page_size,
+      // Guard against a response without an `items` array (empty page / error
+      // body) so a filled catalog can't crash the listing.
+      items: (res.items ?? []).map(mapPartToCatalogItem),
+      total: res.total ?? 0,
+      page: res.page ?? request.page,
+      pageSize: res.page_size ?? request.pageSize,
     };
   }
   async detail(id: string, signal?: AbortSignal): Promise<CatalogDetailResponse | null> {

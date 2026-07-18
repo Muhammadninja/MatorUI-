@@ -18,17 +18,13 @@
   },
   "flows": [
     {
-      "screen_name": "AuthPhoneEntryScreen",
+      "screen_name": "AuthPhoneSheet",
+      "ui_notes": "Auth is a single unified phone bottom sheet — no separate sign-up vs sign-in screen. The same sheet ('Log in or sign up') serves both new and returning numbers; the server upserts by phone (a new MSISDN gets an account created on verify, an existing one is matched). The sheet is presented as a transparentModal over whatever triggered it (e.g. the Cart tab or the purchase gate), phase 1 = phone entry, phase 2 = OTP code. There is no email/password path.",
       "api_endpoints": [
         {
           "method": "POST",
           "url": "/v1/auth/phone/request-otp",
-          "description": "Send a 6-digit SMS OTP to the supplied Uzbek phone number via Eskiz/Playmobile aggregator. Server enforces 60s resend cooldown and 5/hour per-MSISDN ceiling."
-        },
-        {
-          "method": "POST",
-          "url": "/v1/auth/phone/check-availability",
-          "description": "Pre-flight check to tell the client whether this MSISDN already has an account (controls signup vs login copy on the next screen)."
+          "description": "Send a 6-digit SMS OTP to the supplied Uzbek phone number via Eskiz/Playmobile aggregator. Server enforces 60s resend cooldown and 5/hour per-MSISDN ceiling. Unified endpoint for both login and signup — the client does not pre-branch on account existence (the response's is_existing_user is informational only)."
         }
       ],
       "request_payload": {
@@ -62,7 +58,9 @@
         "expo-device: read Device.modelId (ios) / Device.modelName (android) for device_model and Device.osVersion.",
         "react-native-otp-entry: 6-cell input wired to the response.otp_length value.",
         "react-native-google-recaptcha-v2 (or expo-recaptcha-v3): produce captcha_token on Android release builds; web on iOS via WebView fallback.",
-        "Headers attached by api-client interceptor: X-Mator-Client-Platform, X-Mator-App-Version, X-Mator-Build, X-Mator-Install-Id, Accept-Language."
+        "Headers attached by api-client interceptor: X-Mator-Client-Platform, X-Mator-App-Version, X-Mator-Build, X-Mator-Install-Id, Accept-Language.",
+        "UI is components/screens-components/auth/passwordless-auth-screen.tsx rendered by the app/(auth)/sign-in route as a transparentModal bottom sheet (there is no /sign-up route). Both phases (phone entry, OTP) live in this one sheet.",
+        "Transport is services/auth-api.ts (HttpAuthTransport): it normalizes the entered phone to E.164 (strips spaces/dashes → +998901234567) before request-otp, remembers request_id → phone_e164 so verify-otp can resend it, and maps { user, tokens } → the app's UserSummary + AuthSession."
       ]
     },
     {
