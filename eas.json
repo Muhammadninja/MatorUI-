@@ -59,6 +59,12 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "ascApiKeyPath": "./AuthKey_VXU8PH57WU.p8",
+        "ascApiKeyId": "VXU8PH57WU",
+        "ascApiKeyIssuerId": "f2b9c4dc-6d55-4233-91ad-963f201d5253"
+      }
+    }
   }
 }
