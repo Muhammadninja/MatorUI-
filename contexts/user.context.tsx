@@ -26,7 +26,7 @@ import {
   type PropsWithChildren,
 } from 'react';
 
-import { setUnauthorizedHandler } from '@/services/api-client';
+import { setUnauthorizedHandler, ApiError } from '@/services/api-client';
 import {
   authTransport,
   type RequestOtpInput,
@@ -43,6 +43,31 @@ import {
   type AuthSession,
 } from '@/services/auth-storage';
 import { userTransport } from '@/services/user-api';
+import { debugLog, DEBUG_API_ENABLED } from '@/services/debug-log';
+import { getDeviceId } from '@/services/device-id';
+
+/**
+ * DEV-ONLY: print the full auth credentials (refresh token, account phone/id,
+ * device id) so they can be copied — e.g. to seed the admin panel's
+ * MATOR_REFRESH_TOKEN without going through the OTP flow. Gated on
+ * DEBUG_API_ENABLED (dev / EXPO_PUBLIC_DEBUG_API), never in a silent release.
+ * Deliberately NOT redacted (unlike debugLog) — that's the point.
+ */
+async function logAuthCreds(
+  label: string,
+  session: AuthSession | null,
+  user: { id?: string; phone?: string | null } | null,
+): Promise<void> {
+  if (!DEBUG_API_ENABLED || !session) return;
+  const deviceId = await getDeviceId().catch(() => 'unknown');
+  console.log(`[mator:creds] ${label}`, {
+    phone: user?.phone ?? null,
+    account_id: user?.id ?? null,
+    device_id: deviceId,
+    refresh_token: session.refreshToken,
+    access_token: session.accessToken,
+  });
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -60,6 +85,11 @@ type UserContextValue = {
   error: string | null;
   refreshProfile: () => Promise<void>;
   updateProfile: (patch: Partial<Omit<UserProfile, 'id' | 'memberSince'>>) => Promise<void>;
+  /** Change the login phone: send an OTP to the new number. Returns a dev code on
+   *  dev builds so the verify step can prefill it. */
+  requestPhoneChange: (phone: string) => Promise<{ expiresIn: number; devCode?: string }>;
+  /** Verify the OTP; rebinds the account to the new number and swaps the session. */
+  confirmPhoneChange: (phone: string, otp: string) => Promise<void>;
   /** Passwordless: send a one-time code to the phone/email. Returns a handle for `verifyOtp`. */
   requestOtp: (input: RequestOtpInput) => Promise<RequestOtpResult>;
   /** Passwordless: verify the code, establish the session, and load the profile. */
@@ -126,7 +156,10 @@ export function UserProvider({ children }: PropsWithChildren) {
         const result = await authTransport.verifyOtp(input);
         await persistSession(result.session);
         setProfile(result.user);
+        debugLog('auth', 'verifyOtp OK — session established', result.user);
+        void logAuthCreds('verifyOtp', result.session, result.user);
       } catch (err) {
+        debugLog('auth', 'verifyOtp FAILED', { message: (err as Error)?.message });
         setError(err instanceof Error ? err.message : 'Verification failed.');
         throw err;
       } finally {
@@ -154,18 +187,38 @@ export function UserProvider({ children }: PropsWithChildren) {
     async (patch: Partial<Omit<UserProfile, 'id' | 'memberSince'>>) => {
       if (!profile) return;
       const previous = profile;
+      debugLog('profile', 'updateProfile → patch', patch);
       // Optimistic update
       setProfile((prev) => (prev ? { ...prev, ...patch } : prev));
       try {
         const updated = await userTransport.updateMe(patch);
         setProfile(updated);
+        debugLog('profile', 'updateProfile OK — saved profile', updated);
       } catch (err) {
         setProfile(previous);
         setError(err instanceof Error ? err.message : 'Failed to update profile.');
+        debugLog('profile', 'updateProfile FAILED — rolled back', { message: (err as Error)?.message });
         throw err;
       }
     },
     [profile],
+  );
+
+  const requestPhoneChange = useCallback(
+    (phone: string) => userTransport.requestPhoneChange(phone),
+    [],
+  );
+
+  const confirmPhoneChange = useCallback(
+    async (phone: string, otp: string) => {
+      // Confirming rebinds the account to the new number and issues a NEW session
+      // (the login identity changed) — persist it and swap the profile.
+      const { user, session } = await userTransport.confirmPhoneChange(phone, otp);
+      await persistSession(session);
+      setProfile(user);
+      debugLog('profile', 'phone changed — session swapped', { phone: user.phone });
+    },
+    [persistSession],
   );
 
   // ── Hydration on mount ──────────────────────────────────────────────
@@ -179,13 +232,26 @@ export function UserProvider({ children }: PropsWithChildren) {
         try {
           const me = await userTransport.getMe();
           if (!cancelled) setProfile(me);
-        } catch {
-          // If `/me` fails on cold boot (network, expired token), drop
-          // the session — the user lands on the guest experience and
-          // can sign in again.
-          if (!cancelled) {
+          void logAuthCreds('hydrate (restored session)', session, me);
+        } catch (err) {
+          // Only DISCARD the persisted session on a definitive auth failure —
+          // i.e. a 401 that survived the refresh-and-retry in api-client (the
+          // refresh token is dead). A transient cold-boot failure (network not
+          // ready yet, timeout, 5xx) must NOT log the user out: keep the
+          // session on disk so the next launch — or an in-app retry — restores
+          // them. Wiping on any error is what made users re-authenticate every
+          // time they opened the app on a flaky connection.
+          const isAuthFailure = err instanceof ApiError && err.status === 401;
+          debugLog('auth', 'hydrate getMe FAILED', {
+            status: err instanceof ApiError ? err.status : undefined,
+            discardingSession: isAuthFailure,
+            message: (err as Error)?.message,
+          });
+          if (!cancelled && isAuthFailure) {
             await persistSession(null);
           }
+          // On a transient error we keep `session` in the in-memory cache (set
+          // above) so authed requests can still be attempted this run.
         }
       }
       if (!cancelled) setIsHydrating(false);
@@ -218,6 +284,7 @@ export function UserProvider({ children }: PropsWithChildren) {
         }
         await persistSession(result.session);
         setProfile(result.user);
+        void logAuthCreds('token refreshed', result.session, result.user);
         return true;
       })();
       refreshInFlightRef.current = work;
@@ -241,6 +308,8 @@ export function UserProvider({ children }: PropsWithChildren) {
       error,
       refreshProfile,
       updateProfile,
+      requestPhoneChange,
+      confirmPhoneChange,
       requestOtp,
       verifyOtp,
       signOut,
@@ -252,6 +321,8 @@ export function UserProvider({ children }: PropsWithChildren) {
       error,
       refreshProfile,
       updateProfile,
+      requestPhoneChange,
+      confirmPhoneChange,
       requestOtp,
       verifyOtp,
       signOut,
