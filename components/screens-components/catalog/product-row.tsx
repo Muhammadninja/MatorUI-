@@ -1,9 +1,9 @@
 import { router } from 'expo-router';
-import { Car, Heart, ShoppingCart } from 'lucide-react-native';
+import { BadgeCheck, Car, Heart, ShoppingCart } from 'lucide-react-native';
 import { memo } from 'react';
 
 import ImageBox from '@/components/screens-components/home/image-box';
-import Rating from '@/components/screens-components/home/rating';
+import { AppPrice } from '@/components/shared/app-price';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useActiveVehicle } from '@/contexts/active-vehicle.context';
@@ -18,84 +18,6 @@ type ProductRowItem = CatalogItem & {
   brand?: string;
   gm?: string;
 };
-
-/**
- * Stable pseudo-rating (3.9–5.0) + review count derived from the id.
- * PLACEHOLDER — the catalog has no product ratings yet; deterministic so it
- * never flickers between renders. Swap for real fields once the backend ships
- * them.
- */
-function pseudoRating(id: string): { value: number; count: number } {
-  let h = 0;
-  for (let i = 0; i < id.length; i += 1) h = (h * 31 + id.charCodeAt(i)) | 0;
-  h = Math.abs(h);
-  return { value: 3.9 + (h % 12) / 10, count: 12 + (h % 480) };
-}
-
-
-/**
- * Split a formatted price ("UZS 129 000", "$64.99", "100 so'm") into a raised
- * currency, the big whole amount, and optional superscript cents — the pieces
- * of the Amazon-style price treatment below.
- */
-function splitPrice(price: string): { currency: string; amount: string; cents?: string } {
-  const s = (price ?? '').trim();
-  if (!s) return { currency: '', amount: '' };
-  const m = s.match(/^([^\d]+)?\s*([\d\s.,'’]+)\s*([^\d]+)?$/);
-  const currency = (m?.[1] ?? m?.[3] ?? '').trim();
-  const num = (m?.[2] ?? s).trim();
-  const frac = num.match(/^(.*?)[.,](\d{2})$/);
-  if (frac) return { currency, amount: frac[1].trim(), cents: frac[2] };
-  return { currency, amount: num };
-}
-
-/**
- * Amazon-style price: a small raised currency, an oversized bold amount, and
- * tiny superscript cents — designed to catch the eye as the primary purchase
- * signal. Falls back to the raw string if it can't be parsed.
- */
-function PriceTag({ value, color }: { value: string; color: string }) {
-  const { currency, amount, cents } = splitPrice(value);
-  if (!amount) {
-    return (
-      <AppText family="heading" weight="bold" numberOfLines={1} style={{ fontSize: 20, color }}>
-        {value || '—'}
-      </AppText>
-    );
-  }
-  return (
-    <AppView row align="flex-start">
-      {currency ? (
-        <AppText
-          family="accent"
-          weight="bold"
-          style={{ fontSize: 11, lineHeight: 14, color, marginTop: 4, marginRight: 2 }}
-        >
-          {currency}
-        </AppText>
-      ) : null}
-      <AppText
-        family="heading"
-        weight="bold"
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.6}
-        style={{ fontSize: 26, lineHeight: 28, letterSpacing: 0.2, color }}
-      >
-        {amount}
-      </AppText>
-      {cents ? (
-        <AppText
-          family="accent"
-          weight="bold"
-          style={{ fontSize: 11, lineHeight: 14, color, marginTop: 4, marginLeft: 1 }}
-        >
-          {cents}
-        </AppText>
-      ) : null}
-    </AppView>
-  );
-}
 
 export type ProductRowProps = {
   item: CatalogItem;
@@ -122,7 +44,6 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
   const image = product.images?.[0];
 
   const activeVehicle = currentActiveVehicle?.vehicle ?? null;
-  const rating = pseudoRating(product.id);
   // "Check if it fits" (amber) until a vehicle is active in the garage, then
   // "Fits your <car>" (green) — mirrors the item-detail confirmed-fit banner.
   const fitColor = activeVehicle ? tokens.success : tokens.warning;
@@ -204,13 +125,25 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
           ) : null}
         </AppPressableView>
 
-        {/* Ratings (wheel-mark rating glyph + review count) */}
-        <AppView row align="center" gap={6}>
-          <Rating value={rating.value} size={12} />
-          <AppText family="default" style={{ fontSize: 11.5, color: tokens.textMuted }}>
-            ({rating.count})
-          </AppText>
-        </AppView>
+        {/* MATOR Certified trust badge — shown only when the backend marks this
+            part's seller certified (operator-panel toggle). Off by default. */}
+        {product.certified ? (
+          <AppView
+            row
+            align="center"
+            gap={5}
+            rounded={7}
+            px={8}
+            py={3}
+            borderWidth={1}
+            style={{ alignSelf: 'flex-start', backgroundColor: `${tokens.info}14`, borderColor: `${tokens.info}45` }}
+          >
+            <BadgeCheck size={13} strokeWidth={2.5} color={tokens.info} />
+            <AppText family="accent" weight="bold" style={{ fontSize: 10.5, letterSpacing: 0.3, color: tokens.info }}>
+              MATOR Certified
+            </AppText>
+          </AppView>
+        ) : null}
 
         {/* OEM / GM cross-reference numbers */}
         {product.oem || product.gm ? (
@@ -267,7 +200,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
         <AppView row justify="flex-start" style={{ marginTop: 'auto' }}>
           {/* Amazon-style price tag — near-black (theme text) so it reads as
               bold near-black in light mode and stays legible in dark mode. */}
-          <PriceTag value={item.price} color={tokens.text} />
+          <AppPrice value={item.price} color={tokens.text} />
         </AppView>
 
         {/* Add to cart — in the right column, beside the image (never over it). */}

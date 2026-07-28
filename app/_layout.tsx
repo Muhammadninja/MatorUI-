@@ -11,7 +11,7 @@ import { requireNativeModule } from 'expo-modules-core';
 import { ThemeProvider as NavigationThemeProvider, Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import * as SystemUI from 'expo-system-ui';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { LogBox, Platform, StatusBar } from 'react-native';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import 'react-native-reanimated';
@@ -50,10 +50,13 @@ import { AppToastHost } from '@/components/shared/app-toast';
 import { AppView } from '@/components/shared/app-view';
 import GlobalModalHost from '@/components/shared/global-modal-host';
 import LikesListSuggestionHost from '@/components/shared/likes-list-suggestion-host';
+import SplashOverlay from '@/components/screens/splash-screen';
 import { useColorScheme } from '@/components/useColorScheme';
+import AppGateHost from '@/components/shared/app-gate-host';
+import { useDeviceRegistration } from '@/hooks/use-device-registration';
 import { ActiveVehicleProvider } from '@/contexts/active-vehicle.context';
 import { CartProvider } from '@/contexts/cart.context';
-import { LanguageProvider, useLanguageContext } from '@/contexts/language.context';
+import { LanguageProvider } from '@/contexts/language.context';
 import { LikesProvider } from '@/contexts/likes.context';
 import { SearchUIProvider } from '@/contexts/search-ui.context';
 import { ThemeProvider as AppThemeProvider, useThemeContext } from '@/contexts/theme.context';
@@ -101,6 +104,13 @@ export default function RootLayout() {
   return <RootLayoutNav />;
 }
 
+/** Registers this install for push once signed in, and routes notification taps.
+ *  Renders nothing; lives inside UserProvider so it can read auth state. */
+function NotificationsRegistrar() {
+  useDeviceRegistration();
+  return null;
+}
+
 function RootLayoutNav() {
   return (
     <SafeAreaProvider>
@@ -113,10 +123,12 @@ function RootLayoutNav() {
                   <LikesProvider>
                     <ActiveVehicleProvider>
                       <SearchUIProvider>
+                        <NotificationsRegistrar />
                         <RootNavigation />
                         <GlobalModalHost />
                         <LikesListSuggestionHost />
                         <AppToastHost />
+                        <AppGateHost />
                       </SearchUIProvider>
                     </ActiveVehicleProvider>
                   </LikesProvider>
@@ -135,16 +147,11 @@ function RootNavigation() {
   const { scheme, tokens } = useThemeContext();
   const resolvedScheme = scheme ?? (colorScheme === 'dark' ? 'dark' : 'light');
   const navigationTheme = createNavigationTheme(resolvedScheme);
-  const { isHydrated: languageHydrated, hasChosen: languageChosen } = useLanguageContext();
 
-  // Hold the splash until the persisted language choice has been read.
-  // Once hydrated: if the user has never picked a language, the initial
-  // route is the select-language screen; otherwise the tabs as usual.
-  useEffect(() => {
-    if (languageHydrated) {
-      SplashScreen.hideAsync().catch(() => undefined);
-    }
-  }, [languageHydrated]);
+  // The branded splash is a full-screen overlay rendered on top of the whole
+  // navigator. It owns the native-launch-screen handoff (`hideAsync` on its
+  // first paint) and cross-fades itself out, then calls back here to unmount.
+  const [splashVisible, setSplashVisible] = useState(true);
 
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(tokens.background).catch(() => undefined);
@@ -196,10 +203,6 @@ function RootNavigation() {
           }}
         >
           <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="splash"
-            options={{ headerShown: false, animation: 'fade', gestureEnabled: false }}
-          />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen
             name="vin-finder"
@@ -214,10 +217,16 @@ function RootNavigation() {
             name="(auth)"
             options={{
               headerShown: false,
-              animation: 'slide_from_bottom',
+              // Auth is a bottom sheet presented OVER the screen that triggered
+              // it. The group must be a transparent modal so its scrim reveals
+              // that screen behind it — otherwise the opaque group background
+              // (theme background = white in light mode) reads as a full new
+              // screen. The inner sign-in screen is itself a transparentModal.
+              presentation: 'transparentModal',
+              animation: 'fade',
               animationDuration: 180,
-              gestureEnabled: true,
-              gestureDirection: 'vertical',
+              gestureEnabled: false,
+              contentStyle: { backgroundColor: 'transparent' },
             }}
           />
           <Stack.Screen
@@ -249,6 +258,9 @@ function RootNavigation() {
           />
         </Stack>
       </NavigationThemeProvider>
+      {splashVisible ? (
+        <SplashOverlay onFinish={() => setSplashVisible(false)} />
+      ) : null}
     </AppView>
   );
 }

@@ -7,11 +7,12 @@ import { WheelLoader } from '@/components/shared/wheel-loader';
 
 import { AppButton } from '@/components/shared/app-button';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
+import { AppPrice } from '@/components/shared/app-price';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useOrders } from '@/hooks/use-orders';
-import type { OrderListRow, OrderListStatus } from '@/services/orders-service';
+import { formatOrderNo, type OrderListRow, type OrderListStatus } from '@/services/orders-service';
 import { triggerHaptic } from '@/utils/haptics';
 
 /**
@@ -102,21 +103,24 @@ const OrderCard = React.memo(function OrderCard({ order }: { order: OrderListRow
       }}
     >
       {/* Top row: order # mono/bold + status pill */}
-      <AppView row align="center" justify="space-between">
+      <AppView row align="center" justify="space-between" style={{ gap: 10 }}>
         <AppText
           weight="bold"
+          numberOfLines={1}
           style={{
             fontFamily: 'SpaceMono',
             fontSize: 14,
             lineHeight: 18,
             color: tokens.text,
+            flexShrink: 1,
           }}
         >
-          {order.id}
+          {formatOrderNo(order.id)}
         </AppText>
 
         <AppView
           style={{
+            flexShrink: 0,
             backgroundColor: tokens.backgroundSecondary,
             borderWidth: 1,
             borderColor: tokens.border,
@@ -153,13 +157,7 @@ const OrderCard = React.memo(function OrderCard({ order }: { order: OrderListRow
         >
           {order.date} · {order.items} item{order.items > 1 ? 's' : ''}
         </AppText>
-        <AppText
-          family="heading"
-          weight="bold"
-          style={{ fontSize: 16, lineHeight: 20, color: tokens.text }}
-        >
-          {order.total}
-        </AppText>
+        <AppPrice value={order.total} size={16} color={tokens.text} />
       </AppView>
     </AppPressableView>
   );

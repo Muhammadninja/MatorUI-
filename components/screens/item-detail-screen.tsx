@@ -9,6 +9,7 @@ import { AppButton } from '@/components/shared/app-button';
 import AppImageViewer from '@/components/shared/app-image-viewer/app-image-viewer';
 import { AppOemPill } from '@/components/shared/app-oem-pill';
 import { AppQtyStepper } from '@/components/shared/app-qty-stepper';
+import { AppPrice } from '@/components/shared/app-price';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { WheelLoader } from '@/components/shared/wheel-loader';
@@ -191,9 +192,7 @@ export default function ItemDetailScreen() {
 
           {item.oem || item.gm ? <AppOemPill oem={item.oem} gm={item.gm} /> : null}
 
-          <AppText family="heading" weight="bold" style={{ fontSize: 30, lineHeight: 36, color: tokens.info }}>
-            {item.price}
-          </AppText>
+          <AppPrice value={item.price} size={30} color={tokens.info} />
 
           {/* Confirmed fit — only when a vehicle is active in the garage. */}
           {activeVehicle ? (
@@ -251,9 +250,7 @@ export default function ItemDetailScreen() {
       >
         <AppView>
           <AppText family="default" style={{ fontSize: 11, color: tokens.textMuted }}>Total</AppText>
-          <AppText family="heading" weight="bold" style={{ fontSize: 20, color: tokens.text }}>
-            {formatCurrency(parsePrice(item.price) * qty)}
-          </AppText>
+          <AppPrice value={formatCurrency(parsePrice(item.price) * qty)} size={20} color={tokens.text} />
         </AppView>
         <AppView flex={1}>
           <AppButton testID="add-to-cart-btn" title="Add to cart" kind="brand" size="lg" fullWidth onPress={addToCart} />

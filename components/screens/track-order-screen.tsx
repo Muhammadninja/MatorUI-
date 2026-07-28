@@ -1,17 +1,18 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { AlertCircle } from 'lucide-react-native';
+import { useCallback, useRef } from 'react';
 import { ScrollView } from 'react-native';
 
 import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import ImageBox from '@/components/screens-components/home/image-box';
 import { AppButton } from '@/components/shared/app-button';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useOrder } from '@/hooks/use-orders';
+import { formatOrderNo } from '@/services/orders-service';
 import { triggerHaptic } from '@/utils/haptics';
 
 /**
@@ -28,6 +29,20 @@ export default function TrackOrderScreen() {
 
   const { orderId } = useLocalSearchParams<{ orderId?: string }>();
   const { state, order, error, refresh } = useOrder(orderId ?? null);
+
+  // Pull the latest status every time the screen is focused — navigating here
+  // from order history (or returning to a still-mounted track screen) must show
+  // the current status immediately, not a cached one that only the 15s poll
+  // would eventually correct. `refresh` isn't referentially stable (React Query
+  // returns a new result each render), so call it through a ref to keep the
+  // focus callback stable and avoid a refetch-on-every-render loop.
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
+  useFocusEffect(
+    useCallback(() => {
+      refreshRef.current();
+    }, []),
+  );
 
   const goShopping = () => {
     triggerHaptic('selection');
@@ -63,10 +78,9 @@ export default function TrackOrderScreen() {
             gap: 16,
           }}
         >
-          {/* Map placeholder */}
-          <ImageBox label="live delivery map" height={180} radius={18} />
-
-          {/* ETA card — brand-filled */}
+          {/* Status card — brand-filled. Big line = ETA when known, else the
+              status label (so pending orders read "Awaiting payment" once, on a
+              single line). Order # is the short display form. */}
           <AppView
             row
             align="center"
@@ -88,17 +102,20 @@ export default function TrackOrderScreen() {
                   letterSpacing: 0.6,
                 }}
               >
-                {order.statusLabel}
+                Order status
               </AppText>
               <AppText
                 family="heading"
                 weight="bold"
-                style={{ fontSize: 22, color: tokens.onBrand }}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.7}
+                style={{ fontSize: 20, color: tokens.onBrand }}
               >
-                {order.etaWindow}
+                {order.etaWindow || order.statusLabel}
               </AppText>
             </AppView>
-            <AppView style={{ alignItems: 'flex-end' }}>
+            <AppView style={{ alignItems: 'flex-end', flexShrink: 0 }}>
               <AppText
                 family="accent"
                 weight="semibold"
@@ -112,9 +129,53 @@ export default function TrackOrderScreen() {
               <AppText
                 family="mono"
                 weight="bold"
+                numberOfLines={1}
                 style={{ fontSize: 14, color: tokens.onBrand }}
               >
-                {order.id}
+                {formatOrderNo(order.id)}
+              </AppText>
+            </AppView>
+          </AppView>
+
+          {/* Order items — real line data (no placeholder imagery). */}
+          <AppView
+            style={{
+              backgroundColor: tokens.card,
+              borderWidth: 1,
+              borderColor: tokens.border,
+              borderRadius: 16,
+              padding: 16,
+              gap: 10,
+            }}
+          >
+            <AppText
+              family="accent"
+              weight="semibold"
+              style={{ fontSize: 11, color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 }}
+            >
+              Items
+            </AppText>
+            {order.items.map((line) => (
+              <AppView key={line.id} row justify="space-between" style={{ gap: 12 }}>
+                <AppText
+                  family="default"
+                  numberOfLines={1}
+                  style={{ fontSize: 13.5, color: tokens.textMuted, flex: 1 }}
+                >
+                  {line.title} × {line.quantity}
+                </AppText>
+                <AppText family="accent" weight="semibold" style={{ fontSize: 13.5, color: tokens.text }}>
+                  {line.price}
+                </AppText>
+              </AppView>
+            ))}
+            <AppView style={{ height: 1, backgroundColor: tokens.divider, marginVertical: 2 }} />
+            <AppView row justify="space-between">
+              <AppText family="default" weight="semibold" style={{ fontSize: 14, color: tokens.textMuted }}>
+                Total
+              </AppText>
+              <AppText family="heading" weight="bold" style={{ fontSize: 16, color: tokens.text }}>
+                {order.totalLabel}
               </AppText>
             </AppView>
           </AppView>

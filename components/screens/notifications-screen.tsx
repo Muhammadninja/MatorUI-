@@ -1,4 +1,6 @@
+import { useFocusEffect } from 'expo-router';
 import { BellOff } from 'lucide-react-native';
+import { useCallback, useRef } from 'react';
 
 import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
@@ -30,8 +32,19 @@ function useDotColor(tokens: ReturnType<typeof useThemeContext>['tokens']) {
 
 export default function NotificationsScreen() {
   const { tokens } = useThemeContext();
-  const { state, notifications, unreadCount, markRead, markAllRead } = useNotifications();
+  const { state, notifications, unreadCount, markRead, markAllRead, refresh } = useNotifications();
   const dotColor = useDotColor(tokens);
+
+  // Refetch whenever the screen is focused so a new order/delivery update from
+  // the backend shows the moment the user opens (or returns to) this screen.
+  // `refresh` isn't referentially stable, so call it through a ref.
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
+  useFocusEffect(
+    useCallback(() => {
+      void refreshRef.current();
+    }, []),
+  );
 
   const handleMarkAll = () => {
     markAllRead();

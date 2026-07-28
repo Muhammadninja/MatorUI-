@@ -1,8 +1,10 @@
+import { memo } from 'react';
 import { X } from 'lucide-react-native';
 
 import AppImage from '@/components/shared/app-image';
 import { AppOemPill } from '@/components/shared/app-oem-pill';
 import { AppQtyStepper } from '@/components/shared/app-qty-stepper';
+import { AppPrice } from '@/components/shared/app-price';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import type { CartItem } from '@/contexts/cart.context';
@@ -23,7 +25,7 @@ export type CartItemCardProps = {
  * affordance. Real cart data only — the OEM pill renders only if the item
  * carries an `oem`.
  */
-export default function CartItemCard({
+function CartItemCard({
   item,
   onIncrement,
   onDecrement,
@@ -77,9 +79,7 @@ export default function CartItemCard({
         </AppView>
 
         <AppView row align="center" justify="space-between" gap="md">
-          <AppText textVariant="body" family="heading" weight="bold">
-            {item.price}
-          </AppText>
+          <AppPrice value={item.price} size={18} />
           <AppQtyStepper
             value={item.quantity}
             onIncrement={onIncrement}
@@ -91,3 +91,5 @@ export default function CartItemCard({
     </AppView>
   );
 }
+
+export default memo(CartItemCard);
