@@ -115,15 +115,18 @@ async function saveProfileCache(p: UserProfile | null): Promise<void> {
   try {
     if (p) await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(p));
     else await AsyncStorage.removeItem(PROFILE_CACHE_KEY);
-  } catch {
-    /* non-fatal — losing the cache just means one more /me round-trip */
+    debugLog('auth', p ? 'saveProfileCache OK' : 'saveProfileCache cleared');
+  } catch (err) {
+    debugLog('auth', 'saveProfileCache FAILED', { message: (err as Error)?.message });
   }
 }
 async function loadProfileCache(): Promise<UserProfile | null> {
   try {
     const raw = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
+    debugLog('auth', raw ? 'loadProfileCache → restored' : 'loadProfileCache → none');
     return raw ? (JSON.parse(raw) as UserProfile) : null;
-  } catch {
+  } catch (err) {
+    debugLog('auth', 'loadProfileCache FAILED', { message: (err as Error)?.message });
     return null;
   }
 }
@@ -291,6 +294,7 @@ export function UserProvider({ children }: PropsWithChildren) {
         }
       }
       if (!cancelled) {
+        debugLog('auth', `BOOT DONE — restoredSession=${!!session} restoredProfile=${!!cachedProfile}`);
         bootingRef.current = false;
         setIsHydrating(false);
       }

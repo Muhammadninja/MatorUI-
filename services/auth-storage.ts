@@ -23,16 +23,15 @@ import * as SecureStore from 'expo-secure-store';
 
 import { debugLog } from '@/services/debug-log';
 
-/** Legacy single-key SecureStore envelope (schema 1) — still read for upgrades. */
-const LEGACY_KEY = 'auth:v1';
+// ⚠️ SecureStore keys must be alphanumeric + `.`, `-`, `_` ONLY. A colon `:`
+// throws "Invalid key provided to SecureStore" and the write silently fails —
+// which is why the session never survived a cold boot (the original `auth:v1`
+// key had the exact same bug from day one). Underscores are valid.
+const KEY_ACCESS = 'auth_v2_access';
+const KEY_REFRESH = 'auth_v2_refresh';
+const KEY_META = 'auth_v2_meta';
 
-// SecureStore is capped at 2048 bytes per value, so the two JWTs live under
-// their own keys (a lone JWT is well under the ceiling) plus a tiny meta blob.
-const KEY_ACCESS = 'auth:v2:access';
-const KEY_REFRESH = 'auth:v2:refresh';
-const KEY_META = 'auth:v2:meta';
-
-/** AsyncStorage fallback — a single JSON envelope, the reliable copy. */
+// AsyncStorage keys allow any string (colons are fine here) — the reliable copy.
 const ASYNC_KEY = 'auth:v2:session';
 
 const SCHEMA = 1;
@@ -89,12 +88,6 @@ export async function loadAuthSession(): Promise<AuthSession | null> {
       debugLog('auth', 'loadAuthSession → SecureStore (split keys)');
       return { accessToken, refreshToken, expiresAt };
     }
-    // Legacy single-key envelope.
-    const legacy = parseEnvelope(await SecureStore.getItemAsync(LEGACY_KEY));
-    if (legacy) {
-      debugLog('auth', 'loadAuthSession → SecureStore (legacy)');
-      return legacy;
-    }
   } catch (err) {
     debugLog('auth', 'loadAuthSession → SecureStore read failed', { message: (err as Error)?.message });
   }
@@ -134,7 +127,6 @@ export async function saveAuthSession(session: AuthSession): Promise<void> {
       SecureStore.setItemAsync(KEY_REFRESH, session.refreshToken),
       SecureStore.setItemAsync(KEY_META, meta),
     ]);
-    await SecureStore.deleteItemAsync(LEGACY_KEY).catch(() => undefined);
     debugLog('auth', 'saveAuthSession → SecureStore OK');
   } catch (err) {
     debugLog('auth', 'saveAuthSession → SecureStore FAILED (AsyncStorage fallback covers it)', {
@@ -148,7 +140,6 @@ export async function clearAuthSession(): Promise<void> {
     SecureStore.deleteItemAsync(KEY_ACCESS).catch(() => undefined),
     SecureStore.deleteItemAsync(KEY_REFRESH).catch(() => undefined),
     SecureStore.deleteItemAsync(KEY_META).catch(() => undefined),
-    SecureStore.deleteItemAsync(LEGACY_KEY).catch(() => undefined),
     AsyncStorage.removeItem(ASYNC_KEY).catch(() => undefined),
   ]);
 }
