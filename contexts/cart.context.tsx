@@ -24,6 +24,7 @@ import {
 } from '@/services/cart-math';
 import { clearStoredCart, loadCart, saveCart } from '@/services/cart-storage';
 import { toastService } from '@/services/toast-service';
+import { useUserContext } from '@/contexts/user.context';
 
 // Re-export types and constants so existing imports keep working without churn.
 export type { CartItem, CartTotals, PromoCode, PromoResult };
@@ -72,6 +73,16 @@ export function CartProvider({ children }: PropsWithChildren) {
   const [pendingIds, setPendingIds] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
 
+  // The server-side cart endpoints require auth. Guests use a purely LOCAL cart
+  // (persisted to storage); we only talk to the remote cart once signed in —
+  // otherwise every mutation 401s and rolls the change back. A ref keeps the
+  // async transport gate reading the CURRENT auth state, not a stale closure.
+  const { isAuthenticated } = useUserContext();
+  const authedRef = useRef(isAuthenticated);
+  useEffect(() => {
+    authedRef.current = isAuthenticated;
+  }, [isAuthenticated]);
+
   // Always-current snapshot for rollback during optimistic mutations.
   // We can't rely on closure values inside async callbacks because they
   // capture stale state from the moment the mutation was queued.
@@ -112,8 +123,10 @@ export function CartProvider({ children }: PropsWithChildren) {
           if (promo) setAppliedPromo(promo);
         }
       }
-      // After local cache renders, reconcile with the server.
+      // After local cache renders, reconcile with the server — but only when
+      // signed in. A guest cart is local-only, so skip the fetch (it would 401).
       try {
+        if (!authedRef.current) return;
         const remote = await cartTransport.fetch();
         if (cancelled) return;
         // Empty server cart shouldn't wipe local; only reconcile when the
@@ -168,7 +181,9 @@ export function CartProvider({ children }: PropsWithChildren) {
       optimistic();
       markPending(pendingId);
       try {
-        const result = await apiCall();
+        // Guests: local-only cart. Skip the server call (it requires auth and
+        // would 401 → rollback). The optimistic update still persists to storage.
+        const result = authedRef.current ? await apiCall() : null;
         setError(null);
         return result;
       } catch (err) {

@@ -1,34 +1,26 @@
 /**
  * Placements transport — the Explore "MATOR Certified" row.
  *
- * The row is a MONETIZABLE slot: each entry is a generic
- * `MatorCertifiedPlacement` (a certified category like "Certified Batteries", a
- * verified dealer, or a sold/sponsored ad unit). Same swap-by-injection pattern
- * as `categories-service`: a mock impl returning the bundled seed, and an HTTP
- * impl calling the (future) `GET /v1/placements` endpoint. Gated per-domain by
- * `shouldUseHttpTransport('placements')`, so it stays on the mock until the
- * backend ships the endpoint and the `placements` key is added to
- * `EXPO_PUBLIC_HTTP_DOMAINS` — a one-line enable, no code change.
+ * Live data comes from the PUBLIC dealer storefront `GET /v1/dealers`: its rows
+ * ARE the verified/certified dealers, and the admin console's certify / suspend
+ * writes are reflected here (a suspended dealer drops off the list), so this row
+ * stays in sync with what operators do in the panel — same shared DB.
  *
- * Backend contract (proposed — confirm field names from the first real payload):
- *   GET /v1/placements → { items: ApiPlacement[] }
- *   ApiPlacement = {
- *     id, title, subtitle?, badges?: string[],
- *     visual: { monogram?, image_url?, color },
- *     target: { kind:'catalogue', label, certified?:'oem'|'gm', query? }
- *           | { kind:'category', id, label }
- *           | { kind:'dealer', id, label }
- *           | { kind:'search', query }
- *           | { kind:'url', href },
- *     sponsor?: { name, sponsored }
- *   }
+ * Same swap-by-injection pattern as `categories-service`: a mock impl returning
+ * the bundled `MATOR_CERTIFIED` seed (offline / error fallback), and an HTTP impl
+ * calling `/v1/dealers`. Gated per-domain by `shouldUseHttpTransport('dealers')`,
+ * so it stays on the mock until `dealers` is in `EXPO_PUBLIC_HTTP_DOMAINS`.
+ *
+ * Backend contract (verified live on api.mator.uz 2026-07-28):
+ *   GET /v1/dealers → { items: ApiDealer[] }
+ *   ApiDealer = { id, name, initial?, color?, orders?: string, years?: number }
+ *   (`orders` is a preformatted display string, e.g. "18k+".)
  */
 
 import { shouldUseHttpTransport } from '@/config/api';
 import { apiClient } from '@/services/api-client';
 import {
   MATOR_CERTIFIED,
-  type CertifiedTarget,
   type MatorCertifiedPlacement,
 } from '@/mocks/mator-catalog';
 
@@ -66,86 +58,66 @@ class MockPlacementsTransport implements PlacementsTransport {
   }
 }
 
-// ── HTTP transport (proposed wire shape) ──────────────────────────────────
+// ── HTTP transport — real certified dealers via GET /v1/dealers ────────────
 
-type ApiTarget =
-  | { kind: 'catalogue'; label: string; certified?: 'oem' | 'gm'; query?: string }
-  | { kind: 'category'; id: string; label?: string }
-  | { kind: 'dealer'; id: string; label?: string }
-  | { kind: 'search'; query: string }
-  | { kind: 'url'; href: string };
-
-type ApiPlacement = {
+type ApiDealer = {
   id: string;
-  title: string;
-  subtitle?: string | null;
-  badges?: string[] | null;
-  visual?: {
-    monogram?: string | null;
-    image_url?: string | null;
-    imageUrl?: string | null;
-    color?: string | null;
-  } | null;
-  target?: ApiTarget | null;
-  sponsor?: { name?: string | null; sponsored?: boolean | null } | null;
+  name: string;
+  initial?: string | null;
+  /** Preformatted display string, e.g. "18k+". */
+  orders?: string | null;
+  years?: number | null;
+  color?: string | null;
+  /** Live badge flags mirrored from the admin dealer console. */
+  certified?: boolean | null;
+  lowestPrice?: boolean | null;
+  lowest_price?: boolean | null;
 };
 
-type ApiPlacementsResponse = { items: ApiPlacement[] };
+type ApiDealersResponse = { items: ApiDealer[] };
 
-/** Map the backend target onto the app's `CertifiedTarget`, defaulting unknown/
- *  missing targets to a labeled listing so a tap is never a dead end. */
-function mapTarget(t: ApiTarget | null | undefined, fallbackLabel: string): CertifiedTarget {
-  switch (t?.kind) {
-    case 'catalogue':
-      return {
-        kind: 'catalogue',
-        label: t.label ?? fallbackLabel,
-        certified: t.certified,
-        query: t.query,
-      };
-    case 'category':
-      return { kind: 'category', id: String(t.id), label: t.label ?? fallbackLabel };
-    case 'dealer':
-      return { kind: 'dealer', id: String(t.id), label: t.label ?? fallbackLabel };
-    case 'search':
-      return { kind: 'search', query: String(t.query ?? fallbackLabel) };
-    case 'url':
-      return { kind: 'url', href: String(t.href ?? '') };
-    default:
-      // Unknown/missing target → open the premium certified catalogue labeled
-      // with the placement title, so a tap is never a dead end.
-      return { kind: 'catalogue', label: fallbackLabel };
-  }
+/** "18k+ orders · 12y", or a single part, or nothing if the backend omits both. */
+function dealerSubtitle(d: ApiDealer): string | undefined {
+  const parts: string[] = [];
+  if (d.orders) parts.push(`${d.orders} orders`);
+  if (typeof d.years === 'number' && d.years > 0) parts.push(`${d.years}y`);
+  return parts.length ? parts.join(' · ') : undefined;
 }
 
-function mapPlacement(p: ApiPlacement): Placement {
+/** Map a public dealer storefront row onto a MATOR Certified card. Badges are
+ *  driven by the live flags: the endpoint only returns certified dealers, so the
+ *  Certified chip always shows, and the Lowest-Price chip follows the real flag —
+ *  so disabling either in the admin console updates this card. */
+function mapDealer(d: ApiDealer): Placement {
+  const lowestPrice = d.lowestPrice ?? d.lowest_price ?? false;
+  const badges: string[] = [];
+  if (d.certified ?? true) badges.push('MATOR CERTIFIED');
+  if (lowestPrice) badges.push('LOWEST PRICE');
   return {
-    id: p.id,
-    title: p.title,
-    subtitle: p.subtitle ?? undefined,
-    badges: p.badges ?? undefined,
+    id: d.id,
+    title: d.name,
+    subtitle: dealerSubtitle(d),
+    badges: badges.length ? badges : undefined,
     visual: {
-      monogram: p.visual?.monogram ?? undefined,
-      imageUrl: p.visual?.image_url ?? p.visual?.imageUrl ?? undefined,
-      color: p.visual?.color ?? DEFAULT_PLACEMENT_COLOR,
+      monogram: d.initial ?? d.name.charAt(0).toUpperCase(),
+      color: d.color ?? DEFAULT_PLACEMENT_COLOR,
     },
-    target: mapTarget(p.target, p.title),
-    sponsor: p.sponsor
-      ? { name: p.sponsor.name ?? '', sponsored: p.sponsor.sponsored ?? false }
-      : undefined,
+    // A verified storefront. Taps open the premium certified catalogue labeled
+    // for the dealer (no dealer-scoped catalog filter on the backend yet).
+    target: { kind: 'dealer', id: d.id, label: d.name },
   };
 }
 
 class HttpPlacementsTransport implements PlacementsTransport {
   async list(signal?: AbortSignal): Promise<Placement[]> {
-    const res = await apiClient.get<ApiPlacementsResponse>('/v1/placements', { signal });
-    return (res.items ?? []).map(mapPlacement);
+    const res = await apiClient.get<ApiDealersResponse>('/v1/dealers', { signal });
+    return (res.items ?? []).map(mapDealer);
   }
 }
 
 // ── Singleton ─────────────────────────────────────────────────────────────
 
-export const placementsTransport: PlacementsTransport = shouldUseHttpTransport('placements')
+export const placementsTransport: PlacementsTransport = shouldUseHttpTransport('dealers')
   ? new HttpPlacementsTransport()
   : new MockPlacementsTransport();
 

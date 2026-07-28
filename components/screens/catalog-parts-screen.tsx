@@ -251,7 +251,7 @@ export default function CatalogPartsScreen() {
           renderItem={renderItem}
           ItemSeparatorComponent={() => <AppView style={{ height: 12 }} />}
           ListHeaderComponent={
-            <AppView gap={12} style={{ paddingBottom: 4 }}>
+            <AppView gap={12} style={{ paddingBottom: 4, paddingHorizontal: 16 }}>
               <VehicleContextBar />
               <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>
                 {categoryLabel ? `${categoryLabel} · ` : ''}

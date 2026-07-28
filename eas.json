@@ -49,7 +49,7 @@
       "channel": "production",
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://api.mator.uz",
-        "EXPO_PUBLIC_HTTP_DOMAINS": "categories,catalog,search,auth,user,cart,garage,notifications"
+        "EXPO_PUBLIC_HTTP_DOMAINS": "categories,catalog,search,auth,user,cart,garage,notifications,orders,avatar,dealers"
       },
       "ios": {
         "resourceClass": "m-medium"
