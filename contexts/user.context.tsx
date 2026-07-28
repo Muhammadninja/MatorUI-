@@ -45,6 +45,7 @@ import {
 import { userTransport } from '@/services/user-api';
 import { debugLog, DEBUG_API_ENABLED } from '@/services/debug-log';
 import { getDeviceId } from '@/services/device-id';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
  * DEV-ONLY: print the full auth credentials (refresh token, account phone/id,
@@ -101,6 +102,32 @@ type UserContextValue = {
 
 const UserContext = createContext<UserContextValue | undefined>(undefined);
 
+/**
+ * Cached profile — persisted to AsyncStorage (reliable across cold boots) so a
+ * returning user is shown as logged-in INSTANTLY on launch, before and
+ * independent of the `/me` refresh. Keyed separately from the session tokens.
+ * This is what makes "remember me" survive a slow/failed `/me` or token refresh:
+ * the UI's `isAuthenticated` is driven by the cached profile, not by a
+ * network round-trip that can fail on a cold boot.
+ */
+const PROFILE_CACHE_KEY = 'auth:v2:profile';
+async function saveProfileCache(p: UserProfile | null): Promise<void> {
+  try {
+    if (p) await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(p));
+    else await AsyncStorage.removeItem(PROFILE_CACHE_KEY);
+  } catch {
+    /* non-fatal — losing the cache just means one more /me round-trip */
+  }
+}
+async function loadProfileCache(): Promise<UserProfile | null> {
+  try {
+    const raw = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
+    return raw ? (JSON.parse(raw) as UserProfile) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Short opaque ID like "A8F2K3" — readable, unambiguous, no real PII. */
 function makeGuestId(): string {
   const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -117,6 +144,17 @@ export function UserProvider({ children }: PropsWithChildren) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const guestIdRef = useRef<string>(makeGuestId());
+  // True only during the initial cold-boot hydration. While true, a failed
+  // token refresh must NOT sign the user out — the restored session + cached
+  // profile keep them logged in; the token retries on the next request.
+  const bootingRef = useRef(true);
+
+  // Set the profile in memory AND persist it, so the next cold boot can render
+  // the user as logged-in immediately, without waiting on `/me`.
+  const applyProfile = useCallback((p: UserProfile | null) => {
+    setProfile(p);
+    void saveProfileCache(p);
+  }, []);
 
   // Atomically swap the persisted session: SecureStore + in-memory cache.
   const persistSession = useCallback(async (session: AuthSession | null) => {
@@ -127,7 +165,7 @@ export function UserProvider({ children }: PropsWithChildren) {
 
   const signOut = useCallback(async () => {
     const existing = getCurrentSession();
-    setProfile(null);
+    applyProfile(null);
     await persistSession(null);
     // Best-effort revocation — don't block the sign-out UX on it.
     if (existing) {
@@ -155,7 +193,7 @@ export function UserProvider({ children }: PropsWithChildren) {
       try {
         const result = await authTransport.verifyOtp(input);
         await persistSession(result.session);
-        setProfile(result.user);
+        applyProfile(result.user);
         debugLog('auth', 'verifyOtp OK — session established', result.user);
         void logAuthCreds('verifyOtp', result.session, result.user);
       } catch (err) {
@@ -192,10 +230,10 @@ export function UserProvider({ children }: PropsWithChildren) {
       setProfile((prev) => (prev ? { ...prev, ...patch } : prev));
       try {
         const updated = await userTransport.updateMe(patch);
-        setProfile(updated);
+        applyProfile(updated);
         debugLog('profile', 'updateProfile OK — saved profile', updated);
       } catch (err) {
-        setProfile(previous);
+        applyProfile(previous);
         setError(err instanceof Error ? err.message : 'Failed to update profile.');
         debugLog('profile', 'updateProfile FAILED — rolled back', { message: (err as Error)?.message });
         throw err;
@@ -215,7 +253,7 @@ export function UserProvider({ children }: PropsWithChildren) {
       // (the login identity changed) — persist it and swap the profile.
       const { user, session } = await userTransport.confirmPhoneChange(phone, otp);
       await persistSession(session);
-      setProfile(user);
+      applyProfile(user);
       debugLog('profile', 'phone changed — session swapped', { phone: user.phone });
     },
     [persistSession],
@@ -225,41 +263,42 @@ export function UserProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const session = await loadAuthSession();
+      const [session, cachedProfile] = await Promise.all([loadAuthSession(), loadProfileCache()]);
       if (cancelled) return;
       setCurrentSession(session);
       if (session) {
+        // Render the returning user as logged-in IMMEDIATELY from the cached
+        // profile. The `/me` refresh below is best-effort — it must never be
+        // able to log them out.
+        if (cachedProfile) setProfile(cachedProfile);
         try {
           const me = await userTransport.getMe();
-          if (!cancelled) setProfile(me);
+          if (!cancelled) applyProfile(me);
           void logAuthCreds('hydrate (restored session)', session, me);
         } catch (err) {
-          // Only DISCARD the persisted session on a definitive auth failure —
-          // i.e. a 401 that survived the refresh-and-retry in api-client (the
-          // refresh token is dead). A transient cold-boot failure (network not
-          // ready yet, timeout, 5xx) must NOT log the user out: keep the
-          // session on disk so the next launch — or an in-app retry — restores
-          // them. Wiping on any error is what made users re-authenticate every
-          // time they opened the app on a flaky connection.
-          const isAuthFailure = err instanceof ApiError && err.status === 401;
-          debugLog('auth', 'hydrate getMe FAILED', {
+          // NEVER wipe the session on cold boot. A failed `/me` — expired
+          // access token whose refresh was rejected, offline, timeout, 5xx —
+          // keeps the restored session AND the cached profile, so the user
+          // stays signed in and the token refreshes on the next successful
+          // request. Only an explicit signOut (or a dead refresh on a real
+          // in-app action, once booting is done) clears the session. Wiping on
+          // boot is exactly what made users re-authenticate every launch.
+          debugLog('auth', 'hydrate getMe FAILED — keeping session + cached profile', {
             status: err instanceof ApiError ? err.status : undefined,
-            discardingSession: isAuthFailure,
+            hadCachedProfile: !!cachedProfile,
             message: (err as Error)?.message,
           });
-          if (!cancelled && isAuthFailure) {
-            await persistSession(null);
-          }
-          // On a transient error we keep `session` in the in-memory cache (set
-          // above) so authed requests can still be attempted this run.
         }
       }
-      if (!cancelled) setIsHydrating(false);
+      if (!cancelled) {
+        bootingRef.current = false;
+        setIsHydrating(false);
+      }
     })();
     return () => {
       cancelled = true;
     };
-  }, [persistSession]);
+  }, [applyProfile]);
 
   // ── 401 handler wired into apiClient ─────────────────────────────────
   //
@@ -278,12 +317,19 @@ export function UserProvider({ children }: PropsWithChildren) {
       const work = (async () => {
         const result = await authTransport.refresh(session.refreshToken).catch(() => null);
         if (!result) {
+          // During cold-boot hydration a failed refresh must NOT sign the user
+          // out — keep the restored session + cached profile; the token retries
+          // on the next request. Only sign out on a dead refresh during a real
+          // in-app action (after booting completes).
+          if (bootingRef.current) return false;
           await signOut();
           router.replace('/sign-in');
           return false;
         }
         await persistSession(result.session);
-        setProfile(result.user);
+        // Refresh may omit the user object; only overwrite the profile when it
+        // actually carries one (else keep the cached / current profile).
+        if (result.user?.id) applyProfile(result.user);
         void logAuthCreds('token refreshed', result.session, result.user);
         return true;
       })();
