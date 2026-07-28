@@ -10,6 +10,9 @@ export default function AuthStackLayout() {
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: tokens.background },
+        // Edge-only swipe-back (see root layout) — not full-screen.
+        fullScreenGestureEnabled: false,
+        gestureResponseDistance: { start: 50 },
       }}
     >
       {/* Auth is a single unified phone-OTP bottom sheet presented OVER the

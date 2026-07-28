@@ -1,10 +1,10 @@
 import {
-    Figtree_400Regular,
-    Figtree_500Medium,
-    Figtree_600SemiBold,
-    Figtree_700Bold,
-    Figtree_800ExtraBold,
-} from '@expo-google-fonts/figtree';
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+    Inter_800ExtraBold,
+} from '@expo-google-fonts/inter';
 import { Raleway_800ExtraBold } from '@expo-google-fonts/raleway';
 import { useFonts } from 'expo-font';
 import { requireNativeModule } from 'expo-modules-core';
@@ -80,11 +80,11 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
-    Figtree_400Regular,
-    Figtree_500Medium,
-    Figtree_600SemiBold,
-    Figtree_700Bold,
-    Figtree_800ExtraBold,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+    Inter_800ExtraBold,
     Raleway_800ExtraBold,
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
@@ -194,6 +194,11 @@ function RootNavigation() {
         <Stack
           screenOptions={{
             contentStyle: { backgroundColor: tokens.background },
+            // Swipe-back only from the LEFT EDGE (~50px), not the whole screen —
+            // with hidden headers the pop gesture defaults to full-screen, which
+            // caused accidental "back" mid-screen. Edge-only = the iOS/Amazon feel.
+            fullScreenGestureEnabled: false,
+            gestureResponseDistance: { start: 50 },
             statusBarTranslucent: true,
             statusBarBackgroundColor: 'transparent',
             // iOS reads UIStatusBarStyle per-screen via native-stack — without
