@@ -170,11 +170,14 @@ export default function ProfileScreen() {
             </AppView>
           </AppView>
 
-          {/* Handoff §17: ghost "Sign out" */}
+          {/* "Sign out" as a plain text button — the default `primary` tint is
+              near-white in light mode (invisible); `kind="text"` uses the theme
+              text color so it reads in both light and dark. */}
           <AppView px="lg">
             <AppButton
               title="Sign out"
               variant="ghost"
+              kind="text"
               size="lg"
               fullWidth
               onPress={handleSignOut}
