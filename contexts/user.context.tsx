@@ -321,13 +321,12 @@ export function UserProvider({ children }: PropsWithChildren) {
       const work = (async () => {
         const result = await authTransport.refresh(session.refreshToken).catch(() => null);
         if (!result) {
-          // During cold-boot hydration a failed refresh must NOT sign the user
-          // out — keep the restored session + cached profile; the token retries
-          // on the next request. Only sign out on a dead refresh during a real
-          // in-app action (after booting completes).
-          if (bootingRef.current) return false;
-          await signOut();
-          router.replace('/sign-in');
+          // Refresh failed. Do NOT sign the user out or wipe the session —
+          // that is exactly what logged users out on every launch. Keep the
+          // persisted session + cached profile so they stay signed in; the
+          // token refreshes on the next request that succeeds. Only an explicit
+          // sign-out (profile / settings) clears the session.
+          debugLog('auth', 'refresh failed — keeping session + cached profile (no auto sign-out)');
           return false;
         }
         await persistSession(result.session);

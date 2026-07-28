@@ -26,6 +26,7 @@
  */
 
 import { apiClient } from '@/services/api-client';
+import { debugLog } from '@/services/debug-log';
 import type { AuthSession } from '@/services/auth-storage';
 
 export type UserSummary = {
@@ -179,9 +180,19 @@ function delay(ms: number): Promise<void> {
 
 // ── HTTP transport (backend.json wire shape) ────────────────────────────
 
-/** Strip spaces / dashes / parens so "+998 90 123 45 67" → "+998901234567". */
+/**
+ * Normalize a user-entered Uzbek phone to E.164 (`+998XXXXXXXXX`). The app is
+ * UZ-only (request-otp always sends `country_iso2: 'UZ'`), so a bare national
+ * number is assumed to be +998. Accepts any of:
+ *   "+998 90 123 45 67", "998901234567", "901234567", "0901234567"
+ * → all become "+998901234567". Strips formatting, drops a leading 998 country
+ * code or a 0 trunk prefix, then re-prefixes +998.
+ */
 function toE164(raw: string): string {
-  return raw.replace(/[^\d+]/g, '');
+  let digits = raw.replace(/[^\d]/g, '');
+  if (digits.startsWith('998')) digits = digits.slice(3);
+  else if (digits.startsWith('0')) digits = digits.replace(/^0+/, '');
+  return `+998${digits}`;
 }
 
 /** Unix seconds from an ISO timestamp; undefined when absent/invalid. */
@@ -322,21 +333,44 @@ class HttpAuthTransport implements AuthTransport {
 
   async refresh(refreshToken: string, signal?: AbortSignal): Promise<AuthResult | null> {
     try {
-      const r = await apiClient.post<{ user?: RawBackendUser; tokens: RawTokens }>(
+      const r = await apiClient.post<Record<string, unknown>>(
         '/v1/auth/token/refresh',
         { refresh_token: refreshToken },
         { signal, skipAuth: true, maxRetries: 0 },
       );
+      // Tolerate every plausible shape the backend might return, so a mismatch
+      // never silently fails the refresh (which used to log the user out):
+      //   { tokens: { access_token, refresh_token } }  (nested, snake)
+      //   { access_token, refresh_token }               (flat, snake)
+      //   { accessToken, refreshToken }                 (flat, camel)
+      const nested = r && typeof (r as { tokens?: unknown }).tokens === 'object'
+        ? ((r as { tokens: Record<string, unknown> }).tokens)
+        : (r as Record<string, unknown>);
+      const t = (nested ?? {}) as Record<string, unknown>;
+      const accessToken = (t.access_token ?? t.accessToken) as string | undefined;
+      // Backends that don't rotate the refresh token return only a new access
+      // token — keep the current refresh token in that case.
+      const newRefresh = (t.refresh_token ?? t.refreshToken ?? refreshToken) as string;
+      if (!accessToken) {
+        debugLog('auth', 'refresh: no access token in response — cannot parse', {
+          responseKeys: Object.keys((r ?? {}) as object),
+          tokenKeys: Object.keys(t),
+        });
+        return null;
+      }
+      const expiresAt = epochFromIso(
+        (t.access_token_expires_at ?? t.accessTokenExpiresAt) as string | undefined,
+      );
+      const rawUser = ((r as { user?: RawBackendUser }).user ??
+        (t.user as RawBackendUser | undefined));
       return {
-        session: tokensToSession(r.tokens),
-        // Refresh may omit the user; the auth context only reads `.session` here.
-        user: r.user
-          ? mapBackendUser(r.user)
+        session: { accessToken, refreshToken: newRefresh, expiresAt },
+        user: rawUser
+          ? mapBackendUser(rawUser)
           : { id: '', firstName: '', lastName: '', email: '', username: '', avatarUrl: null, memberSince: '' },
       };
-    } catch {
-      // A 401/400 on refresh means the refresh token is no longer valid. Return
-      // null so the auth context signs the user out.
+    } catch (err) {
+      debugLog('auth', 'refresh threw', { message: (err as Error)?.message });
       return null;
     }
   }
