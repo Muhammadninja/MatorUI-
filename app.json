@@ -54,13 +54,13 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/MATOR-app-icons/expo/splash-icon.png",
-          "imageWidth": 200,
+          "image": "./assets/MATOR-app-icons/expo/splash-icon-dark.png",
+          "imageWidth": 160,
           "resizeMode": "contain",
-          "backgroundColor": "#F2F3F5",
+          "backgroundColor": "#ffffff",
           "dark": {
             "image": "./assets/MATOR-app-icons/expo/splash-icon.png",
-            "backgroundColor": "#0A0A0A"
+            "backgroundColor": "#050505"
           }
         }
       ],
@@ -90,6 +90,12 @@
         "environment": "production",
         "enableInDev": false
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/1e4e8419-ba28-4fe4-b4af-953729419716"
     }
   }
 }
