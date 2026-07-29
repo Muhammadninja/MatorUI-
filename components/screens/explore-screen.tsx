@@ -100,10 +100,20 @@ export default function ExploreScreen() {
     triggerHaptic('selection');
     router.push({ pathname: '/category', params: { cat: id, label } });
   }, []);
-  const openMake = useCallback((brandId: string) => {
-    triggerHaptic('selection');
-    router.push({ pathname: '/make', params: { make: brandId } });
-  }, []);
+  const openMake = useCallback(
+    (brandId: string) => {
+      triggerHaptic('selection');
+      // Coming-soon brands are teasers — surface a toast instead of opening an
+      // empty model list.
+      const make = makes.find((m) => m.id === brandId);
+      if (make?.comingSoon) {
+        toast.info(`${make.name} — coming soon`);
+        return;
+      }
+      router.push({ pathname: '/make', params: { make: brandId } });
+    },
+    [makes, toast],
+  );
 
   return (
     <AppView flex={1} colorName="background">
@@ -258,6 +268,7 @@ export default function ExploreScreen() {
                 brandId={b.id}
                 label={b.name}
                 logoUrl={b.logoUrl}
+                comingSoon={b.comingSoon}
                 onPress={openMake}
               />
             ))}
