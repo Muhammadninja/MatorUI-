@@ -5,11 +5,11 @@ import { useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AutoPartIcon from '@/components/screens-components/catalog/auto-part-icon';
+import { CategoryRowsSkeleton } from '@/components/screens-components/catalog/category-grid-skeleton';
 import VehicleContextBar from '@/components/screens-components/catalog/vehicle-context-bar';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
-import { ListLoadingOverlay } from '@/components/shared/wheel-loader';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useCategories } from '@/hooks/use-categories';
 import type { CategoryTileData } from '@/services/categories-service';
@@ -72,11 +72,6 @@ export default function CatalogSystemsScreen() {
           <AppText family="heading" weight="bold" style={{ fontSize: hideIcon ? 20 : 18, lineHeight: hideIcon ? 26 : 24, color: tokens.text }}>
             {item.name}
           </AppText>
-          {item.count > 0 ? (
-            <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted }}>
-              {item.count} part{item.count === 1 ? '' : 's'}
-            </AppText>
-          ) : null}
         </AppView>
         <ChevronRight size={22} strokeWidth={2.2} color={tokens.textMuted} />
       </AppPressableView>
@@ -101,10 +96,10 @@ export default function CatalogSystemsScreen() {
           </AppView>
         }
         ItemSeparatorComponent={() => <AppView style={{ height: 1, backgroundColor: tokens.divider }} />}
+        ListEmptyComponent={state === 'loading' ? <CategoryRowsSkeleton /> : null}
         contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: Math.max(insets.bottom + 24, 40) }}
         showsVerticalScrollIndicator={false}
       />
-      <ListLoadingOverlay visible={state === 'loading'} label="Loading systems…" />
     </AppView>
   );
 }
