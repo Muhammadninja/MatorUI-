@@ -1,17 +1,16 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { ChevronRight } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
 import { ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import BrandLogo, { hasBrandLogo, LOGO_BRANDS } from '@/components/screens-components/catalog/brand-logo';
+import BrandLogo, { hasBrandLogo } from '@/components/screens-components/catalog/brand-logo';
 import { brandColor } from '@/components/screens-components/catalog/brand-meta';
+import { CategoryRowsSkeleton } from '@/components/screens-components/catalog/category-grid-skeleton';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
-import { ListLoadingOverlay } from '@/components/shared/wheel-loader';
 import { useThemeContext } from '@/contexts/theme.context';
-import { UZ_BRANDS, UZ_MODELS } from '@/services/uz-vehicle-catalog';
+import { useMakes, useModels } from '@/hooks/use-vehicle-catalog';
 
 /** Catalog categories the listings are actually bucketed by. */
 /**
@@ -24,19 +23,15 @@ export default function MakeScreen() {
   const insets = useSafeAreaInsets();
   const { make: makeParam } = useLocalSearchParams<{ make?: string }>();
 
-  const uzBrand = UZ_BRANDS.find((b) => b.id === makeParam);
-  const brandId = uzBrand?.id ?? makeParam ?? UZ_BRANDS[0].id;
-  const label =
-    uzBrand?.label ?? LOGO_BRANDS.find((b) => b.id === brandId)?.label ?? UZ_BRANDS[0].label;
-  const models = UZ_MODELS.filter((m) => m.brandId === brandId);
+  const brandId = makeParam ?? '';
+  // Live from GET /v1/reference (admin-managed). `makes` resolves the display
+  // name for the hero; `useModels` drives the list. Both fall back to the
+  // bundled catalog on error, so the screen never renders blank.
+  const { makes } = useMakes();
+  const { state: modelsState, models } = useModels(brandId);
+  const label = makes.find((m) => m.id === brandId)?.name ?? makeParam ?? 'Vehicle';
   const color = brandColor(brandId);
-
-  // Simulated fetch — a branded wheel overlay while models load.
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 850);
-    return () => clearTimeout(t);
-  }, []);
+  const loading = modelsState === 'loading';
 
   const openModel = (modelLabel: string) =>
     router.push({
@@ -99,38 +94,44 @@ export default function MakeScreen() {
         >
           Models
         </AppText>
-        <AppView>
-          {models.map((m, i) => (
-            <AppPressableView
-              key={m.id}
-              onPress={() => openModel(m.label)}
-              androidRipple={false}
-              accessibilityRole="button"
-              accessibilityLabel={`${label} ${m.label}`}
-              row
-              align="center"
-              gap={12}
-              style={{
-                paddingVertical: 18,
-                borderBottomWidth: i < models.length - 1 ? 1 : 0,
-                borderBottomColor: tokens.divider,
-              }}
-            >
-              <AppView flex={1}>
-                <AppText family="heading" weight="bold" style={{ fontSize: 19, color: tokens.text }}>
-                  {label} {m.label}
-                </AppText>
-                <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted, textTransform: 'capitalize' }}>
-                  {m.bodyStyle}
-                </AppText>
-              </AppView>
-              <ChevronRight size={22} strokeWidth={2.2} color={tokens.textMuted} />
-            </AppPressableView>
-          ))}
-        </AppView>
+        {loading ? (
+          <CategoryRowsSkeleton showIcon={false} count={4} />
+        ) : models.length === 0 ? (
+          <AppText
+            family="default"
+            style={{ fontSize: 14, color: tokens.textMuted, paddingVertical: 12 }}
+          >
+            No models available for {label} yet.
+          </AppText>
+        ) : (
+          <AppView>
+            {models.map((m, i) => (
+              <AppPressableView
+                key={m.id}
+                onPress={() => openModel(m.name)}
+                androidRipple={false}
+                accessibilityRole="button"
+                accessibilityLabel={`${label} ${m.name}`}
+                row
+                align="center"
+                gap={12}
+                style={{
+                  paddingVertical: 18,
+                  borderBottomWidth: i < models.length - 1 ? 1 : 0,
+                  borderBottomColor: tokens.divider,
+                }}
+              >
+                <AppView flex={1}>
+                  <AppText family="heading" weight="bold" style={{ fontSize: 19, color: tokens.text }}>
+                    {label} {m.name}
+                  </AppText>
+                </AppView>
+                <ChevronRight size={22} strokeWidth={2.2} color={tokens.textMuted} />
+              </AppPressableView>
+            ))}
+          </AppView>
+        )}
       </ScrollView>
-
-      <ListLoadingOverlay visible={loading} label="Loading models…" />
     </AppView>
   );
 }

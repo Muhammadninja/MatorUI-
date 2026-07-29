@@ -2,11 +2,12 @@ import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
 import { Bell, Search } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Defs, Rect, Stop, LinearGradient as SvgLinearGradient } from 'react-native-svg';
 
-import { LOGO_BRANDS } from '@/components/screens-components/catalog/brand-logo';
+import CategoryGridSkeleton, {
+  BrandRowSkeleton,
+} from '@/components/screens-components/catalog/category-grid-skeleton';
 import CategoryTile from '@/components/screens-components/catalog/category-tile';
 import CertifiedSection from '@/components/screens-components/catalog/certified-section';
 import MatorFitBanner from '@/components/screens-components/catalog/mator-fit-banner';
@@ -17,6 +18,7 @@ import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useCategories } from '@/hooks/use-categories';
+import { useMakes } from '@/hooks/use-vehicle-catalog';
 import { useNotifications } from '@/hooks/use-notifications';
 import { useToast } from '@/hooks/use-toast';
 import { triggerHaptic } from '@/utils/haptics';
@@ -24,6 +26,37 @@ import { triggerHaptic } from '@/utils/haptics';
 // Soft feather under the header so the frosted panel dissolves into the
 // content instead of ending in a hard seam ("dropline").
 const HEADER_FADE = 24;
+
+// Number of bands in the feather. More = smoother ramp; 14 over 24px (~1.7px
+// each) reads as a continuous fade.
+const HEADER_FADE_BANDS = 14;
+
+/**
+ * Pure-View replacement for what used to be an SVG linear-gradient. Stacks thin
+ * bands of the background colour with opacity ramping opaque→transparent,
+ * top→bottom. Avoids react-native-svg's benign-but-noisy "No stops in gradient"
+ * paint-order warning (a `<Rect fill="url(#…)">` can paint a frame before its
+ * `<Defs>` stops commit) with zero new dependencies.
+ */
+function HeaderFade({ color, height }: { color: string; height: number }) {
+  return (
+    <View
+      pointerEvents="none"
+      style={{ position: 'absolute', left: 0, right: 0, bottom: -height, height }}
+    >
+      {Array.from({ length: HEADER_FADE_BANDS }).map((_, i) => (
+        <View
+          key={i}
+          style={{
+            flex: 1,
+            backgroundColor: color,
+            opacity: 1 - i / (HEADER_FADE_BANDS - 1),
+          }}
+        />
+      ))}
+    </View>
+  );
+}
 
 /**
  * Explore (home) — v2 AutoZone-style **category browser** (not a product
@@ -44,6 +77,9 @@ export default function ExploreScreen() {
   // "Shop by category" grid — live from GET /v1/categories (per-domain HTTP
   // gate), falling back to the bundled tiles on error so it never renders blank.
   const { state: categoriesState, categories, refresh: refreshCategories } = useCategories();
+  // "Shop by vehicle" row — live from GET /v1/reference/makes (admin-managed),
+  // falling back to the bundled makes on error so it never renders blank.
+  const { state: makesState, makes } = useMakes();
   // Unread count drives the red bell indicator — shown only when > 0.
   const { unreadCount } = useNotifications();
 
@@ -147,20 +183,7 @@ export default function ExploreScreen() {
         </AppView>
 
         {/* Blended dropline — the panel feathers into the content below. */}
-        <Svg
-          pointerEvents="none"
-          width="100%"
-          height={HEADER_FADE}
-          style={{ position: 'absolute', left: 0, right: 0, bottom: -HEADER_FADE }}
-        >
-          <Defs>
-            <SvgLinearGradient id="exploreFade" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor={tokens.background} stopOpacity={1} />
-              <Stop offset="1" stopColor={tokens.background} stopOpacity={0} />
-            </SvgLinearGradient>
-          </Defs>
-          <Rect x="0" y="0" width="100%" height={HEADER_FADE} fill="url(#exploreFade)" />
-        </Svg>
+        <HeaderFade color={tokens.background} height={HEADER_FADE} />
       </AppView>
 
       {/* Branded pull-to-refresh bar — sits just under the frosted header
@@ -220,16 +243,20 @@ export default function ExploreScreen() {
             </AppText>
           </AppPressableView>
         </AppView>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 12, paddingHorizontal: 20, paddingVertical: 2 }}
-          style={{ marginHorizontal: -20 }}
-        >
-          {LOGO_BRANDS.map((b) => (
-            <VehicleMakeTile key={b.id} brandId={b.id} label={b.label} onPress={openMake} />
-          ))}
-        </ScrollView>
+        {makesState === 'loading' ? (
+          <BrandRowSkeleton />
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 12, paddingHorizontal: 20, paddingVertical: 2 }}
+            style={{ marginHorizontal: -20 }}
+          >
+            {makes.map((b) => (
+              <VehicleMakeTile key={b.id} brandId={b.id} label={b.name} onPress={openMake} />
+            ))}
+          </ScrollView>
+        )}
 
         {/* ── MATOR Certified ── */}
         <CertifiedSection />
@@ -239,9 +266,7 @@ export default function ExploreScreen() {
           Shop by category
         </AppText>
         {categoriesState === 'loading' ? (
-          <AppView center style={{ height: 200 }}>
-            <WheelLoader size={26} color={tokens.textMuted} />
-          </AppView>
+          <CategoryGridSkeleton />
         ) : (
           <AppView row wrap justify="space-between" style={{ rowGap: 12 }}>
             {categories.map((c) => (

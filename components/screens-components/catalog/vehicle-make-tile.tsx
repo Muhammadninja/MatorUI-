@@ -1,6 +1,8 @@
 import { memo } from 'react';
 
-import BrandLogo from '@/components/screens-components/catalog/brand-logo';
+import BrandLogo, { hasBrandLogo } from '@/components/screens-components/catalog/brand-logo';
+import { brandColor } from '@/components/screens-components/catalog/brand-meta';
+import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 
@@ -30,7 +32,19 @@ function VehicleMakeTile({ brandId, label, onPress }: VehicleMakeTileProps) {
       style={{ width: 84 }}
     >
       <AppView center rounded={20} style={{ width: 65, height: 65, backgroundColor: tokens.white }}>
-        <BrandLogo name={label} size={50} />
+        {hasBrandLogo(label) ? (
+          <BrandLogo name={label} size={50} />
+        ) : (
+          // Admin-added brands may have no bundled SVG logo yet — show the
+          // brand initial so the tile is never a blank white chip.
+          <AppText
+            family="heading"
+            weight="bold"
+            style={{ fontSize: 26, color: brandColor(brandId) }}
+          >
+            {label.charAt(0).toUpperCase()}
+          </AppText>
+        )}
       </AppView>
     </AppPressableView>
   );
