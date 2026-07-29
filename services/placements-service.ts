@@ -64,6 +64,10 @@ type ApiDealer = {
   id: string;
   name: string;
   initial?: string | null;
+  /** Brand logo the operator uploaded in the admin console. Rendered on the card
+   *  when present; the monogram tile is the fallback. */
+  logoUrl?: string | null;
+  logo_url?: string | null;
   /** Preformatted display string, e.g. "18k+". */
   orders?: string | null;
   years?: number | null;
@@ -99,6 +103,9 @@ function mapDealer(d: ApiDealer): Placement {
     subtitle: dealerSubtitle(d),
     badges: badges.length ? badges : undefined,
     visual: {
+      // Real brand icon when the operator uploaded one; the card renders the
+      // image and only falls back to the monogram tile when it's absent.
+      imageUrl: d.logoUrl ?? d.logo_url ?? undefined,
       monogram: d.initial ?? d.name.charAt(0).toUpperCase(),
       color: d.color ?? DEFAULT_PLACEMENT_COLOR,
     },
