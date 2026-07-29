@@ -3,7 +3,7 @@ import { ChevronRight } from 'lucide-react-native';
 import { ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import BrandLogo, { hasBrandLogo } from '@/components/screens-components/catalog/brand-logo';
+import BrandLogo from '@/components/screens-components/catalog/brand-logo';
 import { brandColor } from '@/components/screens-components/catalog/brand-meta';
 import { CategoryRowsSkeleton } from '@/components/screens-components/catalog/category-grid-skeleton';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
@@ -29,7 +29,9 @@ export default function MakeScreen() {
   // bundled catalog on error, so the screen never renders blank.
   const { makes } = useMakes();
   const { state: modelsState, models } = useModels(brandId);
-  const label = makes.find((m) => m.id === brandId)?.name ?? makeParam ?? 'Vehicle';
+  const make = makes.find((m) => m.id === brandId);
+  const label = make?.name ?? makeParam ?? 'Vehicle';
+  const logoUrl = make?.logoUrl ?? null;
   const color = brandColor(brandId);
   const loading = modelsState === 'loading';
 
@@ -68,13 +70,7 @@ export default function MakeScreen() {
             rounded={16}
             style={{ width: 54, height: 54, backgroundColor: tokens.white, borderWidth: 1, borderColor: tokens.border }}
           >
-            {hasBrandLogo(label) ? (
-              <BrandLogo name={label} size={36} />
-            ) : (
-              <AppText family="heading" weight="bold" style={{ fontSize: 24, color }}>
-                {label.charAt(0)}
-              </AppText>
-            )}
+            <BrandLogo logoUrl={logoUrl} name={label} size={36} color={color} />
           </AppView>
           <AppView flex={1}>
             <AppText family="heading" weight="bold" style={{ fontSize: 19, color: tokens.text }}>

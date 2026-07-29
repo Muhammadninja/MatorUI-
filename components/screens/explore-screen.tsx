@@ -253,7 +253,13 @@ export default function ExploreScreen() {
             style={{ marginHorizontal: -20 }}
           >
             {makes.map((b) => (
-              <VehicleMakeTile key={b.id} brandId={b.id} label={b.name} onPress={openMake} />
+              <VehicleMakeTile
+                key={b.id}
+                brandId={b.id}
+                label={b.name}
+                logoUrl={b.logoUrl}
+                onPress={openMake}
+              />
             ))}
           </ScrollView>
         )}

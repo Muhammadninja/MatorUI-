@@ -1,16 +1,17 @@
 import { memo } from 'react';
 
-import BrandLogo, { hasBrandLogo } from '@/components/screens-components/catalog/brand-logo';
+import BrandLogo from '@/components/screens-components/catalog/brand-logo';
 import { brandColor } from '@/components/screens-components/catalog/brand-meta';
-import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 
 export type VehicleMakeTileProps = {
   /** Brand id used for navigation. */
   brandId: string;
-  /** Brand display name (must match a `BrandLogo` key). */
+  /** Brand display name. */
   label: string;
+  /** Backend logo URL; null → initial fallback (handled by BrandLogo). */
+  logoUrl?: string | null;
   onPress: (brandId: string) => void;
 };
 
@@ -19,7 +20,7 @@ export type VehicleMakeTileProps = {
  * white rounded chip. Presentational; the parent supplies the brand + tap
  * handler.
  */
-function VehicleMakeTile({ brandId, label, onPress }: VehicleMakeTileProps) {
+function VehicleMakeTile({ brandId, label, logoUrl, onPress }: VehicleMakeTileProps) {
   const { tokens } = useThemeContext();
   return (
     <AppPressableView
@@ -32,19 +33,7 @@ function VehicleMakeTile({ brandId, label, onPress }: VehicleMakeTileProps) {
       style={{ width: 84 }}
     >
       <AppView center rounded={20} style={{ width: 65, height: 65, backgroundColor: tokens.white }}>
-        {hasBrandLogo(label) ? (
-          <BrandLogo name={label} size={50} />
-        ) : (
-          // Admin-added brands may have no bundled SVG logo yet — show the
-          // brand initial so the tile is never a blank white chip.
-          <AppText
-            family="heading"
-            weight="bold"
-            style={{ fontSize: 26, color: brandColor(brandId) }}
-          >
-            {label.charAt(0).toUpperCase()}
-          </AppText>
-        )}
+        <BrandLogo logoUrl={logoUrl} name={label} size={50} color={brandColor(brandId)} />
       </AppView>
     </AppPressableView>
   );
