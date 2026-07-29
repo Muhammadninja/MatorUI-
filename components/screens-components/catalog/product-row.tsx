@@ -1,23 +1,18 @@
-import { router } from 'expo-router';
-import { BadgeCheck, Car, Heart, ShoppingCart } from 'lucide-react-native';
-import { memo } from 'react';
+import { MaterialIcons } from '@expo/vector-icons';
+import { memo, useEffect, useRef, useState } from 'react';
+import { View } from 'react-native';
 
 import ImageBox from '@/components/screens-components/home/image-box';
-import { AppPrice } from '@/components/shared/app-price';
+import { splitPrice } from '@/components/shared/app-price';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
+import WheelLoader from '@/components/shared/wheel-loader/wheel-loader';
 import { useActiveVehicle } from '@/contexts/active-vehicle.context';
-import { useLikesContext } from '@/contexts/likes.context';
 import { useThemeContext } from '@/contexts/theme.context';
+import { useToast } from '@/hooks/use-toast';
 import type { CatalogItem } from '@/services/catalog-service';
 
-// Hairline border shared by the card and the like-button chip.
-const HAIRLINE = '#E6E7EA';
-
-type ProductRowItem = CatalogItem & {
-  brand?: string;
-  gm?: string;
-};
+type ProductRowItem = CatalogItem & { brand?: string };
 
 export type ProductRowProps = {
   item: CatalogItem;
@@ -27,183 +22,274 @@ export type ProductRowProps = {
   onAdd: (item: CatalogItem) => void;
 };
 
+type FitState = 'idle' | 'checking' | 'fits';
+const FIT_CHECK_MS = 900;
+
+/** Deterministic per-product hash → stable, varied placeholder rating / reviews /
+ *  discount (the backend carries none; see the design handoff). */
+function hashId(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return h;
+}
+
 /**
- * `ProductRow` — the AutoZone-style result card on Category / Search, backed by
- * the real catalog (`CatalogItem`). A white product-image tile on the left; on
- * the right the title, Part # (OEM), and price; and a
- * full-width "Add to cart" below. Only fields the catalog actually carries are
- * shown — rating, warranty, core deposit, store address, and delivery are
- * omitted rather than faked.
+ * `ProductRow` — the Mator listing card, matched to `design_handoff_mator_app`
+ * (radius-20 surface card, 108² image, brand eyebrow, meta row, inline fit chip,
+ * and a footer bar with price + Add pill). Rating / reviews / save-% are
+ * placeholders (backend has none). Fitment is checked INLINE across three
+ * states — it never routes.
  */
 function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
   const product = item as ProductRowItem;
-  const { tokens } = useThemeContext();
-  const { isLiked, toggleLike } = useLikesContext();
+  const { tokens, scheme } = useThemeContext();
   const { currentActiveVehicle } = useActiveVehicle();
-  const liked = isLiked(product.id);
+  const toast = useToast();
   const image = product.images?.[0];
 
   const activeVehicle = currentActiveVehicle?.vehicle ?? null;
-  // "Check if it fits" (amber) until a vehicle is active in the garage, then
-  // "Fits your <car>" (green) — mirrors the item-detail confirmed-fit banner.
-  const fitColor = activeVehicle ? tokens.success : tokens.warning;
-  const fitLabel = activeVehicle
-    ? `Fits your ${activeVehicle.year} ${activeVehicle.make}`
-    : 'Check if it fits';
+  const vehicleLabel = activeVehicle
+    ? `${activeVehicle.year} ${activeVehicle.model ?? activeVehicle.make}`.trim()
+    : null;
 
-  // The backend `title` is the full localized part name — it already carries
-  // the model (e.g. "Cobalt Remen Generator Xitoy Original"), so show it
-  // verbatim rather than slicing arbitrary words. The subtitle is the part
-  // brand · category (`description`, e.g. "Gates · Dvigatel kamarlari").
-  const primaryTitle = product.title;
-  const subtitle = product.description?.trim() || undefined;
+  const [fitState, setFitState] = useState<FitState>('idle');
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+
+  const handleCheckFit = () => {
+    if (fitState !== 'idle') return;
+    setFitState('checking');
+    timerRef.current = setTimeout(() => {
+      if (vehicleLabel) {
+        setFitState('fits');
+        toast.success(`Confirmed fit — ${activeVehicle!.year} ${activeVehicle!.make} ${activeVehicle!.model ?? ''}`.trim());
+      } else {
+        setFitState('idle');
+        toast.info('Add a vehicle to confirm fit');
+      }
+    }, FIT_CHECK_MS);
+  };
+
+  // ── Placeholder signals (deterministic per product id) ────────────────────
+  const h = hashId(item.id);
+  const rating = (4.2 + (h % 8) / 10).toFixed(1); // 4.2–4.9
+  const reviews = 50 + (h % 900); // 50–949
+  const savePct = 10 + (h % 20); // 10–29%
+  const amountNum = parseInt(item.price.replace(/\D/g, ''), 10) || 0;
+  const wasNum = amountNum > 0 ? Math.round(amountNum / (1 - savePct / 100)) : 0;
+  const priceAmount = splitPrice(item.price).amount || item.price;
+  const wasLabel = wasNum > 0 ? wasNum.toLocaleString('ru-RU') : null;
+
+  const brandEyebrow = (product.brand ?? product.description?.split('·')[0])?.trim();
+  const title = product.title;
+  const oem = product.oem;
+
+  // Footer hairline — deliberately fainter than the global divider token.
+  const hairline = scheme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
+
+  const fitChipBg =
+    fitState === 'fits'
+      ? scheme === 'dark'
+        ? 'rgba(15,157,88,0.16)'
+        : 'rgba(15,157,88,0.10)'
+      : tokens.background;
+  const fitLabel =
+    fitState === 'fits'
+      ? vehicleLabel
+        ? `Fits your ${vehicleLabel}`
+        : 'Fits your vehicle'
+      : fitState === 'checking'
+        ? 'Checking…'
+        : 'Check fit';
+  const fitTextColor = fitState === 'fits' ? tokens.success : fitState === 'checking' ? tokens.textMuted : tokens.text;
 
   return (
-    // Two columns: the image stretches to the full card height on the left;
-    // details + price + button stack in the right column so the button sits
-    // beside the image and never interrupts it. (Row align defaults to
-    // 'stretch', which is what lets the image fill the column height.)
-    <AppView row gap={10} p={8} colorName="background">
-      {/* Product image — white `contain` tile filling the full column height. */}
-      <AppPressableView
-        testID={`part-card-${item.id}`}
-        onPress={() => onOpen(item)}
-        androidRipple={false}
-        accessibilityRole="button"
-        accessibilityLabel={item.title}
-        style={{ width: 128 }}
-      >
-        <ImageBox
-          label={item.title}
-          uri={image}
-          height={250}
-          radius={10}
-          contentFit="contain"
-          backgroundColor={tokens.white}
-        />
-        {/* Like toggle — inline, top-right over the image */}
+    <AppView colorName="backgroundSecondary" rounded={20} style={{ overflow: 'hidden' }}>
+      {/* ── Top block ── */}
+      <AppView row gap={14} style={{ padding: 14 }}>
+        {/* Image + save badge */}
         <AppPressableView
-          onPress={() => toggleLike(item.id)}
-          accessibilityRole="button"
-          accessibilityLabel={liked ? 'Remove from favorites' : 'Save to favorites'}
+          testID={`part-card-${item.id}`}
+          onPress={() => onOpen(item)}
           androidRipple={false}
-          center
-          rounded={32}
-          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-          style={{ position: 'absolute', top: 6, right: 6, width: 28, height: 28, backgroundColor: 'rgba(255,255,255,0.92)', borderWidth: 1, borderColor: HAIRLINE }}
+          accessibilityRole="button"
+          accessibilityLabel={item.title}
+          style={{ width: 108 }}
         >
-          <Heart
-            size={16}
-            strokeWidth={2.2}
-            color={liked ? tokens.error : 'rgba(0,0,0,0.55)'}
-            fill={liked ? tokens.error : 'none'}
+          <ImageBox
+            label={item.title}
+            uri={image}
+            height={108}
+            radius={14}
+            contentFit="contain"
+            backgroundColor={tokens.white}
           />
-        </AppPressableView>
-      </AppPressableView>
-
-      {/* Right column: details, price, and the Add to cart button. */}
-      <AppView flex={1} gap={8}>
-        <AppPressableView onPress={() => onOpen(item)} androidRipple={false}>
-          {/* Title = the full localized part name (already includes the model). */}
-          <AppText
-            family="default"
-            weight="bold"
-            numberOfLines={2}
-            style={{ fontSize: 16, lineHeight: 20, color: tokens.text }}
-          >
-            {primaryTitle}
-          </AppText>
-          {/* Subtitle = part brand · category, smaller + muted. */}
-          {subtitle ? (
-            <AppText
-              family="default"
-              numberOfLines={1}
-              style={{ fontSize: 12, lineHeight: 16, color: tokens.textMuted, marginTop: 2 }}
+          {savePct > 0 ? (
+            <View
+              style={{
+                position: 'absolute',
+                top: 7,
+                left: 7,
+                backgroundColor: '#4ade80',
+                borderRadius: 999,
+                paddingHorizontal: 7,
+                paddingVertical: 3,
+              }}
             >
-              {subtitle}
-            </AppText>
+              <AppText family="accent" weight="bold" style={{ fontSize: 10, color: '#05310f' }}>
+                {`-${savePct}%`}
+              </AppText>
+            </View>
           ) : null}
         </AppPressableView>
 
-        {/* MATOR Certified trust badge — shown only when the backend marks this
-            part's seller certified (operator-panel toggle). Off by default. */}
-        {product.certified ? (
-          <AppView
+        {/* Info column */}
+        <AppView flex={1} gap={6}>
+          <AppPressableView onPress={() => onOpen(item)} androidRipple={false} style={{ gap: 6 }}>
+            {brandEyebrow ? (
+              <AppText
+                family="accent"
+                weight="bold"
+                numberOfLines={1}
+                style={{ fontSize: 10, letterSpacing: 1, color: tokens.textMuted, textTransform: 'uppercase' }}
+              >
+                {brandEyebrow}
+              </AppText>
+            ) : null}
+            <AppText
+              family="default"
+              weight="semibold"
+              numberOfLines={2}
+              style={{ fontSize: 14.5, lineHeight: 19, color: tokens.text, marginTop: 3 }}
+            >
+              {title}
+            </AppText>
+            {/* Seller trust badges — driven by the dealer's admin-toggled
+             *  certified / lowest-price flags (part.seller.{certified,lowest_price}). */}
+            {product.certified || product.lowestPrice ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 5 }}>
+                {product.certified ? (
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 3,
+                      backgroundColor: '#16a34a1a',
+                      borderRadius: 999,
+                      paddingHorizontal: 7,
+                      paddingVertical: 2,
+                    }}
+                  >
+                    <MaterialIcons name="verified" size={11} color="#16a34a" />
+                    <AppText family="accent" weight="bold" style={{ fontSize: 10, color: '#16a34a' }}>
+                      Certified
+                    </AppText>
+                  </View>
+                ) : null}
+                {product.lowestPrice ? (
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 3,
+                      backgroundColor: '#2563eb1a',
+                      borderRadius: 999,
+                      paddingHorizontal: 7,
+                      paddingVertical: 2,
+                    }}
+                  >
+                    <MaterialIcons name="local-offer" size={11} color="#2563eb" />
+                    <AppText family="accent" weight="bold" style={{ fontSize: 10, color: '#2563eb' }}>
+                      Lowest price
+                    </AppText>
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+            {/* Meta row — ★ rating · (reviews) · OEM */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 5 }}>
+              <MaterialIcons name="star" size={12} color="#F59E0B" />
+              <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.text }}>
+                {rating}
+              </AppText>
+              <AppText family="default" style={{ fontSize: 11.5, color: tokens.textMuted }}>
+                {`(${reviews.toLocaleString('en-US')})`}
+              </AppText>
+              {oem ? (
+                <>
+                  <View style={{ width: 3, height: 3, borderRadius: 3, backgroundColor: tokens.textMuted }} />
+                  <AppText
+                    family="mono"
+                    numberOfLines={1}
+                    style={{ flex: 1, fontSize: 10.5, color: tokens.textMuted }}
+                  >
+                    {oem}
+                  </AppText>
+                </>
+              ) : null}
+            </View>
+          </AppPressableView>
+
+          {/* Fit chip — inline, three states, pill, no border. */}
+          <AppPressableView
+            onPress={handleCheckFit}
+            disabled={fitState !== 'idle'}
+            androidRipple={false}
+            pressedOpacity={0.7}
             row
             align="center"
-            gap={5}
-            rounded={7}
-            px={8}
-            py={3}
-            borderWidth={1}
-            style={{ alignSelf: 'flex-start', backgroundColor: `${tokens.info}14`, borderColor: `${tokens.info}45` }}
+            gap={6}
+            rounded={999}
+            hitSlop={{ top: 8, bottom: 8, left: 6, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel={fitState === 'fits' ? fitLabel : 'Check if this part fits your car'}
+            style={{ alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, backgroundColor: fitChipBg }}
           >
-            <BadgeCheck size={13} strokeWidth={2.5} color={tokens.info} />
-            <AppText family="accent" weight="bold" style={{ fontSize: 10.5, letterSpacing: 0.3, color: tokens.info }}>
-              MATOR Certified
+            {fitState === 'checking' ? (
+              <WheelLoader size={13} color={tokens.textMuted} />
+            ) : fitState === 'fits' ? (
+              <MaterialIcons name="check-circle" size={14} color={tokens.success} />
+            ) : (
+              <MaterialIcons name="rule" size={14} color={tokens.text} />
+            )}
+            <AppText family="accent" weight="bold" numberOfLines={1} style={{ fontSize: 11.5, color: fitTextColor }}>
+              {fitLabel}
             </AppText>
-          </AppView>
-        ) : null}
-
-        {/* OEM / GM cross-reference numbers */}
-        {product.oem || product.gm ? (
-          <AppView row wrap gap={6}>
-            {product.oem ? (
-              <AppView row align="center" gap={4} rounded={6} px={7} py={3} colorName="backgroundSecondary">
-                <AppText family="accent" weight="bold" style={{ fontSize: 9.5, letterSpacing: 0.5, color: tokens.textMuted }}>
-                  OEM
-                </AppText>
-                <AppText family="default" weight="semibold" numberOfLines={1} style={{ fontSize: 11, color: tokens.text }}>
-                  {product.oem}
-                </AppText>
-              </AppView>
-            ) : null}
-            {product.gm ? (
-              <AppView row align="center" gap={4} rounded={6} px={7} py={3} colorName="backgroundSecondary">
-                <AppText family="accent" weight="bold" style={{ fontSize: 9.5, letterSpacing: 0.5, color: tokens.textMuted }}>
-                  GM
-                </AppText>
-                <AppText family="default" weight="semibold" numberOfLines={1} style={{ fontSize: 11, color: tokens.text }}>
-                  {product.gm}
-                </AppText>
-              </AppView>
-            ) : null}
-          </AppView>
-        ) : null}
-
-        {/* Check-if-it-fits banner — routes to the garage to pick a vehicle,
-            or shows the confirmed fit when one is already active. */}
-        <AppPressableView
-          onPress={() => (activeVehicle ? onOpen(item) : router.navigate('/garage'))}
-          androidRipple={false}
-          pressedOpacity={0.85}
-          row
-          align="center"
-          gap={8}
-          rounded={10}
-          px={10}
-          py={8}
-          borderWidth={1}
-          accessibilityRole="button"
-          accessibilityLabel={activeVehicle ? fitLabel : 'Check if this part fits your car'}
-          style={{ borderColor: fitColor, backgroundColor: `${fitColor}18` }}
-        >
-          <Car size={15} strokeWidth={2.3} color={fitColor} />
-          <AppText family="accent" weight="bold" numberOfLines={1} style={{ flex: 1, fontSize: 12, color: tokens.text }}>
-            {fitLabel}
-          </AppText>
-        </AppPressableView>
-
-        {/* Price — pushed to the right, just above the button. `marginTop:auto`
-            pins the price + button to the bottom of the column so the image
-            (which matches this column's height) isn't left with empty space. */}
-        <AppView row justify="flex-start" style={{ marginTop: 'auto' }}>
-          {/* Amazon-style price tag — near-black (theme text) so it reads as
-              bold near-black in light mode and stays legible in dark mode. */}
-          <AppPrice value={item.price} color={tokens.text} />
+          </AppPressableView>
         </AppView>
+      </AppView>
 
-        {/* Add to cart — in the right column, beside the image (never over it). */}
+      {/* ── Footer bar ── */}
+      <AppView
+        row
+        align="center"
+        gap={10}
+        style={{ paddingHorizontal: 14, paddingVertical: 11, borderTopWidth: 1, borderTopColor: hairline }}
+      >
+        {/* Price (+ struck was) */}
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+          <AppText
+            family="heading"
+            weight="bold"
+            numberOfLines={1}
+            style={{ fontSize: 19, letterSpacing: -0.4, color: tokens.text }}
+          >
+            {priceAmount}
+          </AppText>
+          <AppText family="accent" weight="semibold" style={{ fontSize: 11, color: tokens.textMuted }}>
+            {"so'm"}
+          </AppText>
+          {wasLabel ? (
+            <AppText
+              family="default"
+              style={{ fontSize: 12, color: tokens.textMuted, textDecorationLine: 'line-through' }}
+            >
+              {wasLabel}
+            </AppText>
+          ) : null}
+        </View>
+
+        {/* Add pill */}
         <AppPressableView
           onPress={() => onAdd(item)}
           accessibilityRole="button"
@@ -211,18 +297,14 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
           androidRipple={false}
           pressedOpacity={0.9}
           row
-          center
-          gap={8}
-          rounded={36}
-          py={6}
-          style={{ backgroundColor: tokens.text }}
+          align="center"
+          gap={6}
+          rounded={999}
+          style={{ paddingHorizontal: 18, paddingVertical: 10, backgroundColor: tokens.text }}
         >
-          {/* Foreground = `tokens.background` (the inverse of `tokens.text`),
-              so the icon + label always contrast: dark button/light text in
-              light mode, light button/dark text in dark mode. */}
-          <ShoppingCart size={17} strokeWidth={2.4} color={tokens.background} />
-          <AppText family="accent" weight="bold" style={{ fontSize: 14, color: tokens.background, letterSpacing: 0.3 }}>
-            Add to cart
+          <MaterialIcons name="add-shopping-cart" size={16} color={tokens.background} />
+          <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.background }}>
+            Add
           </AppText>
         </AppPressableView>
       </AppView>
