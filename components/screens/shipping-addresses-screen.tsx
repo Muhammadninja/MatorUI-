@@ -21,6 +21,7 @@ import {
   useSetDefaultAddress,
 } from '@/hooks/use-orders';
 import type { Address } from '@/services/orders-service';
+import { debugLog } from '@/services/debug-log';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -50,13 +51,18 @@ export default function ShippingAddressesScreen() {
     async (values: AddressFormValues) => {
       try {
         if (editing) {
-          await updateAddress.mutateAsync({ id: editing.id, input: values });
+          debugLog('address', `→ update ${editing.id}`, values);
+          const updated = await updateAddress.mutateAsync({ id: editing.id, input: values });
+          debugLog('address', '← updated (stored)', updated);
           toast.info('Address updated');
         } else {
-          await createAddress.mutateAsync(values);
+          debugLog('address', '→ create', values);
+          const created = await createAddress.mutateAsync(values);
+          debugLog('address', '← created (stored)', created);
           toast.info('Address added');
         }
-      } catch {
+      } catch (err) {
+        debugLog('address', '✗ save FAILED', { message: (err as Error)?.message });
         toast.info('Couldn’t save address. Please try again.');
       }
     },

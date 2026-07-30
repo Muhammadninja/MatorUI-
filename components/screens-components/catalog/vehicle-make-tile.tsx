@@ -23,7 +23,7 @@ export type VehicleMakeTileProps = {
  * white rounded chip. A `comingSoon` brand renders dimmed with a "Soon" badge;
  * the parent decides tap behavior (it does not navigate for coming-soon brands).
  */
-function VehicleMakeTile({ brandId, label, logoUrl, comingSoon, onPress }: VehicleMakeTileProps) {
+const VehicleMakeTile = ({ brandId, label, logoUrl, comingSoon, onPress }: VehicleMakeTileProps) => {
   const { tokens } = useThemeContext();
   return (
     <AppPressableView

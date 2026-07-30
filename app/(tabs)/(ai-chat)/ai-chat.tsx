@@ -1,1 +1,1 @@
-export { default } from '@/components/screens/ai-chat-screen';
+export { default } from '@/components/screens-components/ai-chat/ai-chatbot';

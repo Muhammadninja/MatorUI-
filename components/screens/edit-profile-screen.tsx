@@ -17,6 +17,15 @@ import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useToast } from '@/hooks/use-toast';
 import { useUserContext } from '@/contexts/user.context';
+import { uploadAvatar } from '@/services/avatar-service';
+import { debugLog } from '@/services/debug-log';
+import { PhoneChangeSheet } from '@/components/screens-components/account/phone-change-sheet';
+
+/** A picked image is a local file:// / ph:// / content:// URI that the backend
+ *  can't store — those must be uploaded first. An https URL is already hosted. */
+function isLocalImageUri(uri: string): boolean {
+  return !/^https?:\/\//i.test(uri);
+}
 
 /** Initials monogram from first + last name, e.g. "AM". Falls back to "M". */
 function initials(name: string): string {
@@ -39,8 +48,13 @@ export default function EditProfileScreen() {
   const [fullName, setFullName] = useState(
     `${profile?.firstName ?? ''} ${profile?.lastName ?? ''}`.trim(),
   );
-  const [email, setEmail]       = useState(profile?.email ?? '');
-  const [phone, setPhone]       = useState(profile?.phone ?? '');
+  // Email is read-only (no backend field). Phone IS changeable now — via the
+  // dedicated OTP flow (POST /v1/me/phone/request + confirm), opened as a sheet;
+  // it re-binds the login identity and swaps the session, so it can't ride the
+  // plain name/avatar PATCH.
+  const [email] = useState(profile?.email ?? '');
+  const [phoneSheetVisible, setPhoneSheetVisible] = useState(false);
+  // Seed from the backend avatar so reopening shows the current picture.
   const [avatarUri, setAvatarUri] = useState<string | undefined>(
     profile?.avatarUrl ?? undefined,
   );
@@ -62,8 +76,10 @@ export default function EditProfileScreen() {
     }
   };
 
-  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  const canSave = Boolean(fullName.trim() && emailValid) && !saving;
+  // Only the full name (and avatar) are editable, so that's all the Save gate
+  // needs. Requiring a valid email here used to permanently disable Save for
+  // phone-signup users (who have no email) — they could never update their name.
+  const canSave = Boolean(fullName.trim()) && !saving;
 
   const handleSave = async () => {
     if (!canSave) return;
@@ -77,16 +93,41 @@ export default function EditProfileScreen() {
 
     setSaving(true);
     try {
+      // A freshly-picked photo is a local file:// URI the backend can't store —
+      // upload it first and persist the returned HTTPS URL. An existing https
+      // avatar (or no avatar) is passed through untouched. A freshly-picked photo
+      // is a local file:// URI — upload it (POST /v1/me/avatar, live) to get an
+      // HTTPS URL. If the upload fails, keep the existing avatar and still save
+      // the name (don't block the whole edit), warning the user about the photo.
+      let avatarUrl: string | null = avatarUri ?? null;
+      let photoFailed = false;
+      if (avatarUri && isLocalImageUri(avatarUri)) {
+        try {
+          avatarUrl = await uploadAvatar(avatarUri);
+        } catch (err) {
+          debugLog('profile', 'avatar upload failed — saving without new photo', {
+            message: (err as Error)?.message,
+          });
+          avatarUrl = profile?.avatarUrl ?? null; // leave the backend avatar untouched
+          photoFailed = true;
+        }
+      }
+
+      // Phone is the login identity (changed via the OTP flow, not here) and
+      // email has no backend field, so neither is sent.
       await updateProfile({
         firstName,
         lastName,
-        email: email.trim(),
-        phone: phone.trim(),
-        avatarUrl: avatarUri ?? null,
+        avatarUrl,
       });
-      toast.success('Profile updated');
+      if (photoFailed) {
+        toast.info('Saved, but the photo couldn’t be uploaded. Try again.');
+      } else {
+        toast.success('Profile updated');
+      }
       router.back();
-    } catch {
+    } catch (err) {
+      debugLog('profile', 'handleSave FAILED', { message: (err as Error)?.message });
       toast.danger('Could not save changes. Please try again.');
     } finally {
       setSaving(false);
@@ -175,9 +216,9 @@ export default function EditProfileScreen() {
 
               <AppTextField
                 label="Email"
-                placeholder="Email address"
+                placeholder="Not linked"
                 value={email}
-                onChangeText={setEmail}
+                disabled
                 autoCapitalize="none"
                 keyboardType="email-address"
                 autoCorrect={false}
@@ -185,12 +226,27 @@ export default function EditProfileScreen() {
 
               <AppTextField
                 label="Phone"
-                placeholder="+1 (000) 000-0000"
-                value={phone}
-                onChangeText={setPhone}
+                placeholder="+998 90 123 45 67"
+                value={profile?.phone ?? ''}
+                disabled
                 keyboardType="phone-pad"
                 autoCorrect={false}
               />
+              <Pressable
+                onPress={() => setPhoneSheetVisible(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Change phone number"
+                style={{ marginTop: -6 }}
+              >
+                <AppText
+                  family="accent"
+                  weight="bold"
+                  colorName="brandBg"
+                  style={{ fontSize: 13 }}
+                >
+                  Change phone number
+                </AppText>
+              </Pressable>
             </AppView>
 
             {/* Save CTA */}
@@ -207,6 +263,12 @@ export default function EditProfileScreen() {
           </AppView>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <PhoneChangeSheet
+        visible={phoneSheetVisible}
+        onClose={() => setPhoneSheetVisible(false)}
+        currentPhone={profile?.phone ?? null}
+      />
     </AppView>
   );
 }

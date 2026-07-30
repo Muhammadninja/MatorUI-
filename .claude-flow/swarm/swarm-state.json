@@ -64,7 +64,7 @@
       "swarmId": "swarm-1781632086594-sqpw7e",
       "topology": "hierarchical-mesh",
       "maxAgents": 15,
-      "status": "running",
+      "status": "terminated",
       "agents": [],
       "tasks": [],
       "config": {
@@ -76,8 +76,54 @@
         "consensusMechanism": "majority"
       },
       "createdAt": "2026-06-16T17:48:06.594Z",
-      "updatedAt": "2026-06-16T17:48:06.594Z",
-      "pid": 18817
+      "updatedAt": "2026-07-26T09:37:06.715Z",
+      "pid": 18817,
+      "terminationReason": "host process 18817 exited"
+    },
+    "swarm-1785058698638-y0myzz": {
+      "swarmId": "swarm-1785058698638-y0myzz",
+      "topology": "hierarchical-mesh",
+      "maxAgents": 15,
+      "status": "terminated",
+      "agents": [],
+      "tasks": [],
+      "config": {
+        "topology": "hierarchical-mesh",
+        "maxAgents": 15,
+        "strategy": "specialized",
+        "communicationProtocol": "message-bus",
+        "autoScaling": true,
+        "consensusMechanism": "majority"
+      },
+      "createdAt": "2026-07-26T09:38:18.638Z",
+      "updatedAt": "2026-07-26T09:38:24.631Z",
+      "pid": 4570,
+      "terminationReason": "host process 4570 exited"
+    },
+    "swarm-1785058731517-62q8dt": {
+      "swarmId": "swarm-1785058731517-62q8dt",
+      "topology": "hierarchical-mesh",
+      "maxAgents": 15,
+      "status": "terminated",
+      "agents": [
+        "agent-1785058747839-7glggm",
+        "agent-1785058762773-ts9xrc",
+        "agent-1785058763666-gcraza",
+        "agent-1785058764551-ybg0fw"
+      ],
+      "tasks": [],
+      "config": {
+        "topology": "hierarchical-mesh",
+        "maxAgents": 15,
+        "strategy": "specialized",
+        "communicationProtocol": "message-bus",
+        "autoScaling": true,
+        "consensusMechanism": "majority"
+      },
+      "createdAt": "2026-07-26T09:38:51.517Z",
+      "updatedAt": "2026-07-26T09:38:55.876Z",
+      "pid": 5079,
+      "terminationReason": "host process 5079 exited"
     }
   },
   "version": "3.0.0"

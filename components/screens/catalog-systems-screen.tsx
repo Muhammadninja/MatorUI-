@@ -69,11 +69,11 @@ export default function CatalogSystemsScreen() {
           </AppView>
         )}
         <AppView flex={1}>
-          <AppText family="heading" weight="bold" style={{ fontSize: hideIcon ? 20 : 18, lineHeight: hideIcon ? 26 : 24, color: tokens.text }}>
+          <AppText family="heading" weight="bold" style={{ fontSize: 16, color: tokens.text }}>
             {item.name}
           </AppText>
         </AppView>
-        <ChevronRight size={22} strokeWidth={2.2} color={tokens.textMuted} />
+        <ChevronRight size={22} strokeWidth={1.5} color={tokens.text} />
       </AppPressableView>
     ),
     [openSystem, tokens, hideIcon],

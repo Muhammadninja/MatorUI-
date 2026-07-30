@@ -111,7 +111,7 @@ export function CartProvider({ children }: PropsWithChildren) {
     });
   }, []);
 
-  // ── Hydrate: load local cache instantly, then reconcile from transport.
+  // ── Hydrate: load the local cache instantly so the cart renders offline-first.
   useEffect(() => {
     let cancelled = false;
     const hydrate = async () => {
@@ -123,31 +123,43 @@ export function CartProvider({ children }: PropsWithChildren) {
           if (promo) setAppliedPromo(promo);
         }
       }
-      // After local cache renders, reconcile with the server — but only when
-      // signed in. A guest cart is local-only, so skip the fetch (it would 401).
-      try {
-        if (!authedRef.current) return;
-        const remote = await cartTransport.fetch();
-        if (cancelled) return;
-        // Empty server cart shouldn't wipe local; only reconcile when the
-        // server actually has data. Real backend will return the canonical
-        // shape; this is an offline-first hedge.
-        if (remote.items.length > 0) {
-          setItems(remote.items);
-          const promo = remote.appliedPromoCode ? PROMO_CODES[remote.appliedPromoCode] : null;
-          setAppliedPromo(promo ?? null);
-        }
-      } catch {
-        // Offline / first-ever fetch failed — silently keep local state.
-      } finally {
-        if (!cancelled) setIsHydrated(true);
-      }
+      if (!cancelled) setIsHydrated(true);
     };
     void hydrate();
     return () => {
       cancelled = true;
     };
   }, []);
+
+  // ── Reconcile with the server whenever we're signed in. This runs on every
+  // transition into an authenticated state — not just at mount — because auth
+  // is restored asynchronously on relaunch and may not be ready when hydrate
+  // fires. Beyond syncing state, the fetch WARMS the transport's part_id →
+  // line_id map for the persisted cart, so a subsequent quantity update PATCHes
+  // the right line instead of 404ing on a cold map.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const remote = await cartTransport.fetch();
+        if (cancelled) return;
+        // Empty server cart shouldn't wipe local; only reconcile when the
+        // server actually has data (offline-first hedge).
+        if (remote.items.length > 0) {
+          setItems(remote.items);
+          const promo = remote.appliedPromoCode ? PROMO_CODES[remote.appliedPromoCode] : null;
+          setAppliedPromo(promo ?? null);
+        }
+      } catch {
+        // Offline / fetch failed — silently keep local state. The transport
+        // self-heals the id map lazily on the next mutation if needed.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
 
   // ── Debounce-write to local cache after every change.
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);

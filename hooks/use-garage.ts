@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useUserContext } from '@/contexts/user.context';
 import {
   garageService,
   type Vehicle,
@@ -57,6 +58,10 @@ function isAbortError(e: unknown): boolean {
 }
 
 export function useGarage(): UseGarageState {
+  // Garage is a per-user resource — only signed-in users have one. Guests get an
+  // empty state (with an Add button that triggers auth), so we never fire a
+  // doomed unauthenticated GET /v1/garage/vehicles (which 401s → error state).
+  const { isAuthenticated, isHydrating } = useUserContext();
   const [vehicles, setVehicles] = useState<Vehicle[]>(() => garageService.getVehicles());
   const [isLoading, setIsLoading] = useState(!garageService.hasLoadedOnce());
   const [isMutating, setIsMutating] = useState(false);
@@ -76,31 +81,53 @@ export function useGarage(): UseGarageState {
     };
   }, []);
 
-  // Subscribe to live cache + trigger initial fetch when the cache is cold.
+  // Subscribe to the live cache for this component's lifetime.
   useEffect(() => {
     const unsubscribe = garageService.subscribe(setVehicles);
-    if (!garageService.hasLoadedOnce()) {
-      const controller = new AbortController();
-      readAbortRef.current = controller;
-      garageService
-        .refresh(controller.signal)
-        .catch((e) => {
-          // Aborts (component unmount, superseded by a newer refresh)
-          // are not user-facing errors — silently drop them.
-          if (isAbortError(e)) return;
-          if (mountedRef.current) setError(toMessage(e));
-        })
-        .finally(() => {
-          if (mountedRef.current) setIsLoading(false);
-        });
-    } else {
-      setIsLoading(false);
-    }
     return () => {
       unsubscribe();
       readAbortRef.current?.abort();
     };
   }, []);
+
+  // Auth-gated load. Re-runs whenever auth settles or flips:
+  //   - hydrating           → hold (keep the skeleton; auth not known yet)
+  //   - signed out          → reset the cache (drop the prior user's garage) and
+  //                           stop — the screen shows the guest empty state
+  //   - signed in, cold     → fetch the list
+  //   - signed in, warm     → nothing to do (cache already populated)
+  // Signing in flips isAuthenticated → this fetches; signing out resets so the
+  // next sign-in always re-fetches (never serves a stale account's vehicles).
+  useEffect(() => {
+    if (isHydrating) return;
+    if (!isAuthenticated) {
+      garageService.reset();
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+    if (garageService.hasLoadedOnce()) {
+      setIsLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    readAbortRef.current = controller;
+    setIsLoading(true);
+    setError(null);
+    garageService
+      .refresh(controller.signal)
+      .catch((e) => {
+        // Aborts (unmount, superseded refresh) aren't user-facing errors.
+        if (isAbortError(e)) return;
+        if (mountedRef.current) setError(toMessage(e));
+      })
+      .finally(() => {
+        if (mountedRef.current) setIsLoading(false);
+      });
+    return () => {
+      controller.abort();
+    };
+  }, [isAuthenticated, isHydrating]);
 
   const refresh = useCallback(async () => {
     setError(null);

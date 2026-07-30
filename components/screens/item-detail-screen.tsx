@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { AlertCircle, ArrowLeft, Heart } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
-import { ScrollView } from 'react-native';
+import { Alert, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import ImageBox from '@/components/screens-components/home/image-box';
@@ -19,8 +19,11 @@ import { useLikesContext } from '@/contexts/likes.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useUserContext } from '@/contexts/user.context';
 import { useCatalogDetail } from '@/hooks/use-catalog-detail';
+import { useCompatibility } from '@/hooks/use-compatibility';
 import { useToast } from '@/hooks/use-toast';
+import type { CompatibilityColor, CompatibilityResult } from '@/services/compatibility-service';
 import { parsePrice } from '@/services/cart-math';
+import type { ThemeTokens } from '@/themes/types';
 import { triggerHaptic } from '@/utils/haptics';
 
 /**
@@ -46,6 +49,16 @@ export default function ItemDetailScreen() {
   const { state, detail, error, refresh } = useCatalogDetail(id ?? null);
   const item = detail?.item ?? null;
   const activeVehicle = currentActiveVehicle?.vehicle ?? null;
+
+  // Real fit check against the backend for the active garage vehicle. Called
+  // unconditionally (before the early returns) to satisfy the rules of hooks;
+  // it no-ops when there's no part id or no active vehicle. `compat` stays null
+  // until an answer arrives — we NEVER render a fit badge without one.
+  const { result: compat } = useCompatibility(
+    id ?? null,
+    currentActiveVehicle?.vehicleId,
+    currentActiveVehicle?.vehicle?.vin,
+  );
 
   if (state === 'loading' || state === 'idle') {
     return (
@@ -81,14 +94,9 @@ export default function ItemDetailScreen() {
     toast.info(nowFav ? 'Saved to favorites' : 'Removed from favorites');
   };
 
-  // Guest-first purchase gate: guests go to Sign In; signed-in users add the
-  // real catalog item `qty` times (one unit per `addItem`) and land on Cart.
-  const addToCart = () => {
-    if (!isAuthenticated) {
-      triggerHaptic('selection');
-      router.push('/sign-in?gate=1');
-      return;
-    }
+  // Actually add the real catalog item `qty` times (one unit per `addItem`)
+  // and land on Cart.
+  const commitAddToCart = () => {
     triggerHaptic('success');
     const cartItem = {
       id: item.id,
@@ -100,6 +108,34 @@ export default function ItemDetailScreen() {
     for (let i = 0; i < qty; i += 1) addItem(cartItem);
     setQty(1);
     router.replace('/cart');
+  };
+
+  // Guest-first purchase gate: guests go to Sign In. Signed-in users add
+  // straight away — UNLESS the fit check says the part doesn't fit the active
+  // vehicle, in which case a Safety Gate confirms intent first (cuts returns /
+  // wrong-fit deliveries).
+  const addToCart = () => {
+    if (!isAuthenticated) {
+      triggerHaptic('selection');
+      router.push('/sign-in?gate=1');
+      return;
+    }
+    if (compat?.status === 'NOT_COMPATIBLE') {
+      triggerHaptic('warning');
+      const name = activeVehicle
+        ? `${activeVehicle.year} ${activeVehicle.make} ${activeVehicle.model}`.trim()
+        : 'выбранным авто';
+      Alert.alert(
+        'Деталь не подходит',
+        `Эта запчасть не совместима с ${name}. Вы уверены, что хотите добавить её в заказ?`,
+        [
+          { text: 'Отмена', style: 'cancel' },
+          { text: 'Всё равно добавить', style: 'destructive', onPress: commitAddToCart },
+        ],
+      );
+      return;
+    }
+    commitAddToCart();
   };
 
   return (
@@ -192,23 +228,22 @@ export default function ItemDetailScreen() {
 
           {item.oem || item.gm ? <AppOemPill oem={item.oem} gm={item.gm} /> : null}
 
-          <AppPrice value={item.price} size={30} color={tokens.info} />
+          <AppPrice value={item.price} size={30} color={tokens.text} />
 
-          {/* Confirmed fit — only when a vehicle is active in the garage. */}
-          {activeVehicle ? (
-            <AppView row align="center" gap={10} rounded={14} p={14} colorName="backgroundSecondary" borderWidth={1} borderName="border">
-              <AppView center rounded={999} style={{ width: 22, height: 22, backgroundColor: tokens.success }}>
-                <AppText weight="bold" style={{ fontSize: 13, color: tokens.white }}>✓</AppText>
-              </AppView>
-              <AppView flex={1}>
-                <AppText family="accent" weight="bold" style={{ fontSize: 14, color: tokens.text }}>
-                  Confirmed fit
-                </AppText>
-                <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted }}>
-                  {`${activeVehicle.year} ${activeVehicle.make} ${activeVehicle.model} ${activeVehicle.trim ?? ''}`.trim()}
-                </AppText>
-              </AppView>
-            </AppView>
+          {/* Fit status — driven by the REAL backend check for the active
+              garage vehicle. Renders nothing until an answer arrives (no more
+              unconditional green "Confirmed fit"). */}
+          {compat ? (
+            <FitBadge
+              result={compat}
+              tokens={tokens}
+              subtitle={
+                activeVehicle
+                  ? `${activeVehicle.year} ${activeVehicle.make} ${activeVehicle.model} ${activeVehicle.trim ?? ''}`.trim()
+                  : null
+              }
+              onShowAlternatives={() => router.push('/search')}
+            />
           ) : null}
 
           {/* Quantity */}
@@ -266,6 +301,57 @@ export default function ItemDetailScreen() {
           item.images.length > 1 ? `${i + 1} of ${item.images.length}` : null
         }
       />
+    </AppView>
+  );
+}
+
+// Fit-status plaque driven by the backend compatibility check. Colour + glyph
+// follow `badge.color` (green ✓ / yellow ! / red ✕); the red state adds a
+// "show alternatives" CTA. Kept inline to avoid a new shared file.
+function FitBadge({
+  result,
+  tokens,
+  subtitle,
+  onShowAlternatives,
+}: {
+  result: CompatibilityResult;
+  tokens: ThemeTokens;
+  subtitle: string | null;
+  onShowAlternatives: () => void;
+}) {
+  const colorFor = (c: CompatibilityColor) =>
+    c === 'green' ? tokens.success : c === 'red' ? tokens.error : tokens.warning;
+  const accent = colorFor(result.badge.color);
+  const glyph =
+    result.badge.color === 'green' ? '✓' : result.badge.color === 'red' ? '✕' : '!';
+  return (
+    <AppView gap={10} rounded={14} p={14} colorName="backgroundSecondary" borderWidth={1} borderName="border">
+      <AppView row align="center" gap={10}>
+        <AppView center rounded={999} style={{ width: 22, height: 22, backgroundColor: accent }}>
+          <AppText weight="bold" style={{ fontSize: 13, color: tokens.white }}>
+            {glyph}
+          </AppText>
+        </AppView>
+        <AppView flex={1}>
+          <AppText family="accent" weight="bold" style={{ fontSize: 14, color: tokens.text }}>
+            {result.badge.text}
+          </AppText>
+          {subtitle ? (
+            <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted }}>
+              {subtitle}
+            </AppText>
+          ) : null}
+        </AppView>
+      </AppView>
+      {result.status === 'NOT_COMPATIBLE' ? (
+        <AppButton
+          title="Показать подходящие аналоги"
+          kind="secondary"
+          size="sm"
+          fullWidth
+          onPress={onShowAlternatives}
+        />
+      ) : null}
     </AppView>
   );
 }

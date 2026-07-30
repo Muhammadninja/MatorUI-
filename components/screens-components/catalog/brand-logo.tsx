@@ -24,7 +24,7 @@ export type BrandLogoProps = {
   color?: string;
 };
 
-export default function BrandLogo({ logoUrl, name, size = 40, color }: BrandLogoProps) {
+const BrandLogo = ({ logoUrl, name, size = 40, color }: BrandLogoProps) => {
   const [failed, setFailed] = useState(false);
 
   if (logoUrl && !failed) {
@@ -44,4 +44,6 @@ export default function BrandLogo({ logoUrl, name, size = 40, color }: BrandLogo
       {name.charAt(0).toUpperCase()}
     </AppText>
   );
-}
+};
+
+export default BrandLogo;

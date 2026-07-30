@@ -130,6 +130,11 @@ export type PaymentMethod = {
   isDefault: boolean;
 };
 
+/** Supported payment methods for the Uzbek market. Selected at checkout —
+ *  no stored card/PAN. Payme is online; Terminal is a card reader the courier
+ *  brings; Cash is cash-on-delivery. */
+export type PaymentType = 'payme' | 'terminal' | 'cash';
+
 export type ShippingOption = {
   /** Stable server key (`standard`, `express`, `same_day`, etc.). */
   key: string;
@@ -146,19 +151,42 @@ export type CreateOrderInput = {
   /** Line items as known to the cart at submit time. The server
    *  re-validates pricing and rejects on mismatch. */
   items: { productId: string; quantity: number }[];
-  addressId: string;
-  paymentMethodId: string;
+  /** Selected delivery address, or `null` when the buyer skips it — the
+   *  courier calls to confirm the drop-off location. */
+  addressId: string | null;
+  /** Chosen payment method (Payme / Terminal / Cash). */
+  paymentType: PaymentType;
   shippingOptionKey: string;
   /** Optional promo code already applied to the cart. */
   promoCode: string | null;
   /** Optional courier note. */
   note?: string;
+  /** Garage vehicle this order is for (backend `vehicle_id`). Optional — the
+   *  backend accepts a null vehicle. */
+  vehicleId?: string;
+  /** Contact number for the courier (backend `contact_phone_e164`). Optional;
+   *  normalized to E.164 by the transport. Sourced from the signed-in profile. */
+  contactPhone?: string;
   /** Optimistic display hint: the grand total the client already
    *  rendered on the checkout button. A real backend recomputes pricing
    *  authoritatively and MAY ignore this; the mock echoes it so the
    *  just-placed order's confirmation/track total isn't blank. */
   totalLabel?: string;
 };
+
+/**
+ * Short, display-friendly order number derived from the backend id. Backend
+ * order ids are long ULIDs ("ord_01KY2DNPSRYPT8C7SDT2N7JJCH", 30 chars) that
+ * overflow the compact receipt/tracking UI, so we show a "#" + last 6 alnum
+ * chars ("#N7JJCH"). Already-short mock ids ("ORD-8821", "M-48291") are shown
+ * as-is. The FULL id is still used for fetch/navigation — this is display only.
+ */
+export function formatOrderNo(id: string): string {
+  if (!id) return '';
+  if (id.length <= 10) return id;
+  const tail = id.replace(/[^A-Za-z0-9]/g, '').slice(-6).toUpperCase();
+  return `#${tail}`;
+}
 
 export type CreateOrderResult = {
   orderId: string;

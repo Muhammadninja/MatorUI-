@@ -194,6 +194,20 @@ class GarageService {
     this.hasLoaded = false;
   }
 
+  /**
+   * Drop all cached vehicles and forget we ever loaded. Called on sign-out so
+   * the next user (or a guest) never sees the previous account's garage, and so
+   * the following sign-in always triggers a fresh `refresh()` instead of
+   * short-circuiting on a stale `hasLoaded`. Bumps `refreshSeq` so any in-flight
+   * read from the signed-out session is discarded when it resolves.
+   */
+  reset(): void {
+    this.refreshSeq++;
+    this.vehicles = [];
+    this.hasLoaded = false;
+    this.emit();
+  }
+
   // ── Sync cache reads (no network) ──────────────────────────────────
 
   getVehicles(): Vehicle[] {

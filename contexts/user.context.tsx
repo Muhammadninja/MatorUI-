@@ -216,13 +216,16 @@ export function UserProvider({ children }: PropsWithChildren) {
     setError(null);
     try {
       const me = await userTransport.getMe();
-      setProfile(me);
+      // Persist to the profile cache (not just memory) so the freshly-fetched
+      // avatar/name survive the next cold boot. Using bare setProfile here left
+      // the cache holding a pre-avatar profile → the avatar vanished on relaunch.
+      applyProfile(me);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load profile.');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [applyProfile]);
 
   const updateProfile = useCallback(
     async (patch: Partial<Omit<UserProfile, 'id' | 'memberSince'>>) => {

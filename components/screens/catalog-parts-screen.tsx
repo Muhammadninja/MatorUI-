@@ -141,7 +141,7 @@ export default function CatalogPartsScreen() {
   );
 
   return (
-    <AppView testID="parts-directory-screen" flex={1} colorName="card">
+    <AppView testID="parts-directory-screen" flex={1} colorName="background">
       {/* Fixed header: back + search + quick filters */}
       <AppView style={{ paddingTop: insets.top + 6 }} px="lg" colorName="background">
         <AppView row align="center" gap={10}>
@@ -249,9 +249,9 @@ export default function CatalogPartsScreen() {
           data={results}
           keyExtractor={(it) => it.id}
           renderItem={renderItem}
-          ItemSeparatorComponent={() => <AppView style={{ height: 12 }} />}
+          ItemSeparatorComponent={() => <AppView style={{ height: 14 }} />}
           ListHeaderComponent={
-            <AppView gap={12} style={{ paddingBottom: 4, paddingHorizontal: 16 }}>
+            <AppView gap={12} style={{ paddingBottom: 4 }}>
               <VehicleContextBar />
               <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>
                 {categoryLabel ? `${categoryLabel} · ` : ''}
@@ -260,7 +260,7 @@ export default function CatalogPartsScreen() {
               </AppText>
             </AppView>
           }
-          contentContainerStyle={{ paddingTop: 4, paddingBottom: insets.bottom + 96 }}
+          contentContainerStyle={{ paddingTop: 4, paddingBottom: insets.bottom + 96, paddingHorizontal: 16 }}
           showsVerticalScrollIndicator={false}
           keyboardDismissMode="on-drag"
         />

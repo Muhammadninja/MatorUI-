@@ -207,8 +207,19 @@ function RootNavigation() {
             statusBarStyle: resolvedScheme === 'dark' ? 'light' : 'dark',
           }}
         >
-          <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          {/* `index` is a redirect-only gate and `(tabs)` is the app shell —
+           *  neither should be swipe-back-dismissable. Without this you can
+           *  swipe back off the tabs onto `index`, which instantly redirects
+           *  to Explore again ("swipe back from home → home again"). Inner tab
+           *  stacks are separate navigators and keep their own swipe-back. */}
+          <Stack.Screen
+            name="index"
+            options={{ headerShown: false, gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name="(tabs)"
+            options={{ headerShown: false, gestureEnabled: false }}
+          />
           <Stack.Screen
             name="vin-finder"
             options={{

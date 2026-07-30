@@ -1,10 +1,9 @@
 import { router } from 'expo-router';
-import { ScanLine, Sparkles } from 'lucide-react-native';
+import { Sparkles } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import VinScannerModal from '@/components/screens-components/vin-scanner/vin-scanner-modal';
 import { AppButton } from '@/components/shared/app-button';
 import AppTextField from '@/components/shared/app-text-field';
 import { AppText } from '@/components/shared/app-text';
@@ -17,12 +16,10 @@ import { VinDecoderService, type DecodedVehicle } from '@/services/vin-decoder-s
 import { triggerHaptic } from '@/utils/haptics';
 
 /**
- * Add Vehicle screen — faithful rebuild of the prototype's `scAddVehicle`.
- *
- * Fields: Make / Model (side by side), Year, "OR ENTER VIN" divider,
- * VIN input + "Scan VIN" button, and a "Save vehicle" CTA. Scanning or
- * entering a full 17-char VIN runs it through `VinDecoderService`, which
- * auto-fills Make / Model / Year from the NHTSA record. Local state only.
+ * Add Vehicle screen — VIN decoder. Enter a 17-character VIN and it runs through
+ * `VinDecoderService` (NHTSA), which auto-fills Make / Model / Year from the
+ * decoded record; "Save vehicle" adds it to the garage. Local state only — no
+ * camera / scanner.
  */
 export default function AddVehicleScreen() {
   const { tokens } = useThemeContext();
@@ -31,7 +28,6 @@ export default function AddVehicleScreen() {
 
   const [vin, setVin] = useState('');
   const [decoded, setDecoded] = useState<DecodedVehicle | null>(null);
-  const [scannerVisible, setScannerVisible] = useState(false);
   const [saving, setSaving] = useState(false);
   const [decoding, setDecoding] = useState(false);
 
@@ -50,7 +46,7 @@ export default function AddVehicleScreen() {
     if (!decoded || !canSave) {
       triggerHaptic('warning');
       toastService.info('Decode a VIN first', {
-        description: 'Scan or enter a 17-character VIN to identify the vehicle.',
+        description: 'Enter a 17-character VIN to identify the vehicle.',
       });
       return;
     }
@@ -114,18 +110,6 @@ export default function AddVehicleScreen() {
     }
   }, []);
 
-  const handleBarcodeScanned = useCallback(
-    (raw: string) => {
-      triggerHaptic('success');
-      setVin(raw);
-      setScannerVisible(false);
-      toastService.success('VIN detected', { description: raw });
-      // Auto-decode the scan → identifies Make / Model / Year.
-      void applyDecodedVin(raw);
-    },
-    [applyDecodedVin],
-  );
-
   return (
     <AppView flex={1} colorName="background">
       {/* Header */}
@@ -178,50 +162,23 @@ export default function AddVehicleScreen() {
             colorName="textMuted"
             style={{ fontSize: 13.5, lineHeight: 20 }}
           >
-            Scan or enter your 17-character VIN — we’ll identify the make, model, and
-            year automatically.
+            Enter your 17-character VIN — we’ll identify the make, model, and year
+            automatically.
           </AppText>
 
-          {/* VIN input + Scan VIN button */}
-          <AppView row gap={10} align="flex-end">
-            <AppView flex={1}>
-              <AppTextField
-                label="VIN"
-                placeholder="17-character VIN"
-                value={vin}
-                onChangeText={handleVinChange}
-                autoCapitalize="characters"
-                autoCorrect={false}
-                containerRounded={12}
-                containerColorName="backgroundSecondary"
-                containerBorderName="border"
-              />
-            </AppView>
-            <AppPressableView
-              center
-              rounded={12}
-              px={16}
-              colorName="brand"
-              androidRipple
-              onPress={() => {
-                triggerHaptic('selection');
-                setScannerVisible(true);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Scan VIN with camera"
-              style={{ height: 50, flexDirection: 'row', gap: 6 }}
-            >
-              <ScanLine size={16} strokeWidth={2} color={tokens.onBrand} />
-              <AppText
-                family="accent"
-                weight="bold"
-                colorName="onBrand"
-                style={{ fontSize: 13 }}
-              >
-                Scan VIN
-              </AppText>
-            </AppPressableView>
-          </AppView>
+          {/* VIN input */}
+          <AppTextField
+            label="VIN"
+            placeholder="17-character VIN"
+            value={vin}
+            onChangeText={handleVinChange}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            maxLength={17}
+            containerRounded={12}
+            containerColorName="backgroundSecondary"
+            containerBorderName="border"
+          />
 
           {/* Decode action — appears once a full 17-char VIN is present */}
           {vin.trim().length === 17 && !decoded ? (
@@ -332,12 +289,6 @@ export default function AddVehicleScreen() {
           />
         </AppView>
       </KeyboardAvoidingView>
-
-      <VinScannerModal
-        visible={scannerVisible}
-        onClose={() => setScannerVisible(false)}
-        onBarcodeScanned={handleBarcodeScanned}
-      />
     </AppView>
   );
 }

@@ -1,68 +1,55 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, PackageOpen, Search, X } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
-import { Keyboard, ScrollView, TextInput } from 'react-native';
+import { ArrowLeft, Search, X } from 'lucide-react-native';
+import { useEffect, useRef } from 'react';
+import { Keyboard, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import ProductRow from '@/components/screens-components/catalog/product-row';
+import SearchResults from '@/components/screens-components/search/search-results';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
-import { WheelLoader } from '@/components/shared/wheel-loader';
-import { useCartContext } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
-import { useUserContext } from '@/contexts/user.context';
-import { useCatalogList } from '@/hooks/use-catalog-list';
-import { useToast } from '@/hooks/use-toast';
-import type { CatalogItem } from '@/services/catalog-service';
-import { triggerHaptic } from '@/utils/haptics';
+import { hasActiveFilters, useSearch } from '@/hooks/use-search';
 
 /**
- * Search over the real catalog (`useCatalogList` with a `search` term).
- * Results render as `ProductRow`s (no cards). Opened from the Explore search
- * entry.
+ * Universal search over the REAL search backend (`POST /v1/search` via
+ * `useSearch` → `search-service`), with relevance ranking, facet counts,
+ * did-you-mean, and cursor pagination. Results render through the
+ * purpose-built `SearchResults` surface (`SearchResultRow` cards). Opened
+ * from the Explore search entry; an optional `q` param seeds the query
+ * (e.g. a "Certified Batteries" placement deep-links here pre-filled).
+ *
+ * This replaced the old `useCatalogList({ search })` wiring, which only
+ * text-filtered `/v1/catalog/parts` and never touched the dedicated search
+ * service.
  */
 export default function MatorSearchScreen() {
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
-  // Optional `q` seeds the search (e.g. a "Certified Batteries" placement opens
-  // this screen pre-filled with "battery").
   const { q: initialQuery } = useLocalSearchParams<{ q?: string }>();
-  const [query, setQuery] = useState(initialQuery ?? '');
-  const q = query.trim();
 
-  // Debounce the query so we hit the backend once the user pauses, not on
-  // every keystroke.
-  const [debouncedQ, setDebouncedQ] = useState(q);
+  const {
+    query,
+    setQuery,
+    state,
+    results,
+    total,
+    durationMs,
+    error,
+    filters,
+    didYouMean,
+    isLoadingMore,
+    loadMore,
+  } = useSearch();
+
+  // Seed from the optional `q` deep-link param exactly once on mount.
+  const seededRef = useRef(false);
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedQ(q), 250);
-    return () => clearTimeout(t);
-  }, [q]);
-
-  const { state, items, total } = useCatalogList({
-    page: 1,
-    pageSize: 24,
-    search: debouncedQ || undefined,
-  });
-  // True while the user has typed but the debounced fetch hasn't caught up.
-  const settling = q !== debouncedQ;
-
-  const { addItem } = useCartContext();
-  const { isAuthenticated } = useUserContext();
-  const toast = useToast();
-
-  const openItem = (it: CatalogItem) =>
-    router.push({ pathname: '/item-detail/[id]', params: { id: it.id } });
-
-  const addToCart = (it: CatalogItem) => {
-    if (!isAuthenticated) {
-      triggerHaptic('selection');
-      router.push('/sign-in?gate=1');
-      return;
+    if (seededRef.current) return;
+    seededRef.current = true;
+    if (initialQuery && initialQuery.trim().length > 0) {
+      setQuery(initialQuery);
     }
-    triggerHaptic('success');
-    addItem({ id: it.id, title: it.title, description: it.description, price: it.price, imageUrl: it.images?.[0] });
-    toast.success('Added to cart');
-  };
+  }, [initialQuery, setQuery]);
 
   return (
     <AppView flex={1} colorName="card" testID="search-screen" style={{ paddingTop: insets.top + 6 }}>
@@ -123,45 +110,35 @@ export default function MatorSearchScreen() {
         </AppView>
       </AppView>
 
-      {/* Results — only after the user types; no suggestions on an empty query. */}
-      {q.length === 0 ? (
+      {/* Results — the search hook stays 'idle' until the query is long enough
+          (≥2 chars); render the landing hint in that state, delegate every
+          other state (loading / success / empty / error) to SearchResults. */}
+      {state === 'idle' ? (
         <AppView flex={1} center px="xl" gap={10}>
           <Search size={28} strokeWidth={2} color={tokens.textMuted} />
-          <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted, textAlign: 'center' }}>
+          <AppText
+            family="default"
+            style={{ fontSize: 14, color: tokens.textMuted, textAlign: 'center' }}
+          >
             Search parts, brands, or OEM numbers.
           </AppText>
         </AppView>
-      ) : state === 'loading' || settling ? (
-        <AppView flex={1} center>
-          <WheelLoader size={30} color={tokens.text} />
-        </AppView>
-      ) : state === 'empty' ? (
-        <AppView flex={1} center px="xl" gap={8}>
-          <PackageOpen size={30} strokeWidth={2} color={tokens.textMuted} />
-          <AppText family="heading" weight="bold" style={{ fontSize: 18, color: tokens.text }}>
-            No results found
-          </AppText>
-          <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted, textAlign: 'center' }}>
-            {`Nothing matches “${debouncedQ}”. Try a different name or keyword.`}
-          </AppText>
-        </AppView>
       ) : (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          contentContainerStyle={{ paddingBottom: 28, gap: 8 }}
-        >
-          <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted, paddingTop: 4 }}>
-            {total || items.length} result{(total || items.length) === 1 ? '' : 's'}
-            {debouncedQ ? ` for “${debouncedQ}”` : ''}
-          </AppText>
-          <AppView gap={12}>
-            {items.map((it) => (
-              <ProductRow key={it.id} item={it} onOpen={openItem} onAdd={addToCart} />
-            ))}
-          </AppView>
-        </ScrollView>
+        <AppView flex={1}>
+          <SearchResults
+            state={state}
+            results={results}
+            total={total}
+            durationMs={durationMs}
+            query={query}
+            error={error}
+            didYouMean={didYouMean}
+            hasActiveFilters={hasActiveFilters(filters)}
+            onUseSuggestion={setQuery}
+            onEndReached={loadMore}
+            isLoadingMore={isLoadingMore}
+          />
+        </AppView>
       )}
     </AppView>
   );

@@ -274,9 +274,59 @@ const server = http.createServer(async (req, res) => {
     return send(res, 200, { tokens: authTokens(id) });
   }
 
+  // FLOW 9 — POST /v1/search  → SearchResponse (the REAL search backend the
+  // Search screen now calls via useSearch/HttpSearchTransport). Title/brand
+  // substring match over the same parts, mapped to the SearchResult shape.
+  if (req.method === 'POST' && pathname === '/v1/search') {
+    const body = await readBody(req);
+    const q = String(body.query || '').trim().toLowerCase();
+    const matched = q
+      ? Object.values(PARTS_BY_ID).filter(
+          (p) =>
+            p.title.toLowerCase().includes(q) ||
+            (p.brand && p.brand.name.toLowerCase().includes(q)),
+        )
+      : [];
+    const results = matched.map((p) => ({
+      id: p.id,
+      title: p.title,
+      description: (p.features || []).join(' · '),
+      price: p.price_label || '',
+      priceLabel: p.price_label || '',
+      category: p.category ? p.category.name : '',
+      status: p.in_stock ? 'In stock' : 'Out of stock',
+    }));
+    return send(res, 200, {
+      query: q,
+      requestId: body.requestId ?? null,
+      results,
+      total: results.length,
+      nextPageToken: null,
+      durationMs: 12,
+      facetCounts: { categories: {}, price: {}, minRating: {} },
+      appliedFilters: body.filters ?? {},
+      didYouMean: null,
+      suggestedCategories: [],
+    });
+  }
+
+  // GET /v1/typeahead?q=<prefix>&limit=  → { suggestions:[{ text, type }] }
+  // The app's HttpSearchTransport.typeahead maps `type` → `kind`.
+  if (req.method === 'GET' && pathname === '/v1/typeahead') {
+    const prefix = (url.searchParams.get('q') || '').trim().toLowerCase();
+    const limit = Number(url.searchParams.get('limit')) || 6;
+    const suggestions = prefix
+      ? Object.values(PARTS_BY_ID)
+          .filter((p) => p.title.toLowerCase().includes(prefix))
+          .slice(0, limit)
+          .map((p) => ({ text: p.title, type: 'product', productId: p.id }))
+      : [];
+    return send(res, 200, { prefix, suggestions });
+  }
+
   // FLOW 3 / 9 — GET /v1/catalog/parts
   //   ?systemId=|?category=<sys>  → parts in that system (browse)
-  //   ?q=<term>                   → title/brand substring search (Search screen)
+  //   ?q=<term>                   → title/brand substring search (browse/category)
   if (req.method === 'GET' && pathname === '/v1/catalog/parts') {
     const q = (url.searchParams.get('q') || '').trim().toLowerCase();
     let items;

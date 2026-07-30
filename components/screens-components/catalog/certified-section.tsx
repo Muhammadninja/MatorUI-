@@ -24,12 +24,6 @@ export default function CertifiedSection() {
   const dark = scheme === 'dark';
   const { placements } = usePlacements();
 
-  const openAll = () => {
-    triggerHaptic('selection');
-    // The premium MATOR Certified catalogue (all certified parts, all systems).
-    router.push({ pathname: '/catalog/parts', params: { categoryLabel: 'MATOR Certified' } });
-  };
-
   const open = (p: MatorCertifiedPlacement) => {
     triggerHaptic('selection');
     const t = p.target;
@@ -73,11 +67,6 @@ export default function CertifiedSection() {
         <AppText family="heading" weight="bold" style={{ flex: 1, fontSize: 18, color: tokens.text }}>
           MATOR Certified
         </AppText>
-        <AppPressableView onPress={openAll} androidRipple={false} accessibilityRole="button">
-          <AppText family="accent" weight="semibold" style={{ fontSize: 13, color: tokens.textMuted }}>
-            See all ›
-          </AppText>
-        </AppPressableView>
       </AppView>
       <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted, marginTop: -8 }}>
         Verified dealers. Genuine parts, guaranteed fitment & returns.

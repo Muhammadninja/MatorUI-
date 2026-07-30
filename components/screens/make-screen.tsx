@@ -118,11 +118,11 @@ export default function MakeScreen() {
                 }}
               >
                 <AppView flex={1}>
-                  <AppText family="heading" weight="bold" style={{ fontSize: 19, color: tokens.text }}>
+                  <AppText family="heading" style={{ fontSize: 16, color: tokens.text }}>
                     {label} {m.name}
                   </AppText>
                 </AppView>
-                <ChevronRight size={22} strokeWidth={2.2} color={tokens.textMuted} />
+                <ChevronRight size={22} strokeWidth={1.5} color={tokens.text} />
               </AppPressableView>
             ))}
           </AppView>

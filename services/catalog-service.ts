@@ -38,6 +38,15 @@ export type CatalogItem = {
    *  region filter. Backend-supplied when available, else inferred from the
    *  brand at map time. */
   region?: CatalogRegion;
+  /** MATOR Certified seller — mirrors the customer-facing `seller.certified`
+   *  flag the operator panel toggles (admin `POST /v1/admin/dealers/:id/certify`).
+   *  Drives the "MATOR Certified" trust badge. Absent until the backend exposes
+   *  it on the catalog part's seller — see `docs/mator-certified-contract.md`. */
+  certified?: boolean;
+  /** Lowest-price guarantee badge, when the seller carries one. */
+  lowestPrice?: boolean;
+  /** Seller storefront name, when the catalog part carries one. */
+  sellerName?: string;
 };
 
 export type CatalogItemSpec = {
@@ -123,7 +132,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     status: 'Ready to ship',
     title: 'Chevrolet Cobalt EV Urban Glide X',
     description: 'Compact EV for city runs with fast charge support.',
-    price: 'UZS 11,008,400',
+    price: "UZS' 11,008,400",
     priceLabel: 'Starting at',
     images: [],
     specs: MOCK_SPECS,
@@ -136,7 +145,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     status: 'Low stock',
     title: 'Northline SUV Family Edition',
     description: 'Family-ready drive with smart safety assist and roomy cabin.',
-    price: 'UZS29,900',
+    price: "UZS' 29,900",
     priceLabel: 'Starting at',
     images: [],
     specs: [
@@ -154,7 +163,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     status: 'Pre-order',
     title: 'Aero Coupe S',
     description: 'Sport coupe tuned for range, speed, and sleek daily comfort.',
-    price: 'UZS 34,200',
+    price: "UZS' 34,200",
     priceLabel: 'Starting at',
     images: [],
     specs: [
@@ -172,7 +181,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     status: 'Ready to ship',
     title: 'Cobalt Remen Generator Xitoy Original',
     description: 'Adventure-focused build with rugged stance and long battery life.',
-    price: 'UZS 850,750',
+    price: "UZS' 850,750",
     priceLabel: 'Starting at',
     images: [],
     specs: [
@@ -195,7 +204,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     status: 'Ready to ship',
     title: 'Mator Elite Sedan',
     description: 'Premium sedan with Mator Verified inspection and warranty.',
-    price: 'UZS 24,500',
+    price: "UZS' 24,500",
     priceLabel: 'Starting at',
     images: [],
     specs: [
@@ -220,7 +229,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     status: 'Ready to ship',
     title: 'Mator Prime',
     description: 'Flagship sedan, top-selling, lowest entry price, full Mator Verified inspection.',
-    price: 'UZS 16,900',
+    price: "UZS' 16,900",
     priceLabel: 'Starting at',
     badge: 'Bestseller',
     images: [],
@@ -329,9 +338,10 @@ class MockCatalogTransport implements CatalogTransport {
 // ── Live backend shape (GET /v1/catalog/parts) ───────────────────────
 // The real catalog is a parts marketplace exposed at `/v1/catalog/parts`
 // with snake_case params + a nested part shape. We map it onto the app's
-// flat `CatalogItem`. NOTE: the backend strictly rejects unknown query
-// params (it 400s on `pageSize`), so we send ONLY `page`/`page_size` for
-// now; wire `search`/`category` once their accepted param names are known.
+// flat `CatalogItem`. The backend strictly rejects unknown query params
+// (it 400s on `pageSize`), so every filter below uses the exact param name
+// from the live OpenAPI spec (`q`, `category`, `page`, `page_size`, …) —
+// see PARTS_PARAM.
 type ApiCatalogPart = {
   id: string;
   title: string;
@@ -354,8 +364,16 @@ type ApiCatalogPart = {
   /** Estimated delivery window in days (either can be null). */
   delivery_eta_days_min?: number | null;
   delivery_eta_days_max?: number | null;
-  /** Seller storefront that lists the part. */
-  seller?: { id: string; name: string; rating_avg?: number } | null;
+  /** Seller storefront that lists the part. `certified`/`lowest_price` are the
+   *  customer-facing mirror of the operator panel's dealer badges (added by the
+   *  backend per docs/mator-certified-contract.md; absent until then). */
+  seller?: {
+    id: string;
+    name: string;
+    rating_avg?: number;
+    certified?: boolean;
+    lowest_price?: boolean;
+  } | null;
   /** Market of origin, uppercase enum on the live backend ("USA", "KOREA"). */
   origin_region?: string;
   /** Legacy alias some deployments used before `origin_region`. */
@@ -443,7 +461,7 @@ function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
     description: [p.brand?.name, cleanCategoryName(p.category?.name)].filter(Boolean).join(' · '),
     price:
       p.price_label ??
-      (p.price_uzs != null ? `UZS ${p.price_uzs.toLocaleString('ru-RU')}` : ''),
+      (p.price_uzs != null ? `UZS' ${p.price_uzs.toLocaleString('ru-RU')}` : ''),
     priceLabel: '',
     images: p.images ?? [],
     // Prefer an explicit spec array; otherwise synthesize one from the
@@ -460,14 +478,20 @@ function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
     // Prefer the backend's tagged origin (`origin_region`, uppercase enum),
     // then the legacy `region` alias, then brand inference.
     region: normalizeRegion(p.origin_region ?? p.region) ?? brandRegion(p.brand?.name),
+    // Trust badges — mirror the seller flags the operator panel toggles. Default
+    // off; light up automatically the moment the backend ships the fields.
+    certified: p.seller?.certified === true,
+    lowestPrice: p.seller?.lowest_price === true,
+    sellerName: p.seller?.name ?? undefined,
   };
 }
 
 // Query-param names for GET /v1/catalog/parts. The backend STRICTLY rejects
 // unknown params (400 on `pageSize`), so these must match the backend's
-// Swagger exactly. Names below are the assumed snake_case set derived from the
-// endpoint's response facets (`brands`, `price_range_uzs`, `compatibility`).
-// If a filter 400s, correct the value here — it's the single source of truth.
+// Swagger exactly. Verified against the live spec at `/docs-json` (2026-07-26):
+// `q`, `category`, `page`, `page_size`, `make`, `model`, `brand`, `region`,
+// `gm_only`, `sort`. If a filter 400s, correct the value here — this is the
+// single source of truth.
 const PARTS_PARAM = {
   page: 'page',
   pageSize: 'page_size',

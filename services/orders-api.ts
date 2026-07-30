@@ -16,7 +16,9 @@ import type {
   CreateOrderResult,
   OrderDetail,
   OrderListPage,
+  OrderListRow,
   OrderListStatus,
+  OrderStatus,
   PaymentMethod,
   PaymentMethodInput,
   ShippingOption,
@@ -105,54 +107,6 @@ const BASE_SHIPPING_OPTIONS: ShippingOption[] = [
   { key: 'same_day', label: 'Same day', eta: 'By 9 PM today', price: 19.99 },
 ];
 
-const SEED_ORDERS: OrderListPage = {
-  page: 1,
-  pageSize: 20,
-  total: 5,
-  items: [
-    {
-      id: 'ORD-8821',
-      date: 'May 28, 2026',
-      status: 'Delivered',
-      items: 3,
-      total: '$486.00',
-      summary: 'Garrett GTX3582R + 2 items',
-    },
-    {
-      id: 'ORD-8790',
-      date: 'May 14, 2026',
-      status: 'In Transit',
-      items: 1,
-      total: '$1,249.00',
-      summary: 'KW Coilovers V3 Suspension Kit',
-    },
-    {
-      id: 'ORD-8741',
-      date: 'Apr 30, 2026',
-      status: 'Delivered',
-      items: 2,
-      total: '$920.00',
-      summary: 'Vossen HF-5 Wheels + 1 item',
-    },
-    {
-      id: 'ORD-8703',
-      date: 'Apr 12, 2026',
-      status: 'Cancelled',
-      items: 1,
-      total: '$340.00',
-      summary: 'Brembo GT Big Brake Kit',
-    },
-    {
-      id: 'ORD-8682',
-      date: 'Mar 27, 2026',
-      status: 'Delivered',
-      items: 4,
-      total: '$2,100.00',
-      summary: 'Full suspension overhaul bundle',
-    },
-  ],
-};
-
 function detailFor(row: { id: string; total: string }, statusKey: 'in_transit' | 'delivered' | 'cancelled'): OrderDetail {
   const isInTransit = statusKey === 'in_transit';
   return {
@@ -186,12 +140,21 @@ function detailFor(row: { id: string; total: string }, statusKey: 'in_transit' |
   };
 }
 
-const ORDER_DETAILS: Record<string, OrderDetail> = {
-  'ORD-8821': detailFor({ id: 'ORD-8821', total: '$486.00' }, 'delivered'),
-  'ORD-8790': detailFor({ id: 'ORD-8790', total: '$1,249.00' }, 'in_transit'),
-  'ORD-8741': detailFor({ id: 'ORD-8741', total: '$920.00' }, 'delivered'),
-  'ORD-8703': detailFor({ id: 'ORD-8703', total: '$340.00' }, 'cancelled'),
-  'ORD-8682': detailFor({ id: 'ORD-8682', total: '$2,100.00' }, 'delivered'),
+/** Optional seed data for the mock. The app constructs `new MockOrdersTransport()`
+ *  (all-empty) so screens render their real empty states; tests pass `MOCK_SEED`
+ *  to exercise the account-collection read paths. Orders themselves are no longer
+ *  seeded — real orders come from the HTTP transport (`GET /v1/orders`). */
+export type MockOrdersSeed = {
+  orders?: OrderListPage;
+  details?: Record<string, OrderDetail>;
+  addresses?: Address[];
+  paymentMethods?: PaymentMethod[];
+};
+
+/** Account-collection fixture set — for tests only (orders are not seeded). */
+export const MOCK_SEED: MockOrdersSeed = {
+  addresses: SEED_ADDRESSES,
+  paymentMethods: SEED_PAYMENT_METHODS,
 };
 
 export class MockOrdersTransport implements OrdersTransport {
@@ -202,15 +165,17 @@ export class MockOrdersTransport implements OrdersTransport {
   private addresses: Address[];
   private paymentMethods: PaymentMethod[];
 
-  constructor(seedOrders: OrderListPage = SEED_ORDERS, seedDetails = ORDER_DETAILS) {
-    // Start with NO orders / addresses / payment methods — the screens show
-    // their real empty states instead of mock data. Real data comes from the
-    // HTTP transport (GET /v1/orders, /v1/account/*) when the `orders` domain
-    // is enabled.
-    this.orders = { page: 1, pageSize: seedOrders.pageSize, total: 0, items: [] };
-    this.details = { ...seedDetails };
-    this.addresses = [];
-    this.paymentMethods = [];
+  constructor(seed?: MockOrdersSeed) {
+    // Default: start with NO orders / addresses / payment methods — screens show
+    // their real empty states instead of mock data. Real data comes from the HTTP
+    // transport (GET /v1/orders, /v1/account/*) when the `orders` domain is
+    // enabled. Tests pass `MOCK_SEED` to populate the read paths.
+    this.orders = seed?.orders
+      ? { ...seed.orders, items: seed.orders.items.map((o) => ({ ...o })) }
+      : { page: 1, pageSize: 20, total: 0, items: [] };
+    this.details = { ...(seed?.details ?? {}) };
+    this.addresses = seed?.addresses ? seed.addresses.map((a) => ({ ...a })) : [];
+    this.paymentMethods = seed?.paymentMethods ? seed.paymentMethods.map((p) => ({ ...p })) : [];
   }
 
   async listOrders(
@@ -384,38 +349,334 @@ export class MockOrdersTransport implements OrdersTransport {
  *   POST   /v1/shipping/quote                      → ShippingOption[]
  */
 import { shouldUseHttpTransport } from '@/config/api';
-import { apiClient } from '@/services/api-client';
+import { apiClient, ApiError } from '@/services/api-client';
+import { debugLog } from '@/services/debug-log';
+
+/** Strip spaces / dashes / parens so "+998 90 123 45 67" → "+998901234567". */
+function toE164(raw: string): string {
+  return raw.replace(/[^\d+]/g, '');
+}
+
+/**
+ * Backend address shape (from the live OpenAPI `/docs-json` → CreateAddressDto /
+ * address entity, verified 2026-07-23). The wire model is UZ-centric and totally
+ * different from the app's `{ label, line1, city }`: `full_text` is the only
+ * REQUIRED field; `line1`/`city`/`name` do not exist (sending them → 400
+ * "property X should not exist" on the strict `forbidNonWhitelisted` DTO).
+ */
+type RawAddress = {
+  id: string;
+  label?: string | null;
+  region_code?: string | null;
+  district?: string | null;
+  street?: string | null;
+  full_text?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  is_default?: boolean | null;
+};
+
+/**
+ * Map the app's 2-field form (`line1` = street, `city` = city/state line) onto
+ * the backend `CreateAddressDto`. `full_text` is required, so compose it from the
+ * two fields; `street`/`district` carry the parts so a read round-trips back to
+ * line1/city. `name` is dropped (no backend field). Accepted keys only:
+ * full_text, label, region_code, district, street, lat, lng, is_default.
+ */
+function toAddressBody(input: AddressInput): Record<string, unknown> {
+  const line1 = input.line1.trim();
+  const city = input.city.trim();
+  const fullText = [line1, city].filter(Boolean).join(', ');
+  const body: Record<string, unknown> = {
+    full_text: fullText || input.label.trim() || line1 || city,
+    label: input.label.trim() || line1,
+    street: line1,
+    district: city,
+  };
+  debugLog('address', '→ wire body (mapped to backend DTO)', body);
+  return body;
+}
+
+/** Map a backend `RawAddress` back onto the app's `Address`. */
+function mapRawAddress(raw: RawAddress): Address {
+  return {
+    id: raw.id,
+    label: raw.label ?? raw.street ?? raw.full_text ?? 'Address',
+    line1: raw.street ?? raw.full_text ?? '',
+    city: raw.district ?? raw.region_code ?? '',
+    isDefault: raw.is_default ?? false,
+  };
+}
+
+/**
+ * Normalize a collection response to a plain array. The backend wraps
+ * collections in a `{ items: [...] }` envelope (confirmed on `GET /v1/categories`),
+ * but older/other endpoints may return a bare array — accept either. Anything
+ * unexpected (an error object slipped through with a 200, a null, a string)
+ * degrades to `[]` so the screen renders its empty state instead of crashing
+ * with "undefined is not a function" when it calls `.map` / `.find` / `.filter`.
+ */
+export function asList<T>(raw: unknown): T[] {
+  if (Array.isArray(raw)) return raw as T[];
+  if (raw && typeof raw === 'object') {
+    for (const key of ['items', 'data', 'results']) {
+      const v = (raw as Record<string, unknown>)[key];
+      if (Array.isArray(v)) return v as T[];
+    }
+  }
+  return [];
+}
+
+/**
+ * Raw order object as returned by api.mator.uz (verified live 2026-07-21).
+ * `GET /v1/orders` (list, `{ items, next_cursor }`), `GET /v1/orders/:id`
+ * (detail), and `POST /v1/orders` (create) all return THIS same shape. Prices
+ * are UZS integers; there is no per-step timeline, courier, or embedded address
+ * — the app derives its richer `OrderDetail`/`OrderListRow` from these fields.
+ */
+export type RawBackendOrder = {
+  order_id: string;
+  /** Payment-oriented lifecycle: pending_payment | paid | packed | shipped |
+   *  out_for_delivery | delivered | cancelled | expired | refunded | … */
+  status: string;
+  subtotal_uzs?: number;
+  delivery_uzs?: number;
+  service_fee_uzs?: number;
+  discount_uzs?: number;
+  total_uzs?: number;
+  currency?: string;
+  vehicle_id?: string | null;
+  delivery_address_id?: string | null;
+  delivery_method?: string | null;
+  items?: Array<{
+    part_id?: string | null;
+    service_id?: string | null;
+    title?: string;
+    qty?: number;
+    price_uzs?: number;
+    line_total_uzs?: number;
+    scheduled_at?: string | null;
+  }>;
+  expires_at?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+/** "280000" → "280 000 so'm". Manual thousands grouping (no reliance on Intl,
+ *  which is patchy under Hermes). */
+function formatUzs(n: number | undefined): string {
+  const v = Math.round(n ?? 0);
+  const grouped = String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return `${grouped} so'm`;
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** ISO → "Jul 21, 2026". Empty string on missing/invalid input. */
+function formatDate(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+}
+
+/** Backend status → the order-history pill. Unknown/early states read as
+ *  "Processing" so a new backend status never breaks the list. Operator
+ *  transitions (`confirmed`, `out_for_delivery`, `delivered`) are all covered
+ *  so an admin status change is reflected the moment the app re-fetches. */
+function mapListStatus(s: string): OrderListStatus {
+  switch (s) {
+    case 'delivered':
+    case 'refunded':
+      return 'Delivered';
+    case 'shipped':
+    case 'out_for_delivery':
+      return 'Out for delivery';
+    case 'processing':
+    case 'in_transit':
+      return 'In Transit';
+    case 'cancelled':
+    case 'expired':
+      return 'Cancelled';
+    default:
+      return 'Processing'; // pending_payment, paid
+  }
+}
+
+/** Backend status → the detail step-machine key. Covers the full backend
+ *  lifecycle so an operator advance (via `PATCH /v1/orders/:id/status`) always
+ *  maps to a concrete timeline step — `confirmed`/`paid` sit at "Packed" (order
+ *  accepted, being prepared), `pending_confirmation` stays at "Order placed". */
+function mapDetailStatus(s: string): OrderStatus {
+  // Backend forward path pending_payment→paid→processing→shipped→delivered is
+  // mapped monotonically onto the app's 5-step timeline
+  // placed→packed→shipped→out_for_delivery→delivered.
+  switch (s) {
+    case 'delivered':
+    case 'refunded':
+      return 'delivered';
+    case 'shipped':
+      return 'out_for_delivery';
+    case 'processing':
+    case 'in_transit':
+      return 'shipped';
+    case 'paid':
+    case 'packed':
+      return 'packed';
+    case 'cancelled':
+    case 'expired':
+      return 'cancelled';
+    default:
+      return 'placed'; // pending_payment
+  }
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  pending_payment: 'Awaiting payment',
+  paid: 'Payment received',
+  processing: 'Processing',
+  shipped: 'On the way',
+  delivered: 'Delivered',
+  cancelled: 'Cancelled',
+  expired: 'Expired',
+  refunded: 'Refunded',
+};
+
+const STEP_DEFS: { key: OrderStatus; label: string }[] = [
+  { key: 'placed', label: 'Order placed' },
+  { key: 'packed', label: 'Packed' },
+  { key: 'shipped', label: 'Shipped' },
+  { key: 'out_for_delivery', label: 'Out for delivery' },
+  { key: 'delivered', label: 'Delivered' },
+];
+
+function totalItemCount(o: RawBackendOrder): number {
+  return (o.items ?? []).reduce((n, i) => n + (i.qty ?? 0), 0);
+}
+
+function orderSummary(o: RawBackendOrder): string {
+  const items = o.items ?? [];
+  const first = items[0]?.title?.trim() || 'Order';
+  const rest = items.length - 1;
+  return rest > 0 ? `${first} + ${rest} item${rest > 1 ? 's' : ''}` : first;
+}
+
+/** Raw backend order → order-history row. */
+export function mapOrderToListRow(o: RawBackendOrder): OrderListRow {
+  return {
+    id: o.order_id,
+    date: formatDate(o.created_at),
+    status: mapListStatus(o.status),
+    items: totalItemCount(o),
+    total: formatUzs(o.total_uzs),
+    summary: orderSummary(o),
+  };
+}
+
+/** Raw backend order → the richer detail shape the track screen renders. The
+ *  backend has no per-step timeline / courier / embedded address, so the step
+ *  captions beyond "placed" are blank and courier is null. */
+export function mapOrderToDetail(o: RawBackendOrder): OrderDetail {
+  const status = mapDetailStatus(o.status);
+  const placedAt = formatDate(o.created_at);
+  const activeIndex = STEP_DEFS.findIndex((s) => s.key === status);
+  return {
+    id: o.order_id,
+    status,
+    statusLabel: STATUS_LABEL[o.status] ?? 'Processing',
+    // ETA headline. The backend gives no delivery window, so this is only a
+    // meaningful value for terminal states; otherwise '' and the tracking card
+    // falls back to the status label (avoids a redundant "Awaiting payment"
+    // shown twice).
+    etaWindow: status === 'delivered' ? 'Delivered' : '',
+    placedAt,
+    steps: STEP_DEFS.map((s, i) => ({ key: s.key, label: s.label, caption: i === 0 ? placedAt : '' })),
+    currentStepIndex: status === 'cancelled' ? 0 : Math.max(0, activeIndex),
+    destination: {
+      id: o.delivery_address_id ?? '',
+      label: o.delivery_method === 'courier' ? 'Courier delivery' : 'Delivery',
+      line1: '',
+      city: '',
+    },
+    courier: null,
+    items: (o.items ?? []).map((it, i) => ({
+      id: it.part_id ?? it.service_id ?? `item_${i}`,
+      title: it.title ?? 'Item',
+      quantity: it.qty ?? 1,
+      price: formatUzs(it.price_uzs),
+    })),
+    totalLabel: formatUzs(o.total_uzs),
+  };
+}
 
 export class HttpOrdersTransport implements OrdersTransport {
-  listOrders(req: OrderListRequest, signal?: AbortSignal): Promise<OrderListPage> {
-    const qs = new URLSearchParams();
-    if (req.page) qs.set('page', String(req.page));
-    if (req.pageSize) qs.set('pageSize', String(req.pageSize));
-    if (req.status) qs.set('status', req.status);
-    return apiClient.get<OrderListPage>(`/v1/orders?${qs.toString()}`, { signal });
+  async listOrders(req: OrderListRequest, signal?: AbortSignal): Promise<OrderListPage> {
+    // Backend is cursor-paginated (`{ items, next_cursor }`) and REJECTS
+    // page/pageSize/status query params with a 400 ("property page should not
+    // exist" — verified live). So we fetch the first page unfiltered and map the
+    // raw orders to history rows; status filtering (if any) happens client-side.
+    const raw = await apiClient.get<unknown>('/v1/orders', { signal });
+    const rawItems = asList<RawBackendOrder>(raw);
+    let items = rawItems.map(mapOrderToListRow);
+    if (req.status) items = items.filter((o) => o.status === req.status);
+    return { items, total: items.length, page: 1, pageSize: items.length };
   }
 
-  getOrder(orderId: string, signal?: AbortSignal): Promise<OrderDetail> {
-    return apiClient.get<OrderDetail>(
-      `/v1/orders/${encodeURIComponent(orderId)}`,
-      { signal },
+  async getOrder(orderId: string, signal?: AbortSignal): Promise<OrderDetail | null> {
+    try {
+      const raw = await apiClient.get<RawBackendOrder>(
+        `/v1/orders/${encodeURIComponent(orderId)}`,
+        { signal },
+      );
+      return mapOrderToDetail(raw);
+    } catch (e) {
+      // 404 → the order doesn't exist; surface as null so the screen shows its
+      // not-found state instead of an error toast.
+      if (e instanceof ApiError && e.status === 404) return null;
+      throw e;
+    }
+  }
+
+  async createOrder(input: CreateOrderInput, signal?: AbortSignal): Promise<CreateOrderResult> {
+    // The backend builds the order from the SERVER-side cart (POST /v1/cart/items),
+    // NOT from a body item list — so we send only the checkout selections. It
+    // returns a `pending_payment` order; payment (Payme/Click invoice + deep link)
+    // is a separate follow-up flow. Unknown props 400 the request, so we send
+    // exactly the whitelisted fields.
+    const body: Record<string, unknown> = {
+      cart_snapshot: {
+        delivery_method: 'courier',
+        delivery_address_id: input.addressId ?? null,
+        promo_code: input.promoCode ?? null,
+      },
+    };
+    if (input.vehicleId) body.vehicle_id = input.vehicleId;
+    if (input.contactPhone) body.contact_phone_e164 = toE164(input.contactPhone);
+
+    const r = await apiClient.post<RawBackendOrder>('/v1/orders', body, { signal });
+    return {
+      orderId: r.order_id,
+      eta: r.status === 'pending_payment' ? 'Awaiting payment' : formatDate(r.created_at),
+      totalLabel: formatUzs(r.total_uzs),
+    };
+  }
+
+  async listAddresses(signal?: AbortSignal): Promise<Address[]> {
+    const raw = asList<RawAddress>(await apiClient.get<unknown>('/v1/account/addresses', { signal }));
+    return raw.map(mapRawAddress);
+  }
+
+  async createAddress(input: AddressInput): Promise<Address> {
+    const raw = await apiClient.post<RawAddress>('/v1/addresses', toAddressBody(input));
+    return mapRawAddress(raw);
+  }
+
+  async updateAddress(id: string, input: AddressInput): Promise<Address> {
+    const raw = await apiClient.patch<RawAddress>(
+      `/v1/addresses/${encodeURIComponent(id)}`,
+      toAddressBody(input),
     );
-  }
-
-  createOrder(input: CreateOrderInput, signal?: AbortSignal): Promise<CreateOrderResult> {
-    return apiClient.post<CreateOrderResult>('/v1/orders', input, { signal });
-  }
-
-  listAddresses(signal?: AbortSignal): Promise<Address[]> {
-    return apiClient.get<Address[]>('/v1/account/addresses', { signal });
-  }
-
-  createAddress(input: AddressInput): Promise<Address> {
-    return apiClient.post<Address>('/v1/addresses', input);
-  }
-
-  updateAddress(id: string, input: AddressInput): Promise<Address> {
-    return apiClient.patch<Address>(`/v1/addresses/${encodeURIComponent(id)}`, input);
+    return mapRawAddress(raw);
   }
 
   removeAddress(id: string): Promise<void> {
@@ -426,8 +687,10 @@ export class HttpOrdersTransport implements OrdersTransport {
     return apiClient.post<void>(`/v1/addresses/${encodeURIComponent(id)}/default`);
   }
 
-  listPaymentMethods(signal?: AbortSignal): Promise<PaymentMethod[]> {
-    return apiClient.get<PaymentMethod[]>('/v1/account/payment-methods', { signal });
+  async listPaymentMethods(signal?: AbortSignal): Promise<PaymentMethod[]> {
+    return asList<PaymentMethod>(
+      await apiClient.get<unknown>('/v1/account/payment-methods', { signal }),
+    );
   }
 
   createPaymentMethod(input: PaymentMethodInput): Promise<PaymentMethod> {
@@ -449,11 +712,13 @@ export class HttpOrdersTransport implements OrdersTransport {
     return apiClient.post<void>(`/v1/payment-methods/${encodeURIComponent(id)}/default`);
   }
 
-  getShippingQuote(
+  async getShippingQuote(
     req: ShippingQuoteRequest,
     signal?: AbortSignal,
   ): Promise<ShippingOption[]> {
-    return apiClient.post<ShippingOption[]>('/v1/shipping/quote', req, { signal });
+    return asList<ShippingOption>(
+      await apiClient.post<unknown>('/v1/shipping/quote', req, { signal }),
+    );
   }
 }
 

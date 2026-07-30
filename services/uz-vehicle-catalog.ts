@@ -466,13 +466,30 @@ export function resolveFitmentFromText(
   make: string,
   model: string,
 ): { brandId?: string; modelId?: string } {
-  const m = make.trim().toLowerCase();
-  const md = model.trim().toLowerCase();
-  const brand = UZ_BRANDS.find((b) => b.label.toLowerCase() === m);
+  // Normalize away casing/punctuation so decoder output ("CHEVROLET",
+  // "Cobalt LS") still matches catalog labels ("Chevrolet", "Cobalt").
+  const norm = (s: string) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const m = norm(make);
+  const md = norm(model);
+  if (!m) return {};
+
+  const brand =
+    UZ_BRANDS.find((b) => norm(b.label) === m) ??
+    UZ_BRANDS.find((b) => m.includes(norm(b.label)) || norm(b.label).includes(m));
   if (!brand) return {};
-  const matched = UZ_MODELS.find(
-    (mm) => mm.brandId === brand.id && mm.label.toLowerCase() === md,
-  );
+
+  const brandModels = UZ_MODELS.filter((mm) => mm.brandId === brand.id);
+  const matched =
+    brandModels.find((mm) => norm(mm.label) === md) ??
+    // Decoder often appends a trim ("Cobalt LT") or abbreviates — accept a
+    // prefix/substring match against the catalog label in either direction.
+    (md
+      ? brandModels.find((mm) => {
+          const lm = norm(mm.label);
+          return md.startsWith(lm) || lm.startsWith(md) || md.includes(lm) || lm.includes(md);
+        })
+      : undefined);
+
   return { brandId: brand.id, modelId: matched?.id };
 }
 

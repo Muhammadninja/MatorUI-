@@ -54,7 +54,7 @@ export default function LikedScreen() {
   );
 
   return (
-    <AppView flex={1} colorName="card">
+    <AppView flex={1} colorName="background">
       <AppSettingsHeader title="Liked" fallbackHref="/profile" />
 
       {state === 'loading' ? (
@@ -82,7 +82,7 @@ export default function LikedScreen() {
           data={items}
           keyExtractor={(it) => it.id}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingTop: 4, paddingBottom: 32, gap: 12 }}
+          contentContainerStyle={{ paddingTop: 4, paddingBottom: 32, gap: 14, paddingHorizontal: 16 }}
           renderItem={renderItem}
         />
       )}

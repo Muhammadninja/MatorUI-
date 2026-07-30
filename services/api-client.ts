@@ -25,6 +25,7 @@
  */
 
 import { getApiBaseUrl, getAuthToken } from '@/config/api';
+import { debugLog } from '@/services/debug-log';
 
 // ── Error type ─────────────────────────────────────────────────────────
 
@@ -120,6 +121,8 @@ async function request<T>(
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
   let lastError: unknown;
+  // Guards a single refresh-and-retry on a 401 (token expired mid-request).
+  let authRetried = false;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const { signal, cleanup } = composeSignal(opts.signal, timeoutMs);
@@ -134,12 +137,18 @@ async function request<T>(
         if (token) headers.Authorization = `Bearer ${token}`;
       }
 
+      const attemptLabel = attempt > 0 ? ` (retry ${attempt})` : '';
+      debugLog('api', `→ ${method} ${path}${attemptLabel}`, body);
+
+      const startedAt = Date.now();
       const res = await fetch(`${baseUrl}${path}`, {
         method,
         headers,
         body: body === undefined ? undefined : JSON.stringify(body),
         signal,
       });
+      const ms = Date.now() - startedAt;
+      debugLog('api', `← ${res.status} ${method} ${path} (${ms}ms)`);
 
       if (res.status === 204) return undefined as T;
 
@@ -148,8 +157,27 @@ async function request<T>(
       const parsed = text ? safeJsonParse(text) : undefined;
 
       if (!res.ok) {
+        debugLog('api', `✗ ${res.status} ${method} ${path}`, parsed);
         if (res.status === 401) {
-          await unauthorizedHandler?.();
+          // The access token likely expired mid-request. Let the auth layer
+          // refresh it (persisting a new session), then retry ONCE with the
+          // fresh token — otherwise a routine expiry surfaces to the user as a
+          // spurious "Unauthorized" on an action they're actually allowed to do
+          // (e.g. Save profile), even though the very next attempt would work.
+          // Only fall through to throw when: auth is skipped, we already retried,
+          // there's no handler, or the refresh yielded no token (refresh
+          // failed → the handler has signed the user out and routed to sign-in).
+          if (!opts.skipAuth && !authRetried && unauthorizedHandler) {
+            authRetried = true;
+            await unauthorizedHandler();
+            if (await getAuthToken()) {
+              // Don't let the refresh-retry consume the transient-retry budget.
+              attempt--;
+              continue;
+            }
+            // No token after refresh → refresh failed and the handler has
+            // already signed the user out; fall through and surface the 401.
+          }
           throw new ApiError(
             401,
             extractCode(parsed) ?? 'UNAUTHORIZED',
@@ -181,6 +209,7 @@ async function request<T>(
       const isAbort = raw instanceof DOMException && raw.name === 'AbortError';
       const isNetwork = raw instanceof TypeError; // fetch's network-error shape
       if (isAbort || isNetwork) {
+        debugLog('api', `✗ ${isAbort ? 'TIMEOUT' : 'NETWORK'} ${method} ${path}`);
         const err = new ApiError(
           0,
           isAbort ? 'TIMEOUT' : 'NETWORK_ERROR',

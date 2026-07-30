@@ -58,10 +58,22 @@ export function AppBottomSheet({
 
   const translateY = useRef(new Animated.Value(0)).current;
 
-  // Reset position whenever the sheet becomes visible (after a previous swipe-close)
+  // Slide the sheet panel up whenever it becomes visible. The backdrop itself
+  // fades in via the Modal's `fade` animation, so the screen underneath stays
+  // put (just dims) instead of the whole modal window sliding up from the
+  // bottom — which read as a brand-new screen appearing. Starting from the
+  // capped sheet height guarantees the panel begins fully off-screen.
   useEffect(() => {
-    if (visible) translateY.setValue(0);
-  }, [visible, translateY]);
+    if (visible) {
+      translateY.setValue(sheetHeight);
+      Animated.spring(translateY, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 90,
+        friction: 12,
+      }).start();
+    }
+  }, [visible, translateY, sheetHeight]);
 
   const animateClose = useCallback(() => {
     Animated.timing(translateY, {
@@ -141,7 +153,7 @@ export function AppBottomSheet({
     <Modal
       transparent
       visible={visible}
-      animationType="slide"
+      animationType="fade"
       onRequestClose={onClose}
       statusBarTranslucent
     >
