@@ -9,8 +9,10 @@ import { AppPressableView, AppView } from '@/components/shared/app-view';
 import WheelLoader from '@/components/shared/wheel-loader/wheel-loader';
 import { useActiveVehicle } from '@/contexts/active-vehicle.context';
 import { useThemeContext } from '@/contexts/theme.context';
+import { useActiveSales } from '@/hooks/use-sales';
 import { useToast } from '@/hooks/use-toast';
 import type { CatalogItem } from '@/services/catalog-service';
+import { resolveItemSale } from '@/services/sales-service';
 
 type ProductRowItem = CatalogItem & { brand?: string };
 
@@ -25,8 +27,9 @@ export type ProductRowProps = {
 type FitState = 'idle' | 'checking' | 'fits';
 const FIT_CHECK_MS = 900;
 
-/** Deterministic per-product hash → stable, varied placeholder rating / reviews /
- *  discount (the backend carries none; see the design handoff). */
+/** Deterministic per-product hash → stable, varied placeholder rating / reviews
+ *  (the backend carries neither yet; see the design handoff). The discount, by
+ *  contrast, is now real — resolved from `GET /v1/sales`. */
 function hashId(id: string): number {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
@@ -36,8 +39,9 @@ function hashId(id: string): number {
 /**
  * `ProductRow` — the Mator listing card, matched to `design_handoff_mator_app`
  * (radius-20 surface card, 108² image, brand eyebrow, meta row, inline fit chip,
- * and a footer bar with price + Add pill). Rating / reviews / save-% are
- * placeholders (backend has none). Fitment is checked INLINE across three
+ * and a footer bar with price + Add pill). Rating / reviews are still
+ * placeholders (backend has none); the discount is real, resolved from the
+ * active `GET /v1/sales` campaigns. Fitment is checked INLINE across three
  * states — it never routes.
  */
 function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
@@ -70,13 +74,23 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
     }, FIT_CHECK_MS);
   };
 
-  // ── Placeholder signals (deterministic per product id) ────────────────────
+  // ── Placeholder signals (rating / reviews only — the backend carries none) ─
   const h = hashId(item.id);
   const rating = (4.2 + (h % 8) / 10).toFixed(1); // 4.2–4.9
   const reviews = 50 + (h % 900); // 50–949
-  const savePct = 10 + (h % 20); // 10–29%
-  const amountNum = parseInt(item.price.replace(/\D/g, ''), 10) || 0;
-  const wasNum = amountNum > 0 ? Math.round(amountNum / (1 - savePct / 100)) : 0;
+
+  // ── Sale — real, matched from the active GET /v1/sales campaigns ───────────
+  const sales = useActiveSales();
+  const itemSale = resolveItemSale(
+    { id: item.id, categoryId: product.categoryId, sellerId: product.sellerId, priceUzs: product.priceUzs },
+    sales,
+  );
+  const savePct = itemSale?.percent ?? 0;
+  // The shown price stays the actual (charged) catalog price — reconstruct the
+  // struck-through "was" from the campaign percent so the row never claims a
+  // discount the cart won't honor.
+  const amountNum = product.priceUzs ?? (parseInt(item.price.replace(/\D/g, ''), 10) || 0);
+  const wasNum = savePct > 0 && amountNum > 0 ? Math.round(amountNum / (1 - savePct / 100)) : 0;
   const priceAmount = splitPrice(item.price).amount || item.price;
   const wasLabel = wasNum > 0 ? wasNum.toLocaleString('ru-RU') : null;
 
@@ -107,7 +121,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
     <AppView colorName="backgroundSecondary" rounded={20} style={{ overflow: 'hidden' }}>
       {/* ── Top block ── */}
       <AppView row gap={14} style={{ padding: 14 }}>
-        {/* Image + save badge */}
+        {/* Image — the discount now lives in the footer next to the price. */}
         <AppPressableView
           testID={`part-card-${item.id}`}
           onPress={() => onOpen(item)}
@@ -124,23 +138,6 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
             contentFit="contain"
             backgroundColor={tokens.white}
           />
-          {savePct > 0 ? (
-            <View
-              style={{
-                position: 'absolute',
-                top: 7,
-                left: 7,
-                backgroundColor: '#4ade80',
-                borderRadius: 999,
-                paddingHorizontal: 7,
-                paddingVertical: 3,
-              }}
-            >
-              <AppText family="accent" weight="bold" style={{ fontSize: 10, color: '#05310f' }}>
-                {`-${savePct}%`}
-              </AppText>
-            </View>
-          ) : null}
         </AppPressableView>
 
         {/* Info column */}
@@ -266,26 +263,43 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
         gap={10}
         style={{ paddingHorizontal: 14, paddingVertical: 11, borderTopWidth: 1, borderTopColor: hairline }}
       >
-        {/* Price (+ struck was) */}
-        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-          <AppText
-            family="heading"
-            weight="bold"
-            numberOfLines={1}
-            style={{ fontSize: 19, letterSpacing: -0.4, color: tokens.text }}
-          >
-            {priceAmount}
-          </AppText>
-          <AppText family="accent" weight="semibold" style={{ fontSize: 11, color: tokens.textMuted }}>
-            {"so'm"}
-          </AppText>
-          {wasLabel ? (
+        {/* Price (+ struck was) + sale pill */}
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={{ flexShrink: 1, flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
             <AppText
-              family="default"
-              style={{ fontSize: 12, color: tokens.textMuted, textDecorationLine: 'line-through' }}
+              family="heading"
+              weight="bold"
+              numberOfLines={1}
+              style={{ fontSize: 19, letterSpacing: -0.4, color: tokens.text }}
             >
-              {wasLabel}
+              {priceAmount}
             </AppText>
+            <AppText family="accent" weight="semibold" style={{ fontSize: 11, color: tokens.textMuted }}>
+              {"so'm"}
+            </AppText>
+            {wasLabel ? (
+              <AppText
+                family="default"
+                numberOfLines={1}
+                style={{ fontSize: 12, color: tokens.textMuted, textDecorationLine: 'line-through' }}
+              >
+                {wasLabel}
+              </AppText>
+            ) : null}
+          </View>
+          {savePct > 0 ? (
+            <View
+              style={{
+                backgroundColor: '#DC26261a',
+                borderRadius: 999,
+                paddingHorizontal: 7,
+                paddingVertical: 3,
+              }}
+            >
+              <AppText family="accent" weight="bold" style={{ fontSize: 11, color: '#DC2626' }}>
+                {`-${savePct}%`}
+              </AppText>
+            </View>
           ) : null}
         </View>
 

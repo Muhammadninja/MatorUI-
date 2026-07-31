@@ -13,6 +13,11 @@ export type CatalogItem = {
   title: string;
   description: string;
   price: string;
+  /** Numeric list price in UZS (the same value `price` is formatted from), kept
+   *  raw so callers can do math on it — the sale matcher reconstructs the
+   *  pre-discount "was" price, the cart reads it, etc. Absent when the backend
+   *  omits a numeric price. */
+  priceUzs?: number;
   priceLabel: string;
   images: string[];
   specs: CatalogItemSpec[];
@@ -47,6 +52,11 @@ export type CatalogItem = {
   lowestPrice?: boolean;
   /** Seller storefront name, when the catalog part carries one. */
   sellerName?: string;
+  /** Category id (e.g. "oil-and-fluids"), kept alongside the display `category`
+   *  name so a CATEGORIES-scoped sale can be matched to this item. */
+  categoryId?: string;
+  /** Seller storefront id, so a DEALERS-scoped sale can be matched. */
+  sellerId?: string;
 };
 
 export type CatalogItemSpec = {
@@ -462,6 +472,7 @@ function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
     price:
       p.price_label ??
       (p.price_uzs != null ? `UZS' ${p.price_uzs.toLocaleString('ru-RU')}` : ''),
+    priceUzs: p.price_uzs ?? undefined,
     priceLabel: '',
     images: p.images ?? [],
     // Prefer an explicit spec array; otherwise synthesize one from the
@@ -483,6 +494,10 @@ function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
     certified: p.seller?.certified === true,
     lowestPrice: p.seller?.lowest_price === true,
     sellerName: p.seller?.name ?? undefined,
+    // Raw ids the sale matcher needs to resolve CATEGORIES / DEALERS-scoped
+    // campaigns (see services/sales-service.ts).
+    categoryId: p.category?.id ?? undefined,
+    sellerId: p.seller?.id ?? undefined,
   };
 }
 
