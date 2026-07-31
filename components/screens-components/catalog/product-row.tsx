@@ -79,18 +79,28 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
   const rating = (4.2 + (h % 8) / 10).toFixed(1); // 4.2–4.9
   const reviews = 50 + (h % 900); // 50–949
 
-  // ── Sale — real, matched from the active GET /v1/sales campaigns ───────────
+  // ── Sale — real ────────────────────────────────────────────────────────────
+  // Prefer the backend-resolved sale on the part (authoritative: the server
+  // resolves scope/priority and `price_uzs` is already the sale price). Fall back
+  // to the client `/v1/sales` matcher when the backend hasn't applied it yet — but
+  // note that path can only match ALL_PRODUCTS sales, since the public /v1/sales
+  // omits target ids.
   const sales = useActiveSales();
-  const itemSale = resolveItemSale(
+  const clientSale = resolveItemSale(
     { id: item.id, categoryId: product.categoryId, sellerId: product.sellerId, priceUzs: product.priceUzs },
     sales,
   );
-  const savePct = itemSale?.percent ?? 0;
-  // The shown price stays the actual (charged) catalog price — reconstruct the
-  // struck-through "was" from the campaign percent so the row never claims a
-  // discount the cart won't honor.
+  const backendPct = product.salePercent && product.salePercent > 0 ? product.salePercent : 0;
+  const savePct = backendPct > 0 ? Math.round(backendPct) : (clientSale?.percent ?? 0);
   const amountNum = product.priceUzs ?? (parseInt(item.price.replace(/\D/g, ''), 10) || 0);
-  const wasNum = savePct > 0 && amountNum > 0 ? Math.round(amountNum / (1 - savePct / 100)) : 0;
+  // Backend gives the exact pre-discount price; otherwise reconstruct the struck
+  // "was" from the percent (shown price stays the charged price).
+  const wasNum =
+    backendPct > 0 && product.originalPriceUzs
+      ? Math.round(product.originalPriceUzs)
+      : savePct > 0 && amountNum > 0
+        ? Math.round(amountNum / (1 - savePct / 100))
+        : 0;
   const priceAmount = splitPrice(item.price).amount || item.price;
   const wasLabel = wasNum > 0 ? wasNum.toLocaleString('ru-RU') : null;
 

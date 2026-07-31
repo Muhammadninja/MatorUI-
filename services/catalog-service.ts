@@ -57,6 +57,13 @@ export type CatalogItem = {
   categoryId?: string;
   /** Seller storefront id, so a DEALERS-scoped sale can be matched. */
   sellerId?: string;
+  /** Backend-resolved active sale — the authoritative source for the discount
+   *  badge. When set, `priceUzs`/`price` are ALREADY the sale price and
+   *  `originalPriceUzs` is the pre-discount price. Present only once the backend
+   *  applies sales (mator.uz catalog pricing); the client `/v1/sales` matcher is
+   *  the fallback. */
+  salePercent?: number;
+  originalPriceUzs?: number;
 };
 
 export type CatalogItemSpec = {
@@ -367,6 +374,19 @@ type ApiCatalogPart = {
   part_number_type?: string;
   price_uzs?: number;
   price_label?: string;
+  /** Pre-discount price + the winning campaign, present ONLY when the backend
+   *  applied an active sale to this part (`price_uzs` is then the sale price).
+   *  See mator.uz `part.presenter.ts`. Absent = full price, no sale. */
+  original_price_uzs?: number | null;
+  sale?: {
+    id?: string;
+    title?: string;
+    discount_type?: string;
+    discount_value?: number;
+    /** Effective percent off (whole/2-dp), for the "-15%" pill. */
+    discount_percent?: number;
+    discount_amount_uzs?: number;
+  } | null;
   in_stock?: boolean;
   images?: string[];
   specs?: { label: string; value: string }[];
@@ -494,10 +514,18 @@ function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
     certified: p.seller?.certified === true,
     lowestPrice: p.seller?.lowest_price === true,
     sellerName: p.seller?.name ?? undefined,
-    // Raw ids the sale matcher needs to resolve CATEGORIES / DEALERS-scoped
-    // campaigns (see services/sales-service.ts).
+    // Raw ids the client sale matcher needs to resolve CATEGORIES / DEALERS-scoped
+    // campaigns (see services/sales-service.ts) — the fallback when the backend
+    // hasn't applied the sale itself.
     categoryId: p.category?.id ?? undefined,
     sellerId: p.seller?.id ?? undefined,
+    // Backend-resolved sale (authoritative). `price_uzs` is already the sale
+    // price here, so `original_price_uzs` is the struck-through was.
+    salePercent:
+      p.sale && typeof p.sale.discount_percent === 'number'
+        ? p.sale.discount_percent
+        : undefined,
+    originalPriceUzs: p.original_price_uzs ?? undefined,
   };
 }
 
