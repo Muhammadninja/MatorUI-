@@ -75,8 +75,8 @@ const ACCOUNT_ITEMS: AccountItem[] = [
   },
   {
     key: 'settings',
-    title: 'Settings & security',
-    subtitle: 'Password, privacy',
+    title: 'Settings',
+    subtitle: 'Language, terms, account',
     leading: <AppIconBox Icon={Shield} rounded={11} />,
     rightChevron: true,
     onPress: () => router.push('/settings-security'),

@@ -66,7 +66,13 @@ export function useNotifications(): UseNotificationsValue {
   });
 
   return useMemo<UseNotificationsValue>(() => {
-    const notifications = query.data ?? [];
+    // Drop blank items — a notification with no title AND no body renders as a
+    // bare colored dot with no content. Filtering them here also means a feed of
+    // only-blank items collapses to the proper "all caught up" empty state, and
+    // they never inflate the unread badge.
+    const notifications = (query.data ?? []).filter(
+      (n) => n.title.trim().length > 0 || n.body.trim().length > 0,
+    );
     let state: NotificationsState;
     if (query.isPending) state = 'loading';
     else if (query.isError) state = 'error';
