@@ -198,6 +198,13 @@ function ProfileHeader({ profile }: { profile: UserProfile }) {
   const monogram =
     `${profile.firstName?.[0] ?? ''}${profile.lastName?.[0] ?? ''}`.toUpperCase() || 'M';
 
+  // Fall back to the monogram when the avatar can't load (e.g. a dead/removed
+  // Cloudinary URL) instead of a blank circle. Reset when the URL changes so a
+  // re-upload gets a fresh chance to render.
+  const [imgFailed, setImgFailed] = React.useState(false);
+  React.useEffect(() => setImgFailed(false), [avatarUri]);
+  const showAvatar = !!avatarUri && !imgFailed;
+
   return (
     <AppView row align="center" gap={14} px="lg" style={{ paddingTop: 8 }}>
       {/* 64px avatar with striped monogram per prototype */}
@@ -214,16 +221,17 @@ function ProfileHeader({ profile }: { profile: UserProfile }) {
           borderColor: tokens.border,
         }}
       >
-        {avatarUri ? (
+        {showAvatar ? (
           <Image
             source={{ uri: avatarUri }}
             style={{ width: 64, height: 64 }}
-            onError={(e) =>
+            onError={(e) => {
               debugLog('profile', '✗ avatar image failed to load', {
                 url: avatarUri,
                 error: e.nativeEvent?.error,
-              })
-            }
+              });
+              setImgFailed(true);
+            }}
           />
         ) : (
           <AppText
