@@ -1,5 +1,5 @@
 import { FlashList } from '@shopify/flash-list';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { ChevronRight } from 'lucide-react-native';
 import { useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,10 +10,11 @@ import VehicleContextBar from '@/components/screens-components/catalog/vehicle-c
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
+import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useCategories } from '@/hooks/use-categories';
+import { useCategoryDrill } from '@/hooks/use-category-drill';
 import type { CategoryTileData } from '@/services/categories-service';
-import { triggerHaptic } from '@/utils/haptics';
 
 /**
  * Catalog (Stage 2) — the vehicle-systems landing. Reached from Explore
@@ -36,16 +37,10 @@ export default function CatalogSystemsScreen() {
   const vehicleLabel = [make, model].filter(Boolean).join(' ');
   const { state, categories } = useCategories();
 
-  const openSystem = useCallback(
-    (category: CategoryTileData) => {
-      triggerHaptic('selection');
-      router.push({
-        pathname: '/catalog/parts',
-        params: { categoryId: category.id, categoryLabel: category.name, make, model, brandId },
-      });
-    },
-    [make, model, brandId],
-  );
+  // Tapping a system now DRILLS: if the admin gave it subcategories (e.g.
+  // Heating & Cooling → Antifreeze, Radiators…), show those first; a leaf system
+  // opens its parts directly, exactly as before. Vehicle context flows through.
+  const { drill, resolvingId } = useCategoryDrill({ make, model, brandId });
 
   // Once a model is chosen the row is vehicle-scoped, so drop the category icon
   // and let the (now larger) system name lead.
@@ -54,14 +49,15 @@ export default function CatalogSystemsScreen() {
   const renderItem = useCallback(
     ({ item }: { item: CategoryTileData }) => (
       <AppPressableView
-        onPress={() => openSystem(item)}
+        onPress={() => void drill(item)}
+        disabled={resolvingId != null}
         androidRipple={false}
         accessibilityRole="button"
         accessibilityLabel={item.name}
         row
         align="center"
         gap={14}
-        style={{ paddingVertical: 16 }}
+        style={{ paddingVertical: 16, opacity: resolvingId && resolvingId !== item.id ? 0.5 : 1 }}
       >
         {hideIcon ? null : (
           <AppView center rounded={12} style={{ width: 44, height: 44, backgroundColor: tokens.backgroundSecondary }}>
@@ -73,10 +69,14 @@ export default function CatalogSystemsScreen() {
             {item.name}
           </AppText>
         </AppView>
-        <ChevronRight size={22} strokeWidth={1.5} color={tokens.text} />
+        {resolvingId === item.id ? (
+          <WheelLoader size={18} color={tokens.textMuted} />
+        ) : (
+          <ChevronRight size={22} strokeWidth={1.5} color={tokens.text} />
+        )}
       </AppPressableView>
     ),
-    [openSystem, tokens, hideIcon],
+    [drill, resolvingId, tokens, hideIcon],
   );
 
   return (
