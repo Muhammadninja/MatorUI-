@@ -4,7 +4,6 @@ import { AlertCircle, ChevronRight } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import AutoPartIcon from '@/components/screens-components/catalog/auto-part-icon';
 import { CategoryRowsSkeleton } from '@/components/screens-components/catalog/category-grid-skeleton';
 import VehicleContextBar from '@/components/screens-components/catalog/vehicle-context-bar';
 import { AppButton } from '@/components/shared/app-button';
@@ -86,9 +85,6 @@ export default function CatalogSubcategoriesScreen() {
         gap={14}
         style={{ paddingVertical: 16, opacity: resolvingId && resolvingId !== item.id ? 0.5 : 1 }}
       >
-        <AppView center rounded={12} style={{ width: 44, height: 44, backgroundColor: tokens.backgroundSecondary }}>
-          <AutoPartIcon name={item.name} iconKey={item.slug} size={26} />
-        </AppView>
         <AppView flex={1}>
           <AppText family="heading" weight="bold" style={{ fontSize: 16, color: tokens.text }}>
             {item.name}
