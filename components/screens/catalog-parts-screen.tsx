@@ -10,7 +10,6 @@ import VehicleContextBar from '@/components/screens-components/catalog/vehicle-c
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { WheelLoader } from '@/components/shared/wheel-loader';
-import { CATALOG_REGIONS, type CatalogRegion } from '@/constants/catalog-regions';
 import { useCartContext } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useUserContext } from '@/contexts/user.context';
@@ -75,11 +74,6 @@ export default function CatalogPartsScreen() {
   // Quick-filter mutators — every chip applies immediately (no draft, no Apply).
   const toggleSort = (s: CatalogSortBy) =>
     setFilter((f) => ({ ...f, sortBy: f.sortBy === s ? 'relevance' : s }));
-  const toggleRegion = (r: CatalogRegion) =>
-    setFilter((f) => ({
-      ...f,
-      regions: f.regions.includes(r) ? f.regions.filter((x) => x !== r) : [...f.regions, r],
-    }));
   const toggleBrand = (b: string) =>
     setFilter((f) => ({
       ...f,
@@ -140,9 +134,6 @@ export default function CatalogPartsScreen() {
       { key: 'gm', label: 'GM', active: filter.gmOnly, onPress: () => setFilter((s) => ({ ...s, gmOnly: !s.gmOnly })) },
       { key: 'oem', label: 'OEM Quality', active: filter.oemOnly, onPress: () => setFilter((s) => ({ ...s, oemOnly: !s.oemOnly })) },
     ];
-    for (const r of CATALOG_REGIONS) {
-      list.push({ key: `region:${r.key}`, label: r.label, active: filter.regions.includes(r.key), onPress: () => toggleRegion(r.key) });
-    }
     for (const b of brands) {
       list.push({ key: `brand:${b}`, label: b, active: filter.brands.includes(b), onPress: () => toggleBrand(b), testID: `filter-brand-${b}` });
     }
