@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Image,
   KeyboardAvoidingView,
@@ -58,6 +58,10 @@ export default function EditProfileScreen() {
   const [avatarUri, setAvatarUri] = useState<string | undefined>(
     profile?.avatarUrl ?? undefined,
   );
+  // Fall back to initials when the avatar image can't load (e.g. a dead/removed
+  // Cloudinary URL). Reset on a new pick so a fresh photo gets a chance to show.
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  useEffect(() => setAvatarFailed(false), [avatarUri]);
   const [saving, setSaving] = useState(false);
 
   const pickPhoto = async () => {
@@ -164,8 +168,12 @@ export default function EditProfileScreen() {
                     borderColor: tokens.border,
                   }}
                 >
-                  {avatarUri ? (
-                    <Image source={{ uri: avatarUri }} style={{ width: 92, height: 92 }} />
+                  {avatarUri && !avatarFailed ? (
+                    <Image
+                      source={{ uri: avatarUri }}
+                      style={{ width: 92, height: 92 }}
+                      onError={() => setAvatarFailed(true)}
+                    />
                   ) : (
                     <AppText
                       family="heading"

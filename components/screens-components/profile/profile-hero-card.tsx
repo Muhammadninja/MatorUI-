@@ -1,5 +1,7 @@
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { Pencil } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 
 import { AppText } from '@/components/shared/app-text';
@@ -33,6 +35,16 @@ export default function ProfileHeroCard() {
   const initials = profile
     ? `${profile.firstName?.[0] ?? ''}${profile.lastName?.[0] ?? ''}`.toUpperCase() || 'M'
     : '••';
+
+  // Show the uploaded photo when we have one; fall back to initials if it's
+  // missing OR fails to load (e.g. a dead/removed Cloudinary URL) so the circle
+  // is never blank. Reset the error flag when the URL changes so a re-upload
+  // gets a fresh chance to render.
+  const avatarUrl = profile?.avatarUrl ?? null;
+  const [imgFailed, setImgFailed] = useState(false);
+  useEffect(() => setImgFailed(false), [avatarUrl]);
+  const showAvatar = !!avatarUrl && !imgFailed;
+
   return (
     <AppView
       rounded={16}
@@ -54,14 +66,26 @@ export default function ProfileHeroCard() {
           style={{
             width: 90,
             height: 90,
+            overflow: 'hidden',
             backgroundColor: tokens.backgroundSecondary,
             borderWidth: 1,
             borderColor: tokens.border,
           }}
         >
-          <AppText textVariant="title" family="heading" weight="bold" colorName="text">
-            {initials}
-          </AppText>
+          {showAvatar ? (
+            <Image
+              source={{ uri: avatarUrl! }}
+              style={{ width: 90, height: 90 }}
+              contentFit="cover"
+              transition={150}
+              onError={() => setImgFailed(true)}
+              accessibilityLabel="Profile photo"
+            />
+          ) : (
+            <AppText textVariant="title" family="heading" weight="bold" colorName="text">
+              {initials}
+            </AppText>
+          )}
         </AppView>
         {hasProfile ? (
           <AppPressableView
