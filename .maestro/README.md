@@ -144,8 +144,8 @@ suite depends on. Each was a ~1-line addition; none changed rendered UI.
 | `system-item-<id>` (×8) | `components/screens-components/catalog/master-system-row.tsx` | ids: brakes/maintenance/suspension/electrical/engine/transmission/climate/tuning |
 | `parts-directory-screen` | `components/screens/catalog-parts-screen.tsx` (root) | |
 | `part-card-<id>` | `components/screens-components/catalog/product-row.tsx` | id from the catalog item id (`part-card-brembo-fp`, …) |
-| `floating-filter-btn` | `catalog-parts-screen.tsx` sticky "Filter & Sort" pressable | |
-| `filter-sheet`, `filter-brand-<Brand>`, `filter-apply-btn`, `filter-clear-btn` | `components/screens-components/catalog/catalog-filter-sheet.tsx` | brand is a tappable **chip** (`filter-brand-Brembo`), not a text field |
+| `quick-filters` | `catalog-parts-screen.tsx` horizontal quick-filter chip row | replaces the old bottom sheet — every refinement is a one-tap chip |
+| `filter-brand-<Brand>`, `filter-clear-btn` | `catalog-parts-screen.tsx` inline quick-filter chips | brand is a tappable **chip** (`filter-brand-Brembo`); tap applies immediately (no Apply). `filter-clear-btn` (a "Clear" chip) shows while any filter is active |
 | `part-card-<id>` (buy path) | `product-row.tsx` | on the **image open-pressable** (not the outer row `AppView`) so a Maestro centre-tap lands on `onOpen`, not the dead-zone between pressables |
 | `item-detail-screen`, `add-to-cart-btn` | `item-detail-screen.tsx` | success-branch root + sticky Add-to-cart |
 | `sign-in-screen`, `auth-send-code-btn`, `auth-verify-btn` | `mator-sign-in-screen.tsx` → `passwordless-auth-screen.tsx` | passwordless OTP; phone pre-filled + code auto-filled from `devCode`, so the flow taps send → verify (no typing). Also: `sign-up-screen`, `auth-channel-phone/-email`, `auth-phone-field`, `auth-email-field`, `auth-otp-field` |

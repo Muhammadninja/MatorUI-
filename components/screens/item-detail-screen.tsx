@@ -230,10 +230,14 @@ export default function ItemDetailScreen() {
 
           <AppPrice value={item.price} size={30} color={tokens.text} />
 
-          {/* Fit status — driven by the REAL backend check for the active
-              garage vehicle. Renders nothing until an answer arrives (no more
-              unconditional green "Confirmed fit"). */}
-          {compat ? (
+          {/* Fit status. Universal listings (oils under "Другое") fit every car —
+              show a static "Подходит для всех" plaque and NO compatibility badge
+              (`compatibility` is deliberately null; answering "maybe" for a part
+              that fits everything is misleading). Vehicle-specific parts keep the
+              real backend check, which renders nothing until an answer arrives. */}
+          {item.isUniversal ? (
+            <UniversalFitBadge tokens={tokens} />
+          ) : compat ? (
             <FitBadge
               result={compat}
               tokens={tokens}
@@ -352,6 +356,29 @@ function FitBadge({
           onPress={onShowAlternatives}
         />
       ) : null}
+    </AppView>
+  );
+}
+
+// Static "fits everything" plaque for universal listings. No status, no CTA —
+// mirrors the green FitBadge chrome so the two read as one family. Kept inline
+// to avoid a new shared file.
+function UniversalFitBadge({ tokens }: { tokens: ThemeTokens }) {
+  return (
+    <AppView row align="center" gap={10} rounded={14} p={14} colorName="backgroundSecondary" borderWidth={1} borderName="border">
+      <AppView center rounded={999} style={{ width: 22, height: 22, backgroundColor: tokens.success }}>
+        <AppText weight="bold" style={{ fontSize: 13, color: tokens.white }}>
+          ✓
+        </AppText>
+      </AppView>
+      <AppView flex={1}>
+        <AppText family="accent" weight="bold" style={{ fontSize: 14, color: tokens.text }}>
+          Подходит для всех
+        </AppText>
+        <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted }}>
+          Универсальный товар — совместимость проверять не нужно
+        </AppText>
+      </AppView>
     </AppView>
   );
 }

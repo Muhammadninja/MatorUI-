@@ -40,6 +40,21 @@ export type RefMake = {
 };
 export type RefModel = { id: string; makeId: string; name: string };
 export type RefTrim = { id: string; modelId: string; name: string };
+/**
+ * A public part-category reference node (`GET /v1/reference/categories`). Used to
+ * list the children of a category — notably the "Другое" (OTHER) subtree whose
+ * ids feed the catalog filter (`GET /v1/catalog/parts?category=<id>`). Only
+ * ACTIVE categories are ever returned, at any level. Ids are opaque — carry them
+ * through verbatim; never hardcode or match by name.
+ */
+export type RefCategory = {
+  id: string;
+  name: string;
+  slug: string;
+  parentId: string | null;
+  level: number;
+  sortOrder: number;
+};
 export type RefEngine = {
   id: string;
   name: string;
@@ -165,6 +180,40 @@ export async function fetchEngines(
       name: str(e.name),
       displacementCc: numOrUndef(e.displacement_cc),
       fuelType: e.fuel_type ? str(e.fuel_type) : undefined,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * List the children of a part category (`GET /v1/reference/categories`). Pass a
+ * `parentId` to list that node's children — e.g. the OTHER root's id to get the
+ * oil sub-buckets; omit it for the roots. Only active categories come back.
+ *
+ * Gated on the `catalog` domain (not `garage`) because it feeds catalog browsing.
+ * On mock/offline builds there is no bundled category tree, so this degrades to
+ * an empty list rather than fabricating one. A `404` (unknown parentId) is
+ * surfaced as `[]` too — an empty result and a missing parent both mean "nothing
+ * to show here".
+ */
+export async function fetchReferenceCategories(
+  parentId?: string,
+  signal?: AbortSignal,
+): Promise<RefCategory[]> {
+  if (!shouldUseHttpTransport('catalog')) return [];
+  const qs = parentId ? `?parentId=${encodeURIComponent(parentId)}` : '';
+  try {
+    const res = await apiClient.get<Envelope>(`${BASE}/categories${qs}`, { signal });
+    // The reference node ships camelCase (`parentId`, `sortOrder`) per the spec;
+    // tolerate snake_case too so a backend tweak can't silently blank the fields.
+    return asItems(res).map((c) => ({
+      id: str(c.id),
+      name: str(c.name),
+      slug: str(c.slug),
+      parentId: (c.parentId as string | null) ?? (c.parent_id as string | null) ?? null,
+      level: numOrUndef(c.level) ?? 0,
+      sortOrder: numOrUndef(c.sortOrder) ?? numOrUndef(c.sort_order) ?? 0,
     }));
   } catch {
     return [];

@@ -108,6 +108,15 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
   const title = product.title;
   const oem = product.oem;
 
+  // ── Motor oil ────────────────────────────────────────────────────────────
+  // Oils carry no OEM/GM number; surface their key attributes (viscosity ·
+  // volume) in the meta row instead. Universal listings (oils under "Другое")
+  // replace the Check-fit chip with a static "Подходит для всех" — a
+  // compatibility check is meaningless for a part that fits everything.
+  const oil = product.kind === 'MOTOR_OIL' ? product.motorOil : null;
+  const oilMeta = oil ? [oil.viscosity, oil.volumeLabel].filter(Boolean).join(' · ') : '';
+  const isUniversal = product.isUniversal === true;
+
   // Footer hairline — deliberately fainter than the global divider token.
   const hairline = scheme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
 
@@ -233,36 +242,70 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
                     {oem}
                   </AppText>
                 </>
+              ) : oilMeta ? (
+                <>
+                  <View style={{ width: 3, height: 3, borderRadius: 3, backgroundColor: tokens.textMuted }} />
+                  <AppText
+                    family="accent"
+                    weight="semibold"
+                    numberOfLines={1}
+                    style={{ flex: 1, fontSize: 11, color: tokens.textMuted }}
+                  >
+                    {oilMeta}
+                  </AppText>
+                </>
               ) : null}
             </View>
           </AppPressableView>
 
-          {/* Fit chip — inline, three states, pill, no border. */}
-          <AppPressableView
-            onPress={handleCheckFit}
-            disabled={fitState !== 'idle'}
-            androidRipple={false}
-            pressedOpacity={0.7}
-            row
-            align="center"
-            gap={6}
-            rounded={999}
-            hitSlop={{ top: 8, bottom: 8, left: 6, right: 8 }}
-            accessibilityRole="button"
-            accessibilityLabel={fitState === 'fits' ? fitLabel : 'Check if this part fits your car'}
-            style={{ alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, backgroundColor: fitChipBg }}
-          >
-            {fitState === 'checking' ? (
-              <WheelLoader size={13} color={tokens.textMuted} />
-            ) : fitState === 'fits' ? (
+          {/* Universal listings fit every car — a static badge, never a check.
+              Vehicle-specific parts keep the inline three-state Check-fit chip. */}
+          {isUniversal ? (
+            <AppView
+              row
+              align="center"
+              gap={6}
+              rounded={999}
+              style={{
+                alignSelf: 'flex-start',
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                backgroundColor:
+                  scheme === 'dark' ? 'rgba(15,157,88,0.16)' : 'rgba(15,157,88,0.10)',
+              }}
+            >
               <MaterialIcons name="check-circle" size={14} color={tokens.success} />
-            ) : (
-              <MaterialIcons name="rule" size={14} color={tokens.text} />
-            )}
-            <AppText family="accent" weight="bold" numberOfLines={1} style={{ fontSize: 11.5, color: fitTextColor }}>
-              {fitLabel}
-            </AppText>
-          </AppPressableView>
+              <AppText family="accent" weight="bold" numberOfLines={1} style={{ fontSize: 11.5, color: tokens.success }}>
+                Подходит для всех
+              </AppText>
+            </AppView>
+          ) : (
+            <AppPressableView
+              onPress={handleCheckFit}
+              disabled={fitState !== 'idle'}
+              androidRipple={false}
+              pressedOpacity={0.7}
+              row
+              align="center"
+              gap={6}
+              rounded={999}
+              hitSlop={{ top: 8, bottom: 8, left: 6, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={fitState === 'fits' ? fitLabel : 'Check if this part fits your car'}
+              style={{ alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, backgroundColor: fitChipBg }}
+            >
+              {fitState === 'checking' ? (
+                <WheelLoader size={13} color={tokens.textMuted} />
+              ) : fitState === 'fits' ? (
+                <MaterialIcons name="check-circle" size={14} color={tokens.success} />
+              ) : (
+                <MaterialIcons name="rule" size={14} color={tokens.text} />
+              )}
+              <AppText family="accent" weight="bold" numberOfLines={1} style={{ fontSize: 11.5, color: fitTextColor }}>
+                {fitLabel}
+              </AppText>
+            </AppPressableView>
+          )}
         </AppView>
       </AppView>
 

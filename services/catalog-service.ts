@@ -64,6 +64,33 @@ export type CatalogItem = {
    *  the fallback. */
   salePercent?: number;
   originalPriceUzs?: number;
+  /** Product kind. "MOTOR_OIL" listings render an oil card (oil attributes, no
+   *  OEM/GM row); "SPARE_PART" is the default. Absent → treat as a spare part. */
+  kind?: 'SPARE_PART' | 'MOTOR_OIL';
+  /** Motor-oil attributes — present only for `kind === "MOTOR_OIL"`. Prefer the
+   *  pre-localized `*Label` fields for display. */
+  motorOil?: {
+    viscosity?: string;
+    /** Raw enum. */
+    oilType?: 'SYNTHETIC' | 'SEMI_SYNTHETIC' | 'MINERAL';
+    /** Pre-localized (e.g. "Синтетическое"). */
+    oilTypeLabel?: string;
+    volumeMl?: number;
+    /** Pre-localized (e.g. "4 л"). */
+    volumeLabel?: string;
+  } | null;
+  /** True for universal listings (oils under "Другое"). Universal parts render
+   *  "Подходит для всех" and NEVER a compatibility badge — `fits` is empty and
+   *  the backend deliberately returns a null compatibility. The single source of
+   *  truth for universal vs vehicle-specific; never infer from the category name. */
+  isUniversal?: boolean;
+  /** Vehicle fitments backing the compatibility chips. Empty for universal parts. */
+  fits?: {
+    makeSlug?: string;
+    makeName?: string;
+    modelSlug?: string;
+    modelName?: string;
+  }[];
 };
 
 export type CatalogItemSpec = {
@@ -87,6 +114,17 @@ export type CatalogListRequest = {
   regions?: string[];
   /** Restrict to GM-family brands (Chevrolet / Ravon / Daewoo …). */
   gmOnly?: boolean;
+  /** Product kinds (lowercase, e.g. ["motor_oil"]); repeatable, empty = every kind. */
+  kinds?: string[];
+  /** Motor-oil facet filters. Any of these implies `kind=motor_oil` server-side.
+   *  All lists are repeatable query params; `volumesMl` values are in millilitres.
+   *  `oilTypes` values are lowercase (`synthetic|semi_synthetic|mineral`). */
+  viscosities?: string[];
+  oilTypes?: string[];
+  volumesMl?: number[];
+  /** Volume range in millilitres (inclusive), an alternative to exact `volumesMl`. */
+  volumeMlMin?: number;
+  volumeMlMax?: number;
   /** Cancellation token. The HTTP transport must pass this to fetch.
    *  Mock transport honors it by aborting the simulated delay. */
   signal?: AbortSignal;
@@ -366,6 +404,28 @@ type ApiCatalogPart = {
   category?: { id: string; name: string } | null;
   /** Canonical part system, uppercase enum (e.g. "BRAKES", "ENGINE"). */
   main_category?: string;
+  /** Product kind — drives which card to render. Oils carry a `motor_oil` block
+   *  and a null `part_number_type`. Absent on legacy responses → spare part. */
+  kind?: 'SPARE_PART' | 'MOTOR_OIL';
+  /** Motor-oil attributes; `null` for spare parts. `*_label` fields are already
+   *  localized by the backend — prefer them for display. */
+  motor_oil?: {
+    viscosity?: string | null;
+    oil_type?: string | null;
+    oil_type_label?: string | null;
+    volume_ml?: number | null;
+    volume_label?: string | null;
+  } | null;
+  /** Universal vs vehicle-specific. The authoritative flag — never inferred from
+   *  the category. `true` ⟺ `compatibility` is null and `fits` is empty. */
+  is_universal?: boolean;
+  /** Vehicle fitments; empty for universal listings. */
+  fits?: {
+    make_slug?: string;
+    make_name?: string;
+    model_slug?: string;
+    model_name?: string;
+  }[];
   /** Denormalized brand label the backend attaches to the part. */
   part_brand_name?: string | null;
   oem_numbers?: string[];
@@ -441,6 +501,17 @@ function deriveSpecs(p: ApiCatalogPart): CatalogItemSpec[] {
   const specs: CatalogItemSpec[] = [];
   const brand = p.part_brand_name ?? p.brand?.name;
   if (brand) specs.push({ label: 'Brand', value: brand });
+  // Motor-oil attributes — shown as their own spec rows (oils carry no OEM/GM
+  // row). Prefer the backend's pre-localized labels; fall back to the raw value.
+  const oil = p.motor_oil;
+  if (oil) {
+    if (oil.viscosity) specs.push({ label: 'Viscosity', value: oil.viscosity });
+    const oilType = oil.oil_type_label ?? (oil.oil_type ? prettyEnum(oil.oil_type) : undefined);
+    if (oilType) specs.push({ label: 'Oil type', value: oilType });
+    const volume =
+      oil.volume_label ?? (oil.volume_ml != null ? `${oil.volume_ml} ml` : undefined);
+    if (volume) specs.push({ label: 'Volume', value: volume });
+  }
   const category = p.main_category ? cleanCategoryName(prettyEnum(p.main_category)) : undefined;
   if (category) specs.push({ label: 'Category', value: category });
   const region = normalizeRegion(p.origin_region ?? p.region);
@@ -480,6 +551,15 @@ function resolvePartNumber(p: ApiCatalogPart): { oem?: string; gm?: string } {
   if (gm) return { gm };
   if (oem) return { oem };
   return {};
+}
+
+type OilType = 'SYNTHETIC' | 'SEMI_SYNTHETIC' | 'MINERAL';
+
+/** Narrow the raw `oil_type` string to the three known enum values (else drop
+ *  it — the label carries the display text anyway). */
+function narrowOilType(v: string | null | undefined): OilType | undefined {
+  const up = (v ?? '').toUpperCase();
+  return up === 'SYNTHETIC' || up === 'SEMI_SYNTHETIC' || up === 'MINERAL' ? up : undefined;
 }
 
 function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
@@ -526,6 +606,25 @@ function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
         ? p.sale.discount_percent
         : undefined,
     originalPriceUzs: p.original_price_uzs ?? undefined,
+    // Motor-oil shape — `kind` drives the card; `isUniversal` drives the
+    // "Подходит для всех" treatment (never inferred from the category name).
+    kind: p.kind,
+    motorOil: p.motor_oil
+      ? {
+          viscosity: p.motor_oil.viscosity ?? undefined,
+          oilType: narrowOilType(p.motor_oil.oil_type),
+          oilTypeLabel: p.motor_oil.oil_type_label ?? undefined,
+          volumeMl: p.motor_oil.volume_ml ?? undefined,
+          volumeLabel: p.motor_oil.volume_label ?? undefined,
+        }
+      : undefined,
+    isUniversal: p.is_universal === true,
+    fits: (p.fits ?? []).map((f) => ({
+      makeSlug: f.make_slug ?? undefined,
+      makeName: f.make_name ?? undefined,
+      modelSlug: f.model_slug ?? undefined,
+      modelName: f.model_name ?? undefined,
+    })),
   };
 }
 
@@ -533,8 +632,9 @@ function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
 // unknown params (400 on `pageSize`), so these must match the backend's
 // Swagger exactly. Verified against the live spec at `/docs-json` (2026-07-26):
 // `q`, `category`, `page`, `page_size`, `make`, `model`, `brand`, `region`,
-// `gm_only`, `sort`. If a filter 400s, correct the value here — this is the
-// single source of truth.
+// `gm_only`, `sort`, plus the motor-oil filters `kind`, `viscosity`, `oil_type`,
+// `volume_ml`. If a filter 400s, correct the value here — this is the single
+// source of truth.
 const PARTS_PARAM = {
   page: 'page',
   pageSize: 'page_size',
@@ -546,6 +646,12 @@ const PARTS_PARAM = {
   region: 'region',
   gmOnly: 'gm_only',
   sort: 'sort',
+  kind: 'kind',
+  viscosity: 'viscosity',
+  oilType: 'oil_type',
+  volumeMl: 'volume_ml',
+  volumeMlMin: 'volume_ml_min',
+  volumeMlMax: 'volume_ml_max',
 } as const;
 
 class HttpCatalogTransport implements CatalogTransport {
@@ -563,6 +669,15 @@ class HttpCatalogTransport implements CatalogTransport {
     request.regions?.forEach((r) => params.append(PARTS_PARAM.region, r));
     if (request.gmOnly) params.set(PARTS_PARAM.gmOnly, 'true');
     if (request.sortBy) params.set(PARTS_PARAM.sort, request.sortBy);
+    // Motor-oil filters — every list is a repeatable query param (kind, viscosity,
+    // oil_type, volume_ml). Any of these makes the backend imply kind=motor_oil,
+    // so they compose without an explicit kind. `volume_ml_*` is the range form.
+    request.kinds?.forEach((k) => params.append(PARTS_PARAM.kind, k));
+    request.viscosities?.forEach((v) => params.append(PARTS_PARAM.viscosity, v));
+    request.oilTypes?.forEach((t) => params.append(PARTS_PARAM.oilType, t));
+    request.volumesMl?.forEach((v) => params.append(PARTS_PARAM.volumeMl, String(v)));
+    if (request.volumeMlMin != null) params.set(PARTS_PARAM.volumeMlMin, String(request.volumeMlMin));
+    if (request.volumeMlMax != null) params.set(PARTS_PARAM.volumeMlMax, String(request.volumeMlMax));
     const res = await apiClient.get<ApiCatalogPartsResponse>(
       `${API_BASE}/parts?${params.toString()}`,
       { signal: request.signal },
