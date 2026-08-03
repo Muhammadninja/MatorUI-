@@ -117,6 +117,8 @@ export type AiChatSendMessageRequest = {
   conversationId?: string | null;
   message: string;
   vehicleContext?: AiChatVehicleContext | null;
+  /** Prior turns, oldest→newest, so the stateless endpoint keeps context. */
+  history?: { role: AiChatRole; content: string }[];
 };
 
 /**
