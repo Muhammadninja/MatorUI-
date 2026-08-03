@@ -10,6 +10,9 @@ export default function GarageStackLayout() {
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: tokens.background },
+        // Edge-only swipe-back (see root layout) — not full-screen.
+        fullScreenGestureEnabled: false,
+        gestureResponseDistance: { start: 50 },
       }}
     >
       <Stack.Screen name="garage" options={{ headerShown: false }} />

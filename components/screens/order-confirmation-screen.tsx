@@ -6,10 +6,12 @@ import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/shared/app-button';
+import { AppPrice } from '@/components/shared/app-price';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useOrder } from '@/hooks/use-orders';
+import { formatOrderNo } from '@/services/orders-service';
 import { triggerHaptic } from '@/utils/haptics';
 
 /**
@@ -124,8 +126,8 @@ export default function OrderConfirmationScreen() {
           }}
         >
           {/* Order number + Total row */}
-          <AppView row justify="space-between" style={{ marginBottom: 12 }}>
-            <AppView>
+          <AppView row justify="space-between" align="flex-start" style={{ marginBottom: 12, gap: 12 }}>
+            <AppView style={{ flexShrink: 1 }}>
               <AppText
                 family="accent"
                 weight="semibold"
@@ -141,12 +143,13 @@ export default function OrderConfirmationScreen() {
               <AppText
                 family="mono"
                 weight="bold"
+                numberOfLines={1}
                 style={{ fontSize: 16, color: tokens.text }}
               >
-                {order.id}
+                {formatOrderNo(order.id)}
               </AppText>
             </AppView>
-            <AppView style={{ alignItems: 'flex-end' }}>
+            <AppView style={{ alignItems: 'flex-end', flexShrink: 0 }}>
               <AppText
                 family="accent"
                 weight="semibold"
@@ -159,13 +162,7 @@ export default function OrderConfirmationScreen() {
               >
                 Total
               </AppText>
-              <AppText
-                family="heading"
-                weight="bold"
-                style={{ fontSize: 16, color: tokens.text }}
-              >
-                {order.totalLabel}
-              </AppText>
+              <AppPrice value={order.totalLabel} size={16} color={tokens.text} />
             </AppView>
           </AppView>
 

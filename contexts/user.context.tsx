@@ -26,7 +26,7 @@ import {
   type PropsWithChildren,
 } from 'react';
 
-import { setUnauthorizedHandler } from '@/services/api-client';
+import { setUnauthorizedHandler, ApiError } from '@/services/api-client';
 import {
   authTransport,
   type RequestOtpInput,
@@ -43,6 +43,32 @@ import {
   type AuthSession,
 } from '@/services/auth-storage';
 import { userTransport } from '@/services/user-api';
+import { debugLog, DEBUG_API_ENABLED } from '@/services/debug-log';
+import { getDeviceId } from '@/services/device-id';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+/**
+ * DEV-ONLY: print the full auth credentials (refresh token, account phone/id,
+ * device id) so they can be copied — e.g. to seed the admin panel's
+ * MATOR_REFRESH_TOKEN without going through the OTP flow. Gated on
+ * DEBUG_API_ENABLED (dev / EXPO_PUBLIC_DEBUG_API), never in a silent release.
+ * Deliberately NOT redacted (unlike debugLog) — that's the point.
+ */
+async function logAuthCreds(
+  label: string,
+  session: AuthSession | null,
+  user: { id?: string; phone?: string | null } | null,
+): Promise<void> {
+  if (!DEBUG_API_ENABLED || !session) return;
+  const deviceId = await getDeviceId().catch(() => 'unknown');
+  console.log(`[mator:creds] ${label}`, {
+    phone: user?.phone ?? null,
+    account_id: user?.id ?? null,
+    device_id: deviceId,
+    refresh_token: session.refreshToken,
+    access_token: session.accessToken,
+  });
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -60,6 +86,11 @@ type UserContextValue = {
   error: string | null;
   refreshProfile: () => Promise<void>;
   updateProfile: (patch: Partial<Omit<UserProfile, 'id' | 'memberSince'>>) => Promise<void>;
+  /** Change the login phone: send an OTP to the new number. Returns a dev code on
+   *  dev builds so the verify step can prefill it. */
+  requestPhoneChange: (phone: string) => Promise<{ expiresIn: number; devCode?: string }>;
+  /** Verify the OTP; rebinds the account to the new number and swaps the session. */
+  confirmPhoneChange: (phone: string, otp: string) => Promise<void>;
   /** Passwordless: send a one-time code to the phone/email. Returns a handle for `verifyOtp`. */
   requestOtp: (input: RequestOtpInput) => Promise<RequestOtpResult>;
   /** Passwordless: verify the code, establish the session, and load the profile. */
@@ -70,6 +101,35 @@ type UserContextValue = {
 // ─── Context ─────────────────────────────────────────────────────────────────
 
 const UserContext = createContext<UserContextValue | undefined>(undefined);
+
+/**
+ * Cached profile — persisted to AsyncStorage (reliable across cold boots) so a
+ * returning user is shown as logged-in INSTANTLY on launch, before and
+ * independent of the `/me` refresh. Keyed separately from the session tokens.
+ * This is what makes "remember me" survive a slow/failed `/me` or token refresh:
+ * the UI's `isAuthenticated` is driven by the cached profile, not by a
+ * network round-trip that can fail on a cold boot.
+ */
+const PROFILE_CACHE_KEY = 'auth:v2:profile';
+async function saveProfileCache(p: UserProfile | null): Promise<void> {
+  try {
+    if (p) await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(p));
+    else await AsyncStorage.removeItem(PROFILE_CACHE_KEY);
+    debugLog('auth', p ? 'saveProfileCache OK' : 'saveProfileCache cleared');
+  } catch (err) {
+    debugLog('auth', 'saveProfileCache FAILED', { message: (err as Error)?.message });
+  }
+}
+async function loadProfileCache(): Promise<UserProfile | null> {
+  try {
+    const raw = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
+    debugLog('auth', raw ? 'loadProfileCache → restored' : 'loadProfileCache → none');
+    return raw ? (JSON.parse(raw) as UserProfile) : null;
+  } catch (err) {
+    debugLog('auth', 'loadProfileCache FAILED', { message: (err as Error)?.message });
+    return null;
+  }
+}
 
 /** Short opaque ID like "A8F2K3" — readable, unambiguous, no real PII. */
 function makeGuestId(): string {
@@ -87,6 +147,17 @@ export function UserProvider({ children }: PropsWithChildren) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const guestIdRef = useRef<string>(makeGuestId());
+  // True only during the initial cold-boot hydration. While true, a failed
+  // token refresh must NOT sign the user out — the restored session + cached
+  // profile keep them logged in; the token retries on the next request.
+  const bootingRef = useRef(true);
+
+  // Set the profile in memory AND persist it, so the next cold boot can render
+  // the user as logged-in immediately, without waiting on `/me`.
+  const applyProfile = useCallback((p: UserProfile | null) => {
+    setProfile(p);
+    void saveProfileCache(p);
+  }, []);
 
   // Atomically swap the persisted session: SecureStore + in-memory cache.
   const persistSession = useCallback(async (session: AuthSession | null) => {
@@ -97,7 +168,7 @@ export function UserProvider({ children }: PropsWithChildren) {
 
   const signOut = useCallback(async () => {
     const existing = getCurrentSession();
-    setProfile(null);
+    applyProfile(null);
     await persistSession(null);
     // Best-effort revocation — don't block the sign-out UX on it.
     if (existing) {
@@ -125,8 +196,11 @@ export function UserProvider({ children }: PropsWithChildren) {
       try {
         const result = await authTransport.verifyOtp(input);
         await persistSession(result.session);
-        setProfile(result.user);
+        applyProfile(result.user);
+        debugLog('auth', 'verifyOtp OK — session established', result.user);
+        void logAuthCreds('verifyOtp', result.session, result.user);
       } catch (err) {
+        debugLog('auth', 'verifyOtp FAILED', { message: (err as Error)?.message });
         setError(err instanceof Error ? err.message : 'Verification failed.');
         throw err;
       } finally {
@@ -142,58 +216,96 @@ export function UserProvider({ children }: PropsWithChildren) {
     setError(null);
     try {
       const me = await userTransport.getMe();
-      setProfile(me);
+      // Persist to the profile cache (not just memory) so the freshly-fetched
+      // avatar/name survive the next cold boot. Using bare setProfile here left
+      // the cache holding a pre-avatar profile → the avatar vanished on relaunch.
+      applyProfile(me);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load profile.');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [applyProfile]);
 
   const updateProfile = useCallback(
     async (patch: Partial<Omit<UserProfile, 'id' | 'memberSince'>>) => {
       if (!profile) return;
       const previous = profile;
+      debugLog('profile', 'updateProfile → patch', patch);
       // Optimistic update
       setProfile((prev) => (prev ? { ...prev, ...patch } : prev));
       try {
         const updated = await userTransport.updateMe(patch);
-        setProfile(updated);
+        applyProfile(updated);
+        debugLog('profile', 'updateProfile OK — saved profile', updated);
       } catch (err) {
-        setProfile(previous);
+        applyProfile(previous);
         setError(err instanceof Error ? err.message : 'Failed to update profile.');
+        debugLog('profile', 'updateProfile FAILED — rolled back', { message: (err as Error)?.message });
         throw err;
       }
     },
     [profile],
   );
 
+  const requestPhoneChange = useCallback(
+    (phone: string) => userTransport.requestPhoneChange(phone),
+    [],
+  );
+
+  const confirmPhoneChange = useCallback(
+    async (phone: string, otp: string) => {
+      // Confirming rebinds the account to the new number and issues a NEW session
+      // (the login identity changed) — persist it and swap the profile.
+      const { user, session } = await userTransport.confirmPhoneChange(phone, otp);
+      await persistSession(session);
+      applyProfile(user);
+      debugLog('profile', 'phone changed — session swapped', { phone: user.phone });
+    },
+    [persistSession],
+  );
+
   // ── Hydration on mount ──────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const session = await loadAuthSession();
+      const [session, cachedProfile] = await Promise.all([loadAuthSession(), loadProfileCache()]);
       if (cancelled) return;
       setCurrentSession(session);
       if (session) {
+        // Render the returning user as logged-in IMMEDIATELY from the cached
+        // profile. The `/me` refresh below is best-effort — it must never be
+        // able to log them out.
+        if (cachedProfile) setProfile(cachedProfile);
         try {
           const me = await userTransport.getMe();
-          if (!cancelled) setProfile(me);
-        } catch {
-          // If `/me` fails on cold boot (network, expired token), drop
-          // the session — the user lands on the guest experience and
-          // can sign in again.
-          if (!cancelled) {
-            await persistSession(null);
-          }
+          if (!cancelled) applyProfile(me);
+          void logAuthCreds('hydrate (restored session)', session, me);
+        } catch (err) {
+          // NEVER wipe the session on cold boot. A failed `/me` — expired
+          // access token whose refresh was rejected, offline, timeout, 5xx —
+          // keeps the restored session AND the cached profile, so the user
+          // stays signed in and the token refreshes on the next successful
+          // request. Only an explicit signOut (or a dead refresh on a real
+          // in-app action, once booting is done) clears the session. Wiping on
+          // boot is exactly what made users re-authenticate every launch.
+          debugLog('auth', 'hydrate getMe FAILED — keeping session + cached profile', {
+            status: err instanceof ApiError ? err.status : undefined,
+            hadCachedProfile: !!cachedProfile,
+            message: (err as Error)?.message,
+          });
         }
       }
-      if (!cancelled) setIsHydrating(false);
+      if (!cancelled) {
+        debugLog('auth', `BOOT DONE — restoredSession=${!!session} restoredProfile=${!!cachedProfile}`);
+        bootingRef.current = false;
+        setIsHydrating(false);
+      }
     })();
     return () => {
       cancelled = true;
     };
-  }, [persistSession]);
+  }, [applyProfile]);
 
   // ── 401 handler wired into apiClient ─────────────────────────────────
   //
@@ -212,12 +324,19 @@ export function UserProvider({ children }: PropsWithChildren) {
       const work = (async () => {
         const result = await authTransport.refresh(session.refreshToken).catch(() => null);
         if (!result) {
-          await signOut();
-          router.replace('/sign-in');
+          // Refresh failed. Do NOT sign the user out or wipe the session —
+          // that is exactly what logged users out on every launch. Keep the
+          // persisted session + cached profile so they stay signed in; the
+          // token refreshes on the next request that succeeds. Only an explicit
+          // sign-out (profile / settings) clears the session.
+          debugLog('auth', 'refresh failed — keeping session + cached profile (no auto sign-out)');
           return false;
         }
         await persistSession(result.session);
-        setProfile(result.user);
+        // Refresh may omit the user object; only overwrite the profile when it
+        // actually carries one (else keep the cached / current profile).
+        if (result.user?.id) applyProfile(result.user);
+        void logAuthCreds('token refreshed', result.session, result.user);
         return true;
       })();
       refreshInFlightRef.current = work;
@@ -241,6 +360,8 @@ export function UserProvider({ children }: PropsWithChildren) {
       error,
       refreshProfile,
       updateProfile,
+      requestPhoneChange,
+      confirmPhoneChange,
       requestOtp,
       verifyOtp,
       signOut,
@@ -252,6 +373,8 @@ export function UserProvider({ children }: PropsWithChildren) {
       error,
       refreshProfile,
       updateProfile,
+      requestPhoneChange,
+      confirmPhoneChange,
       requestOtp,
       verifyOtp,
       signOut,

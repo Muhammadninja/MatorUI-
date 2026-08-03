@@ -1,68 +1,49 @@
-import type { FC } from 'react';
-import type { SvgProps } from 'react-native-svg';
+import { useState } from 'react';
+import { Image } from 'react-native';
 
-// All brand logos are SVGs in `assets/brands_svg/`, imported as components via
-// react-native-svg-transformer (see svg.d.ts + metro.config.js).
-import Byd from '../../../assets/brands_svg/byd.svg';
-import Chery from '../../../assets/brands_svg/chery.svg';
-import Chevrolet from '../../../assets/brands_svg/chevrolet.svg';
-import Haval from '../../../assets/brands_svg/haval.svg';
-import Hyundai from '../../../assets/brands_svg/hyundai.svg';
-import Kia from '../../../assets/brands_svg/kia.svg';
-import Skoda from '../../../assets/brands_svg/skoda.svg';
-import Toyota from '../../../assets/brands_svg/toyota.svg';
-import Volkswagen from '../../../assets/brands_svg/volkswagen.svg';
-
-// Lowercase make id → SVG logo component.
-const SVG_LOGOS: Record<string, FC<SvgProps>> = {
-  byd: Byd,
-  chery: Chery,
-  chevrolet: Chevrolet,
-  haval: Haval,
-  hyundai: Hyundai,
-  kia: Kia,
-  skoda: Skoda,
-  toyota: Toyota,
-  volkswagen: Volkswagen,
-};
-
-function normalizeBrandName(name: string): string {
-  return name.trim().toLowerCase();
-}
-
-/** Whether a real brand-logo asset exists for this make name. */
-export function hasBrandLogo(name: string): boolean {
-  return normalizeBrandName(name) in SVG_LOGOS;
-}
-
-/** Every make we ship a real logo for — drives Explore's "Shop by vehicle"
- *  row. `id` is the lowercase key used for navigation / model lookup. */
-export const LOGO_BRANDS: { id: string; label: string }[] = [
-  { id: 'chevrolet', label: 'Chevrolet' },
-  { id: 'byd', label: 'BYD' },
-  { id: 'kia', label: 'Kia' },
-  { id: 'chery', label: 'Chery' },
-  { id: 'hyundai', label: 'Hyundai' },
-  { id: 'haval', label: 'Haval' },
-  { id: 'toyota', label: 'Toyota' },
-  { id: 'skoda', label: 'Skoda' },
-  { id: 'volkswagen', label: 'Volkswagen' },
-];
-
-export type BrandLogoProps = {
-  /** Make name — matched case-insensitively against a key in `SVG_LOGOS`. */
-  name: string;
-  size?: number;
-};
+import { AppText } from '@/components/shared/app-text';
 
 /**
- * `BrandLogo` — renders the vehicle make's real SVG brand logo (from
- * `assets/brands_svg/`) at the given size, in the brand's own colors. Used on
- * the Explore "Shop by vehicle" tiles and the Make screen hero. Renders nothing
- * for an unknown make.
+ * `BrandLogo` — renders a vehicle make's logo from the backend
+ * (`VehicleMake.logoUrl`, exposed as `RefMake.logoUrl`). Brands and their logos
+ * are managed in the admin console; nothing is bundled in the app anymore.
+ *
+ * Falls back to the brand's initial (in the brand color) when there's no
+ * `logoUrl` yet, or if the remote image fails to load — e.g. an operator hasn't
+ * uploaded a logo, or supplied a URL React Native's <Image> can't render (it
+ * handles PNG/JPG/WebP, not remote SVG). This keeps the tile from ever being a
+ * blank chip.
  */
-export default function BrandLogo({ name, size = 40 }: BrandLogoProps) {
-  const SvgLogo = SVG_LOGOS[normalizeBrandName(name)];
-  if (!SvgLogo) return null;
-  return <SvgLogo width={size} height={size} color="currentColor" />;
-}
+export type BrandLogoProps = {
+  /** Remote logo URL from the backend; null → initial fallback. */
+  logoUrl?: string | null;
+  /** Brand display name — used for the initial fallback + accessibility. */
+  name: string;
+  size?: number;
+  /** Color for the initial fallback. */
+  color?: string;
+};
+
+const BrandLogo = ({ logoUrl, name, size = 40, color }: BrandLogoProps) => {
+  const [failed, setFailed] = useState(false);
+
+  if (logoUrl && !failed) {
+    return (
+      <Image
+        source={{ uri: logoUrl }}
+        style={{ width: size, height: size }}
+        resizeMode="contain"
+        onError={() => setFailed(true)}
+        accessibilityLabel={`${name} logo`}
+      />
+    );
+  }
+
+  return (
+    <AppText family="heading" weight="bold" style={{ fontSize: size * 0.55, color }}>
+      {name.charAt(0).toUpperCase()}
+    </AppText>
+  );
+};
+
+export default BrandLogo;

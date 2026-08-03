@@ -1,0 +1,167 @@
+==============================================================================
+ MATOR — EAS BUILD / SUBMIT COMMAND CHEAT SHEET
+==============================================================================
+ App:            Mator Auto
+ Bundle ID:      com.fotih12.mator
+ App Store ID:   6792292831   (ascAppId)
+ Apple Team:     G5876A655Y  (MATOR INNOVATIONS, MCHJ)
+ EAS account:    matoruz  (project @matoruz/Mator)
+ Dashboard:      https://expo.dev/accounts/matoruz/projects/Mator/builds
+ TestFlight:     https://appstoreconnect.apple.com/apps/6792292831/testflight/ios
+ matorinnovations@gmail.com
+
+ App Store Connect API Key (routes around Apple's flaky login — always use it):
+   Key ID:     VXU8PH57WU
+   Issuer ID:  f2b9c4dc-6d55-4233-91ad-963f201d5253
+   Key file:   /Users/muhammadfotihabdullaev/Desktop/matorui/AuthKey_VXU8PH57WU.p8
+
+ NOTE: Always run these from a REAL Terminal window (not inside an editor/agent),
+ in the project folder:   cd /Users/muhammadfotihabdullaev/Desktop/matorui
+ The API-key env vars are already wired into eas.json for SUBMIT; for BUILD we
+ pass them inline (below) so credential setup never falls back to the Apple login.
+
+==============================================================================
+ 0) ONE-TIME: put the API key on your shell so you don't retype it
+==============================================================================
+ Paste these 3 lines once per Terminal session (or add to ~/.zshrc to make
+ them permanent). Then every build command below "just works".
+
+   export EXPO_ASC_API_KEY_PATH="/Users/muhammadfotihabdullaev/Desktop/matorui/AuthKey_VXU8PH57WU.p8"
+   export EXPO_ASC_KEY_ID="VXU8PH57WU"
+   export EXPO_ASC_ISSUER_ID="f2b9c4dc-6d55-4233-91ad-963f201d5253"
+
+ (If you add them to ~/.zshrc, run `source ~/.zshrc` after.)
+
+==============================================================================
+ 1) THE ONE YOU USUALLY WANT — iOS build + upload to TestFlight
+==============================================================================
+ Builds the App Store binary AND auto-submits it to TestFlight.
+
+   eas build --platform ios --profile production --auto-submit
+
+ At the prompts:
+   - "Would you like to set up Push Notifications?"  -> type  n
+   - "Do you want to log in to your Apple account?"  -> type  n
+   - anything else                                   -> press Enter
+
+ If you did NOT run the exports in step 0, use this instead (one line):
+
+   EXPO_ASC_API_KEY_PATH="/Users/muhammadfotihabdullaev/Desktop/matorui/AuthKey_VXU8PH57WU.p8" EXPO_ASC_KEY_ID="VXU8PH57WU" EXPO_ASC_ISSUER_ID="f2b9c4dc-6d55-4233-91ad-963f201d5253" eas build --platform ios --profile production --auto-submit
+
+==============================================================================
+ 2) iOS build ONLY (no upload) — get the .ipa, submit later
+==============================================================================
+   eas build --platform ios --profile production
+     (Push Notifications -> n,  Apple login -> n)
+
+==============================================================================
+ 3) SUBMIT an already-built binary to TestFlight
+==============================================================================
+   eas submit --platform ios --profile production --latest
+     --latest = the most recent finished build.
+     Uses the API key + ascAppId from eas.json, so no prompts.
+
+ Submit a specific build id instead of the latest:
+   eas submit --platform ios --profile production --id <BUILD_ID>
+
+==============================================================================
+ 4) ANDROID (Google Play) — for later
+==============================================================================
+   eas build --platform android --profile production
+   eas submit --platform android --profile production --latest
+
+==============================================================================
+ 5) INTERNAL TEST BUILDS (share a link, no App Store / TestFlight)
+==============================================================================
+ preview      = staging backend (api.staging.matorui.com), installable via link
+ development  = dev backend + dev client (for `expo start`)
+
+   eas build --platform ios     --profile preview
+   eas build --platform android --profile preview        (installable .apk)
+   eas build --platform ios     --profile development
+   eas build --platform ios     --profile development-simulator   (runs in iOS Simulator)
+
+==============================================================================
+ 6) CHECK STATUS / LOGS
+==============================================================================
+   eas build:list --platform ios --limit 5      (recent builds + status)
+   eas build:view <BUILD_ID>                     (details of one build)
+   Open the dashboard for full logs:
+     https://expo.dev/accounts/matoruz/projects/Mator/builds
+
+==============================================================================
+ 7) CREDENTIALS (signing certs / API key)  — rarely needed now
+==============================================================================
+   eas credentials
+     -> iOS -> production
+     -> "Do you want to log in to your Apple account?"  ->  n   (ALWAYS no)
+     -> then use the menu:
+          "App Store Connect: Manage your API Key"  -> add/replace the key
+          "Build Credentials"                       -> set up cert + profile
+
+   IMPORTANT: whenever ANY eas command asks
+      "Do you want to log in to your Apple account?"   ->  always answer  n
+   We authenticate with the API key, NOT the Apple ID login (it 500s).
+
+==============================================================================
+ 8) PUSH NOTIFICATIONS (APNs key) — optional, set up later
+==============================================================================
+ Creating the APNs key is the ONE step that needs the Apple ID login (it can't
+ use the API key). Only do this when Apple's login is healthy:
+   eas credentials  -> iOS -> production -> Push Key -> set up
+ Until then, always answer  n  to the Push Notifications prompt during builds.
+ Push is NOT required for TestFlight.
+
+==============================================================================
+ 9) BEFORE A BUILD — quick project sanity checks
+==============================================================================
+   npx tsc --noEmit                 (types OK?)
+   npx expo-doctor                  (SDK/package health)
+   npx expo install --check         (list version mismatches)
+   npx expo install --fix           (fix version mismatches, then commit)
+   npx expo prebuild --no-install --platform ios   (reproduce EAS's prebuild
+                                                     locally to catch config
+                                                     errors before a cloud build)
+
+ Commit any fixes BEFORE building — EAS builds from your git commits, not your
+ unsaved working files:
+   git add -A
+   git commit -m "your message"
+
+==============================================================================
+ 10) VERSION / BUILD NUMBER
+==============================================================================
+ Handled automatically:
+   - eas.json has  appVersionSource: "remote"  +  production autoIncrement: true
+   - EAS bumps the iOS buildNumber on every production build.
+ To change the marketing version (e.g. 1.0.0 -> 1.0.1): edit "version" in app.json.
+
+==============================================================================
+ 11) AFTER A SUCCESSFUL SUBMIT — get it to testers (in the browser)
+==============================================================================
+ 1. Wait ~5-10 min for Apple to process the build.
+    https://appstoreconnect.apple.com/apps/6792292831/testflight/ios
+ 2. Internal testing (instant, no review):
+    TestFlight -> Internal Testing -> add a group -> add testers (team members)
+ 3. External testing (up to 10k, needs Beta App Review ~1 day):
+    TestFlight -> External group -> add emails -> fill Test Information -> submit.
+ 4. Testers install the "TestFlight" app from the App Store and open Mator.
+
+==============================================================================
+ 12) IF A BUILD CRASHES ON LAUNCH — how to get the real reason
+==============================================================================
+ On the iPhone:
+   Settings -> Privacy & Security -> Analytics & Improvements
+     -> Analytics Data -> find "Mator-<date>.ips" -> copy the top ~15 lines
+       (exception type + first stack frames).
+ Then check package health:  npx expo-doctor   and   npx expo install --check
+ (Version mismatches and bad patch-package patches are common crash causes.)
+
+==============================================================================
+ GOLDEN RULES
+==============================================================================
+ - Any "Do you want to log in to your Apple account?"  ->  n   (use the API key)
+ - Push Notifications prompt during a build            ->  n   (set up later)
+ - Run from a real Terminal, in the project folder.
+ - Commit your changes before building (EAS builds from git).
+==============================================================================

@@ -63,9 +63,7 @@ const SCHEMA: FieldRow[] = [
   ],
   { key: 'mileage', label: 'Mileage', placeholder: '52,840' },
   { key: 'plate', label: 'Plate', placeholder: '01A123BC', autoCapitalize: 'characters' },
-  // VIN is wired to the camera scanner via `vin-scanner-modal.tsx`.
-  // Form field stays editable for manual entry / paste — scanner just
-  // pre-populates it.
+  // VIN is entered manually in this form field.
   { key: 'vin', label: 'VIN', placeholder: '17-character VIN', autoCapitalize: 'characters' },
 ];
 

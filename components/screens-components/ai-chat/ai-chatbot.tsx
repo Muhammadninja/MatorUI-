@@ -26,23 +26,19 @@ import AiChatComposer from '@/components/screens-components/ai-chat/ai-chat-comp
 import AiChatMessageBubble from '@/components/screens-components/ai-chat/ai-chat-message-bubble';
 import AiChatTypingDots from '@/components/screens-components/ai-chat/ai-chat-typing-dots';
 import ComposerBlurWrapper from '@/components/screens-components/ai-chat/composer-blur-wrapper';
-import VehicleContextBar from '@/components/screens-components/ai-chat/vehicle-context-bar';
 import ScreenShell from '@/components/screens-components/screen-shell';
 import { AppIconButton } from '@/components/shared/app-icon-button';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useActiveVehicle } from '@/contexts/active-vehicle.context';
 import { useThemeContext } from '@/contexts/theme.context';
-import useGarage from '@/hooks/use-garage';
 import { useGlobalModal } from '@/hooks/use-global-modal';
 import { chatTransport } from '@/services/chat-api';
-import { modalService } from '@/services/global-modal-service/global-modal.service';
 import { toastService } from '@/services/toast-service';
 import type {
     AiChatConversationSummary,
     AiChatMessage,
     AiChatToolCall,
-    AiChatVehicleContext,
 } from '@/types/ai-chat';
 import { triggerHaptic } from '@/utils/haptics';
 import { router } from 'expo-router';
@@ -90,24 +86,9 @@ function dateBucket(iso: string): string {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
-function formatVehicleFromGarage(v: {
-  year: number;
-  make: string;
-  model: string;
-  trim?: string;
-}): AiChatVehicleContext {
-  return {
-    makeId: v.make.toLowerCase(),
-    modelId: v.model.toLowerCase(),
-    trimId: v.trim?.toLowerCase() ?? '',
-    selectedCarName: `${v.year} ${v.make} ${v.model}${v.trim ? ` ${v.trim}` : ''}`,
-  };
-}
-
 export default function AiChatbot() {
   const { tokens } = useThemeContext();
   const { openConfirm } = useGlobalModal();
-  const { primaryVehicle } = useGarage();
   const { currentActiveVehicle } = useActiveVehicle();
   const [historyItems, setHistoryItems] = useState<AiChatConversationSummary[]>([]);
 
@@ -134,7 +115,6 @@ export default function AiChatbot() {
 
   const [draft, setDraft] = useState('');
   const [messages, setMessages] = useState<AiChatMessage[]>([]);
-  const [vehicleContext, setVehicleContext] = useState<AiChatVehicleContext | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [streamingReply, setStreamingReply] = useState<StreamingReply | null>(null);
   const [lastSuggestions, setLastSuggestions] = useState<string[]>([]);
@@ -153,20 +133,14 @@ export default function AiChatbot() {
   const sendingRef = useRef(false);
   const scrollRef = useRef<ScrollView | null>(null);
   const isAtBottomRef = useRef(true);
-  const isSending = streamingReply !== null;
-
-  // ── Garage autofill ─────────────────────────────────────────────────
-  // On first mount, if no vehicle context is set and the user has a
-  // primary vehicle in their Garage, preselect it so the assistant has
-  // context without forcing the picker.
-  const garageAutofilledRef = useRef(false);
+  // Mirror of `messages` so we can snapshot the conversation as send-time
+  // history without adding `messages` to sendMessage's deps (which would
+  // re-create the streaming callback on every token).
+  const messagesRef = useRef<AiChatMessage[]>([]);
   useEffect(() => {
-    if (garageAutofilledRef.current) return;
-    if (vehicleContext) return;
-    if (!primaryVehicle) return;
-    setVehicleContext(formatVehicleFromGarage(primaryVehicle));
-    garageAutofilledRef.current = true;
-  }, [primaryVehicle, vehicleContext]);
+    messagesRef.current = messages;
+  }, [messages]);
+  const isSending = streamingReply !== null;
 
   // ── Scroll plumbing ─────────────────────────────────────────────────
   const scrollToEnd = useCallback((animated = true) => {
@@ -264,7 +238,15 @@ export default function AiChatbot() {
         const toolCallMap = new Map<string, AiChatToolCall>();
 
         const stream = chatTransport.streamMessage(
-          { conversationId, message: trimmed, vehicleContext },
+          {
+            conversationId,
+            message: trimmed,
+            // Snapshot the prior turns (pre-append: this fires before the ref
+            // effect runs) so the endpoint remembers earlier context.
+            history: messagesRef.current
+              .slice(-10)
+              .map((m) => ({ role: m.role, content: m.body })),
+          },
           controller.signal,
         );
 
@@ -351,7 +333,7 @@ export default function AiChatbot() {
         sendingRef.current = false;
       }
     },
-    [conversationId, isSending, scrollToEnd, vehicleContext],
+    [conversationId, isSending, scrollToEnd],
   );
 
   const stopGenerating = useCallback(() => {
@@ -378,50 +360,6 @@ export default function AiChatbot() {
       }
     }
   }, [isSending, messages, sendMessage]);
-
-  // ── Vehicle picker — insert a system note when context changes mid-chat
-  const openVehicleSelector = useCallback(() => {
-    triggerHaptic('selection');
-    modalService.openModal('carSelection', {
-      initialMake: vehicleContext?.makeId ?? '',
-      initialModel: vehicleContext?.modelId ?? '',
-      initialTrim: vehicleContext?.trimId ?? '',
-      onSelect: (selection: AiChatVehicleContext) => {
-        const isSwap =
-          messages.length > 0 &&
-          vehicleContext?.selectedCarName !== selection.selectedCarName;
-        setVehicleContext(selection);
-        if (isSwap) {
-          const lastMessage = messages[messages.length - 1]!;
-          setSystemNotes((current) => [
-            ...current,
-            {
-              id: `swap-${Date.now()}`,
-              label: `Switched to ${selection.selectedCarName} for the rest of this chat`,
-              afterId: lastMessage.id,
-            },
-          ]);
-        }
-        triggerHaptic('success');
-      },
-    });
-  }, [messages, vehicleContext]);
-
-  const clearVehicleContext = useCallback(() => {
-    triggerHaptic('selection');
-    if (vehicleContext && messages.length > 0) {
-      const lastMessage = messages[messages.length - 1]!;
-      setSystemNotes((current) => [
-        ...current,
-        {
-          id: `swap-${Date.now()}`,
-          label: 'Vehicle context cleared for the rest of this chat',
-          afterId: lastMessage.id,
-        },
-      ]);
-    }
-    setVehicleContext(null);
-  }, [messages, vehicleContext]);
 
   const handleEmptyComposerTap = useCallback(() => {
     triggerHaptic('error');
@@ -480,7 +418,6 @@ export default function AiChatbot() {
     if (!latest) return;
     setConversationId(latest.id);
     setMessages(latest.messages);
-    setVehicleContext(latest.vehicleContext ?? null);
     setLastSuggestions([]);
     setFailedUserMessageIds(new Set());
     setSystemNotes([]);
@@ -696,16 +633,6 @@ export default function AiChatbot() {
           />
         </AppView>
 
-        {/* Always-visible vehicle context bar. Doubles as the entry
-         *  point to the picker (replaces the composer's Car button)
-         *  and as the indicator of what context the assistant is
-         *  using right now. */}
-        <VehicleContextBar
-          label={vehicleContext?.selectedCarName ?? null}
-          onChange={openVehicleSelector}
-          onClear={clearVehicleContext}
-        />
-
         <ScrollView
           ref={scrollRef}
           style={{ flex: 1 }}
@@ -762,11 +689,6 @@ export default function AiChatbot() {
                   >
                     Tell me about your vehicle so I can give personalized parts and fitment help.
                   </AppText>
-                  {vehicleContext?.selectedCarName ? (
-                    <AppText textVariant="bodyXs" style={{ color: tokens.brand }}>
-                      Vehicle selected: {vehicleContext.selectedCarName}
-                    </AppText>
-                  ) : null}
                 </AppView>
               </AppView>
 
@@ -1052,9 +974,8 @@ export default function AiChatbot() {
   );
 }
 
-// ComposerBlurWrapper + VehicleContextBar moved to their own files:
+// ComposerBlurWrapper lives in its own file:
 //   ./composer-blur-wrapper.tsx
-//   ./vehicle-context-bar.tsx
 // (Extracted as part of the monolith-split refactor.)
 
 function FeedbackButton({

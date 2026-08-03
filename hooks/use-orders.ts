@@ -82,11 +82,28 @@ export type UseOrderValue = {
   refresh: () => void;
 };
 
+/** How often the tracking screen re-fetches an ACTIVE order (ms). Keeps the
+ *  customer's status in sync with backend/operator changes without a WebSocket.
+ *  Terminal orders stop polling to spare battery/network. */
+const ACTIVE_ORDER_POLL_MS = 15_000;
+const TERMINAL_STATUSES: ReadonlySet<OrderDetail['status']> = new Set(['delivered', 'cancelled']);
+
 export function useOrder(orderId: string | null | undefined): UseOrderValue {
   const query = useQuery({
     queryKey: orderId ? ordersQueryKeys.detail(orderId) : ['orders', 'detail', 'disabled'],
     queryFn: ({ signal }) => ordersTransport.getOrder(orderId as string, signal),
     enabled: !!orderId,
+    // Always refetch when the tracking screen mounts, so an order opened from
+    // history never renders a stale cached status before the poll catches up.
+    refetchOnMount: 'always',
+    // Poll while the order is in-flight so operator/webhook status changes appear
+    // within ~15s; stop once it reaches a terminal state. Foreground only.
+    refetchInterval: (q) => {
+      const status = q.state.data?.status;
+      if (!status || TERMINAL_STATUSES.has(status)) return false;
+      return ACTIVE_ORDER_POLL_MS;
+    },
+    refetchIntervalInBackground: false,
   });
 
   return useMemo<UseOrderValue>(() => {

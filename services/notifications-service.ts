@@ -41,16 +41,6 @@ export interface NotificationsTransport {
   markAllRead(): Promise<void>;
 }
 
-// ── Bundled feed (mock + offline fallback) ───────────────────────────────
-
-export const NOTIFICATIONS_SEED: NotificationItem[] = [
-  { id: 'n1', tone: 'info', title: 'Out for delivery', body: 'Order MTR-482910 arrives today by 6 PM.', time: '2m', unread: true },
-  { id: 'n2', tone: 'value', title: 'Price drop', body: 'Ceramic Brake Pads dropped to $64.99. You saved it.', time: '1h', unread: true },
-  { id: 'n3', tone: 'warning', title: 'Back in stock', body: 'AGM Battery Group 35 is available again.', time: '5h', unread: false },
-  { id: 'n4', tone: 'success', title: 'Order delivered', body: 'MTR-471002 was left at your front door.', time: '2d', unread: false },
-  { id: 'n5', tone: 'accolade', title: 'Welcome to Mator Pro', body: 'Free 2-day shipping is now active on your account.', time: '1w', unread: false },
-];
-
 const MOCK_LATENCY_MS = 260;
 
 function delay(ms: number, signal?: AbortSignal): Promise<void> {
@@ -68,9 +58,9 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
 }
 
 class MockNotificationsTransport implements NotificationsTransport {
-  // Start empty so the screen shows the real "You're all caught up" empty
-  // state instead of fake rows. Swap to `NOTIFICATIONS_SEED.map((n) => ({...n}))`
-  // if you want the populated feed for a UI demo.
+  // Always empty — offline/mock has no fabricated notifications, so the screen
+  // shows the real "You're all caught up" empty state. Real notifications only
+  // ever come from the backend (HTTP transport).
   private items: NotificationItem[] = [];
 
   async list(signal?: AbortSignal): Promise<NotificationItem[]> {
@@ -183,4 +173,38 @@ export const notificationsTransport: NotificationsTransport = shouldUseHttpTrans
 
 export function fetchNotifications(signal?: AbortSignal): Promise<NotificationItem[]> {
   return notificationsTransport.list(signal);
+}
+
+// ── Push-device registration ───────────────────────────────────────────────
+//
+// Registers this install's Expo push token with the backend (`POST /v1/devices/
+// register`) so server-sent push — order/delivery status updates emitted by the
+// admin console, etc. — can reach the device. Idempotent per (user, install_id).
+// No-op on mock/offline (`notifications` domain off) so it never throws there.
+
+export type RegisterDeviceInput = {
+  /** Stable per-install id (services/device-id.ts). */
+  installId: string;
+  platform: 'ios' | 'android';
+  /** Expo push token; may be null if permission was denied or unavailable. */
+  expoPushToken?: string | null;
+  permissionsGranted?: boolean;
+  osVersion?: string;
+  appVersion?: string;
+  locale?: string;
+  timezone?: string;
+};
+
+export async function registerDevice(input: RegisterDeviceInput): Promise<void> {
+  if (!shouldUseHttpTransport('notifications')) return;
+  await apiClient.post('/v1/devices/register', {
+    install_id: input.installId,
+    platform: input.platform,
+    expo_push_token: input.expoPushToken ?? undefined,
+    permissions_granted: input.permissionsGranted,
+    os_version: input.osVersion,
+    app_version: input.appVersion,
+    locale: input.locale,
+    timezone: input.timezone,
+  });
 }

@@ -1,3 +1,4 @@
+import { AppPrice } from '@/components/shared/app-price';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
@@ -28,14 +29,7 @@ export default function PriceBlock({
        *  "UZS 100,000,000"). Price never shrinks/truncates — it's the
        *  functional number; the ribbon is decorative and can wrap. */}
       <AppView row align="flex-end" style={{ gap: 8, flexWrap: 'wrap' }}>
-        <AppText
-          family="heading"
-          weight="bold"
-          numberOfLines={1}
-          style={{ fontSize: 18, lineHeight: 24, color: tokens.info }}
-        >
-          {price}
-        </AppText>
+        <AppPrice value={price} size={18} color={tokens.info} />
         {signal ? (
           <Ribbon
             label={signal.label}

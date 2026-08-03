@@ -24,6 +24,7 @@ import {
 } from '@/services/cart-math';
 import { clearStoredCart, loadCart, saveCart } from '@/services/cart-storage';
 import { toastService } from '@/services/toast-service';
+import { useUserContext } from '@/contexts/user.context';
 
 // Re-export types and constants so existing imports keep working without churn.
 export type { CartItem, CartTotals, PromoCode, PromoResult };
@@ -72,6 +73,16 @@ export function CartProvider({ children }: PropsWithChildren) {
   const [pendingIds, setPendingIds] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
 
+  // The server-side cart endpoints require auth. Guests use a purely LOCAL cart
+  // (persisted to storage); we only talk to the remote cart once signed in —
+  // otherwise every mutation 401s and rolls the change back. A ref keeps the
+  // async transport gate reading the CURRENT auth state, not a stale closure.
+  const { isAuthenticated } = useUserContext();
+  const authedRef = useRef(isAuthenticated);
+  useEffect(() => {
+    authedRef.current = isAuthenticated;
+  }, [isAuthenticated]);
+
   // Always-current snapshot for rollback during optimistic mutations.
   // We can't rely on closure values inside async callbacks because they
   // capture stale state from the moment the mutation was queued.
@@ -100,7 +111,7 @@ export function CartProvider({ children }: PropsWithChildren) {
     });
   }, []);
 
-  // ── Hydrate: load local cache instantly, then reconcile from transport.
+  // ── Hydrate: load the local cache instantly so the cart renders offline-first.
   useEffect(() => {
     let cancelled = false;
     const hydrate = async () => {
@@ -112,29 +123,43 @@ export function CartProvider({ children }: PropsWithChildren) {
           if (promo) setAppliedPromo(promo);
         }
       }
-      // After local cache renders, reconcile with the server.
-      try {
-        const remote = await cartTransport.fetch();
-        if (cancelled) return;
-        // Empty server cart shouldn't wipe local; only reconcile when the
-        // server actually has data. Real backend will return the canonical
-        // shape; this is an offline-first hedge.
-        if (remote.items.length > 0) {
-          setItems(remote.items);
-          const promo = remote.appliedPromoCode ? PROMO_CODES[remote.appliedPromoCode] : null;
-          setAppliedPromo(promo ?? null);
-        }
-      } catch {
-        // Offline / first-ever fetch failed — silently keep local state.
-      } finally {
-        if (!cancelled) setIsHydrated(true);
-      }
+      if (!cancelled) setIsHydrated(true);
     };
     void hydrate();
     return () => {
       cancelled = true;
     };
   }, []);
+
+  // ── Reconcile with the server whenever we're signed in. This runs on every
+  // transition into an authenticated state — not just at mount — because auth
+  // is restored asynchronously on relaunch and may not be ready when hydrate
+  // fires. Beyond syncing state, the fetch WARMS the transport's part_id →
+  // line_id map for the persisted cart, so a subsequent quantity update PATCHes
+  // the right line instead of 404ing on a cold map.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const remote = await cartTransport.fetch();
+        if (cancelled) return;
+        // Empty server cart shouldn't wipe local; only reconcile when the
+        // server actually has data (offline-first hedge).
+        if (remote.items.length > 0) {
+          setItems(remote.items);
+          const promo = remote.appliedPromoCode ? PROMO_CODES[remote.appliedPromoCode] : null;
+          setAppliedPromo(promo ?? null);
+        }
+      } catch {
+        // Offline / fetch failed — silently keep local state. The transport
+        // self-heals the id map lazily on the next mutation if needed.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
 
   // ── Debounce-write to local cache after every change.
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -168,7 +193,9 @@ export function CartProvider({ children }: PropsWithChildren) {
       optimistic();
       markPending(pendingId);
       try {
-        const result = await apiCall();
+        // Guests: local-only cart. Skip the server call (it requires auth and
+        // would 401 → rollback). The optimistic update still persists to storage.
+        const result = authedRef.current ? await apiCall() : null;
         setError(null);
         return result;
       } catch (err) {

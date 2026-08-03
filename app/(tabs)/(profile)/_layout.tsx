@@ -10,15 +10,39 @@ export default function ProfileStackLayout() {
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: tokens.background },
+        // Edge-only swipe-back (see root layout) — not full-screen.
+        fullScreenGestureEnabled: false,
+        gestureResponseDistance: { start: 50 },
       }}
     >
       <Stack.Screen name="profile" options={{ headerShown: false }} />
-      <Stack.Screen name="edit-profile" options={{ headerShown: false }} />
-      <Stack.Screen name="order-history" options={{ headerShown: false }} />
-      <Stack.Screen name="payment-methods" options={{ headerShown: false }} />
-      <Stack.Screen name="liked" options={{ headerShown: false }} />
-      <Stack.Screen name="shipping-addresses" options={{ headerShown: false }} />
-      <Stack.Screen name="settings-security" options={{ headerShown: false }} />
+      {/* Every sub-screen is a horizontal push off the profile root, so they
+          share the same slide-from-right + swipe-back transition used across
+          the rest of the app (vehicle-detail, notifications, catalog, …). */}
+      <Stack.Screen
+        name="edit-profile"
+        options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }}
+      />
+      <Stack.Screen
+        name="order-history"
+        options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }}
+      />
+      <Stack.Screen
+        name="payment-methods"
+        options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }}
+      />
+      <Stack.Screen
+        name="liked"
+        options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }}
+      />
+      <Stack.Screen
+        name="shipping-addresses"
+        options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }}
+      />
+      <Stack.Screen
+        name="settings-security"
+        options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }}
+      />
     </Stack>
   );
 }

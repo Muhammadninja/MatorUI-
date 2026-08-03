@@ -10,6 +10,9 @@ export default function ExploreStackLayout() {
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: tokens.background },
+        // Edge-only swipe-back (see root layout) — not full-screen.
+        fullScreenGestureEnabled: false,
+        gestureResponseDistance: { start: 50 },
       }}
     >
       <Stack.Screen name="explore" options={{ headerShown: false }} />

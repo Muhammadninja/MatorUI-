@@ -13,6 +13,11 @@ export type CatalogItem = {
   title: string;
   description: string;
   price: string;
+  /** Numeric list price in UZS (the same value `price` is formatted from), kept
+   *  raw so callers can do math on it — the sale matcher reconstructs the
+   *  pre-discount "was" price, the cart reads it, etc. Absent when the backend
+   *  omits a numeric price. */
+  priceUzs?: number;
   priceLabel: string;
   images: string[];
   specs: CatalogItemSpec[];
@@ -38,6 +43,54 @@ export type CatalogItem = {
    *  region filter. Backend-supplied when available, else inferred from the
    *  brand at map time. */
   region?: CatalogRegion;
+  /** MATOR Certified seller — mirrors the customer-facing `seller.certified`
+   *  flag the operator panel toggles (admin `POST /v1/admin/dealers/:id/certify`).
+   *  Drives the "MATOR Certified" trust badge. Absent until the backend exposes
+   *  it on the catalog part's seller — see `docs/mator-certified-contract.md`. */
+  certified?: boolean;
+  /** Lowest-price guarantee badge, when the seller carries one. */
+  lowestPrice?: boolean;
+  /** Seller storefront name, when the catalog part carries one. */
+  sellerName?: string;
+  /** Category id (e.g. "oil-and-fluids"), kept alongside the display `category`
+   *  name so a CATEGORIES-scoped sale can be matched to this item. */
+  categoryId?: string;
+  /** Seller storefront id, so a DEALERS-scoped sale can be matched. */
+  sellerId?: string;
+  /** Backend-resolved active sale — the authoritative source for the discount
+   *  badge. When set, `priceUzs`/`price` are ALREADY the sale price and
+   *  `originalPriceUzs` is the pre-discount price. Present only once the backend
+   *  applies sales (mator.uz catalog pricing); the client `/v1/sales` matcher is
+   *  the fallback. */
+  salePercent?: number;
+  originalPriceUzs?: number;
+  /** Product kind. "MOTOR_OIL" listings render an oil card (oil attributes, no
+   *  OEM/GM row); "SPARE_PART" is the default. Absent → treat as a spare part. */
+  kind?: 'SPARE_PART' | 'MOTOR_OIL';
+  /** Motor-oil attributes — present only for `kind === "MOTOR_OIL"`. Prefer the
+   *  pre-localized `*Label` fields for display. */
+  motorOil?: {
+    viscosity?: string;
+    /** Raw enum. */
+    oilType?: 'SYNTHETIC' | 'SEMI_SYNTHETIC' | 'MINERAL';
+    /** Pre-localized (e.g. "Синтетическое"). */
+    oilTypeLabel?: string;
+    volumeMl?: number;
+    /** Pre-localized (e.g. "4 л"). */
+    volumeLabel?: string;
+  } | null;
+  /** True for universal listings (oils under "Другое"). Universal parts render
+   *  "Подходит для всех" and NEVER a compatibility badge — `fits` is empty and
+   *  the backend deliberately returns a null compatibility. The single source of
+   *  truth for universal vs vehicle-specific; never infer from the category name. */
+  isUniversal?: boolean;
+  /** Vehicle fitments backing the compatibility chips. Empty for universal parts. */
+  fits?: {
+    makeSlug?: string;
+    makeName?: string;
+    modelSlug?: string;
+    modelName?: string;
+  }[];
 };
 
 export type CatalogItemSpec = {
@@ -61,6 +114,17 @@ export type CatalogListRequest = {
   regions?: string[];
   /** Restrict to GM-family brands (Chevrolet / Ravon / Daewoo …). */
   gmOnly?: boolean;
+  /** Product kinds (lowercase, e.g. ["motor_oil"]); repeatable, empty = every kind. */
+  kinds?: string[];
+  /** Motor-oil facet filters. Any of these implies `kind=motor_oil` server-side.
+   *  All lists are repeatable query params; `volumesMl` values are in millilitres.
+   *  `oilTypes` values are lowercase (`synthetic|semi_synthetic|mineral`). */
+  viscosities?: string[];
+  oilTypes?: string[];
+  volumesMl?: number[];
+  /** Volume range in millilitres (inclusive), an alternative to exact `volumesMl`. */
+  volumeMlMin?: number;
+  volumeMlMax?: number;
   /** Cancellation token. The HTTP transport must pass this to fetch.
    *  Mock transport honors it by aborting the simulated delay. */
   signal?: AbortSignal;
@@ -123,7 +187,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     status: 'Ready to ship',
     title: 'Chevrolet Cobalt EV Urban Glide X',
     description: 'Compact EV for city runs with fast charge support.',
-    price: 'UZS 11,008,400',
+    price: "UZS' 11,008,400",
     priceLabel: 'Starting at',
     images: [],
     specs: MOCK_SPECS,
@@ -136,7 +200,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     status: 'Low stock',
     title: 'Northline SUV Family Edition',
     description: 'Family-ready drive with smart safety assist and roomy cabin.',
-    price: 'UZS29,900',
+    price: "UZS' 29,900",
     priceLabel: 'Starting at',
     images: [],
     specs: [
@@ -154,7 +218,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     status: 'Pre-order',
     title: 'Aero Coupe S',
     description: 'Sport coupe tuned for range, speed, and sleek daily comfort.',
-    price: 'UZS 34,200',
+    price: "UZS' 34,200",
     priceLabel: 'Starting at',
     images: [],
     specs: [
@@ -172,7 +236,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     status: 'Ready to ship',
     title: 'Cobalt Remen Generator Xitoy Original',
     description: 'Adventure-focused build with rugged stance and long battery life.',
-    price: 'UZS 850,750',
+    price: "UZS' 850,750",
     priceLabel: 'Starting at',
     images: [],
     specs: [
@@ -195,7 +259,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     status: 'Ready to ship',
     title: 'Mator Elite Sedan',
     description: 'Premium sedan with Mator Verified inspection and warranty.',
-    price: 'UZS 24,500',
+    price: "UZS' 24,500",
     priceLabel: 'Starting at',
     images: [],
     specs: [
@@ -220,7 +284,7 @@ const MOCK_CATALOG_ITEMS: CatalogItem[] = [
     status: 'Ready to ship',
     title: 'Mator Prime',
     description: 'Flagship sedan, top-selling, lowest entry price, full Mator Verified inspection.',
-    price: 'UZS 16,900',
+    price: "UZS' 16,900",
     priceLabel: 'Starting at',
     badge: 'Bestseller',
     images: [],
@@ -329,9 +393,10 @@ class MockCatalogTransport implements CatalogTransport {
 // ── Live backend shape (GET /v1/catalog/parts) ───────────────────────
 // The real catalog is a parts marketplace exposed at `/v1/catalog/parts`
 // with snake_case params + a nested part shape. We map it onto the app's
-// flat `CatalogItem`. NOTE: the backend strictly rejects unknown query
-// params (it 400s on `pageSize`), so we send ONLY `page`/`page_size` for
-// now; wire `search`/`category` once their accepted param names are known.
+// flat `CatalogItem`. The backend strictly rejects unknown query params
+// (it 400s on `pageSize`), so every filter below uses the exact param name
+// from the live OpenAPI spec (`q`, `category`, `page`, `page_size`, …) —
+// see PARTS_PARAM.
 type ApiCatalogPart = {
   id: string;
   title: string;
@@ -339,6 +404,28 @@ type ApiCatalogPart = {
   category?: { id: string; name: string } | null;
   /** Canonical part system, uppercase enum (e.g. "BRAKES", "ENGINE"). */
   main_category?: string;
+  /** Product kind — drives which card to render. Oils carry a `motor_oil` block
+   *  and a null `part_number_type`. Absent on legacy responses → spare part. */
+  kind?: 'SPARE_PART' | 'MOTOR_OIL';
+  /** Motor-oil attributes; `null` for spare parts. `*_label` fields are already
+   *  localized by the backend — prefer them for display. */
+  motor_oil?: {
+    viscosity?: string | null;
+    oil_type?: string | null;
+    oil_type_label?: string | null;
+    volume_ml?: number | null;
+    volume_label?: string | null;
+  } | null;
+  /** Universal vs vehicle-specific. The authoritative flag — never inferred from
+   *  the category. `true` ⟺ `compatibility` is null and `fits` is empty. */
+  is_universal?: boolean;
+  /** Vehicle fitments; empty for universal listings. */
+  fits?: {
+    make_slug?: string;
+    make_name?: string;
+    model_slug?: string;
+    model_name?: string;
+  }[];
   /** Denormalized brand label the backend attaches to the part. */
   part_brand_name?: string | null;
   oem_numbers?: string[];
@@ -347,6 +434,19 @@ type ApiCatalogPart = {
   part_number_type?: string;
   price_uzs?: number;
   price_label?: string;
+  /** Pre-discount price + the winning campaign, present ONLY when the backend
+   *  applied an active sale to this part (`price_uzs` is then the sale price).
+   *  See mator.uz `part.presenter.ts`. Absent = full price, no sale. */
+  original_price_uzs?: number | null;
+  sale?: {
+    id?: string;
+    title?: string;
+    discount_type?: string;
+    discount_value?: number;
+    /** Effective percent off (whole/2-dp), for the "-15%" pill. */
+    discount_percent?: number;
+    discount_amount_uzs?: number;
+  } | null;
   in_stock?: boolean;
   images?: string[];
   specs?: { label: string; value: string }[];
@@ -354,8 +454,16 @@ type ApiCatalogPart = {
   /** Estimated delivery window in days (either can be null). */
   delivery_eta_days_min?: number | null;
   delivery_eta_days_max?: number | null;
-  /** Seller storefront that lists the part. */
-  seller?: { id: string; name: string; rating_avg?: number } | null;
+  /** Seller storefront that lists the part. `certified`/`lowest_price` are the
+   *  customer-facing mirror of the operator panel's dealer badges (added by the
+   *  backend per docs/mator-certified-contract.md; absent until then). */
+  seller?: {
+    id: string;
+    name: string;
+    rating_avg?: number;
+    certified?: boolean;
+    lowest_price?: boolean;
+  } | null;
   /** Market of origin, uppercase enum on the live backend ("USA", "KOREA"). */
   origin_region?: string;
   /** Legacy alias some deployments used before `origin_region`. */
@@ -393,6 +501,17 @@ function deriveSpecs(p: ApiCatalogPart): CatalogItemSpec[] {
   const specs: CatalogItemSpec[] = [];
   const brand = p.part_brand_name ?? p.brand?.name;
   if (brand) specs.push({ label: 'Brand', value: brand });
+  // Motor-oil attributes — shown as their own spec rows (oils carry no OEM/GM
+  // row). Prefer the backend's pre-localized labels; fall back to the raw value.
+  const oil = p.motor_oil;
+  if (oil) {
+    if (oil.viscosity) specs.push({ label: 'Viscosity', value: oil.viscosity });
+    const oilType = oil.oil_type_label ?? (oil.oil_type ? prettyEnum(oil.oil_type) : undefined);
+    if (oilType) specs.push({ label: 'Oil type', value: oilType });
+    const volume =
+      oil.volume_label ?? (oil.volume_ml != null ? `${oil.volume_ml} ml` : undefined);
+    if (volume) specs.push({ label: 'Volume', value: volume });
+  }
   const category = p.main_category ? cleanCategoryName(prettyEnum(p.main_category)) : undefined;
   if (category) specs.push({ label: 'Category', value: category });
   const region = normalizeRegion(p.origin_region ?? p.region);
@@ -434,6 +553,15 @@ function resolvePartNumber(p: ApiCatalogPart): { oem?: string; gm?: string } {
   return {};
 }
 
+type OilType = 'SYNTHETIC' | 'SEMI_SYNTHETIC' | 'MINERAL';
+
+/** Narrow the raw `oil_type` string to the three known enum values (else drop
+ *  it — the label carries the display text anyway). */
+function narrowOilType(v: string | null | undefined): OilType | undefined {
+  const up = (v ?? '').toUpperCase();
+  return up === 'SYNTHETIC' || up === 'SEMI_SYNTHETIC' || up === 'MINERAL' ? up : undefined;
+}
+
 function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
   const partNumber = resolvePartNumber(p);
   return {
@@ -443,7 +571,8 @@ function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
     description: [p.brand?.name, cleanCategoryName(p.category?.name)].filter(Boolean).join(' · '),
     price:
       p.price_label ??
-      (p.price_uzs != null ? `UZS ${p.price_uzs.toLocaleString('ru-RU')}` : ''),
+      (p.price_uzs != null ? `UZS' ${p.price_uzs.toLocaleString('ru-RU')}` : ''),
+    priceUzs: p.price_uzs ?? undefined,
     priceLabel: '',
     images: p.images ?? [],
     // Prefer an explicit spec array; otherwise synthesize one from the
@@ -460,14 +589,52 @@ function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
     // Prefer the backend's tagged origin (`origin_region`, uppercase enum),
     // then the legacy `region` alias, then brand inference.
     region: normalizeRegion(p.origin_region ?? p.region) ?? brandRegion(p.brand?.name),
+    // Trust badges — mirror the seller flags the operator panel toggles. Default
+    // off; light up automatically the moment the backend ships the fields.
+    certified: p.seller?.certified === true,
+    lowestPrice: p.seller?.lowest_price === true,
+    sellerName: p.seller?.name ?? undefined,
+    // Raw ids the client sale matcher needs to resolve CATEGORIES / DEALERS-scoped
+    // campaigns (see services/sales-service.ts) — the fallback when the backend
+    // hasn't applied the sale itself.
+    categoryId: p.category?.id ?? undefined,
+    sellerId: p.seller?.id ?? undefined,
+    // Backend-resolved sale (authoritative). `price_uzs` is already the sale
+    // price here, so `original_price_uzs` is the struck-through was.
+    salePercent:
+      p.sale && typeof p.sale.discount_percent === 'number'
+        ? p.sale.discount_percent
+        : undefined,
+    originalPriceUzs: p.original_price_uzs ?? undefined,
+    // Motor-oil shape — `kind` drives the card; `isUniversal` drives the
+    // "Подходит для всех" treatment (never inferred from the category name).
+    kind: p.kind,
+    motorOil: p.motor_oil
+      ? {
+          viscosity: p.motor_oil.viscosity ?? undefined,
+          oilType: narrowOilType(p.motor_oil.oil_type),
+          oilTypeLabel: p.motor_oil.oil_type_label ?? undefined,
+          volumeMl: p.motor_oil.volume_ml ?? undefined,
+          volumeLabel: p.motor_oil.volume_label ?? undefined,
+        }
+      : undefined,
+    isUniversal: p.is_universal === true,
+    fits: (p.fits ?? []).map((f) => ({
+      makeSlug: f.make_slug ?? undefined,
+      makeName: f.make_name ?? undefined,
+      modelSlug: f.model_slug ?? undefined,
+      modelName: f.model_name ?? undefined,
+    })),
   };
 }
 
 // Query-param names for GET /v1/catalog/parts. The backend STRICTLY rejects
 // unknown params (400 on `pageSize`), so these must match the backend's
-// Swagger exactly. Names below are the assumed snake_case set derived from the
-// endpoint's response facets (`brands`, `price_range_uzs`, `compatibility`).
-// If a filter 400s, correct the value here — it's the single source of truth.
+// Swagger exactly. Verified against the live spec at `/docs-json` (2026-07-26):
+// `q`, `category`, `page`, `page_size`, `make`, `model`, `brand`, `region`,
+// `gm_only`, `sort`, plus the motor-oil filters `kind`, `viscosity`, `oil_type`,
+// `volume_ml`. If a filter 400s, correct the value here — this is the single
+// source of truth.
 const PARTS_PARAM = {
   page: 'page',
   pageSize: 'page_size',
@@ -479,6 +646,12 @@ const PARTS_PARAM = {
   region: 'region',
   gmOnly: 'gm_only',
   sort: 'sort',
+  kind: 'kind',
+  viscosity: 'viscosity',
+  oilType: 'oil_type',
+  volumeMl: 'volume_ml',
+  volumeMlMin: 'volume_ml_min',
+  volumeMlMax: 'volume_ml_max',
 } as const;
 
 class HttpCatalogTransport implements CatalogTransport {
@@ -496,6 +669,15 @@ class HttpCatalogTransport implements CatalogTransport {
     request.regions?.forEach((r) => params.append(PARTS_PARAM.region, r));
     if (request.gmOnly) params.set(PARTS_PARAM.gmOnly, 'true');
     if (request.sortBy) params.set(PARTS_PARAM.sort, request.sortBy);
+    // Motor-oil filters — every list is a repeatable query param (kind, viscosity,
+    // oil_type, volume_ml). Any of these makes the backend imply kind=motor_oil,
+    // so they compose without an explicit kind. `volume_ml_*` is the range form.
+    request.kinds?.forEach((k) => params.append(PARTS_PARAM.kind, k));
+    request.viscosities?.forEach((v) => params.append(PARTS_PARAM.viscosity, v));
+    request.oilTypes?.forEach((t) => params.append(PARTS_PARAM.oilType, t));
+    request.volumesMl?.forEach((v) => params.append(PARTS_PARAM.volumeMl, String(v)));
+    if (request.volumeMlMin != null) params.set(PARTS_PARAM.volumeMlMin, String(request.volumeMlMin));
+    if (request.volumeMlMax != null) params.set(PARTS_PARAM.volumeMlMax, String(request.volumeMlMax));
     const res = await apiClient.get<ApiCatalogPartsResponse>(
       `${API_BASE}/parts?${params.toString()}`,
       { signal: request.signal },

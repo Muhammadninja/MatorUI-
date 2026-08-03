@@ -10,6 +10,9 @@ export default function CartStackLayout() {
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: tokens.background },
+        // Edge-only swipe-back (see root layout) — not full-screen.
+        fullScreenGestureEnabled: false,
+        gestureResponseDistance: { start: 50 },
       }}
     >
       <Stack.Screen name="cart" options={{ headerShown: false }} />

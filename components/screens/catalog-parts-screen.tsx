@@ -1,11 +1,10 @@
 import { FlashList } from '@shopify/flash-list';
 import { router, useLocalSearchParams } from 'expo-router';
-import { AlertCircle, ArrowLeft, PackageOpen, Search, SlidersHorizontal, X } from 'lucide-react-native';
+import { AlertCircle, ArrowLeft, PackageOpen, Search, X } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
-import { Keyboard, TextInput } from 'react-native';
+import { Keyboard, ScrollView, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import CatalogFilterSheet from '@/components/screens-components/catalog/catalog-filter-sheet';
 import ProductRow from '@/components/screens-components/catalog/product-row';
 import VehicleContextBar from '@/components/screens-components/catalog/vehicle-context-bar';
 import { AppText } from '@/components/shared/app-text';
@@ -18,7 +17,7 @@ import { useCatalogList } from '@/hooks/use-catalog-list';
 import { useToast } from '@/hooks/use-toast';
 import { parsePrice } from '@/services/cart-math';
 import type { CatalogItem } from '@/services/catalog-service';
-import type { FilterState } from '@/types/catalog-nav';
+import type { CatalogSortBy, FilterState } from '@/types/catalog-nav';
 import { triggerHaptic } from '@/utils/haptics';
 
 const DEFAULT_FILTER: FilterState = {
@@ -38,10 +37,10 @@ function brandOf(item: CatalogItem): string {
 
 /**
  * Catalog parts (Stage 3) — the parts list for a chosen system + vehicle.
- * Fixed header (back + search + quick-filter pills) over a FlashList of
- * `ProductRow`s from the real catalog, plus a sticky "Filter & Sort" bar that
- * opens a bottom sheet. Filters/sort are applied client-side over the fetched
- * page (server filter params are wired once the backend exposes them).
+ * Fixed header (back + search) over a single horizontally-scrolling row of
+ * QUICK FILTERS — sort, GM/OEM flags, region, and brand chips that each apply
+ * on tap. There is no filter bottom sheet: every refinement is a one-tap chip.
+ * Region + GM go to the backend; the rest refine the fetched page client-side.
  */
 export default function CatalogPartsScreen() {
   const { tokens } = useThemeContext();
@@ -71,7 +70,15 @@ export default function CatalogPartsScreen() {
     oemOnly: certified === 'oem',
     gmOnly: certified === 'gm',
   }));
-  const [sheetOpen, setSheetOpen] = useState(false);
+
+  // Quick-filter mutators — every chip applies immediately (no draft, no Apply).
+  const toggleSort = (s: CatalogSortBy) =>
+    setFilter((f) => ({ ...f, sortBy: f.sortBy === s ? 'relevance' : s }));
+  const toggleBrand = (b: string) =>
+    setFilter((f) => ({
+      ...f,
+      brands: f.brands.includes(b) ? f.brands.filter((x) => x !== b) : [...f.brands, b],
+    }));
 
   // Flow context + the coarse catalog facets (region, GM) go to the backend so
   // the transport does that filtering; the fine refinements (brand, sort, stock,
@@ -115,7 +122,24 @@ export default function CatalogPartsScreen() {
     filter.brands.length +
     filter.regions.length +
     (filter.oemOnly ? 1 : 0) +
-    (filter.gmOnly ? 1 : 0);
+    (filter.gmOnly ? 1 : 0) +
+    (filter.sortBy !== 'relevance' ? 1 : 0);
+
+  // The full quick-filter row: sort → flags → regions → brands, each a one-tap
+  // chip. Replaces the old bottom sheet entirely.
+  const chips = useMemo<QuickChip[]>(() => {
+    const list: QuickChip[] = [
+      { key: 'sort:price_asc', label: 'Price ↑', active: filter.sortBy === 'price_asc', onPress: () => toggleSort('price_asc') },
+      { key: 'sort:price_desc', label: 'Price ↓', active: filter.sortBy === 'price_desc', onPress: () => toggleSort('price_desc') },
+      { key: 'gm', label: 'GM', active: filter.gmOnly, onPress: () => setFilter((s) => ({ ...s, gmOnly: !s.gmOnly })) },
+      { key: 'oem', label: 'OEM Quality', active: filter.oemOnly, onPress: () => setFilter((s) => ({ ...s, oemOnly: !s.oemOnly })) },
+    ];
+    for (const b of brands) {
+      list.push({ key: `brand:${b}`, label: b, active: filter.brands.includes(b), onPress: () => toggleBrand(b), testID: `filter-brand-${b}` });
+    }
+    return list;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, brands]);
 
   const openItem = useCallback((it: CatalogItem) => {
     router.push({ pathname: '/item-detail/[id]', params: { id: it.id } });
@@ -141,7 +165,7 @@ export default function CatalogPartsScreen() {
   );
 
   return (
-    <AppView testID="parts-directory-screen" flex={1} colorName="card">
+    <AppView testID="parts-directory-screen" flex={1} colorName="background">
       {/* Fixed header: back + search + quick filters */}
       <AppView style={{ paddingTop: insets.top + 6 }} px="lg" colorName="background">
         <AppView row align="center" gap={10}>
@@ -189,34 +213,40 @@ export default function CatalogPartsScreen() {
           </AppView>
         </AppView>
 
-        {/* Quick filter pills */}
-        <FlashList
-          data={QUICK_FILTERS}
+        {/* Quick filters — a single horizontally-scrolling row of one-tap chips.
+            A ScrollView (not FlashList) keeps the small, dynamic chip set simple
+            and avoids nested-virtualization warnings under the page list. */}
+        <ScrollView
+          testID="quick-filters"
           horizontal
-          keyExtractor={(f) => f.key}
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingVertical: 12 }}
-          renderItem={({ item: f }) => {
-            const active =
-              (f.key === 'oem' && filter.oemOnly) ||
-              (f.key === 'gm' && filter.gmOnly) ||
-              (f.key === 'brand' && filter.brands.length > 0) ||
-              (f.key === 'region' && filter.regions.length > 0);
-            return (
-              <QuickPill
-                label={f.label}
-                active={active}
-                onPress={() => {
-                  triggerHaptic('selection');
-                  if (f.key === 'oem') setFilter((s) => ({ ...s, oemOnly: !s.oemOnly }));
-                  else if (f.key === 'gm') setFilter((s) => ({ ...s, gmOnly: !s.gmOnly }));
-                  else setSheetOpen(true); // brand / region open the sheet
-                }}
-              />
-            );
-          }}
-          ItemSeparatorComponent={() => <AppView style={{ width: 8 }} />}
-        />
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingVertical: 12, gap: 8, alignItems: 'center' }}
+        >
+          {activeFilterCount > 0 ? (
+            <QuickPill
+              testID="filter-clear-btn"
+              label="Clear"
+              active={false}
+              onPress={() => {
+                triggerHaptic('selection');
+                setFilter(DEFAULT_FILTER);
+              }}
+            />
+          ) : null}
+          {chips.map((c) => (
+            <QuickPill
+              key={c.key}
+              testID={c.testID}
+              label={c.label}
+              active={c.active}
+              onPress={() => {
+                triggerHaptic('selection');
+                c.onPress();
+              }}
+            />
+          ))}
+        </ScrollView>
       </AppView>
 
       {/* Body */}
@@ -249,7 +279,7 @@ export default function CatalogPartsScreen() {
           data={results}
           keyExtractor={(it) => it.id}
           renderItem={renderItem}
-          ItemSeparatorComponent={() => <AppView style={{ height: 12 }} />}
+          ItemSeparatorComponent={() => <AppView style={{ height: 14 }} />}
           ListHeaderComponent={
             <AppView gap={12} style={{ paddingBottom: 4 }}>
               <VehicleContextBar />
@@ -260,57 +290,29 @@ export default function CatalogPartsScreen() {
               </AppText>
             </AppView>
           }
-          contentContainerStyle={{ paddingTop: 4, paddingBottom: insets.bottom + 96 }}
+          contentContainerStyle={{ paddingTop: 4, paddingBottom: insets.bottom + 96, paddingHorizontal: 16 }}
           showsVerticalScrollIndicator={false}
           keyboardDismissMode="on-drag"
         />
       )}
-
-      {/* Sticky Filter & Sort bar */}
-      <AppView center style={{ position: 'absolute', left: 0, right: 0, bottom: Math.max(insets.bottom, 16) }} pointerEvents="box-none">
-        <AppPressableView
-          testID="floating-filter-btn"
-          onPress={() => setSheetOpen(true)}
-          accessibilityRole="button"
-          accessibilityLabel="Filter and sort"
-          pressedOpacity={0.85}
-          row
-          align="center"
-          gap={8}
-          rounded={999}
-          px={20}
-          py={13}
-          style={{ backgroundColor: tokens.brandBg, shadowColor: tokens.black, shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 6 }}
-        >
-          <SlidersHorizontal size={17} strokeWidth={2.4} color={tokens.onBrand} />
-          <AppText family="accent" weight="bold" style={{ fontSize: 14, color: tokens.onBrand }}>
-            Filter & Sort{activeFilterCount > 0 ? ` · ${activeFilterCount}` : ''}
-          </AppText>
-        </AppPressableView>
-      </AppView>
-
-      <CatalogFilterSheet
-        visible={sheetOpen}
-        onClose={() => setSheetOpen(false)}
-        value={filter}
-        brands={brands}
-        onApply={setFilter}
-      />
     </AppView>
   );
 }
 
-const QUICK_FILTERS: { key: string; label: string }[] = [
-  { key: 'gm', label: 'GM' },
-  { key: 'brand', label: 'Brand' },
-  { key: 'region', label: 'Region' },
-  { key: 'oem', label: 'OEM Quality' },
-];
+/** One quick-filter chip descriptor built in the screen. */
+type QuickChip = {
+  key: string;
+  label: string;
+  active: boolean;
+  onPress: () => void;
+  testID?: string;
+};
 
-function QuickPill({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+function QuickPill({ label, active, onPress, testID }: { label: string; active: boolean; onPress: () => void; testID?: string }) {
   const { tokens } = useThemeContext();
   return (
     <AppPressableView
+      testID={testID}
       onPress={onPress}
       androidRipple={false}
       accessibilityRole="button"

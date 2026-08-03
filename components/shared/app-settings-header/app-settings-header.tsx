@@ -80,33 +80,35 @@ export function AppSettingsHeader({
         pb={12}
         style={{ minHeight: SETTINGS_HEADER_HEIGHT }}
       >
-        <AppView style={{ flex: 1, alignItems: 'flex-start' }}>
-          <AppPressableView
-            center
-            rounded={999}
-            onPress={handleBack}
-            androidRipple
-            accessibilityRole="button"
-            accessibilityLabel={backAccessibilityLabel}
-            style={{
-              width: 36,
-              height: 36,
-              borderWidth: 1,
-              borderColor: tokens.border,
-              backgroundColor: scheme === 'dark' ? tokens.card : tokens.white,
-            }}
-          >
-            <ArrowLeft size={18} strokeWidth={2.2} color={tokens.text} />
-          </AppPressableView>
-        </AppView>
+        {/* Back button (fixed width). The title takes ALL remaining space so it
+            never truncates in a 1/3 column; a matching-width spacer on the right
+            keeps it centered when there's no right slot. */}
+        <AppPressableView
+          center
+          rounded={999}
+          onPress={handleBack}
+          androidRipple
+          accessibilityRole="button"
+          accessibilityLabel={backAccessibilityLabel}
+          style={{
+            width: 36,
+            height: 36,
+            flexShrink: 0,
+            borderWidth: 1,
+            borderColor: tokens.border,
+            backgroundColor: scheme === 'dark' ? tokens.card : tokens.white,
+          }}
+        >
+          <ArrowLeft size={18} strokeWidth={2.2} color={tokens.text} />
+        </AppPressableView>
 
-        <AppView style={{ flex: 1, alignItems: 'center' }}>
+        <AppView style={{ flex: 1, alignItems: 'center', paddingHorizontal: 8 }}>
           <AppText textVariant="bodySm" weight="semibold" numberOfLines={1}>
             {title}
           </AppText>
         </AppView>
 
-        <AppView style={{ flex: 1, alignItems: 'flex-end' }}>
+        <AppView style={{ minWidth: 36, alignItems: 'flex-end', flexShrink: 0 }}>
           {right ?? null}
         </AppView>
       </AppView>

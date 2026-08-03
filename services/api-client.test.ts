@@ -155,6 +155,39 @@ describe('apiClient — 401 handling', () => {
     fetchMock.mockImplementation(() => Promise.resolve(bad({}, 401)));
     await expect(apiClient.get('/x')).rejects.toBeInstanceOf(ApiError);
   });
+
+  test('401 → handler refreshes token → retries once with the fresh token and succeeds', async () => {
+    const handler = vi.fn(); // simulates a successful refresh
+    setUnauthorizedHandler(handler);
+    (config.getAuthToken as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce('stale') // first attempt's header
+      .mockResolvedValueOnce('fresh') // 401-branch check → truthy → retry
+      .mockResolvedValueOnce('fresh'); // retry's header
+    fetchMock
+      .mockResolvedValueOnce(bad({ message: 'expired' }, 401))
+      .mockResolvedValueOnce(ok({ ok: true }));
+
+    const res = await apiClient.patch('/me', { first_name: 'A' });
+    expect(res).toEqual({ ok: true });
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [, retryInit] = fetchMock.mock.calls[1]!;
+    expect((retryInit!.headers as Record<string, string>).Authorization).toBe('Bearer fresh');
+  });
+
+  test('401 → refresh yields no token (signed out) → throws once, no retry loop', async () => {
+    const handler = vi.fn();
+    setUnauthorizedHandler(handler);
+    (config.getAuthToken as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce('stale') // header
+      .mockResolvedValueOnce(null); // 401-branch check → falsy → throw
+    fetchMock.mockResolvedValue(bad({ code: 'UNAUTHORIZED', message: 'nope' }, 401));
+
+    const err = (await apiClient.get('/x').catch((e) => e)) as ApiError;
+    expect(err.status).toBe(401);
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('apiClient — 4xx client errors', () => {

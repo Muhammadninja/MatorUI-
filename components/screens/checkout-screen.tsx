@@ -1,76 +1,109 @@
 import { router } from 'expo-router';
-import { AlertCircle, ArrowLeft } from 'lucide-react-native';
+import { AlertCircle, ArrowLeft, Check, MapPin, PhoneCall, Plus } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { ScrollView } from 'react-native';
-
-import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import AddressFormSheet, {
+  type AddressFormValues,
+} from '@/components/screens-components/account/address-form-sheet';
 import { AppButton } from '@/components/shared/app-button';
+import { AppPrice } from '@/components/shared/app-price';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
+import { WheelLoader } from '@/components/shared/wheel-loader';
+import { DEFAULT_PAYMENT_TYPE, PAYMENT_OPTIONS, type PaymentOption } from '@/constants/payment-options';
 import { useCartContext } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
-import { useAddresses, useCreateOrder, usePaymentMethods, useShippingQuote } from '@/hooks/use-orders';
+import { useUserContext } from '@/contexts/user.context';
+import { useAddresses, useCreateAddress, useCreateOrder, useShippingQuote } from '@/hooks/use-orders';
 import { parsePrice } from '@/services/cart-math';
+import garageService from '@/services/garage-service';
+import type { Address, PaymentType } from '@/services/orders-service';
 import { triggerHaptic } from '@/utils/haptics';
 
+type Tokens = ReturnType<typeof useThemeContext>['tokens'];
+
 /**
- * Checkout — faithful rebuild of the prototype's `scCheckout`, now on the
- * real orders layer. Shipping + payment section cards cycle through the
- * server's address / card / shipping lists (`useAddresses`,
- * `usePaymentMethods`, `useShippingQuote`). "Place order" builds a
- * `CreateOrderInput` from the cart + selections, calls
- * `useCreateOrder().placeOrder`, clears the cart, and hands the created
- * order id to the confirmation screen via a route param.
+ * Checkout — the Uzbek-market flow. Delivery address is OPTIONAL (the courier
+ * calls to confirm the drop-off, so the buyer can skip it), and payment is a
+ * fixed choice of Payme / Terminal / Cash rather than a stored card. Addresses
+ * can be added inline via a bottom-sheet. "Place order" builds a
+ * `CreateOrderInput` (addressId may be null) and hands the created order id to
+ * the confirmation screen.
  */
 export default function CheckoutScreen() {
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
   const { items, totals, appliedPromo, formatCurrency, clearCart } = useCartContext();
+  const { profile } = useUserContext();
 
   const addresses = useAddresses();
-  const payments = usePaymentMethods();
+  const createAddress = useCreateAddress();
+  const create = useCreateOrder();
 
-  const [addrIdx, setAddrIdx] = useState(0);
-  const [cardIdx, setCardIdx] = useState(0);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [addressSkipped, setAddressSkipped] = useState(false);
+  const [paymentType, setPaymentType] = useState<PaymentType>(DEFAULT_PAYMENT_TYPE);
   const [shipIdx, setShipIdx] = useState(0);
+  const [sheetVisible, setSheetVisible] = useState(false);
 
-  // Default the card to the one the server marks default; addresses have no
-  // default flag so we take the first. We track selections by index and clamp
-  // on read so a shorter-than-expected list never crashes.
-  const defaultCardIdx = Math.max(payments.items.findIndex((c) => c.isDefault), 0);
-  const addr = addresses.items[addrIdx] ?? addresses.items[0];
-  const card = payments.items[cardIdx] ?? payments.items[defaultCardIdx] ?? payments.items[0];
+  const addrItems = addresses.items;
+  const defaultAddr = useMemo(
+    () => addrItems.find((a) => a.isDefault) ?? addrItems[0],
+    [addrItems],
+  );
+  const chosenAddr = selectedAddressId
+    ? addrItems.find((a) => a.id === selectedAddressId)
+    : undefined;
+  // Effective delivery address: null when skipped or none available.
+  const addr: Address | null = addressSkipped ? null : chosenAddr ?? defaultAddr ?? null;
 
-  // Shipping quote depends on the selected address + current subtotal.
+  // Shipping quote only makes sense with a concrete address. Without one the
+  // order ships via courier (free) and the selector is hidden.
   const shippingRequest = useMemo(
     () => (addr ? { addressId: addr.id, subtotal: totals.subtotal } : null),
     [addr, totals.subtotal],
   );
   const shipping = useShippingQuote(shippingRequest);
-  const shipOption = shipping.options[shipIdx] ?? shipping.options[0];
-
-  const create = useCreateOrder();
-
-  const collectionsLoading = addresses.state === 'loading' || payments.state === 'loading';
-  const collectionsError =
-    addresses.state === 'error' || payments.state === 'error'
-      ? addresses.error ?? payments.error ?? 'Could not load checkout details.'
-      : null;
+  const shipOption = addr ? shipping.options[shipIdx] ?? shipping.options[0] : undefined;
 
   const grandTotal = totals.total + (shipOption?.price ?? 0);
 
+  const cycleAddress = () => {
+    if (addrItems.length === 0) return;
+    const curIdx = Math.max(0, addrItems.findIndex((a) => a.id === addr?.id));
+    const next = addrItems[(curIdx + 1) % addrItems.length]!;
+    setSelectedAddressId(next.id);
+    setAddressSkipped(false);
+    setShipIdx(0);
+  };
+
+  const handleAddAddress = async (values: AddressFormValues) => {
+    try {
+      const created = await createAddress.mutateAsync(values);
+      setSelectedAddressId(created.id);
+      setAddressSkipped(false);
+      setShipIdx(0);
+    } catch {
+      // The address query stays as-is on failure; the buyer can retry or skip.
+    }
+  };
+
   const placeOrder = async () => {
-    if (items.length === 0 || !addr || !card || !shipOption) return;
+    if (items.length === 0) return;
     triggerHaptic('success');
     const result = await create.placeOrder({
       items: items.map((i) => ({ productId: i.id, quantity: i.quantity })),
-      addressId: addr.id,
-      paymentMethodId: card.id,
-      shippingOptionKey: shipOption.key,
+      addressId: addr?.id ?? null,
+      paymentType,
+      shippingOptionKey: shipOption?.key ?? 'standard',
       promoCode: appliedPromo?.code ?? null,
       totalLabel: formatCurrency(grandTotal),
+      // Backend order is built from the server cart; these tag it with the
+      // buyer's vehicle + contact number (both optional server-side).
+      vehicleId: garageService.getPrimary()?.id,
+      contactPhone: profile?.phone ?? undefined,
     });
     if (!result) return; // hook surfaced the error; stay on the screen.
     clearCart();
@@ -80,30 +113,10 @@ export default function CheckoutScreen() {
     });
   };
 
-  if (collectionsLoading) {
+  if (addresses.state === 'loading') {
     return (
       <AppView flex={1} colorName="background" center>
         <WheelLoader size={30} color={tokens.text} />
-      </AppView>
-    );
-  }
-
-  if (collectionsError || !addr || !card) {
-    return (
-      <AppView flex={1} colorName="background" center px="xl" gap={12}>
-        <AlertCircle size={32} strokeWidth={2} color={tokens.error} />
-        <AppText family="default" style={{ color: tokens.textMuted, textAlign: 'center' }}>
-          {collectionsError ?? 'No addresses or cards available.'}
-        </AppText>
-        <AppButton
-          title="Retry"
-          kind="secondary"
-          size="sm"
-          onPress={() => {
-            addresses.refresh();
-            payments.refresh();
-          }}
-        />
       </AppView>
     );
   }
@@ -123,31 +136,36 @@ export default function CheckoutScreen() {
         </AppView>
 
         <AppView px="lg" gap={16}>
-          <SectionCard
-            label="Shipping address"
-            main={addr.label}
-            sub={`${addr.line1}, ${addr.city}`}
-            onChange={
-              addresses.items.length > 1
-                ? () => setAddrIdx((i) => (i + 1) % addresses.items.length)
-                : undefined
-            }
+          {/* Delivery address (optional — courier calls to confirm) */}
+          <DeliverySection
             tokens={tokens}
-          />
-          <SectionCard
-            label="Payment"
-            main={`${card.brand} ···· ${card.last4}`}
-            sub={`Expires ${card.exp}`}
-            onChange={
-              payments.items.length > 1
-                ? () => setCardIdx((i) => (i + 1) % payments.items.length)
-                : undefined
-            }
-            tokens={tokens}
+            addr={addr}
+            skipped={addressSkipped}
+            canChange={addrItems.length > 1}
+            onChange={cycleAddress}
+            onAdd={() => setSheetVisible(true)}
+            onSkip={() => {
+              setAddressSkipped(true);
+              setSelectedAddressId(null);
+            }}
           />
 
-          {/* Shipping option */}
-          {shipOption ? (
+          {/* Payment method — Payme / Terminal / Cash */}
+          <AppView gap={10}>
+            <SectionLabel tokens={tokens}>Payment</SectionLabel>
+            {PAYMENT_OPTIONS.map((opt) => (
+              <PaymentRow
+                key={opt.id}
+                option={opt}
+                selected={paymentType === opt.id}
+                onPress={() => setPaymentType(opt.id)}
+                tokens={tokens}
+              />
+            ))}
+          </AppView>
+
+          {/* Shipping option — only when a concrete address is selected */}
+          {addr && shipOption ? (
             <SectionCard
               label="Shipping"
               main={`${shipOption.label} · ${shipOption.price === 0 ? 'Free' : formatCurrency(shipOption.price)}`}
@@ -179,11 +197,15 @@ export default function CheckoutScreen() {
             {totals.discount > 0 ? (
               <SummaryRow label="Discount" value={`−${formatCurrency(totals.discount)}`} tokens={tokens} />
             ) : null}
-            <SummaryRow label="Shipping" value={shipOption && shipOption.price > 0 ? formatCurrency(shipOption.price) : 'Free'} tokens={tokens} />
+            <SummaryRow
+              label="Shipping"
+              value={shipOption && shipOption.price > 0 ? formatCurrency(shipOption.price) : 'Free'}
+              tokens={tokens}
+            />
             <SummaryRow label="Tax" value={formatCurrency(totals.tax)} tokens={tokens} />
             <AppView row justify="space-between">
               <AppText family="accent" weight="bold" style={{ fontSize: 16, color: tokens.text }}>Total</AppText>
-              <AppText family="heading" weight="bold" style={{ fontSize: 18, color: tokens.text }}>{formatCurrency(grandTotal)}</AppText>
+              <AppPrice value={formatCurrency(grandTotal)} size={18} color={tokens.text} />
             </AppView>
           </AppView>
 
@@ -208,17 +230,164 @@ export default function CheckoutScreen() {
           onPress={placeOrder}
         />
       </AppView>
+
+      <AddressFormSheet
+        visible={sheetVisible}
+        onClose={() => setSheetVisible(false)}
+        onSubmit={handleAddAddress}
+      />
     </AppView>
   );
 }
 
-function SectionCard({ label, main, sub, onChange, tokens }: { label: string; main: string; sub: string; onChange?: () => void; tokens: ReturnType<typeof useThemeContext>['tokens'] }) {
+// ── Delivery address section ───────────────────────────────────────────
+// Three shapes: a chosen address (with change/skip), the skipped state
+// (courier calls), or the empty prompt (add / skip).
+
+function DeliverySection({
+  tokens,
+  addr,
+  skipped,
+  canChange,
+  onChange,
+  onAdd,
+  onSkip,
+}: {
+  tokens: Tokens;
+  addr: Address | null;
+  skipped: boolean;
+  canChange: boolean;
+  onChange: () => void;
+  onAdd: () => void;
+  onSkip: () => void;
+}) {
+  return (
+    <AppView rounded={16} p={16} colorName="card" borderWidth={1} borderName="border" gap={10}>
+      <AppView row align="center" justify="space-between">
+        <SectionLabel tokens={tokens}>Delivery address</SectionLabel>
+        {addr && canChange ? (
+          <AppPressableView onPress={onChange} accessibilityRole="button" accessibilityLabel="Change address">
+            <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.text }}>Change</AppText>
+          </AppPressableView>
+        ) : null}
+      </AppView>
+
+      {addr ? (
+        <>
+          <AppView row align="center" gap={10}>
+            <MapPin size={18} strokeWidth={2} color={tokens.text} />
+            <AppView flex={1}>
+              <AppText family="default" weight="semibold" style={{ fontSize: 15, color: tokens.text }}>{addr.label}</AppText>
+              <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted, marginTop: 2 }} numberOfLines={2}>
+                {`${addr.line1}, ${addr.city}`}
+              </AppText>
+            </AppView>
+          </AppView>
+          <AppView row gap={18} style={{ marginTop: 2 }}>
+            <LinkAction label="Add new" onPress={onAdd} color={tokens.text} />
+            <LinkAction label="Skip for now" onPress={onSkip} color={tokens.textMuted} />
+          </AppView>
+        </>
+      ) : skipped ? (
+        <>
+          <AppView row align="center" gap={10}>
+            <PhoneCall size={18} strokeWidth={2} color={tokens.text} />
+            <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted, flex: 1 }}>
+              No address — the courier will call you to confirm the delivery location.
+            </AppText>
+          </AppView>
+          <LinkAction label="Add an address" onPress={onAdd} color={tokens.text} />
+        </>
+      ) : (
+        <>
+          <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted }}>
+            Add a delivery address, or skip it — the courier will call to confirm your location.
+          </AppText>
+          <AppView row gap={10}>
+            <AppButton title="Add address" kind="secondary" size="sm" onPress={onAdd} />
+            {/* variant="ghost" → transparent bg + `tokens.text` label. Without it
+                the default solid text-kind button is white-on-white (invisible)
+                in dark mode. */}
+            <AppButton title="Skip" kind="text" variant="ghost" size="sm" onPress={onSkip} />
+          </AppView>
+        </>
+      )}
+    </AppView>
+  );
+}
+
+function LinkAction({ label, onPress, color }: { label: string; onPress: () => void; color: string }) {
+  return (
+    <AppPressableView onPress={onPress} accessibilityRole="button" accessibilityLabel={label} hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}>
+      <AppText family="accent" weight="bold" style={{ fontSize: 13, color }}>{label}</AppText>
+    </AppPressableView>
+  );
+}
+
+// ── Payment row (selectable) ───────────────────────────────────────────
+
+function PaymentRow({
+  option,
+  selected,
+  onPress,
+  tokens,
+}: {
+  option: PaymentOption;
+  selected: boolean;
+  onPress: () => void;
+  tokens: Tokens;
+}) {
+  const Icon = option.icon;
+  return (
+    <AppPressableView
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
+      accessibilityLabel={option.label}
+      rounded={16}
+      p={14}
+      colorName="card"
+      borderWidth={1}
+      borderName={selected ? undefined : 'border'}
+      style={selected ? { borderWidth: 1.5, borderColor: tokens.text } : undefined}
+    >
+      <AppView row align="center" gap={12}>
+        <Icon size={20} strokeWidth={2} color={tokens.text} />
+        <AppView flex={1}>
+          <AppText family="default" weight="semibold" style={{ fontSize: 15, color: tokens.text }}>{option.label}</AppText>
+          <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted, marginTop: 1 }}>{option.description}</AppText>
+        </AppView>
+        <AppView
+          center
+          rounded={999}
+          style={{
+            width: 22,
+            height: 22,
+            borderWidth: selected ? 0 : 1.5,
+            borderColor: tokens.border,
+            backgroundColor: selected ? tokens.text : 'transparent',
+          }}
+        >
+          {selected ? <Check size={14} strokeWidth={3} color={tokens.background} /> : null}
+        </AppView>
+      </AppView>
+    </AppPressableView>
+  );
+}
+
+function SectionLabel({ tokens, children }: { tokens: Tokens; children: string }) {
+  return (
+    <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.7 }}>
+      {children}
+    </AppText>
+  );
+}
+
+function SectionCard({ label, main, sub, onChange, tokens }: { label: string; main: string; sub: string; onChange?: () => void; tokens: Tokens }) {
   return (
     <AppView rounded={16} p={16} colorName="card" borderWidth={1} borderName="border">
       <AppView row align="center" justify="space-between" style={{ marginBottom: 8 }}>
-        <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.7 }}>
-          {label}
-        </AppText>
+        <SectionLabel tokens={tokens}>{label}</SectionLabel>
         {onChange ? (
           <AppPressableView onPress={onChange} accessibilityRole="button" accessibilityLabel={`Change ${label}`}>
             <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.text }}>Change</AppText>
@@ -231,7 +400,7 @@ function SectionCard({ label, main, sub, onChange, tokens }: { label: string; ma
   );
 }
 
-function SummaryRow({ label, value, tokens }: { label: string; value: string; tokens: ReturnType<typeof useThemeContext>['tokens'] }) {
+function SummaryRow({ label, value, tokens }: { label: string; value: string; tokens: Tokens }) {
   return (
     <AppView row justify="space-between">
       <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted }}>{label}</AppText>

@@ -1,19 +1,20 @@
 import { FlashList } from '@shopify/flash-list';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { ChevronRight } from 'lucide-react-native';
 import { useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AutoPartIcon from '@/components/screens-components/catalog/auto-part-icon';
+import { CategoryRowsSkeleton } from '@/components/screens-components/catalog/category-grid-skeleton';
 import VehicleContextBar from '@/components/screens-components/catalog/vehicle-context-bar';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
-import { ListLoadingOverlay } from '@/components/shared/wheel-loader';
+import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useCategories } from '@/hooks/use-categories';
+import { useCategoryDrill } from '@/hooks/use-category-drill';
 import type { CategoryTileData } from '@/services/categories-service';
-import { triggerHaptic } from '@/utils/haptics';
 
 /**
  * Catalog (Stage 2) — the vehicle-systems landing. Reached from Explore
@@ -36,16 +37,10 @@ export default function CatalogSystemsScreen() {
   const vehicleLabel = [make, model].filter(Boolean).join(' ');
   const { state, categories } = useCategories();
 
-  const openSystem = useCallback(
-    (category: CategoryTileData) => {
-      triggerHaptic('selection');
-      router.push({
-        pathname: '/catalog/parts',
-        params: { categoryId: category.id, categoryLabel: category.name, make, model, brandId },
-      });
-    },
-    [make, model, brandId],
-  );
+  // Tapping a system now DRILLS: if the admin gave it subcategories (e.g.
+  // Heating & Cooling → Antifreeze, Radiators…), show those first; a leaf system
+  // opens its parts directly, exactly as before. Vehicle context flows through.
+  const { drill, resolvingId } = useCategoryDrill({ make, model, brandId });
 
   // Once a model is chosen the row is vehicle-scoped, so drop the category icon
   // and let the (now larger) system name lead.
@@ -54,14 +49,15 @@ export default function CatalogSystemsScreen() {
   const renderItem = useCallback(
     ({ item }: { item: CategoryTileData }) => (
       <AppPressableView
-        onPress={() => openSystem(item)}
+        onPress={() => void drill(item)}
+        disabled={resolvingId != null}
         androidRipple={false}
         accessibilityRole="button"
         accessibilityLabel={item.name}
         row
         align="center"
         gap={14}
-        style={{ paddingVertical: 16 }}
+        style={{ paddingVertical: 16, opacity: resolvingId && resolvingId !== item.id ? 0.5 : 1 }}
       >
         {hideIcon ? null : (
           <AppView center rounded={12} style={{ width: 44, height: 44, backgroundColor: tokens.backgroundSecondary }}>
@@ -69,19 +65,18 @@ export default function CatalogSystemsScreen() {
           </AppView>
         )}
         <AppView flex={1}>
-          <AppText family="heading" weight="bold" style={{ fontSize: hideIcon ? 20 : 18, lineHeight: hideIcon ? 26 : 24, color: tokens.text }}>
+          <AppText family="heading" weight="bold" style={{ fontSize: 16, color: tokens.text }}>
             {item.name}
           </AppText>
-          {item.count > 0 ? (
-            <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted }}>
-              {item.count} part{item.count === 1 ? '' : 's'}
-            </AppText>
-          ) : null}
         </AppView>
-        <ChevronRight size={22} strokeWidth={2.2} color={tokens.textMuted} />
+        {resolvingId === item.id ? (
+          <WheelLoader size={18} color={tokens.textMuted} />
+        ) : (
+          <ChevronRight size={22} strokeWidth={1.5} color={tokens.text} />
+        )}
       </AppPressableView>
     ),
-    [openSystem, tokens, hideIcon],
+    [drill, resolvingId, tokens, hideIcon],
   );
 
   return (
@@ -101,10 +96,10 @@ export default function CatalogSystemsScreen() {
           </AppView>
         }
         ItemSeparatorComponent={() => <AppView style={{ height: 1, backgroundColor: tokens.divider }} />}
+        ListEmptyComponent={state === 'loading' ? <CategoryRowsSkeleton /> : null}
         contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: Math.max(insets.bottom + 24, 40) }}
         showsVerticalScrollIndicator={false}
       />
-      <ListLoadingOverlay visible={state === 'loading'} label="Loading systems…" />
     </AppView>
   );
 }

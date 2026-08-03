@@ -1,3 +1,5 @@
+import { memo } from 'react';
+
 import AiChatToolCallCard from '@/components/screens-components/ai-chat/ai-chat-tool-call-card';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
@@ -19,7 +21,7 @@ type AiChatMessageBubbleProps = {
   toolCalls?: AiChatToolCall[];
 };
 
-export default function AiChatMessageBubble({
+function AiChatMessageBubble({
   role,
   body,
   caption,
@@ -168,3 +170,5 @@ export default function AiChatMessageBubble({
     </AppView>
   );
 }
+
+export default memo(AiChatMessageBubble);

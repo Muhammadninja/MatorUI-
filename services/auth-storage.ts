@@ -1,19 +1,39 @@
 /**
- * Encrypted persistence for the auth session.
+ * Persistence for the auth session.
  *
- * Backed by `expo-secure-store` so tokens are stored in the iOS Keychain /
- * Android Keystore — never plain-text on disk. A single JSON envelope
- * holds both tokens + an issued-at timestamp so future schema migrations
- * (e.g. add `scope`) can detect-and-discard.
+ * DUAL-BACKED: written to BOTH `expo-secure-store` (iOS Keychain / Android
+ * Keystore — encrypted) AND `@react-native-async-storage/async-storage`
+ * (plaintext file in the app sandbox). SecureStore is preferred on read, but
+ * some iOS release builds silently fail to persist keychain items across cold
+ * launches (the write "succeeds" but the value is gone next launch) — which
+ * logged users out on every restart. AsyncStorage persists reliably (the same
+ * store already survives launches for the garage / likes / language), so it is
+ * the fallback that guarantees the session survives.
  *
- * All functions are memory-safe to call from anywhere — they swallow
- * SecureStore I/O errors and return `null` rather than throw, so a
- * corrupt keychain entry can't crash the auth flow on cold boot.
+ * Security note: the refresh token in the AsyncStorage copy is NOT encrypted at
+ * rest. Acceptable here — accounts are phone-OTP only (no password to steal),
+ * the token still rotates, and SecureStore remains the primary encrypted store.
+ *
+ * All functions swallow I/O errors and return `null` rather than throw, so a
+ * corrupt entry can't crash the auth flow on cold boot.
  */
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 
-const KEY = 'auth:v1';
+import { debugLog } from '@/services/debug-log';
+
+// ⚠️ SecureStore keys must be alphanumeric + `.`, `-`, `_` ONLY. A colon `:`
+// throws "Invalid key provided to SecureStore" and the write silently fails —
+// which is why the session never survived a cold boot (the original `auth:v1`
+// key had the exact same bug from day one). Underscores are valid.
+const KEY_ACCESS = 'auth_v2_access';
+const KEY_REFRESH = 'auth_v2_refresh';
+const KEY_META = 'auth_v2_meta';
+
+// AsyncStorage keys allow any string (colons are fine here) — the reliable copy.
+const ASYNC_KEY = 'auth:v2:session';
+
 const SCHEMA = 1;
 
 export type AuthSession = {
@@ -38,10 +58,10 @@ function isEnvelope(value: unknown): value is Envelope {
   );
 }
 
-export async function loadAuthSession(): Promise<AuthSession | null> {
+/** Parse a JSON envelope string into a session, or null if invalid/mismatched. */
+function parseEnvelope(raw: string | null): AuthSession | null {
+  if (!raw) return null;
   try {
-    const raw = await SecureStore.getItemAsync(KEY);
-    if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
     if (!isEnvelope(parsed) || parsed.v !== SCHEMA) return null;
     const { v: _v, ...session } = parsed;
@@ -51,29 +71,83 @@ export async function loadAuthSession(): Promise<AuthSession | null> {
   }
 }
 
-export async function saveAuthSession(session: AuthSession): Promise<void> {
+export async function loadAuthSession(): Promise<AuthSession | null> {
+  // 1) SecureStore split keys (encrypted, preferred).
   try {
-    const envelope: Envelope = { v: SCHEMA, ...session };
-    await SecureStore.setItemAsync(KEY, JSON.stringify(envelope));
-  } catch {
-    // Silent — failing to persist isn't fatal for the current session.
-    // The user just won't survive a cold boot. Surface this via Sentry
-    // once we have a meaningful breadcrumb story.
+    const [accessToken, refreshToken, metaRaw] = await Promise.all([
+      SecureStore.getItemAsync(KEY_ACCESS),
+      SecureStore.getItemAsync(KEY_REFRESH),
+      SecureStore.getItemAsync(KEY_META),
+    ]);
+    if (accessToken && refreshToken) {
+      let expiresAt: number | undefined;
+      if (metaRaw) {
+        const meta = JSON.parse(metaRaw) as { v?: number; expiresAt?: number };
+        if (meta.v === SCHEMA) expiresAt = meta.expiresAt;
+      }
+      debugLog('auth', 'loadAuthSession → SecureStore (split keys)');
+      return { accessToken, refreshToken, expiresAt };
+    }
+  } catch (err) {
+    debugLog('auth', 'loadAuthSession → SecureStore read failed', { message: (err as Error)?.message });
+  }
+
+  // 2) AsyncStorage fallback (the copy that survives when the keychain doesn't).
+  try {
+    const fallback = parseEnvelope(await AsyncStorage.getItem(ASYNC_KEY));
+    if (fallback) {
+      debugLog('auth', 'loadAuthSession → AsyncStorage fallback');
+      return fallback;
+    }
+  } catch (err) {
+    debugLog('auth', 'loadAuthSession → AsyncStorage read failed', { message: (err as Error)?.message });
+  }
+
+  debugLog('auth', 'loadAuthSession → no persisted session');
+  return null;
+}
+
+export async function saveAuthSession(session: AuthSession): Promise<void> {
+  const envelope = JSON.stringify({ v: SCHEMA, ...session });
+
+  // 1) AsyncStorage FIRST — the reliable store. Persistence must never depend
+  //    solely on the keychain, which can silently drop values in release builds.
+  try {
+    await AsyncStorage.setItem(ASYNC_KEY, envelope);
+    debugLog('auth', 'saveAuthSession → AsyncStorage OK');
+  } catch (err) {
+    debugLog('auth', 'saveAuthSession → AsyncStorage FAILED', { message: (err as Error)?.message });
+  }
+
+  // 2) SecureStore (encrypted, split keys) — best effort on top.
+  try {
+    const meta = JSON.stringify({ v: SCHEMA, expiresAt: session.expiresAt });
+    await Promise.all([
+      SecureStore.setItemAsync(KEY_ACCESS, session.accessToken),
+      SecureStore.setItemAsync(KEY_REFRESH, session.refreshToken),
+      SecureStore.setItemAsync(KEY_META, meta),
+    ]);
+    debugLog('auth', 'saveAuthSession → SecureStore OK');
+  } catch (err) {
+    debugLog('auth', 'saveAuthSession → SecureStore FAILED (AsyncStorage fallback covers it)', {
+      message: (err as Error)?.message,
+    });
   }
 }
 
 export async function clearAuthSession(): Promise<void> {
-  try {
-    await SecureStore.deleteItemAsync(KEY);
-  } catch {
-    // Silent — same reason as save.
-  }
+  await Promise.all([
+    SecureStore.deleteItemAsync(KEY_ACCESS).catch(() => undefined),
+    SecureStore.deleteItemAsync(KEY_REFRESH).catch(() => undefined),
+    SecureStore.deleteItemAsync(KEY_META).catch(() => undefined),
+    AsyncStorage.removeItem(ASYNC_KEY).catch(() => undefined),
+  ]);
 }
 
 // ── In-memory cache ────────────────────────────────────────────────────
 //
 // `getAuthToken()` in config/api.ts is called on EVERY HTTP request, so
-// going through SecureStore each time would add ~5ms per call. We cache
+// going through storage each time would add latency per call. We cache
 // the most recent session in module state; `setCurrentSession()` is
 // called whenever the auth-flow hydrates / signs in / refreshes / signs
 // out, keeping the cache in lock-step with disk.

@@ -214,6 +214,20 @@ export class HttpCartTransport implements CartTransport {
     };
   }
 
+  /**
+   * Resolve a product id to its server cart-line id. On a cold map — e.g.
+   * right after an app relaunch, before any fetch has warmed it — refresh
+   * from the server once and retry. This is what stops us from PATCH/DELETE-ing
+   * a line keyed by the `part_id` (the backend keys lines by their own
+   * `item_01K…` id, so a part_id there 404s "Cart item not found").
+   */
+  private async resolveLineId(partId: string): Promise<string | null> {
+    const known = this.lineIdByPart.get(partId);
+    if (known) return known;
+    await this.fetch(); // rebuilds lineIdByPart via ingest()
+    return this.lineIdByPart.get(partId) ?? null;
+  }
+
   /** Fold a full-cart response into a CartSnapshot and refresh the id map. */
   private ingest(cart: ApiCart | undefined): CartSnapshot {
     this.lineIdByPart.clear();
@@ -256,7 +270,19 @@ export class HttpCartTransport implements CartTransport {
       await this.removeItem(itemId);
       return null;
     }
-    const lineId = this.lineIdByPart.get(itemId) ?? itemId;
+    const lineId = await this.resolveLineId(itemId);
+    if (!lineId) {
+      // The line genuinely isn't on the server cart (the map was cold AND a
+      // refresh still didn't find it — e.g. the cart was cleared server-side
+      // while the app held a stale local copy). Recreate it instead of
+      // PATCHing a nonexistent line; the backend merges by part_id on POST.
+      return this.addItem({
+        productId: itemId,
+        title: '',
+        description: '',
+        price: '',
+      });
+    }
     const cart = await apiClient.patch<ApiCart>(
       `/v1/cart/items/${encodeURIComponent(lineId)}`,
       { quantity: Math.min(quantity, MAX_CART_QUANTITY) },
@@ -266,7 +292,10 @@ export class HttpCartTransport implements CartTransport {
   }
 
   async removeItem(itemId: string): Promise<void> {
-    const lineId = this.lineIdByPart.get(itemId) ?? itemId;
+    const lineId = await this.resolveLineId(itemId);
+    // No line for this part even after a refresh → already absent server-side,
+    // so the desired end state (gone) is already met; nothing to delete.
+    if (!lineId) return;
     const cart = await apiClient.delete<ApiCart>(
       `/v1/cart/items/${encodeURIComponent(lineId)}`,
     );

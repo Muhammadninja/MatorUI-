@@ -1,5 +1,6 @@
 import { CheckCircle2, X } from 'lucide-react-native';
-import { Modal, Pressable, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, Dimensions, Modal, Pressable, View } from 'react-native';
 
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
@@ -28,6 +29,21 @@ export default function LanguagePickerSheet({ visible, onClose }: LanguagePicker
   const { language, setLanguage } = useLanguageContext();
   const isDark = scheme === 'dark';
 
+  // Slide the panel up over a static (fading) backdrop so the screen underneath
+  // stays put, rather than the whole modal window sliding up like a new screen.
+  const translateY = useRef(new Animated.Value(Dimensions.get('window').height)).current;
+  useEffect(() => {
+    if (visible) {
+      translateY.setValue(Dimensions.get('window').height);
+      Animated.spring(translateY, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 90,
+        friction: 12,
+      }).start();
+    }
+  }, [visible, translateY]);
+
   const titles = {
     en: 'Choose your language',
     ru: 'Выберите язык',
@@ -46,9 +62,10 @@ export default function LanguagePickerSheet({ visible, onClose }: LanguagePicker
   };
 
   return (
-    <Modal transparent animationType="slide" visible={visible} onRequestClose={handleClose}>
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={handleClose}>
       <AppView flex={1} justify="flex-end" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}>
         <AppPressableView style={{ flex: 1 }} onPress={handleClose} accessibilityLabel="Dismiss" />
+        <Animated.View style={{ width: '100%', transform: [{ translateY }] }}>
         <AppView
           roundedTop={28}
           safeArea="bottom"
@@ -164,6 +181,7 @@ export default function LanguagePickerSheet({ visible, onClose }: LanguagePicker
             })}
           </AppView>
         </AppView>
+        </Animated.View>
       </AppView>
     </Modal>
   );

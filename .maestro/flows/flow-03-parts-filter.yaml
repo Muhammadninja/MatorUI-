@@ -1,18 +1,19 @@
 # ═════════════════════════════════════════════════════════════════════════════
 # FLOW 3 — Dynamic Parts Filtering  (Stage 3 / AutoZone flow)
 # ═════════════════════════════════════════════════════════════════════════════
-# Mock the brakes parts list (2 items), assert both render, open the floating
-# filter, apply a brand filter, assert the list reacts dynamically.
+# Mock the brakes parts list (2 items), assert both render, apply a brand filter
+# via the inline quick-filter chips, assert the list reacts dynamically.
 #
 # Mocked endpoint (../mock-server): GET /v1/catalog/parts?systemId=brakes
 #   (the live app sends ?category=brakes — the mock matches both)
 #   res: { items: [Brembo Front Brake Pads, Bosch Brake Rotor], total: 2 }
 #
-# testIDs: parts-directory-screen · part-card-<id> · floating-filter-btn ·
-#          filter-sheet · filter-brand-<Brand> · filter-apply-btn · filter-clear-btn
+# testIDs: parts-directory-screen · part-card-<id> · quick-filters ·
+#          filter-brand-<Brand> · filter-clear-btn
 #
-# The filter sheet uses tappable brand CHIPS (not a text field), so the brand
-# criteria is applied by tapping filter-brand-Brembo.
+# There is NO bottom sheet: the quick-filter row holds tappable brand CHIPS that
+# apply immediately on tap (no Apply). A "Clear" chip appears while any filter is
+# active. Brand chips are derived from the fetched page → "Bosch", "Brembo".
 # ═════════════════════════════════════════════════════════════════════════════
 appId: com.fotih12.mator
 name: flow-03-parts-filter
@@ -46,16 +47,16 @@ env:
 - assertVisible:
     text: "Bosch Brake Rotor"
 
-# ── Act: open the floating filter and constrain to a single brand ────────────
-- tapOn:
-    id: "floating-filter-btn"
-- assertVisible:
-    id: "filter-sheet"
-# Brand chips are derived from the fetched page → "Bosch", "Brembo".
+# ── Act: constrain to a single brand via the inline quick-filter chip ────────
+# The brand chips sit at the far end of the horizontal quick-filter row, so
+# scroll it into view before tapping. Tapping applies immediately (no Apply).
+- scrollUntilVisible:
+    element:
+      id: "filter-brand-Brembo"
+    direction: RIGHT
+    timeout: 6000
 - tapOn:
     id: "filter-brand-Brembo"
-- tapOn:
-    id: "filter-apply-btn"
 
 # ── Assert: the list adjusts dynamically ─────────────────────────────────────
 # Brembo stays, Bosch drops out. The absence assertion is the real proof the
@@ -70,12 +71,14 @@ env:
 
 - takeScreenshot: artifacts/flow-03-brand-filtered
 
-# ── Teardown: clear the filter, assert both parts return (list is reactive) ──
-- tapOn:
-    id: "floating-filter-btn"
+# ── Teardown: tap the Clear chip, assert both parts return (list is reactive) ─
+# The Clear chip sits at the START of the quick-filter row, so scroll back left.
+- scrollUntilVisible:
+    element:
+      id: "filter-clear-btn"
+    direction: LEFT
+    timeout: 6000
 - tapOn:
     id: "filter-clear-btn"
-- tapOn:
-    id: "filter-apply-btn"
 - assertVisible: { id: "part-card-brembo-fp" }
 - assertVisible: { id: "part-card-bosch-rotor" }

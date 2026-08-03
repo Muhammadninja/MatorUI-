@@ -83,6 +83,8 @@ function SearchResultRow({
         setViewerVisible(true);
       }}
       androidRipple
+      testID={`part-card-${result.id}`}
+      accessibilityRole="button"
       accessibilityLabel={`Open ${result.title}`}
       style={{
         backgroundColor: isDark ? tokens.card : tokens.white,

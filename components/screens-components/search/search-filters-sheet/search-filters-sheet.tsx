@@ -1,6 +1,6 @@
 import { X } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
-import { Modal } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Dimensions, Modal } from 'react-native';
 
 import { AppButton } from '@/components/shared/app-button';
 import { AppText } from '@/components/shared/app-text';
@@ -63,6 +63,21 @@ export default function SearchFiltersSheet({
     if (visible) setDraft(filters);
   }, [visible, filters]);
 
+  // Slide the panel up over a static (fading) backdrop so the screen underneath
+  // stays put, rather than the whole modal window sliding up like a new screen.
+  const translateY = useRef(new Animated.Value(Dimensions.get('window').height)).current;
+  useEffect(() => {
+    if (visible) {
+      translateY.setValue(Dimensions.get('window').height);
+      Animated.spring(translateY, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 90,
+        friction: 12,
+      }).start();
+    }
+  }, [visible, translateY]);
+
   const toggleCategory = (cat: string) => {
     triggerHaptic('selection');
     setDraft((d) => ({
@@ -95,9 +110,10 @@ export default function SearchFiltersSheet({
   };
 
   return (
-    <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
       <AppView flex={1} justify="flex-end" style={{ backgroundColor: tokens.scrim }}>
         <AppPressableView style={{ flex: 1 }} onPress={onClose} accessibilityLabel="Dismiss" />
+        <Animated.View style={{ width: '100%', transform: [{ translateY }] }}>
         <AppView
           roundedTop={28}
           safeArea="bottom"
@@ -216,6 +232,7 @@ export default function SearchFiltersSheet({
             />
           </AppView>
         </AppView>
+        </Animated.View>
       </AppView>
     </Modal>
   );

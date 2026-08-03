@@ -13,6 +13,7 @@ import { AppButton } from '@/components/shared/app-button';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
+import { useUserContext } from '@/contexts/user.context';
 import useGarage from '@/hooks/use-garage';
 
 /**
@@ -32,11 +33,21 @@ import useGarage from '@/hooks/use-garage';
 export default function GarageScreen() {
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
+  const { isAuthenticated } = useUserContext();
   const { state, primaryVehicle, secondaryVehicles, error, refresh } = useGarage();
 
   const openDetail = (id: string) =>
     router.push({ pathname: '/vehicle-detail', params: { id } });
-  const openAdd = () => router.push('/add-vehicle');
+  const openAdd = () => {
+    // Guests can browse the garage and see the Add button, but adding a vehicle
+    // needs an account — tapping Add triggers the unified phone-OTP auth sheet
+    // (gate=1). After signing in they land back here and can add.
+    if (!isAuthenticated) {
+      router.push('/sign-in?gate=1');
+      return;
+    }
+    router.push('/add-vehicle');
+  };
 
   return (
     <AppView flex={1} colorName="background">
@@ -52,7 +63,11 @@ export default function GarageScreen() {
         </AppText>
       </AppView>
 
-      {state === 'loading' || state === 'idle' ? (
+      {!isAuthenticated ? (
+        // Guest: no garage to load — show the same empty state (with the Add
+        // button) as a signed-in user with zero vehicles. Add → auth sheet.
+        <GarageEmptyState onAddVehicle={openAdd} />
+      ) : state === 'loading' || state === 'idle' ? (
         <AppScrollView showsVerticalScrollIndicator={false} padding={0}
           contentContainerStyle={{ paddingTop: 12, paddingHorizontal: 20, paddingBottom: 40 }}
         >

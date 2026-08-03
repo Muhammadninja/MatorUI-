@@ -1,9 +1,8 @@
 import React from 'react';
 import { Image } from 'react-native';
 
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import {
-  CreditCard,
   Heart,
   MapPin,
   ReceiptText,
@@ -21,8 +20,10 @@ import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useLikesContext } from '@/contexts/likes.context';
+import { debugLog } from '@/services/debug-log';
 import { useToast } from '@/hooks/use-toast';
 import useGarage from '@/hooks/use-garage';
+import { useOrders } from '@/hooks/use-orders';
 import { useUserContext, type UserProfile } from '@/contexts/user.context';
 
 const SECTION_RADIUS = 16;
@@ -65,14 +66,6 @@ const ACCOUNT_ITEMS: AccountItem[] = [
     onPress: () => router.push('/shipping-addresses'),
   },
   {
-    key: 'payments',
-    title: 'Payment methods',
-    subtitle: 'Manage payment options',
-    leading: <AppIconBox Icon={CreditCard} rounded={11} />,
-    rightChevron: true,
-    onPress: () => router.push('/payment-methods'),
-  },
-  {
     key: 'liked',
     title: 'Liked',
     subtitle: 'Parts you saved',
@@ -82,8 +75,8 @@ const ACCOUNT_ITEMS: AccountItem[] = [
   },
   {
     key: 'settings',
-    title: 'Settings & security',
-    subtitle: 'Password, privacy',
+    title: 'Settings',
+    subtitle: 'Language, terms, account',
     leading: <AppIconBox Icon={Shield} rounded={11} />,
     rightChevron: true,
     onPress: () => router.push('/settings-security'),
@@ -94,10 +87,28 @@ const ACCOUNT_ITEMS: AccountItem[] = [
 
 export default function ProfileScreen() {
   const toast = useToast();
-  const { profile, isAuthenticated, isHydrating, signOut } = useUserContext();
+  const { profile, isAuthenticated, isHydrating, signOut, refreshProfile } = useUserContext();
+
+  // Re-fetch GET /v1/me every time the tab gains focus so freshly-saved fields
+  // (avatar_url, name) show up without an app restart. The context was only
+  // hydrated once at cold boot, so an avatar saved after that would stay stale.
+  useFocusEffect(
+    React.useCallback(() => {
+      void refreshProfile();
+    }, [refreshProfile]),
+  );
   // Real counts for the stat cards (no mock numbers).
   const { vehicles } = useGarage();
   const { likedIds } = useLikesContext();
+  // Order count from the live order list (GET /v1/orders). The backend is
+  // cursor-paginated with no grand total, so this counts the user's recent
+  // orders on the first page — EXCLUDING cancelled/expired ones (both surface as
+  // the 'Cancelled' list status), so the stat reflects real orders placed.
+  const { page: ordersPage } = useOrders();
+  const orderCount = React.useMemo(
+    () => (ordersPage?.items ?? []).filter((o) => o.status !== 'Cancelled').length,
+    [ordersPage],
+  );
 
   const handleSignOut = async () => {
     await signOut();
@@ -135,11 +146,9 @@ export default function ProfileScreen() {
           {/* Handoff §17: 64px avatar, name 21/700, email, Pro pill */}
           <ProfileHeader profile={profile} />
 
-          {/* 3-equal stats cards — real counts (0 = the honest empty state).
-              Orders has no working data source yet (orders integration is
-              backend-blocked), so it stays 0 until that lands. */}
+          {/* 3-equal stats cards — real counts (0 = the honest empty state). */}
           <AppView row gap="sm" px="lg">
-            <StatCard label="Orders" value="0" />
+            <StatCard label="Orders" value={String(orderCount)} />
             <StatCard label="Vehicles" value={String(vehicles.length)} />
             <StatCard label="Saved" value={String(likedIds.size)} />
           </AppView>
@@ -161,11 +170,14 @@ export default function ProfileScreen() {
             </AppView>
           </AppView>
 
-          {/* Handoff §17: ghost "Sign out" */}
+          {/* "Sign out" as a plain text button — the default `primary` tint is
+              near-white in light mode (invisible); `kind="text"` uses the theme
+              text color so it reads in both light and dark. */}
           <AppView px="lg">
             <AppButton
               title="Sign out"
               variant="ghost"
+              kind="text"
               size="lg"
               fullWidth
               onPress={handleSignOut}
@@ -180,10 +192,18 @@ export default function ProfileScreen() {
 // ── Profile Header ────────────────────────────────────────────────────────────
 
 function ProfileHeader({ profile }: { profile: UserProfile }) {
+  const avatarUri = profile.avatarUrl;
   const { tokens } = useThemeContext();
   const fullName = `${profile.firstName ?? ''} ${profile.lastName ?? ''}`.trim();
   const monogram =
     `${profile.firstName?.[0] ?? ''}${profile.lastName?.[0] ?? ''}`.toUpperCase() || 'M';
+
+  // Fall back to the monogram when the avatar can't load (e.g. a dead/removed
+  // Cloudinary URL) instead of a blank circle. Reset when the URL changes so a
+  // re-upload gets a fresh chance to render.
+  const [imgFailed, setImgFailed] = React.useState(false);
+  React.useEffect(() => setImgFailed(false), [avatarUri]);
+  const showAvatar = !!avatarUri && !imgFailed;
 
   return (
     <AppView row align="center" gap={14} px="lg" style={{ paddingTop: 8 }}>
@@ -201,8 +221,18 @@ function ProfileHeader({ profile }: { profile: UserProfile }) {
           borderColor: tokens.border,
         }}
       >
-        {profile.avatarUrl ? (
-          <Image source={{ uri: profile.avatarUrl }} style={{ width: 64, height: 64 }} />
+        {showAvatar ? (
+          <Image
+            source={{ uri: avatarUri }}
+            style={{ width: 64, height: 64 }}
+            onError={(e) => {
+              debugLog('profile', '✗ avatar image failed to load', {
+                url: avatarUri,
+                error: e.nativeEvent?.error,
+              });
+              setImgFailed(true);
+            }}
+          />
         ) : (
           <AppText
             family="heading"

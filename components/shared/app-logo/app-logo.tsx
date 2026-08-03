@@ -17,7 +17,7 @@ export type AppLogoProps = {
 /**
  * `Logo` — the MATOR wordmark whose "O" is the alloy-wheel glyph
  * ([[WheelMark]]). Per the v2 handoff the letters are Raleway 800 (the one
- * deliberate exception to the app-wide Figtree family), tightened with
+ * deliberate exception to the app-wide Inter family), tightened with
  * negative tracking to read as a wordmark.
  */
 export default function AppLogo({ size = 28, color, spin = false }: AppLogoProps) {

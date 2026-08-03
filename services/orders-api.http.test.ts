@@ -1,0 +1,167 @@
+/**
+ * orders-api — HTTP transport contract tests (the REAL /v1/orders path).
+ *
+ * Pins the mapping against the shape verified live on api.mator.uz 2026-07-21:
+ *   - GET  /v1/orders        → { items:[RawBackendOrder], next_cursor }  (cursor,
+ *                              NOT page/pageSize — those 400)
+ *   - GET  /v1/orders/:id    → RawBackendOrder
+ *   - POST /v1/orders        → RawBackendOrder  (order built from the SERVER cart;
+ *                              body is cart_snapshot + optional vehicle/phone)
+ */
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+
+vi.mock('@/config/api', () => ({
+  getApiBaseUrl: () => 'https://api.test',
+  getAuthToken: async () => null,
+  shouldUseHttpTransport: () => true,
+}));
+
+const get = vi.fn();
+const post = vi.fn();
+vi.mock('@/services/api-client', () => ({
+  apiClient: { get: (...a: unknown[]) => get(...a), post: (...a: unknown[]) => post(...a) },
+  ApiError: class ApiError extends Error {
+    constructor(public status: number) {
+      super('api');
+    }
+  },
+}));
+
+import { HttpOrdersTransport, mapOrderToListRow, mapOrderToDetail, type RawBackendOrder } from './orders-api';
+import { formatOrderNo } from './orders-service';
+
+describe('formatOrderNo', () => {
+  test('shortens a long backend ULID to #<last6>', () => {
+    expect(formatOrderNo('ord_01KY2DNPSRYPT8C7SDT2N7JJCH')).toBe('#N7JJCH');
+  });
+  test('leaves already-short mock ids as-is', () => {
+    expect(formatOrderNo('ORD-8821')).toBe('ORD-8821');
+    expect(formatOrderNo('M-48291')).toBe('M-48291');
+  });
+  test('empty id → empty string', () => {
+    expect(formatOrderNo('')).toBe('');
+  });
+});
+
+// The exact object api.mator.uz returned for a freshly-created order.
+const RAW: RawBackendOrder = {
+  order_id: 'ord_01KY2DNPSRYPT8C7SDT2N7JJCH',
+  status: 'pending_payment',
+  subtotal_uzs: 250000,
+  delivery_uzs: 25000,
+  service_fee_uzs: 5000,
+  discount_uzs: 0,
+  total_uzs: 280000,
+  currency: 'UZS',
+  vehicle_id: null,
+  delivery_address_id: null,
+  delivery_method: 'courier',
+  items: [
+    { part_id: 'part_stock_28', service_id: null, title: 'Motor oil', qty: 2, price_uzs: 250000, line_total_uzs: 500000, scheduled_at: null },
+  ],
+  expires_at: '2026-07-21T13:56:03.305Z',
+  created_at: '2026-07-21T13:26:03.322Z',
+};
+
+beforeEach(() => {
+  get.mockReset();
+  post.mockReset();
+});
+
+describe('mapOrderToListRow', () => {
+  test('maps a raw order to a history row', () => {
+    const row = mapOrderToListRow(RAW);
+    expect(row.id).toBe('ord_01KY2DNPSRYPT8C7SDT2N7JJCH');
+    expect(row.status).toBe('Processing'); // pending_payment → Processing
+    expect(row.items).toBe(2); // sum of qty
+    expect(row.total).toBe("280 000 so'm"); // UZS grouped
+    expect(row.date).toBe('Jul 21, 2026');
+    expect(row.summary).toBe('Motor oil');
+  });
+
+  test('summary counts extra line items', () => {
+    const row = mapOrderToListRow({
+      ...RAW,
+      items: [
+        { title: 'Turbo', qty: 1, price_uzs: 1 },
+        { title: 'Brakes', qty: 1, price_uzs: 1 },
+        { title: 'Filter', qty: 1, price_uzs: 1 },
+      ],
+    });
+    expect(row.summary).toBe('Turbo + 2 items');
+    expect(row.items).toBe(3);
+  });
+});
+
+describe('mapOrderToDetail', () => {
+  test('synthesizes a coherent detail from the flat backend order', () => {
+    const d = mapOrderToDetail(RAW);
+    expect(d.id).toBe('ord_01KY2DNPSRYPT8C7SDT2N7JJCH');
+    expect(d.status).toBe('placed'); // pending_payment → placed
+    expect(d.statusLabel).toBe('Awaiting payment');
+    expect(d.currentStepIndex).toBe(0);
+    expect(d.steps).toHaveLength(5);
+    expect(d.courier).toBeNull();
+    expect(d.totalLabel).toBe("280 000 so'm");
+    expect(d.items[0]).toMatchObject({ title: 'Motor oil', quantity: 2, price: "250 000 so'm" });
+  });
+});
+
+describe('HttpOrdersTransport', () => {
+  const t = new HttpOrdersTransport();
+
+  test('listOrders GETs /v1/orders with NO page params and maps items', async () => {
+    get.mockResolvedValueOnce({ items: [RAW], next_cursor: null });
+    const page = await t.listOrders({ page: 1, pageSize: 20 });
+    expect(get.mock.calls[0]![0]).toBe('/v1/orders'); // no ?page= (would 400)
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0]!.id).toBe(RAW.order_id);
+  });
+
+  test('createOrder sends cart_snapshot + vehicle + phone and maps the result', async () => {
+    post.mockResolvedValueOnce(RAW);
+    const res = await t.createOrder({
+      items: [{ productId: 'p', quantity: 1 }],
+      addressId: 'addr_1',
+      paymentType: 'cash',
+      shippingOptionKey: 'standard',
+      promoCode: 'SAVE10',
+      vehicleId: 'veh_1',
+      contactPhone: '+998 90 123 45 67',
+    });
+
+    const [url, body] = post.mock.calls[0]!;
+    expect(url).toBe('/v1/orders');
+    expect(body).toEqual({
+      cart_snapshot: { delivery_method: 'courier', delivery_address_id: 'addr_1', promo_code: 'SAVE10' },
+      vehicle_id: 'veh_1',
+      contact_phone_e164: '+998901234567', // normalized
+    });
+    expect(res.orderId).toBe(RAW.order_id);
+    expect(res.totalLabel).toBe("280 000 so'm");
+  });
+
+  test('createOrder omits vehicle/phone when absent (both optional server-side)', async () => {
+    post.mockResolvedValueOnce(RAW);
+    await t.createOrder({
+      items: [],
+      addressId: null,
+      paymentType: 'payme',
+      shippingOptionKey: 'standard',
+      promoCode: null,
+    });
+    const [, body] = post.mock.calls[0]!;
+    expect(body).toEqual({
+      cart_snapshot: { delivery_method: 'courier', delivery_address_id: null, promo_code: null },
+    });
+    expect(body).not.toHaveProperty('vehicle_id');
+    expect(body).not.toHaveProperty('contact_phone_e164');
+  });
+
+  test('getOrder returns null on 404', async () => {
+    const { ApiError } = await import('@/services/api-client');
+    get.mockRejectedValueOnce(new (ApiError as any)(404));
+    const d = await t.getOrder('ord_missing');
+    expect(d).toBeNull();
+  });
+});

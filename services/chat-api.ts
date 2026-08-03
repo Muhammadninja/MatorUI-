@@ -430,9 +430,122 @@ export class HttpChatTransport implements ChatTransport {
   }
 }
 
+// ── Live sourcing transport ──────────────────────────────────────────
+
+/** Path of the live single-shot support/sourcing endpoint (mator.uz/Backend
+ *  `@Controller('api/ai-chat')` + `@Post('message')`). */
+const SOURCING_CHAT_PATH = '/api/ai-chat/message';
+
+/** Response of POST /api/ai-chat/message. */
+type SourcingChatResponse = {
+  reply_text: string;
+  intent: 'SEARCH_PART' | 'CREATE_SOURCING_TICKET' | 'GENERAL_QUESTION' | 'FOUND_IN_STOCK';
+  extracted_data?: unknown;
+  items?: { id: string; title: string; price: string; category: string | null }[];
+};
+
+/**
+ * Adapts the LIVE sourcing endpoint to the streaming ChatTransport the UI
+ * expects. That endpoint is single-shot JSON — stateless, no SSE, no tools —
+ * so:
+ *   - conversations are local-only (no server history) → list/get return empty;
+ *   - the reply is fake-streamed token-by-token for a natural feel;
+ *   - FOUND_IN_STOCK `items` are appended to the reply as a plain list (rich
+ *     product cards via the tool-call card path are a follow-up).
+ * The endpoint is public, so no auth token is required.
+ */
+export class SourcingChatTransport implements ChatTransport {
+  async listConversations(): Promise<AiChatConversationSummary[]> {
+    return [];
+  }
+
+  async getConversation(): Promise<AiChatConversationSummary | null> {
+    return null;
+  }
+
+  async deleteConversation(): Promise<void> {
+    // Nothing persisted server-side — no-op.
+  }
+
+  async submitFeedback(): Promise<void> {
+    // The sourcing endpoint has no feedback route yet — no-op.
+  }
+
+  streamMessage(
+    input: AiChatSendMessageRequest,
+    signal?: AbortSignal,
+  ): AsyncIterable<ChatStreamEvent> {
+    const conversationId = input.conversationId ?? 'chat-active';
+    const replyId = makeId('assistant');
+    // The mobile vehicle context carries no VIN; surface the selected car name
+    // as a text hint so the extractor still resolves brand/model.
+    const message = input.vehicleContext?.selectedCarName
+      ? `${input.message}\n\n[Автомобиль: ${input.vehicleContext.selectedCarName}]`
+      : input.message;
+    // Prior turns give the stateless endpoint memory (vehicle/part from earlier
+    // messages), so it stops re-asking for details already provided.
+    const history = input.history;
+
+    return {
+      async *[Symbol.asyncIterator]() {
+        // Guard blank input locally — the endpoint 400s on empty and 503s on
+        // whitespace-only, neither of which is worth a round-trip. Prompt the
+        // user instead of surfacing a network error.
+        if (!input.message.trim()) {
+          yield { type: 'token', value: 'Напишите, какую запчасть вы ищете 🙂' };
+          yield {
+            type: 'done',
+            conversationId,
+            suggestions: [],
+            replyId,
+            title: 'Mator AI',
+            createdAt: new Date().toISOString(),
+          };
+          return;
+        }
+
+        const res = await apiClient.post<SourcingChatResponse>(
+          SOURCING_CHAT_PATH,
+          { message, history },
+          { signal },
+        );
+
+        let text = res.reply_text ?? '';
+        if (res.intent === 'FOUND_IN_STOCK' && res.items?.length) {
+          const lines = res.items.map((it) => `• ${it.title} — ${it.price}`).join('\n');
+          text = text ? `${text}\n\n${lines}` : lines;
+        }
+
+        // Fake-stream the reply token-by-token to match the streaming UI.
+        const tokens = text.match(/\S+\s*/g) ?? [text];
+        for (const token of tokens) {
+          if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+          await delay(PER_TOKEN_MS, signal);
+          yield { type: 'token', value: token };
+        }
+
+        yield {
+          type: 'done',
+          conversationId,
+          suggestions: [],
+          replyId,
+          title: 'Mator AI',
+          createdAt: new Date().toISOString(),
+        };
+      },
+    };
+  }
+}
+
 // ── Singleton ────────────────────────────────────────────────────────
 
-/** Flips automatically based on `EXPO_PUBLIC_API_BASE_URL`. */
+/**
+ * Flips on `shouldUseHttpTransport('chat')` — a base URL is configured AND
+ * 'chat' is in the `EXPO_PUBLIC_HTTP_DOMAINS` allowlist (or the allowlist is
+ * unset). The live HTTP path is the single-shot sourcing endpoint;
+ * `HttpChatTransport` (SSE `/v1/chatbot`) is retained for when the richer
+ * streaming chat backend ships.
+ */
 export const chatTransport: ChatTransport = shouldUseHttpTransport('chat')
-  ? new HttpChatTransport()
+  ? new SourcingChatTransport()
   : new MockChatTransport();

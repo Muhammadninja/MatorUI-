@@ -4,8 +4,10 @@
 # From Explore, open Search, type a term, assert the mocked catalog search
 # returns matching parts, then open one into Item Detail.
 #
-# Mocked endpoint (../mock-server): GET /v1/catalog/parts?q=brake
+# Mocked endpoint (../mock-server): POST /v1/search {query:"brake"}
 #   → title/brand substring match: [Brembo Front Brake Pads, Bosch Brake Rotor]
+#   (the Search screen now calls the real search backend via useSearch, not
+#    the catalog list endpoint)
 #
 # testIDs: explore-search-entry (explore-screen) · search-screen / search-input
 #          (mator-search-screen) · part-card-<id> (product-row) ·

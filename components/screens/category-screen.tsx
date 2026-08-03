@@ -4,7 +4,7 @@ import { ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import ProductRow from '@/components/screens-components/catalog/product-row';
-import { AppButton } from '@/components/shared/app-button';
+import { RADIUS_PILL } from '@/components/screens-components/search/radii';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
@@ -31,7 +31,7 @@ export default function CategoryScreen() {
   const cat = params.cat ?? 'All';
   const label = params.label ?? cat;
 
-  const { state, items, total, refresh } = useCatalogList({
+  const { state, items, total } = useCatalogList({
     page: 1,
     pageSize: 24,
     category: cat && cat !== 'All' ? cat : undefined,
@@ -62,46 +62,60 @@ export default function CategoryScreen() {
   };
 
   return (
-    <AppView flex={1} colorName="card">
+    <AppView flex={1}>
       <AppSettingsHeader title={label} fallbackHref="/explore" />
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingTop: 0,
-          paddingBottom: Math.max(insets.bottom + 24, 40),
-          gap: 8,
-        }}
-      >
-        {state === 'success' ? (
-          <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>
-            {total || items.length} result{(total || items.length) === 1 ? '' : 's'}
+      {showEmpty ? (
+        // Minimal centered empty state — icon medallion + "No parts found".
+        // Offset the centered region by the bottom tab bar (+ safe area) so
+        // the content reads as visually centered in the space ABOVE the bar,
+        // not pushed low behind it.
+        <AppView
+          flex={1}
+          px={20}
+          justify="center"
+          align="center"
+          gap={16}
+          style={{ paddingBottom: insets.bottom + 72 }}
+        >
+          <AppView
+            center
+            rounded={RADIUS_PILL}
+            colorName="backgroundSecondary"
+            borderName="border"
+            borderWidth={1}
+            style={{ width: 72, height: 72 }}
+          >
+            <PackageOpen size={28} strokeWidth={2} color={tokens.text} />
+          </AppView>
+          <AppText textVariant="title" family="heading" colorName="text" align="center">
+            No parts found
           </AppText>
-        ) : null}
+        </AppView>
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingTop: 0,
+            paddingBottom: Math.max(insets.bottom + 24, 40),
+            paddingHorizontal: 16,
+            gap: 8,
+          }}
+        >
+          {state === 'success' ? (
+            <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>
+              {total || items.length} result{(total || items.length) === 1 ? '' : 's'}
+            </AppText>
+          ) : null}
 
-        {showEmpty ? (
-          <AppView center py={40} gap={12}>
-            <PackageOpen size={30} strokeWidth={2} color={tokens.textMuted} />
-            <AppView align="center" gap={4}>
-              <AppText family="heading" weight="bold" style={{ fontSize: 17, color: tokens.text }}>
-                No results found
-              </AppText>
-              <AppText
-                family="default"
-                style={{ fontSize: 13, color: tokens.textMuted, textAlign: 'center', maxWidth: 280 }}
-              >
-                We couldn&apos;t find anything for {label}. Try another category.
-              </AppText>
+          {state === 'success' ? (
+            <AppView gap={14}>
+              {items.map((it) => (
+                <ProductRow key={it.id} item={it} onOpen={openItem} onAdd={addToCart} />
+              ))}
             </AppView>
-            <AppButton title="Retry" kind="secondary" size="sm" onPress={refresh} />
-          </AppView>
-        ) : state === 'success' ? (
-          <AppView gap={12}>
-            {items.map((it) => (
-              <ProductRow key={it.id} item={it} onOpen={openItem} onAdd={addToCart} />
-            ))}
-          </AppView>
-        ) : null}
-      </ScrollView>
+          ) : null}
+        </ScrollView>
+      )}
 
       <ListLoadingOverlay visible={state === 'loading'} label="Finding parts…" />
     </AppView>

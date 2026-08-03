@@ -206,7 +206,7 @@ export default function GlobalModalHost() {
     const handleClose = () => modalService.closeModal();
 
     return (
-      <Modal transparent animationType="slide" visible onRequestClose={handleClose}>
+      <Modal transparent animationType="fade" visible onRequestClose={handleClose}>
         <AppView flex={1} justify="flex-end" style={{ backgroundColor: 'rgba(0, 0, 0, 0.42)' }}>
           <AppView
             roundedTop={28}
@@ -320,7 +320,7 @@ export default function GlobalModalHost() {
   };
 
   return (
-    <Modal transparent animationType="slide" visible onRequestClose={handleSheetClose}>
+    <Modal transparent animationType="fade" visible onRequestClose={handleSheetClose}>
       <AppView flex={1} justify="flex-end" style={{ backgroundColor: 'rgba(0, 0, 0, 0.42)' }}>
         <AppView
           roundedTop={28}
@@ -633,7 +633,19 @@ function CarSelectionModal({ payload }: { payload: CarSelectionPayload }) {
   const DISMISS_DISTANCE = 120;
   const DISMISS_VELOCITY = 1.2;
 
-  const translateY = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(SHEET_HEIGHT_HINT)).current;
+
+  // Slide the panel up on mount over a static (fading) backdrop, so the screen
+  // underneath stays in place rather than the whole modal window sliding up.
+  useEffect(() => {
+    Animated.spring(translateY, {
+      toValue: 0,
+      useNativeDriver: true,
+      damping: 20,
+      stiffness: 240,
+      mass: 0.9,
+    }).start();
+  }, [translateY]);
 
   const handleClose = () => {
     payload.onCancel?.();
@@ -707,7 +719,7 @@ function CarSelectionModal({ payload }: { payload: CarSelectionPayload }) {
   const isLoading = state === 'loading' || state === 'idle';
 
   return (
-    <Modal transparent animationType="slide" visible onRequestClose={handleClose}>
+    <Modal transparent animationType="fade" visible onRequestClose={handleClose}>
       <View style={{ flex: 1 }}>
         {/* Backdrop fills all space above the sheet — tap to dismiss. */}
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.42)' }} onPress={handleClose} />
