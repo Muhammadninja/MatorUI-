@@ -62,12 +62,10 @@ const MOCK_ACCENT_KINDS: (AccentTagKind | null)[] = [
 ];
 
 function catalogToResult(item: CatalogItem, score: number): SearchResult {
-  // Deterministic pseudo-rating + review count so the mock returns
-  // consistent UI values without server data. Same formula as the
-  // SearchResultRow uses, so client doesn't have to derive it.
+  // No rating in the mock: the catalog has no review data, so `rating`
+  // stays undefined and the row hides its rating line — mirroring how the
+  // live backend returns `rating_avg: null` for products with no reviews.
   const h = hashCode(item.id);
-  const rating = 3.8 + (h % 12) / 10;
-  const reviewCount = 50 + (hashCode(item.id + ':r') % 5000);
   const accentTagKind =
     MOCK_ACCENT_KINDS[(h * 7) % MOCK_ACCENT_KINDS.length] ?? undefined;
   return {
@@ -81,8 +79,6 @@ function catalogToResult(item: CatalogItem, score: number): SearchResult {
     badge: item.badge,
     accentTagKind,
     status: item.status,
-    rating,
-    reviewCount,
     score,
   };
 }
@@ -130,12 +126,9 @@ function passesFilters(item: CatalogItem, filters?: SearchFilters): boolean {
     if (filters.price === '1k_to_10k' && (cents < 100_000 || cents > 1_000_000)) return false;
     if (filters.price === 'over_10k' && cents <= 1_000_000) return false;
   }
-  if (filters.minRating !== 'any') {
-    const h = hashCode(item.id);
-    const rating = 3.8 + (h % 12) / 10;
-    if (filters.minRating === '3_plus' && rating < 3) return false;
-    if (filters.minRating === '4_plus' && rating < 4) return false;
-  }
+  // No rating data in the mock catalog, so the minRating filter can't be
+  // applied here — it's a server-side concern once ratings ship. Leave it
+  // as a pass-through rather than filter on fabricated values.
   return true;
 }
 
@@ -143,6 +136,8 @@ function passesFilters(item: CatalogItem, filters?: SearchFilters): boolean {
 function computeFacets(items: CatalogItem[]) {
   const categories: Record<string, number> = {};
   const price: Partial<Record<PriceBucket, number>> = {};
+  // No rating data in the mock catalog, so minRating facet counts stay
+  // empty — the server owns these once ratings ship.
   const minRating: Partial<Record<RatingBucket, number>> = {};
 
   for (const item of items) {
@@ -152,10 +147,6 @@ function computeFacets(items: CatalogItem[]) {
     if (cents < 100_000) price.under_1k = (price.under_1k ?? 0) + 1;
     else if (cents <= 1_000_000) price['1k_to_10k'] = (price['1k_to_10k'] ?? 0) + 1;
     else price.over_10k = (price.over_10k ?? 0) + 1;
-
-    const rating = 3.8 + (hashCode(item.id) % 12) / 10;
-    if (rating >= 3) minRating['3_plus'] = (minRating['3_plus'] ?? 0) + 1;
-    if (rating >= 4) minRating['4_plus'] = (minRating['4_plus'] ?? 0) + 1;
   }
   return { categories, price, minRating };
 }
@@ -250,11 +241,8 @@ function sortResults(
       entries.sort((a, b) => parsePriceToCents(b.item.price) - parsePriceToCents(a.item.price));
       return;
     case 'rating':
-      entries.sort((a, b) => {
-        const ra = 3.8 + (hashCode(a.item.id) % 12) / 10;
-        const rb = 3.8 + (hashCode(b.item.id) % 12) / 10;
-        return rb - ra;
-      });
+      // No rating data in the mock catalog; preserve relevance order until
+      // the backend supplies ratings to sort by.
       return;
     case 'newest':
       // No timestamp on catalog mocks; preserve relevance order.
@@ -321,7 +309,17 @@ import { apiClient } from '@/services/api-client';
 // `type` where the app expects `kind`. We normalize both here.
 
 /** A live `/v1/search` result — everything past id/title is optional. */
-type RawSearchResult = Partial<SearchResult> & { id: string; title: string };
+type RawSearchResult = Partial<SearchResult> & {
+  id: string;
+  title: string;
+  /**
+   * Live backend rating fields (snake_case). `rating_avg` is `null` when
+   * the product has no reviews yet — the row is hidden in that case.
+   * `review_count` is shown verbatim.
+   */
+  rating_avg?: number | null;
+  review_count?: number | null;
+};
 
 /** The live `/v1/search` envelope — fields may be null / absent. */
 type RawSearchResponse = Partial<Omit<SearchResponse, 'results'>> & {
@@ -341,8 +339,11 @@ function normalizeSearchResult(r: RawSearchResult): SearchResult {
     badge: r.badge,
     accentTagKind: r.accentTagKind,
     status: r.status,
-    rating: r.rating,
-    reviewCount: r.reviewCount,
+    // Live backend emits snake_case `rating_avg`/`review_count`. When
+    // `rating_avg` is null (no reviews yet) leave `rating` undefined so the
+    // row hides it. camelCase fallbacks cover any pre-normalized transport.
+    rating: r.rating_avg ?? r.rating,
+    reviewCount: r.review_count ?? r.reviewCount,
     score: r.score ?? 0,
     explanation: r.explanation,
   };
