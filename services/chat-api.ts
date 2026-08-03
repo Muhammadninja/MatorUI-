@@ -488,6 +488,22 @@ export class SourcingChatTransport implements ChatTransport {
 
     return {
       async *[Symbol.asyncIterator]() {
+        // Guard blank input locally — the endpoint 400s on empty and 503s on
+        // whitespace-only, neither of which is worth a round-trip. Prompt the
+        // user instead of surfacing a network error.
+        if (!input.message.trim()) {
+          yield { type: 'token', value: 'Напишите, какую запчасть вы ищете 🙂' };
+          yield {
+            type: 'done',
+            conversationId,
+            suggestions: [],
+            replyId,
+            title: 'Mator AI',
+            createdAt: new Date().toISOString(),
+          };
+          return;
+        }
+
         const res = await apiClient.post<SourcingChatResponse>(
           SOURCING_CHAT_PATH,
           { message, history },
