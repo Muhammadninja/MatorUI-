@@ -55,7 +55,7 @@ function Chip({ label, tokens }: { label: string; tokens: Tokens }) {
         paddingHorizontal: 10,
         paddingVertical: 5,
         borderRadius: 8,
-        backgroundColor: tokens.brandBg,
+        backgroundColor: tokens.brandSoft,
       }}
     >
       <AppText family="accent" weight="semibold" style={{ fontSize: 12, color: tokens.brand }}>
@@ -323,7 +323,7 @@ export default function SourcingOfferScreen() {
                     marginTop: 16,
                     padding: 12,
                     borderRadius: 12,
-                    backgroundColor: tokens.brandBg,
+                    backgroundColor: tokens.brandSoft,
                   }}
                 >
                   <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.brand, marginBottom: 3 }}>
@@ -414,7 +414,7 @@ export default function SourcingOfferScreen() {
                   borderRadius: 12,
                   borderWidth: 1,
                   borderColor: active ? tokens.brand : tokens.divider,
-                  backgroundColor: active ? tokens.brandBg : 'transparent',
+                  backgroundColor: active ? tokens.brandSoft : 'transparent',
                 }}
               >
                 <AppText family="default" weight={active ? 'bold' : 'regular'} style={{ fontSize: 15, color: tokens.text }}>

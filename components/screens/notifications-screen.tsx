@@ -416,7 +416,7 @@ export default function NotificationsScreen() {
                   borderRadius: 12,
                   borderWidth: 1,
                   borderColor: active ? tokens.brand : tokens.divider,
-                  backgroundColor: active ? tokens.brandBg : 'transparent',
+                  backgroundColor: active ? tokens.brandSoft : 'transparent',
                 }}
               >
                 <AppText family="default" weight={active ? 'bold' : 'regular'} style={{ fontSize: 15, color: tokens.text }}>
