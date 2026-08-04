@@ -1,7 +1,7 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
-import { BellOff, Check, X } from 'lucide-react-native';
+import { BellOff, Check, ChevronRight, X } from 'lucide-react-native';
 import { useCallback, useRef, useState } from 'react';
 
 import AppBottomSheet from '@/components/shared/app-bottom-sheet';
@@ -59,6 +59,7 @@ function SourcingOfferCard({
   added,
   busy,
   rejected,
+  unavailable,
   onAdd,
   onReject,
 }: {
@@ -67,6 +68,7 @@ function SourcingOfferCard({
   added: boolean;
   busy: boolean;
   rejected: boolean;
+  unavailable: boolean;
   onAdd: () => void;
   onReject: () => void;
 }) {
@@ -122,7 +124,11 @@ function SourcingOfferCard({
       </AppView>
 
       {/* Actions */}
-      {rejected ? (
+      {unavailable ? (
+        <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted }}>
+          Предложение больше недоступно
+        </AppText>
+      ) : rejected ? (
         <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted }}>
           Вы отклонили это предложение
         </AppText>
@@ -203,9 +209,9 @@ export default function NotificationsScreen() {
   // later accept/decline, so we track what the user did while on this screen).
   const [added, setAdded] = useState<Set<string>>(new Set());
   const [rejected, setRejected] = useState<Set<string>>(new Set());
+  const [gone, setGone] = useState<Set<string>>(new Set());
   const [busyOffer, setBusyOffer] = useState<string | null>(null);
   const [rejectTarget, setRejectTarget] = useState<string | null>(null);
-  const [reason, setReason] = useState<SourcingOfferDeclineReason | null>(null);
   const [rejectBusy, setRejectBusy] = useState(false);
 
   const refreshRef = useRef(refresh);
@@ -245,9 +251,14 @@ export default function NotificationsScreen() {
         if (n.unread) markRead(n.id);
         toastService.success('Добавлено в корзину');
       } catch (err) {
-        if ((err as { status?: number })?.status === 409) {
+        const status = (err as { status?: number })?.status;
+        if (status === 409) {
           setAdded((s) => new Set(s).add(offerId));
           toastService.info('Уже в корзине');
+        } else if (status === 404) {
+          // Offer was deleted (e.g. its ticket removed) → stale notification.
+          setGone((s) => new Set(s).add(offerId));
+          toastService.info('Предложение больше недоступно');
         } else {
           toastService.danger('Не удалось добавить в корзину');
         }
@@ -260,25 +271,34 @@ export default function NotificationsScreen() {
 
   const openReject = (n: NotificationItem) => {
     if (!n.offer?.offerId) return;
-    setReason(null);
     setRejectTarget(n.offer.offerId);
     if (n.unread) markRead(n.id);
   };
 
-  const confirmReject = useCallback(async () => {
-    if (!rejectTarget || !reason) return;
-    setRejectBusy(true);
-    try {
-      await rejectSourcingOffer(rejectTarget, reason);
-      setRejected((s) => new Set(s).add(rejectTarget));
-      toastService.info('Предложение отклонено');
-      setRejectTarget(null);
-    } catch {
-      toastService.danger('Не удалось отклонить предложение');
-    } finally {
-      setRejectBusy(false);
-    }
-  }, [rejectTarget, reason]);
+  // One tap on a reason declines with it — no separate confirm step.
+  const rejectWith = useCallback(
+    async (reasonKey: SourcingOfferDeclineReason) => {
+      const target = rejectTarget;
+      if (!target || rejectBusy) return;
+      setRejectBusy(true);
+      try {
+        await rejectSourcingOffer(target, reasonKey);
+        setRejected((s) => new Set(s).add(target));
+        toastService.info('Предложение отклонено');
+      } catch (err) {
+        if ((err as { status?: number })?.status === 404) {
+          setGone((s) => new Set(s).add(target));
+          toastService.info('Предложение больше недоступно');
+        } else {
+          toastService.danger('Не удалось отклонить предложение');
+        }
+      } finally {
+        setRejectBusy(false);
+        setRejectTarget(null);
+      }
+    },
+    [rejectTarget, rejectBusy],
+  );
 
   return (
     <AppView flex={1} colorName="background">
@@ -339,6 +359,7 @@ export default function NotificationsScreen() {
                   added={added.has(offerId)}
                   busy={busyOffer === offerId}
                   rejected={rejected.has(offerId)}
+                  unavailable={gone.has(offerId)}
                   onAdd={() => addToCart(n)}
                   onReject={() => openReject(n)}
                 />
@@ -396,58 +417,35 @@ export default function NotificationsScreen() {
         heightFraction={0.52}
         expandable={false}
       >
-        <AppView style={{ paddingHorizontal: 20, paddingBottom: 28, gap: 8 }}>
-          <AppText family="heading" weight="bold" style={{ fontSize: 18, color: tokens.text, marginBottom: 6 }}>
+        <AppView style={{ paddingHorizontal: 20, paddingBottom: 28, gap: 10 }}>
+          <AppText family="heading" weight="bold" style={{ fontSize: 18, color: tokens.text, marginBottom: 2 }}>
             Причина отказа
           </AppText>
-          {REJECT_REASONS.map((r) => {
-            const active = reason === r.key;
-            return (
-              <AppPressableView
-                key={r.key}
-                onPress={() => setReason(r.key)}
-                pressedOpacity={0.7}
-                row
-                justify="space-between"
-                align="center"
-                style={{
-                  paddingVertical: 15,
-                  paddingHorizontal: 16,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: active ? tokens.brand : tokens.divider,
-                  backgroundColor: active ? tokens.brandSoft : 'transparent',
-                }}
-              >
-                <AppText family="default" weight={active ? 'bold' : 'regular'} style={{ fontSize: 15, color: tokens.text }}>
-                  {r.label}
-                </AppText>
-                {active ? <Check size={18} color={tokens.brand} /> : null}
-              </AppPressableView>
-            );
-          })}
-
-          <AppPressableView
-            onPress={confirmReject}
-            disabled={!reason || rejectBusy}
-            pressedScale={0.97}
-            center
-            style={{
-              marginTop: 10,
-              height: 52,
-              borderRadius: 16,
-              backgroundColor: tokens.text,
-              opacity: !reason || rejectBusy ? 0.5 : 1,
-            }}
-          >
-            {rejectBusy ? (
-              <WheelLoader size={18} color={tokens.background} />
-            ) : (
-              <AppText family="accent" weight="bold" style={{ fontSize: 15.5, color: tokens.background }}>
-                Отклонить
+          {REJECT_REASONS.map((r) => (
+            <AppPressableView
+              key={r.key}
+              onPress={() => rejectWith(r.key)}
+              disabled={rejectBusy}
+              pressedOpacity={0.6}
+              pressedScale={0.98}
+              row
+              justify="space-between"
+              align="center"
+              style={{
+                paddingVertical: 16,
+                paddingHorizontal: 16,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: tokens.divider,
+                opacity: rejectBusy ? 0.5 : 1,
+              }}
+            >
+              <AppText family="default" weight="semibold" style={{ fontSize: 15, color: tokens.text }}>
+                {r.label}
               </AppText>
-            )}
-          </AppPressableView>
+              <ChevronRight size={18} color={tokens.textMuted} />
+            </AppPressableView>
+          ))}
         </AppView>
       </AppBottomSheet>
     </AppView>
