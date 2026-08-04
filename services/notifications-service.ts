@@ -25,14 +25,36 @@ import { apiClient } from '@/services/api-client';
 /** Drives the leading dot color on each feed row. */
 export type NotificationTone = 'info' | 'value' | 'warning' | 'success' | 'accolade';
 
+/** A seller's quote surfaced inside a `sourcing_offer` notification (from `data`). */
+export type SourcingOfferPayload = {
+  offerId?: string;
+  ticketId?: string;
+  partName?: string | null;
+  price?: number;
+  currency?: string;
+  condition?: string;
+  availability?: string;
+  etaDays?: number | null;
+  note?: string | null;
+  imageUrl?: string | null;
+  imagesCount?: number;
+  sellerUsername?: string | null;
+};
+
 export type NotificationItem = {
   id: string;
+  /** Backend notification type (lowercased), e.g. "sourcing_offer". */
+  type?: string;
   tone: NotificationTone;
   title: string;
   body: string;
   /** Pre-formatted relative time for display (e.g. "2m", "1h", "2d"). */
   time: string;
   unread: boolean;
+  /** Where a tap on the row should route (backend `deeplink_path`). */
+  deeplinkPath?: string | null;
+  /** Structured offer, present on `sourcing_offer` rows — drives the found-part card. */
+  offer?: SourcingOfferPayload;
 };
 
 export interface NotificationsTransport {
@@ -93,6 +115,9 @@ type RawNotification = {
   unread?: boolean;
   created_at?: string;
   createdAt?: string;
+  data?: Record<string, unknown> | null;
+  deeplink_path?: string | null;
+  deeplinkPath?: string | null;
 };
 
 type RawNotificationsResponse =
@@ -102,6 +127,7 @@ type RawNotificationsResponse =
 /** Map a backend notification `type`/`category` onto a display tone. */
 function toTone(raw: RawNotification): NotificationTone {
   const key = (raw.type ?? raw.category ?? '').toLowerCase();
+  if (/sourc|offer|found/.test(key)) return 'success';
   if (/deliver|order|ship/.test(key)) return 'info';
   if (/price|deal|discount|save/.test(key)) return 'value';
   if (/stock|warn|alert/.test(key)) return 'warning';
@@ -138,15 +164,24 @@ export function relativeTime(iso?: string): string {
   return `${Math.floor(day / 365)}y`;
 }
 
-function mapRawNotification(raw: RawNotification): NotificationItem {
-  return {
+export function mapRawNotification(raw: RawNotification): NotificationItem {
+  const type = raw.type?.toLowerCase();
+  const item: NotificationItem = {
     id: raw.id,
+    type,
     tone: toTone(raw),
     title: raw.title ?? '',
     body: raw.body ?? raw.message ?? '',
     time: relativeTime(raw.created_at ?? raw.createdAt),
     unread: isUnread(raw),
+    deeplinkPath: raw.deeplink_path ?? raw.deeplinkPath ?? null,
   };
+  // A found-part offer carries its structured payload in `data`; surface it so
+  // the feed can render the rich card (image, price, condition).
+  if (type === 'sourcing_offer' && raw.data && typeof raw.data === 'object') {
+    item.offer = raw.data as SourcingOfferPayload;
+  }
+  return item;
 }
 
 class HttpNotificationsTransport implements NotificationsTransport {
