@@ -47,18 +47,18 @@ function formatSom(price?: number): string | null {
 
 type Tokens = ReturnType<typeof useThemeContext>['tokens'];
 
-/** A frosted pill badge, overlaid on the offer image. */
-function ImageBadge({ label, tokens }: { label: string; tokens: Tokens }) {
+/** A small tonal chip for condition / availability. */
+function Chip({ label, tokens }: { label: string; tokens: Tokens }) {
   return (
     <AppView
       style={{
         paddingHorizontal: 10,
         paddingVertical: 5,
-        borderRadius: 36,
-        backgroundColor: tokens.scrim,
+        borderRadius: 8,
+        backgroundColor: tokens.brandBg,
       }}
     >
-      <AppText family="accent" weight="semibold" style={{ fontSize: 11.5, color: tokens.white }}>
+      <AppText family="accent" weight="semibold" style={{ fontSize: 12, color: tokens.brand }}>
         {label}
       </AppText>
     </AppView>
@@ -236,6 +236,15 @@ export default function SourcingOfferScreen() {
   const priceText = formatSom(offer?.price);
   const conditionLabel = offer ? CONDITION_RU[offer.condition] : undefined;
   const availabilityLabel = offer ? AVAILABILITY_RU[offer.availability] : undefined;
+  const chips = offer
+    ? [
+        conditionLabel,
+        availabilityLabel
+          ? availabilityLabel +
+            (offer.availability === 'ON_ORDER' && offer.etaDays ? ` · ~${offer.etaDays} дн.` : '')
+          : undefined,
+      ].filter((c): c is string => Boolean(c))
+    : [];
 
   return (
     <AppView flex={1} colorName="background">
@@ -265,74 +274,53 @@ export default function SourcingOfferScreen() {
             contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24, paddingTop: 12 }}
             padding={0}
           >
-            {/* Product-style offer card */}
+            {/* Product-style offer card. The image section renders ONLY when the
+                dealer attached a photo — no placeholder for a price-only quote. */}
             <AppCard rounded={20}>
-              {/* Hero image (or tonal placeholder) with badges */}
-              <AppView style={{ position: 'relative' }}>
-                {offer.images.length > 0 ? (
-                  <Image
-                    source={{ uri: offer.images[0] }}
-                    style={{ width: '100%', height: 210, borderRadius: 14, backgroundColor: tokens.divider }}
-                    contentFit="cover"
-                    transition={150}
-                  />
-                ) : (
-                  <AppView
-                    center
-                    style={{ width: '100%', height: 210, borderRadius: 14, backgroundColor: tokens.brandBg, gap: 10 }}
-                  >
-                    <AppView
-                      center
-                      style={{ width: 64, height: 64, borderRadius: 999, backgroundColor: tokens.background }}
-                    >
-                      <Package size={30} strokeWidth={1.8} color={tokens.brand} />
-                    </AppView>
-                    <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.brand }}>
-                      Продавец указал только цену
-                    </AppText>
-                  </AppView>
-                )}
+              {offer.images.length > 0 ? (
+                <Image
+                  source={{ uri: offer.images[0] }}
+                  style={{
+                    width: '100%',
+                    height: 210,
+                    borderRadius: 14,
+                    backgroundColor: tokens.divider,
+                    marginBottom: 16,
+                  }}
+                  contentFit="cover"
+                  transition={150}
+                />
+              ) : null}
 
-                <AppView row style={{ position: 'absolute', top: 10, left: 10, gap: 6 }}>
-                  {conditionLabel ? <ImageBadge label={conditionLabel} tokens={tokens} /> : null}
+              {offer.partName ? (
+                <AppText family="heading" weight="bold" style={{ fontSize: 19, color: tokens.text }}>
+                  {offer.partName}
+                </AppText>
+              ) : null}
+
+              {chips.length ? (
+                <AppView row gap={6} style={{ marginTop: 8, flexWrap: 'wrap' }}>
+                  {chips.map((c) => (
+                    <Chip key={c} label={c} tokens={tokens} />
+                  ))}
                 </AppView>
-                {availabilityLabel ? (
-                  <AppView style={{ position: 'absolute', top: 10, right: 10 }}>
-                    <ImageBadge
-                      label={
-                        availabilityLabel +
-                        (offer.availability === 'ON_ORDER' && offer.etaDays ? ` · ~${offer.etaDays} дн.` : '')
-                      }
-                      tokens={tokens}
-                    />
-                  </AppView>
+              ) : null}
+
+              <AppView gap={2} style={{ marginTop: 16 }}>
+                <AppText family="default" style={{ fontSize: 12, color: tokens.textMuted }}>
+                  Цена от продавца
+                </AppText>
+                {priceText ? (
+                  <AppText family="heading" weight="bold" style={{ fontSize: 28, color: tokens.brand }}>
+                    {priceText}
+                  </AppText>
                 ) : null}
               </AppView>
 
-              {/* Title + price */}
-              <AppView style={{ marginTop: 14, gap: 8 }}>
-                {offer.partName ? (
-                  <AppText family="heading" weight="bold" style={{ fontSize: 18, color: tokens.text }}>
-                    {offer.partName}
-                  </AppText>
-                ) : null}
-                <AppView gap={2}>
-                  <AppText family="default" style={{ fontSize: 12, color: tokens.textMuted }}>
-                    Цена от продавца
-                  </AppText>
-                  {priceText ? (
-                    <AppText family="heading" weight="bold" style={{ fontSize: 27, color: tokens.brand }}>
-                      {priceText}
-                    </AppText>
-                  ) : null}
-                </AppView>
-              </AppView>
-
-              {/* Seller note */}
               {offer.note ? (
                 <AppView
                   style={{
-                    marginTop: 14,
+                    marginTop: 16,
                     padding: 12,
                     borderRadius: 12,
                     backgroundColor: tokens.brandBg,
