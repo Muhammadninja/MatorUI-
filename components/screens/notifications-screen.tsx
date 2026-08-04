@@ -2,7 +2,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { BellOff, Check, ChevronRight, X } from 'lucide-react-native';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import AppBottomSheet from '@/components/shared/app-bottom-sheet';
 import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
@@ -16,6 +16,7 @@ import { useNotifications } from '@/hooks/use-notifications';
 import { toastService } from '@/services/toast-service';
 import {
   acceptSourcingOffer,
+  fetchSourcingOffer,
   rejectSourcingOffer,
   type SourcingOfferDeclineReason,
 } from '@/services/sourcing-service';
@@ -47,6 +48,18 @@ function formatSom(price?: number): string | null {
   return `${price.toLocaleString('ru-RU').replace(/ /g, ' ')} сум`;
 }
 
+/** Live display state for an offer card, derived from the offer's server status. */
+type OfferCardState = 'actionable' | 'in_cart' | 'declined' | 'unavailable';
+
+/** Raw offer status (or GONE for a 404) → card state. Unknown/undefined (still
+ *  loading) is treated as actionable — the common case is a fresh SENT offer. */
+function deriveOfferState(raw: string | undefined): OfferCardState {
+  if (raw === 'ACCEPTED') return 'in_cart';
+  if (raw === 'DECLINED') return 'declined';
+  if (raw === 'EXPIRED' || raw === 'GONE') return 'unavailable';
+  return 'actionable';
+}
+
 /**
  * Found-part offer card — a self-contained product-row-style row for a
  * `sourcing_offer`. The seller's photo shows only when present (no placeholder),
@@ -56,19 +69,15 @@ function formatSom(price?: number): string | null {
 function SourcingOfferCard({
   n,
   tokens,
-  added,
   busy,
-  rejected,
-  unavailable,
+  state,
   onAdd,
   onReject,
 }: {
   n: NotificationItem;
   tokens: Tokens;
-  added: boolean;
   busy: boolean;
-  rejected: boolean;
-  unavailable: boolean;
+  state: OfferCardState;
   onAdd: () => void;
   onReject: () => void;
 }) {
@@ -123,18 +132,18 @@ function SourcingOfferCard({
         </AppView>
       </AppView>
 
-      {/* Actions */}
-      {unavailable ? (
+      {/* Actions — reflect the live offer status */}
+      {state === 'unavailable' ? (
         <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted }}>
           Предложение больше недоступно
         </AppText>
-      ) : rejected ? (
+      ) : state === 'declined' ? (
         <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted }}>
           Вы отклонили это предложение
         </AppText>
       ) : (
         <AppView row justify="flex-end" align="center" gap={10}>
-          {added ? (
+          {state === 'in_cart' ? (
             <AppView
               row
               align="center"
@@ -205,11 +214,11 @@ export default function NotificationsScreen() {
   const { state, notifications, unreadCount, markRead, markAllRead, refresh } = useNotifications();
   const { refresh: refreshCart } = useCartContext();
 
-  // Session-local offer action state (the notification payload can't reflect a
-  // later accept/decline, so we track what the user did while on this screen).
-  const [added, setAdded] = useState<Set<string>>(new Set());
-  const [rejected, setRejected] = useState<Set<string>>(new Set());
-  const [gone, setGone] = useState<Set<string>>(new Set());
+  // offerId → LIVE status ('SENT'|'ACCEPTED'|'DECLINED'|'EXPIRED'|'GONE').
+  // Fetched from the server on load so a card reflects reality (already bought /
+  // declined / expired / deleted), and updated optimistically after an action —
+  // not just this session's taps.
+  const [liveStatus, setLiveStatus] = useState<Record<string, string>>({});
   const [busyOffer, setBusyOffer] = useState<string | null>(null);
   const [rejectTarget, setRejectTarget] = useState<string | null>(null);
   const [rejectBusy, setRejectBusy] = useState(false);
@@ -221,6 +230,40 @@ export default function NotificationsScreen() {
       void refreshRef.current();
     }, []),
   );
+
+  // Resolve the live status of every offer notification. Reads current statuses
+  // through a ref so the effect only re-runs when the set of offer ids changes,
+  // and fetches only ids not yet resolved.
+  const offerIds = notifications
+    .map((n) => ((n.type === 'sourcing_offer' || n.offer) ? n.offer?.offerId : undefined))
+    .filter((id): id is string => Boolean(id));
+  const offerIdsKey = offerIds.join(',');
+  const liveStatusRef = useRef(liveStatus);
+  liveStatusRef.current = liveStatus;
+  useEffect(() => {
+    const pending = offerIds.filter((id) => liveStatusRef.current[id] === undefined);
+    if (pending.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      const results = await Promise.allSettled(pending.map((id) => fetchSourcingOffer(id)));
+      if (cancelled) return;
+      const next: Record<string, string> = {};
+      results.forEach((r, i) => {
+        const id = pending[i];
+        next[id] =
+          r.status === 'fulfilled'
+            ? r.value.status
+            : (r.reason as { status?: number })?.status === 404
+              ? 'GONE'
+              : 'SENT'; // network error → assume actionable; retries next open
+      });
+      setLiveStatus((prev) => ({ ...prev, ...next }));
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offerIdsKey]);
 
   const handleMarkAll = () => {
     markAllRead();
@@ -247,17 +290,17 @@ export default function NotificationsScreen() {
       try {
         await acceptSourcingOffer(offerId);
         await refreshCart();
-        setAdded((s) => new Set(s).add(offerId));
+        setLiveStatus((s) => ({ ...s, [offerId]: 'ACCEPTED' }));
         if (n.unread) markRead(n.id);
         toastService.success('Добавлено в корзину');
       } catch (err) {
         const status = (err as { status?: number })?.status;
         if (status === 409) {
-          setAdded((s) => new Set(s).add(offerId));
+          setLiveStatus((s) => ({ ...s, [offerId]: 'ACCEPTED' }));
           toastService.info('Уже в корзине');
         } else if (status === 404) {
           // Offer was deleted (e.g. its ticket removed) → stale notification.
-          setGone((s) => new Set(s).add(offerId));
+          setLiveStatus((s) => ({ ...s, [offerId]: 'GONE' }));
           toastService.info('Предложение больше недоступно');
         } else {
           toastService.danger('Не удалось добавить в корзину');
@@ -283,11 +326,11 @@ export default function NotificationsScreen() {
       setRejectBusy(true);
       try {
         await rejectSourcingOffer(target, reasonKey);
-        setRejected((s) => new Set(s).add(target));
+        setLiveStatus((s) => ({ ...s, [target]: 'DECLINED' }));
         toastService.info('Предложение отклонено');
       } catch (err) {
         if ((err as { status?: number })?.status === 404) {
-          setGone((s) => new Set(s).add(target));
+          setLiveStatus((s) => ({ ...s, [target]: 'GONE' }));
           toastService.info('Предложение больше недоступно');
         } else {
           toastService.danger('Не удалось отклонить предложение');
@@ -356,10 +399,8 @@ export default function NotificationsScreen() {
                   key={n.id}
                   n={n}
                   tokens={tokens}
-                  added={added.has(offerId)}
                   busy={busyOffer === offerId}
-                  rejected={rejected.has(offerId)}
-                  unavailable={gone.has(offerId)}
+                  state={deriveOfferState(liveStatus[offerId])}
                   onAdd={() => addToCart(n)}
                   onReject={() => openReject(n)}
                 />
