@@ -431,12 +431,14 @@ export default function NotificationsScreen() {
                       {n.time}
                     </AppText>
                   </AppView>
-                  <AppText
-                    family="default"
-                    style={{ fontSize: 13, color: tokens.textMuted, marginTop: 3, lineHeight: 18 }}
-                  >
-                    {n.body}
-                  </AppText>
+                  {n.body ? (
+                    <AppText
+                      family="default"
+                      style={{ fontSize: 13, color: tokens.textMuted, marginTop: 3, lineHeight: 18 }}
+                    >
+                      {n.body}
+                    </AppText>
+                  ) : null}
                 </AppView>
                 {n.unread ? (
                   <AppView

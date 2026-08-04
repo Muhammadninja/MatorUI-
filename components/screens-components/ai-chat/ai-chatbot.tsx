@@ -34,6 +34,7 @@ import { useActiveVehicle } from '@/contexts/active-vehicle.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useGlobalModal } from '@/hooks/use-global-modal';
 import { chatTransport } from '@/services/chat-api';
+import { clearStoredChat, loadChat, saveChat } from '@/services/chat-storage';
 import { toastService } from '@/services/toast-service';
 import type {
     AiChatConversationSummary,
@@ -140,6 +141,33 @@ export default function AiChatbot() {
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+
+  // ── Persist the conversation across refresh/relaunch ────────────────
+  // The sourcing endpoint is stateless, so without this the thread is lost on
+  // reload. Hydrate the cached turns once on mount, then debounce-save on change.
+  const chatHydratedRef = useRef(false);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const stored = await loadChat();
+      if (!cancelled && stored && stored.messages.length > 0) {
+        setMessages(stored.messages);
+        if (stored.conversationId) setConversationId(stored.conversationId);
+      }
+      if (!cancelled) chatHydratedRef.current = true;
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!chatHydratedRef.current) return;
+    const t = setTimeout(() => {
+      void saveChat({ messages, conversationId });
+    }, 400);
+    return () => clearTimeout(t);
+  }, [messages, conversationId]);
   const isSending = streamingReply !== null;
 
   // ── Scroll plumbing ─────────────────────────────────────────────────
@@ -449,6 +477,7 @@ export default function AiChatbot() {
     setFailedUserMessageIds(new Set());
     setSystemNotes([]);
     setDraft('');
+    void clearStoredChat();
   }, []);
 
   const requestClear = useCallback(() => {
