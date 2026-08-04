@@ -176,7 +176,7 @@ import { PROMO_CODES } from '@/services/cart-math';
 /** A cart line as the backend returns it (snake_case, line-keyed). */
 type ApiCartItem = {
   id: string; // cart-line id (item_01K…)
-  part_id: string;
+  part_id: string | null; // null for sourced-offer / service lines
   service_id?: string | null;
   title?: string;
   price?: string;
@@ -203,7 +203,9 @@ export class HttpCartTransport implements CartTransport {
 
   private mapItem(i: ApiCartItem): CartItem {
     return {
-      id: i.part_id, // the provider keys by product id, not the line id
+      // Catalog lines key by product id; sourced-offer lines have no part_id,
+      // so they key by their own cart-line id instead.
+      id: i.part_id ?? i.id,
       title: i.title ?? '',
       description: '',
       price:
@@ -232,7 +234,9 @@ export class HttpCartTransport implements CartTransport {
   private ingest(cart: ApiCart | undefined): CartSnapshot {
     this.lineIdByPart.clear();
     const items = (cart?.items ?? []).map((i) => {
-      this.lineIdByPart.set(i.part_id, i.id);
+      // Key by the same id mapItem exposes, so PATCH/DELETE resolve the line id
+      // for offer lines (part_id ?? line id → line id) too.
+      this.lineIdByPart.set(i.part_id ?? i.id, i.id);
       return this.mapItem(i);
     });
     return { items, appliedPromoCode: cart?.promo?.code ?? null };
