@@ -1,11 +1,11 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Check, Package } from 'lucide-react-native';
+import { Check, Package, ShoppingCart, X } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 
 import AppBottomSheet from '@/components/shared/app-bottom-sheet';
 import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
-import { AppButton } from '@/components/shared/app-button';
+import { AppCard } from '@/components/shared/app-card';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
@@ -45,13 +45,125 @@ function formatSom(price?: number): string | null {
   return `${price.toLocaleString('ru-RU').replace(/ /g, ' ')} сум`;
 }
 
+type Tokens = ReturnType<typeof useThemeContext>['tokens'];
+
+/** A frosted pill badge, overlaid on the offer image. */
+function ImageBadge({ label, tokens }: { label: string; tokens: Tokens }) {
+  return (
+    <AppView
+      style={{
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 36,
+        backgroundColor: tokens.scrim,
+      }}
+    >
+      <AppText family="accent" weight="semibold" style={{ fontSize: 11.5, color: tokens.white }}>
+        {label}
+      </AppText>
+    </AppView>
+  );
+}
+
+/**
+ * Primary "buy" button — a branded pill with the icon in a translucent badge and
+ * a soft brand shadow. Deliberately not the stock button: it should feel like a
+ * commerce CTA. Shows a spinner while the purchase is in flight.
+ */
+function BuyButton({
+  priceText,
+  busy,
+  disabled,
+  onPress,
+  tokens,
+}: {
+  priceText: string | null;
+  busy: boolean;
+  disabled: boolean;
+  onPress: () => void;
+  tokens: Tokens;
+}) {
+  return (
+    <AppPressableView
+      onPress={onPress}
+      disabled={disabled}
+      pressedScale={0.97}
+      row
+      center
+      gap={10}
+      style={{
+        height: 56,
+        borderRadius: 18,
+        backgroundColor: tokens.brand,
+        opacity: disabled && !busy ? 0.6 : 1,
+        shadowColor: tokens.brand,
+        shadowOpacity: 0.35,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 8 },
+        elevation: 7,
+      }}
+    >
+      {busy ? (
+        <WheelLoader size={20} color={tokens.onBrand} />
+      ) : (
+        <>
+          <AppView
+            center
+            style={{ width: 30, height: 30, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.22)' }}
+          >
+            <ShoppingCart size={16} color={tokens.onBrand} />
+          </AppView>
+          <AppText family="accent" weight="bold" style={{ fontSize: 16, color: tokens.onBrand }}>
+            {priceText ? `Купить · ${priceText}` : 'Добавить в корзину'}
+          </AppText>
+        </>
+      )}
+    </AppPressableView>
+  );
+}
+
+/** Secondary "reject" button — a soft tonal pill, clearly lower-emphasis. */
+function RejectButton({
+  disabled,
+  onPress,
+  tokens,
+}: {
+  disabled: boolean;
+  onPress: () => void;
+  tokens: Tokens;
+}) {
+  return (
+    <AppPressableView
+      onPress={onPress}
+      disabled={disabled}
+      pressedScale={0.97}
+      row
+      center
+      gap={7}
+      style={{
+        height: 48,
+        borderRadius: 16,
+        backgroundColor: tokens.card ?? tokens.background,
+        borderWidth: 1,
+        borderColor: tokens.divider,
+        opacity: disabled ? 0.6 : 1,
+      }}
+    >
+      <X size={15} color={tokens.textMuted} />
+      <AppText family="accent" weight="semibold" style={{ fontSize: 14.5, color: tokens.textMuted }}>
+        Не подходит
+      </AppText>
+    </AppPressableView>
+  );
+}
+
 type LoadState = 'loading' | 'ready' | 'error';
 
 /**
- * Offer detail — opened from a "found part" notification. The customer can BUY
- * (adds the offer to the cart → normal checkout) or REJECT with a reason. Photos
- * render when present; a price-only quote gets an intentional tonal placeholder
- * rather than an empty box.
+ * Offer detail — opened from a "found part" notification. The offer is presented
+ * as a product-style card; the customer can BUY (adds it to the cart → normal
+ * checkout) or REJECT with a reason. A price-only quote gets an intentional
+ * tonal placeholder instead of an empty photo box.
  */
 export default function SourcingOfferScreen() {
   const { tokens } = useThemeContext();
@@ -121,12 +233,9 @@ export default function SourcingOfferScreen() {
     }
   }, [offer, reason]);
 
-  const chips = offer
-    ? [CONDITION_RU[offer.condition], AVAILABILITY_RU[offer.availability]].filter(
-        (c): c is string => Boolean(c),
-      )
-    : [];
   const priceText = formatSom(offer?.price);
+  const conditionLabel = offer ? CONDITION_RU[offer.condition] : undefined;
+  const availabilityLabel = offer ? AVAILABILITY_RU[offer.availability] : undefined;
 
   return (
     <AppView flex={1} colorName="background">
@@ -153,101 +262,94 @@ export default function SourcingOfferScreen() {
         <>
           <AppScrollView
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24, paddingTop: 8 }}
+            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24, paddingTop: 12 }}
             padding={0}
           >
-            {/* Hero: photos, or an intentional tonal placeholder for a price-only quote */}
-            {offer.images.length > 0 ? (
-              <AppScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                padding={0}
-                contentContainerStyle={{ gap: 10 }}
-              >
-                {offer.images.map((uri) => (
+            {/* Product-style offer card */}
+            <AppCard rounded={20}>
+              {/* Hero image (or tonal placeholder) with badges */}
+              <AppView style={{ position: 'relative' }}>
+                {offer.images.length > 0 ? (
                   <Image
-                    key={uri}
-                    source={{ uri }}
-                    style={{
-                      width: offer.images.length > 1 ? 260 : 320,
-                      height: 260,
-                      borderRadius: 16,
-                      backgroundColor: tokens.divider,
-                    }}
+                    source={{ uri: offer.images[0] }}
+                    style={{ width: '100%', height: 210, borderRadius: 14, backgroundColor: tokens.divider }}
                     contentFit="cover"
                     transition={150}
                   />
-                ))}
-              </AppScrollView>
-            ) : (
-              <AppView
-                center
-                style={{
-                  height: 168,
-                  borderRadius: 16,
-                  backgroundColor: tokens.brandBg,
-                  gap: 10,
-                }}
-              >
+                ) : (
+                  <AppView
+                    center
+                    style={{ width: '100%', height: 210, borderRadius: 14, backgroundColor: tokens.brandBg, gap: 10 }}
+                  >
+                    <AppView
+                      center
+                      style={{ width: 64, height: 64, borderRadius: 999, backgroundColor: tokens.background }}
+                    >
+                      <Package size={30} strokeWidth={1.8} color={tokens.brand} />
+                    </AppView>
+                    <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.brand }}>
+                      Продавец указал только цену
+                    </AppText>
+                  </AppView>
+                )}
+
+                <AppView row style={{ position: 'absolute', top: 10, left: 10, gap: 6 }}>
+                  {conditionLabel ? <ImageBadge label={conditionLabel} tokens={tokens} /> : null}
+                </AppView>
+                {availabilityLabel ? (
+                  <AppView style={{ position: 'absolute', top: 10, right: 10 }}>
+                    <ImageBadge
+                      label={
+                        availabilityLabel +
+                        (offer.availability === 'ON_ORDER' && offer.etaDays ? ` · ~${offer.etaDays} дн.` : '')
+                      }
+                      tokens={tokens}
+                    />
+                  </AppView>
+                ) : null}
+              </AppView>
+
+              {/* Title + price */}
+              <AppView style={{ marginTop: 14, gap: 8 }}>
+                {offer.partName ? (
+                  <AppText family="heading" weight="bold" style={{ fontSize: 18, color: tokens.text }}>
+                    {offer.partName}
+                  </AppText>
+                ) : null}
+                <AppView gap={2}>
+                  <AppText family="default" style={{ fontSize: 12, color: tokens.textMuted }}>
+                    Цена от продавца
+                  </AppText>
+                  {priceText ? (
+                    <AppText family="heading" weight="bold" style={{ fontSize: 27, color: tokens.brand }}>
+                      {priceText}
+                    </AppText>
+                  ) : null}
+                </AppView>
+              </AppView>
+
+              {/* Seller note */}
+              {offer.note ? (
                 <AppView
-                  center
                   style={{
-                    width: 60,
-                    height: 60,
-                    borderRadius: 999,
-                    backgroundColor: tokens.background,
+                    marginTop: 14,
+                    padding: 12,
+                    borderRadius: 12,
+                    backgroundColor: tokens.brandBg,
                   }}
                 >
-                  <Package size={30} strokeWidth={1.8} color={tokens.brand} />
+                  <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.brand, marginBottom: 3 }}>
+                    Комментарий продавца
+                  </AppText>
+                  <AppText family="default" style={{ fontSize: 14, color: tokens.text, lineHeight: 20 }}>
+                    {offer.note}
+                  </AppText>
                 </AppView>
-                <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.brand }}>
-                  Продавец указал только цену
-                </AppText>
-              </AppView>
-            )}
-
-            {/* Part + price */}
-            <AppView gap={4} style={{ marginTop: 18 }}>
-              {offer.partName ? (
-                <AppText family="heading" weight="bold" style={{ fontSize: 19, color: tokens.text }}>
-                  {offer.partName}
-                </AppText>
               ) : null}
-              {priceText ? (
-                <AppText family="accent" weight="bold" style={{ fontSize: 26, color: tokens.brand }}>
-                  {priceText}
-                </AppText>
-              ) : null}
-              {chips.length ? (
-                <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted, marginTop: 2 }}>
-                  {chips.join(' · ')}
-                  {offer.availability === 'ON_ORDER' && offer.etaDays ? ` · ~${offer.etaDays} дн.` : ''}
-                </AppText>
-              ) : null}
-            </AppView>
-
-            {/* Seller note */}
-            {offer.note ? (
-              <AppView
-                style={{
-                  marginTop: 16,
-                  padding: 14,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: tokens.divider,
-                }}
-              >
-                <AppText family="accent" weight="bold" style={{ fontSize: 12.5, color: tokens.textMuted, marginBottom: 4 }}>
-                  Комментарий продавца
-                </AppText>
-                <AppText family="default" style={{ fontSize: 14, color: tokens.text, lineHeight: 20 }}>
-                  {offer.note}
-                </AppText>
-              </AppView>
-            ) : null}
+            </AppCard>
           </AppScrollView>
 
-          {/* Sticky action bar — state-aware */}
+          {/* Sticky action bar — state-aware, custom buttons */}
           <AppView
             style={{
               paddingHorizontal: 20,
@@ -260,39 +362,24 @@ export default function SourcingOfferScreen() {
           >
             {status === 'SENT' ? (
               <>
-                <AppButton
-                  title="Добавить в корзину"
-                  kind="brand"
-                  variant="solid"
-                  fullWidth
-                  loading={busy === 'accept'}
+                <BuyButton
+                  priceText={priceText}
+                  busy={busy === 'accept'}
                   disabled={busy !== null}
                   onPress={handleBuy}
+                  tokens={tokens}
                 />
-                <AppButton
-                  title="Отклонить предложение"
-                  kind="error"
-                  variant="ghost"
-                  fullWidth
-                  disabled={busy !== null}
-                  onPress={() => setRejectOpen(true)}
-                />
+                <RejectButton disabled={busy !== null} onPress={() => setRejectOpen(true)} tokens={tokens} />
               </>
             ) : status === 'ACCEPTED' ? (
               <>
-                <AppView row center gap={6} style={{ paddingVertical: 4 }}>
+                <AppView row center gap={6} style={{ paddingVertical: 2 }}>
                   <Check size={16} color={tokens.success} />
                   <AppText family="accent" weight="bold" style={{ fontSize: 14, color: tokens.success }}>
                     Добавлено в корзину
                   </AppText>
                 </AppView>
-                <AppButton
-                  title="Перейти в корзину"
-                  kind="brand"
-                  variant="solid"
-                  fullWidth
-                  onPress={() => router.navigate('/cart')}
-                />
+                <BuyButton priceText={null} busy={false} disabled={false} onPress={() => router.navigate('/cart')} tokens={tokens} />
               </>
             ) : status === 'DECLINED' ? (
               <AppText
@@ -345,16 +432,29 @@ export default function SourcingOfferScreen() {
             );
           })}
 
-          <AppButton
-            title="Отклонить"
-            kind="error"
-            variant="solid"
-            fullWidth
-            disabled={!reason || busy !== null}
-            loading={busy === 'reject'}
+          <AppPressableView
             onPress={handleReject}
-            style={{ marginTop: 8 }}
-          />
+            disabled={!reason || busy !== null}
+            pressedScale={0.97}
+            row
+            center
+            gap={7}
+            style={{
+              marginTop: 8,
+              height: 52,
+              borderRadius: 16,
+              backgroundColor: tokens.text,
+              opacity: !reason || busy !== null ? 0.5 : 1,
+            }}
+          >
+            {busy === 'reject' ? (
+              <WheelLoader size={18} color={tokens.background} />
+            ) : (
+              <AppText family="accent" weight="bold" style={{ fontSize: 15.5, color: tokens.background }}>
+                Отклонить
+              </AppText>
+            )}
+          </AppPressableView>
         </AppView>
       </AppBottomSheet>
     </AppView>
