@@ -19,20 +19,9 @@ import {
   rejectSourcingOffer,
   type SourcingOfferDeclineReason,
 } from '@/services/sourcing-service';
-import type { NotificationItem, NotificationTone } from '@/services/notifications-service';
+import type { NotificationItem } from '@/services/notifications-service';
 
 type Tokens = ReturnType<typeof useThemeContext>['tokens'];
-
-function useDotColor(tokens: Tokens) {
-  return (tone: NotificationTone): string => {
-    if (tone === 'info') return tokens.info;
-    if (tone === 'value') return tokens.value;
-    if (tone === 'warning') return tokens.warning;
-    if (tone === 'success') return tokens.success;
-    if (tone === 'accolade') return tokens.accolade;
-    return tokens.brand;
-  };
-}
 
 const CONDITION_RU: Record<string, string> = {
   NEW: 'новый',
@@ -209,7 +198,6 @@ export default function NotificationsScreen() {
   const { tokens } = useThemeContext();
   const { state, notifications, unreadCount, markRead, markAllRead, refresh } = useNotifications();
   const { refresh: refreshCart } = useCartContext();
-  const dotColor = useDotColor(tokens);
 
   // Session-local offer action state (the notification payload can't reflect a
   // later accept/decline, so we track what the user did while on this screen).
@@ -356,7 +344,6 @@ export default function NotificationsScreen() {
                 />
               );
             }
-            const dot = dotColor(n.tone);
             return (
               <AppPressableView
                 key={n.id}
@@ -373,9 +360,6 @@ export default function NotificationsScreen() {
                   borderBottomColor: tokens.divider,
                 }}
               >
-                <AppView
-                  style={{ width: 10, height: 10, borderRadius: 999, backgroundColor: dot, marginTop: 5, flexShrink: 0 }}
-                />
                 <AppView style={{ flex: 1 }}>
                   <AppView row justify="space-between" gap={8}>
                     <AppText family="accent" weight="bold" style={{ fontSize: 14.5, color: tokens.text }}>
