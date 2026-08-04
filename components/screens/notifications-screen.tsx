@@ -1,26 +1,29 @@
+import { MaterialIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
-import { BellOff, Package } from 'lucide-react-native';
-import { useCallback, useRef } from 'react';
+import { BellOff, Check, X } from 'lucide-react-native';
+import { useCallback, useRef, useState } from 'react';
 
+import AppBottomSheet from '@/components/shared/app-bottom-sheet';
 import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { WheelLoader } from '@/components/shared/wheel-loader';
+import { useCartContext } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useNotifications } from '@/hooks/use-notifications';
 import { toastService } from '@/services/toast-service';
+import {
+  acceptSourcingOffer,
+  rejectSourcingOffer,
+  type SourcingOfferDeclineReason,
+} from '@/services/sourcing-service';
 import type { NotificationItem, NotificationTone } from '@/services/notifications-service';
 
-/**
- * Notifications — feed backed by the real notifications transport
- * (`useNotifications`). Faithful to the prototype's `scNotifications` row
- * layout (leading colored dot | title + time | body | trailing unread dot),
- * plus loading / empty states and tap-to-mark-read.
- */
+type Tokens = ReturnType<typeof useThemeContext>['tokens'];
 
-function useDotColor(tokens: ReturnType<typeof useThemeContext>['tokens']) {
+function useDotColor(tokens: Tokens) {
   return (tone: NotificationTone): string => {
     if (tone === 'info') return tokens.info;
     if (tone === 'value') return tokens.value;
@@ -42,120 +45,181 @@ const AVAILABILITY_RU: Record<string, string> = {
   ON_ORDER: 'под заказ',
 };
 
+const REJECT_REASONS: { key: SourcingOfferDeclineReason; label: string }[] = [
+  { key: 'TOO_EXPENSIVE', label: 'Слишком дорого' },
+  { key: 'FOUND_CHEAPER', label: 'Нашёл дешевле' },
+  { key: 'NO_LONGER_NEEDED', label: 'Уже не нужно' },
+  { key: 'OTHER', label: 'Другое' },
+];
+
 /** 250000 → "250 000 сум". */
 function formatSom(price?: number): string | null {
   if (typeof price !== 'number' || !Number.isFinite(price)) return null;
-  return `${price.toLocaleString('ru-RU').replace(/ /g, ' ')} сум`;
+  return `${price.toLocaleString('ru-RU').replace(/ /g, ' ')} сум`;
 }
 
 /**
- * Found-part offer card — the rich variant of a notification row for a
- * `sourcing_offer`. Renders the seller's photo when present and degrades to a
- * part-icon placeholder when the seller sent a price only, so a price-only offer
- * still reads as a proper result. Tapping opens the offer detail.
+ * Found-part offer card — a self-contained product-row-style row for a
+ * `sourcing_offer`. The seller's photo shows only when present (no placeholder),
+ * and the customer acts right here: an "add to cart" pill and an "✕" that opens
+ * the decline sheet. No navigation away from the feed.
  */
 function SourcingOfferCard({
   n,
   tokens,
-  onOpen,
+  added,
+  busy,
+  rejected,
+  onAdd,
+  onReject,
 }: {
   n: NotificationItem;
-  tokens: ReturnType<typeof useThemeContext>['tokens'];
-  onOpen: (n: NotificationItem) => void;
+  tokens: Tokens;
+  added: boolean;
+  busy: boolean;
+  rejected: boolean;
+  onAdd: () => void;
+  onReject: () => void;
 }) {
   const offer = n.offer ?? {};
   const priceText = formatSom(offer.price);
-  const chips = [CONDITION_RU[offer.condition ?? ''], AVAILABILITY_RU[offer.availability ?? '']]
-    .filter((c): c is string => Boolean(c));
+  const chips = [CONDITION_RU[offer.condition ?? ''], AVAILABILITY_RU[offer.availability ?? '']].filter(
+    (c): c is string => Boolean(c),
+  );
 
   return (
-    <AppPressableView
-      onPress={() => onOpen(n)}
-      pressedOpacity={0.7}
-      accessibilityRole="button"
-      accessibilityLabel={`${n.title}. ${offer.partName ?? ''} ${priceText ?? ''}`}
+    <AppView
       style={{
         borderWidth: 1,
         borderColor: n.unread ? tokens.brand : tokens.divider,
         backgroundColor: tokens.card ?? tokens.background,
-        borderRadius: 14,
+        borderRadius: 16,
         padding: 12,
         marginVertical: 6,
+        gap: 12,
       }}
     >
-      {/* Header: title + time + unread dot */}
-      <AppView row justify="space-between" gap={8} style={{ marginBottom: 10 }}>
-        <AppText family="accent" weight="bold" style={{ fontSize: 14, color: tokens.text, flex: 1 }}>
-          {n.title || 'Нашли вашу запчасть'}
-        </AppText>
-        <AppView row gap={6} style={{ alignItems: 'center', flexShrink: 0 }}>
-          <AppText family="default" style={{ fontSize: 11.5, color: tokens.textMuted }}>
-            {n.time}
-          </AppText>
-          {n.unread ? (
-            <AppView style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: tokens.brandBg }} />
-          ) : null}
-        </AppView>
-      </AppView>
-
-      {/* Body: image (or placeholder) + details */}
+      {/* Content row: thumb (only if a photo exists) + details */}
       <AppView row gap={12}>
         {offer.imageUrl ? (
           <Image
             source={{ uri: offer.imageUrl }}
-            style={{ width: 76, height: 76, borderRadius: 10, backgroundColor: tokens.divider }}
+            style={{ width: 64, height: 64, borderRadius: 12 }}
             contentFit="cover"
             transition={150}
           />
-        ) : (
-          <AppView
-            center
-            style={{ width: 76, height: 76, borderRadius: 10, backgroundColor: tokens.brandBg }}
-          >
-            <Package size={26} strokeWidth={1.9} color={tokens.brand} />
-          </AppView>
-        )}
+        ) : null}
 
         <AppView style={{ flex: 1 }}>
-          {offer.partName ? (
-            <AppText family="default" weight="bold" style={{ fontSize: 14, color: tokens.text }} numberOfLines={2}>
-              {offer.partName}
+          <AppView row justify="space-between" gap={8}>
+            <AppText family="default" weight="bold" style={{ fontSize: 14.5, color: tokens.text, flex: 1 }} numberOfLines={2}>
+              {offer.partName || n.title || 'Найденная запчасть'}
             </AppText>
-          ) : null}
+            <AppText family="default" style={{ fontSize: 11, color: tokens.textMuted, flexShrink: 0 }}>
+              {n.time}
+            </AppText>
+          </AppView>
           {priceText ? (
-            <AppText family="accent" weight="bold" style={{ fontSize: 17, color: tokens.brand, marginTop: 2 }}>
+            <AppText family="accent" weight="bold" style={{ fontSize: 18, color: tokens.brand, marginTop: 2 }}>
               {priceText}
             </AppText>
           ) : null}
           {chips.length ? (
-            <AppText family="default" style={{ fontSize: 12, color: tokens.textMuted, marginTop: 3 }}>
+            <AppText family="default" style={{ fontSize: 12, color: tokens.textMuted, marginTop: 2 }}>
               {chips.join(' · ')}
-            </AppText>
-          ) : null}
-          {offer.note ? (
-            <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted, marginTop: 4 }} numberOfLines={2}>
-              {offer.note}
             </AppText>
           ) : null}
         </AppView>
       </AppView>
 
-      {/* CTA */}
-      <AppText family="accent" weight="bold" style={{ fontSize: 12.5, color: tokens.brand, marginTop: 10 }}>
-        Посмотреть предложение →
-      </AppText>
-    </AppPressableView>
+      {/* Actions */}
+      {rejected ? (
+        <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted }}>
+          Вы отклонили это предложение
+        </AppText>
+      ) : (
+        <AppView row justify="flex-end" align="center" gap={10}>
+          {added ? (
+            <AppView
+              row
+              align="center"
+              gap={6}
+              rounded={999}
+              style={{ paddingHorizontal: 16, paddingVertical: 9, backgroundColor: tokens.success }}
+            >
+              <Check size={15} color={tokens.background} />
+              <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.background }}>
+                В корзине
+              </AppText>
+            </AppView>
+          ) : (
+            <>
+              {/* Decline (✕) */}
+              <AppPressableView
+                onPress={onReject}
+                disabled={busy}
+                pressedOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Отклонить предложение"
+                center
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 999,
+                  borderWidth: 1,
+                  borderColor: tokens.divider,
+                }}
+              >
+                <X size={18} color={tokens.textMuted} />
+              </AppPressableView>
+
+              {/* Add to cart */}
+              <AppPressableView
+                onPress={onAdd}
+                disabled={busy}
+                pressedOpacity={0.9}
+                accessibilityRole="button"
+                accessibilityLabel="Добавить в корзину"
+                row
+                align="center"
+                gap={6}
+                rounded={999}
+                style={{ paddingHorizontal: 18, paddingVertical: 10, backgroundColor: tokens.text, minWidth: 128, justifyContent: 'center' }}
+              >
+                {busy ? (
+                  <WheelLoader size={16} color={tokens.background} />
+                ) : (
+                  <>
+                    <MaterialIcons name="add-shopping-cart" size={16} color={tokens.background} />
+                    <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.background }}>
+                      В корзину
+                    </AppText>
+                  </>
+                )}
+              </AppPressableView>
+            </>
+          )}
+        </AppView>
+      )}
+    </AppView>
   );
 }
 
 export default function NotificationsScreen() {
   const { tokens } = useThemeContext();
   const { state, notifications, unreadCount, markRead, markAllRead, refresh } = useNotifications();
+  const { refresh: refreshCart } = useCartContext();
   const dotColor = useDotColor(tokens);
 
-  // Refetch whenever the screen is focused so a new order/delivery update from
-  // the backend shows the moment the user opens (or returns to) this screen.
-  // `refresh` isn't referentially stable, so call it through a ref.
+  // Session-local offer action state (the notification payload can't reflect a
+  // later accept/decline, so we track what the user did while on this screen).
+  const [added, setAdded] = useState<Set<string>>(new Set());
+  const [rejected, setRejected] = useState<Set<string>>(new Set());
+  const [busyOffer, setBusyOffer] = useState<string | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<string | null>(null);
+  const [reason, setReason] = useState<SourcingOfferDeclineReason | null>(null);
+  const [rejectBusy, setRejectBusy] = useState(false);
+
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
   useFocusEffect(
@@ -169,8 +233,7 @@ export default function NotificationsScreen() {
     toastService.success('All marked read');
   };
 
-  // Mark read on open and, when the notification carries a deep link (offers →
-  // the offer detail screen), route there. A malformed path is ignored, never crashes.
+  // Regular (non-offer) notifications: mark read + follow a deep link if present.
   const openNotification = (n: NotificationItem) => {
     if (n.unread) markRead(n.id);
     if (n.deeplinkPath) {
@@ -181,6 +244,53 @@ export default function NotificationsScreen() {
       }
     }
   };
+
+  const addToCart = useCallback(
+    async (n: NotificationItem) => {
+      const offerId = n.offer?.offerId;
+      if (!offerId) return;
+      setBusyOffer(offerId);
+      try {
+        await acceptSourcingOffer(offerId);
+        await refreshCart();
+        setAdded((s) => new Set(s).add(offerId));
+        if (n.unread) markRead(n.id);
+        toastService.success('Добавлено в корзину');
+      } catch (err) {
+        if ((err as { status?: number })?.status === 409) {
+          setAdded((s) => new Set(s).add(offerId));
+          toastService.info('Уже в корзине');
+        } else {
+          toastService.danger('Не удалось добавить в корзину');
+        }
+      } finally {
+        setBusyOffer(null);
+      }
+    },
+    [refreshCart, markRead],
+  );
+
+  const openReject = (n: NotificationItem) => {
+    if (!n.offer?.offerId) return;
+    setReason(null);
+    setRejectTarget(n.offer.offerId);
+    if (n.unread) markRead(n.id);
+  };
+
+  const confirmReject = useCallback(async () => {
+    if (!rejectTarget || !reason) return;
+    setRejectBusy(true);
+    try {
+      await rejectSourcingOffer(rejectTarget, reason);
+      setRejected((s) => new Set(s).add(rejectTarget));
+      toastService.info('Предложение отклонено');
+      setRejectTarget(null);
+    } catch {
+      toastService.danger('Не удалось отклонить предложение');
+    } finally {
+      setRejectBusy(false);
+    }
+  }, [rejectTarget, reason]);
 
   return (
     <AppView flex={1} colorName="background">
@@ -230,10 +340,20 @@ export default function NotificationsScreen() {
           padding={0}
         >
           {notifications.map((n) => {
-            // Found-part offers render as a rich card (image/placeholder + price).
+            // Found-part offers act inline (add to cart / decline) — no navigation.
             if (n.type === 'sourcing_offer' || n.offer) {
+              const offerId = n.offer?.offerId ?? '';
               return (
-                <SourcingOfferCard key={n.id} n={n} tokens={tokens} onOpen={openNotification} />
+                <SourcingOfferCard
+                  key={n.id}
+                  n={n}
+                  tokens={tokens}
+                  added={added.has(offerId)}
+                  busy={busyOffer === offerId}
+                  rejected={rejected.has(offerId)}
+                  onAdd={() => addToCart(n)}
+                  onReject={() => openReject(n)}
+                />
               );
             }
             const dot = dotColor(n.tone);
@@ -253,12 +373,9 @@ export default function NotificationsScreen() {
                   borderBottomColor: tokens.divider,
                 }}
               >
-                {/* Leading colored dot */}
                 <AppView
                   style={{ width: 10, height: 10, borderRadius: 999, backgroundColor: dot, marginTop: 5, flexShrink: 0 }}
                 />
-
-                {/* Content */}
                 <AppView style={{ flex: 1 }}>
                   <AppView row justify="space-between" gap={8}>
                     <AppText family="accent" weight="bold" style={{ fontSize: 14.5, color: tokens.text }}>
@@ -268,7 +385,6 @@ export default function NotificationsScreen() {
                       {n.time}
                     </AppText>
                   </AppView>
-
                   <AppText
                     family="default"
                     style={{ fontSize: 13, color: tokens.textMuted, marginTop: 3, lineHeight: 18 }}
@@ -276,8 +392,6 @@ export default function NotificationsScreen() {
                     {n.body}
                   </AppText>
                 </AppView>
-
-                {/* Trailing unread dot */}
                 {n.unread ? (
                   <AppView
                     style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: tokens.brandBg, marginTop: 6, flexShrink: 0 }}
@@ -290,6 +404,68 @@ export default function NotificationsScreen() {
           })}
         </AppScrollView>
       )}
+
+      {/* Shared decline-reason sheet */}
+      <AppBottomSheet
+        visible={rejectTarget !== null}
+        onClose={() => setRejectTarget(null)}
+        heightFraction={0.52}
+        expandable={false}
+      >
+        <AppView style={{ paddingHorizontal: 20, paddingBottom: 28, gap: 8 }}>
+          <AppText family="heading" weight="bold" style={{ fontSize: 18, color: tokens.text, marginBottom: 6 }}>
+            Причина отказа
+          </AppText>
+          {REJECT_REASONS.map((r) => {
+            const active = reason === r.key;
+            return (
+              <AppPressableView
+                key={r.key}
+                onPress={() => setReason(r.key)}
+                pressedOpacity={0.7}
+                row
+                justify="space-between"
+                align="center"
+                style={{
+                  paddingVertical: 15,
+                  paddingHorizontal: 16,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: active ? tokens.brand : tokens.divider,
+                  backgroundColor: active ? tokens.brandBg : 'transparent',
+                }}
+              >
+                <AppText family="default" weight={active ? 'bold' : 'regular'} style={{ fontSize: 15, color: tokens.text }}>
+                  {r.label}
+                </AppText>
+                {active ? <Check size={18} color={tokens.brand} /> : null}
+              </AppPressableView>
+            );
+          })}
+
+          <AppPressableView
+            onPress={confirmReject}
+            disabled={!reason || rejectBusy}
+            pressedScale={0.97}
+            center
+            style={{
+              marginTop: 10,
+              height: 52,
+              borderRadius: 16,
+              backgroundColor: tokens.text,
+              opacity: !reason || rejectBusy ? 0.5 : 1,
+            }}
+          >
+            {rejectBusy ? (
+              <WheelLoader size={18} color={tokens.background} />
+            ) : (
+              <AppText family="accent" weight="bold" style={{ fontSize: 15.5, color: tokens.background }}>
+                Отклонить
+              </AppText>
+            )}
+          </AppPressableView>
+        </AppView>
+      </AppBottomSheet>
     </AppView>
   );
 }

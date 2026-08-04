@@ -389,7 +389,12 @@ export default function SourcingOfferScreen() {
       )}
 
       {/* Reject-reason sheet */}
-      <AppBottomSheet visible={rejectOpen} onClose={() => setRejectOpen(false)}>
+      <AppBottomSheet
+        visible={rejectOpen}
+        onClose={() => setRejectOpen(false)}
+        heightFraction={0.52}
+        expandable={false}
+      >
         <AppView style={{ paddingHorizontal: 20, paddingBottom: 28, gap: 8 }}>
           <AppText family="heading" weight="bold" style={{ fontSize: 17, color: tokens.text, marginBottom: 4 }}>
             Причина отказа
