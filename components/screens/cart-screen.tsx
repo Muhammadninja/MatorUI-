@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { AlertCircle, ShoppingBag, X } from 'lucide-react-native';
+import { AlertCircle, Package, ShoppingBag, X } from 'lucide-react-native';
 import { RefreshControl, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -136,7 +136,18 @@ export default function CartScreen() {
               style={{ opacity: pending ? 0.55 : 1 }}
             >
               <AppView style={{ width: 84 }}>
-                <ImageBox label={item.title} uri={item.imageUrl} height={84} radius={11} small />
+                {item.sourced && !item.imageUrl ? (
+                  // Sourced offer with no dealer photo → a clean icon tile, not
+                  // the misleading catalog stand-in image.
+                  <AppView
+                    center
+                    style={{ width: 84, height: 84, borderRadius: 11, backgroundColor: tokens.brandSoft }}
+                  >
+                    <Package size={30} strokeWidth={1.7} color={tokens.textMuted} />
+                  </AppView>
+                ) : (
+                  <ImageBox label={item.title} uri={item.imageUrl} height={84} radius={11} small />
+                )}
               </AppView>
               <AppView flex={1}>
                 <AppText family="default" weight="semibold" numberOfLines={2} style={{ fontSize: 14, lineHeight: 18, color: tokens.text }}>

@@ -212,6 +212,8 @@ export class HttpCartTransport implements CartTransport {
         i.price ??
         (i.price_uzs != null ? `UZS ${i.price_uzs.toLocaleString('ru-RU')}` : ''),
       imageUrl: i.imageUrl ?? undefined,
+      // No catalog part and no service behind it → a sourced-offer line.
+      sourced: !i.part_id && !i.service_id,
       quantity: i.quantity,
     };
   }

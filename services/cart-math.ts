@@ -20,6 +20,10 @@ export type CartItem = {
   /** Remote image URL for the product. When absent, surfaces fall back
    *  to a generic placeholder. */
   imageUrl?: string;
+  /** A sourced-offer line (no catalog part / service behind it). Drives a
+   *  clean icon placeholder instead of the catalog stand-in photo when the
+   *  dealer sent no image. */
+  sourced?: boolean;
   quantity: number;
 };
 
