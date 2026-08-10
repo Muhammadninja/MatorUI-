@@ -1,5 +1,7 @@
 import { ScrollView } from 'react-native';
 
+import { useTranslation } from 'react-i18next';
+
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
@@ -12,17 +14,18 @@ import { useThemeContext } from '@/contexts/theme.context';
  * on the account, so there is nothing to add or manage here.
  */
 export default function PaymentMethodsScreen() {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
 
   return (
     <AppView flex={1} colorName="background">
-      <AppSettingsHeader title="Payment methods" fallbackHref="/profile" />
+      <AppSettingsHeader title={t('paymentMethods.title')} fallbackHref="/profile" />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: 12, paddingBottom: 40, gap: 12, paddingHorizontal: 16 }}
       >
         <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted, marginBottom: 4 }}>
-          Choose how to pay when you place an order. No card is stored on your account.
+          {t('paymentMethods.intro')}
         </AppText>
 
         {PAYMENT_OPTIONS.map((opt) => {

@@ -1,10 +1,12 @@
 import { router, Stack } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { AppButton } from '@/components/shared/app-button';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 
 export default function ModalScreen() {
+  const { t } = useTranslation();
   return (
     <>
       <Stack.Screen
@@ -21,9 +23,9 @@ export default function ModalScreen() {
           Mator
         </AppText>
         <AppText textVariant="body" colorName="gray400">
-          Swipe down to dismiss.
+          {t('common.swipeToDismiss')}
         </AppText>
-        <AppButton title="Close" kind="secondary" onPress={() => router.back()} />
+        <AppButton title={t('common.close')} kind="secondary" onPress={() => router.back()} />
       </AppView>
     </>
   );

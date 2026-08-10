@@ -1,4 +1,5 @@
 import { SendHorizontal, Square } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 
 import AppTextField from '@/components/shared/app-text-field';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
@@ -26,6 +27,7 @@ export default function AiChatComposer({
   onStop,
 }: AiChatComposerProps) {
   const { tokens } = useThemeContext();
+  const { t } = useTranslation();
   const canSend = value.trim().length > 0 && !isSending;
   const handleRightPress = isSending
     ? onStop
@@ -37,8 +39,8 @@ export default function AiChatComposer({
     <AppView px={10} py={6} row align="center" gap="sm">
       <AppView flex={1}>
         <AppTextField
-          placeholder="Ask a parts question…"
-          accessibilityLabel="Message Mator AI"
+          placeholder={t('aiChat.composerPlaceholder')}
+          accessibilityLabel={t('aiChat.composerA11yLabel')}
           value={value}
           onChangeText={onChangeText}
           autoCapitalize="sentences"
@@ -63,7 +65,7 @@ export default function AiChatComposer({
         pressedOpacity={0.7}
         onPress={handleRightPress}
         accessibilityRole="button"
-        accessibilityLabel={isSending ? 'Stop generating' : 'Send message'}
+        accessibilityLabel={isSending ? t('aiChat.stopGenerating') : t('aiChat.sendMessage')}
         hitSlop={{ top: 3, bottom: 3, left: 3, right: 3 }}
         style={{
           width: 38,

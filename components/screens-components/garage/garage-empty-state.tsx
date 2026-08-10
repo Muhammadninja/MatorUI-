@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { CarFront } from 'lucide-react-native';
 
 import { RADIUS_PILL, RADIUS_SHEET } from '@/components/screens-components/search/radii';
@@ -11,6 +12,7 @@ export type GarageEmptyStateProps = {
 };
 
 export function GarageEmptyState({ onAddVehicle }: GarageEmptyStateProps) {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
 
   return (
@@ -41,15 +43,15 @@ export function GarageEmptyState({ onAddVehicle }: GarageEmptyStateProps) {
 
         <AppView gap={6} align="center">
           <AppText textVariant="title" family="heading" colorName="text" align="center">
-            No vehicles yet
+            {t('garage.emptyTitle')}
           </AppText>
           <AppText textVariant="bodySm" colorName="textMuted" align="center">
-            Add your first vehicle to unlock guaranteed-fit parts.
+            {t('garage.emptyBody')}
           </AppText>
         </AppView>
 
         <AppButton
-          title="Add vehicle"
+          title={t('garage.addVehicle')}
           kind="brand"
           size="lg"
           fullWidth

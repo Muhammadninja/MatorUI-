@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Check } from 'lucide-react-native';
 
 import { AppText } from '@/components/shared/app-text';
@@ -12,6 +13,7 @@ export type AddVehicleHeaderProps = {
 };
 
 export function AddVehicleHeader({ title, canSubmit, onBack, onSubmit }: AddVehicleHeaderProps) {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
 
   return (
@@ -22,7 +24,7 @@ export function AddVehicleHeader({ title, canSubmit, onBack, onSubmit }: AddVehi
             androidRipple={false}
             onPress={onBack}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            accessibilityLabel="Go back"
+            accessibilityLabel={t('addVehicle.goBack')}
           >
             <AppView row align="center">
               <ArrowLeft size={20} strokeWidth={2.2} color={tokens.text} />
@@ -46,7 +48,7 @@ export function AddVehicleHeader({ title, canSubmit, onBack, onSubmit }: AddVehi
             androidRipple={false}
             onPress={onSubmit}
             disabled={!canSubmit}
-            accessibilityLabel="Save"
+            accessibilityLabel={t('common.save')}
             style={{
               width: 36,
               height: 36,

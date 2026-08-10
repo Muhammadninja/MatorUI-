@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import BrandLogo from '@/components/screens-components/catalog/brand-logo';
 import { brandColor } from '@/components/screens-components/catalog/brand-meta';
@@ -24,13 +25,14 @@ export type VehicleMakeTileProps = {
  * the parent decides tap behavior (it does not navigate for coming-soon brands).
  */
 const VehicleMakeTile = ({ brandId, label, logoUrl, comingSoon, onPress }: VehicleMakeTileProps) => {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   return (
     <AppPressableView
       onPress={() => onPress(brandId)}
       androidRipple={false}
       accessibilityRole="button"
-      accessibilityLabel={comingSoon ? `${label} — coming soon` : `Shop ${label} vehicles`}
+      accessibilityLabel={comingSoon ? t('make.tileComingSoon', { label }) : t('make.tileShop', { label })}
       accessibilityState={{ disabled: !!comingSoon }}
       align="center"
       gap={8}
@@ -69,7 +71,7 @@ const VehicleMakeTile = ({ brandId, label, logoUrl, comingSoon, onPress }: Vehic
               weight="bold"
               style={{ fontSize: 9, color: tokens.background, letterSpacing: 0.3 }}
             >
-              SOON
+              {t('make.soon')}
             </AppText>
           </AppView>
         ) : null}

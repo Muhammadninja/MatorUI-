@@ -1,5 +1,6 @@
 import * as SplashScreen from 'expo-splash-screen';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   FadeIn,
@@ -38,6 +39,7 @@ const FADE_MS = 320;
  */
 export default function SplashOverlay({ onFinish }: { onFinish: () => void }) {
   const { tokens } = useThemeContext();
+  const { t } = useTranslation();
   const { isHydrated } = useLanguageContext();
   const [minElapsed, setMinElapsed] = useState(false);
   const opacity = useSharedValue(1);
@@ -83,7 +85,7 @@ export default function SplashOverlay({ onFinish }: { onFinish: () => void }) {
         style={{ flex: 1 }}
         onPress={skip}
         accessibilityRole="button"
-        accessibilityLabel="Skip"
+        accessibilityLabel={t('splash.skip')}
       >
         <AppView flex={1} colorName="background" center>
           <TreadBand color={tokens.textMuted} position="top" />
@@ -110,7 +112,7 @@ export default function SplashOverlay({ onFinish }: { onFinish: () => void }) {
               weight="semibold"
               style={{ fontSize: 11, letterSpacing: 3, color: tokens.textMuted }}
             >
-              AUTO PARTS MARKETPLACE
+              {t('splash.tagline')}
             </AppText>
           </AppView>
 

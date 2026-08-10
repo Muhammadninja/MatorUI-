@@ -1,5 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { AlertCircle, Check } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { ScrollView } from 'react-native';
 
 import { WheelLoader } from '@/components/shared/wheel-loader';
@@ -21,6 +22,7 @@ import { triggerHaptic } from '@/utils/haptics';
  * `OrderDetail`, whose `totalLabel` + line items populate the receipt.
  */
 export default function OrderConfirmationScreen() {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
 
@@ -56,14 +58,14 @@ export default function OrderConfirmationScreen() {
       <AppView flex={1} colorName="background" center px="xl" gap={12}>
         <AlertCircle size={32} strokeWidth={2} color={tokens.error} />
         <AppText family="heading" weight="bold" style={{ fontSize: 17, color: tokens.text }}>
-          Couldn&apos;t load your order
+          {t('orderConfirmation.loadErrorTitle')}
         </AppText>
         <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted, textAlign: 'center', maxWidth: 280 }}>
-          {error ?? 'This order could not be found.'}
+          {error ?? t('orderConfirmation.notFound')}
         </AppText>
         <AppView row gap={10}>
-          <AppButton title="Retry" kind="secondary" size="sm" onPress={refresh} />
-          <AppButton title="Continue shopping" kind="brand" size="sm" onPress={goShopping} />
+          <AppButton title={t('common.retry')} kind="secondary" size="sm" onPress={refresh} />
+          <AppButton title={t('orderConfirmation.continueShopping')} kind="brand" size="sm" onPress={goShopping} />
         </AppView>
       </AppView>
     );
@@ -95,7 +97,7 @@ export default function OrderConfirmationScreen() {
           weight="bold"
           style={{ fontSize: 26, lineHeight: 32, color: tokens.text, marginTop: 22, textAlign: 'center' }}
         >
-          Order placed
+          {t('orderConfirmation.orderPlaced')}
         </AppText>
 
         {/* Sub-copy */}
@@ -110,7 +112,7 @@ export default function OrderConfirmationScreen() {
             textAlign: 'center',
           }}
         >
-          Thanks! A confirmation has been sent to your email.
+          {t('orderConfirmation.subtitle')}
         </AppText>
 
         {/* Receipt card */}
@@ -138,7 +140,7 @@ export default function OrderConfirmationScreen() {
                   letterSpacing: 0.6,
                 }}
               >
-                Order number
+                {t('orderConfirmation.orderNumber')}
               </AppText>
               <AppText
                 family="mono"
@@ -160,7 +162,7 @@ export default function OrderConfirmationScreen() {
                   letterSpacing: 0.6,
                 }}
               >
-                Total
+                {t('orderConfirmation.total')}
               </AppText>
               <AppPrice value={order.totalLabel} size={16} color={tokens.text} />
             </AppView>
@@ -201,14 +203,14 @@ export default function OrderConfirmationScreen() {
         <AppView style={{ width: '100%', gap: 12, marginTop: 24 }}>
           <AppButton
             testID="confirmation-track-btn"
-            title="Track order"
+            title={t('orderConfirmation.trackOrder')}
             kind="brand"
             size="lg"
             fullWidth
             onPress={goTrackOrder}
           />
           <AppButton
-            title="Continue shopping"
+            title={t('orderConfirmation.continueShopping')}
             kind="secondary"
             variant="outline"
             size="lg"

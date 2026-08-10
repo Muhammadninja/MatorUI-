@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { Car, ChevronRight } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
@@ -15,6 +16,7 @@ import { triggerHaptic } from '@/utils/haptics';
  * empty garage), so we never show fabricated fitment.
  */
 export default function SearchFitBanner() {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const { currentActiveVehicle } = useActiveVehicle();
 
@@ -35,7 +37,7 @@ export default function SearchFitBanner() {
       <AppPressableView
         onPress={handlePress}
         accessibilityRole="button"
-        accessibilityLabel={`Showing fitment for ${label}. Change vehicle.`}
+        accessibilityLabel={t('search.fitmentBannerA11y', { vehicle: label })}
         androidRipple={false}
         pressedOpacity={0.9}
         row
@@ -59,7 +61,7 @@ export default function SearchFitBanner() {
             weight="semibold"
             style={{ fontSize: 10.5, letterSpacing: 0.7, color: `${tokens.onBrand}b0` }}
           >
-            SHOWING FITMENT FOR
+            {t('search.showingFitmentFor')}
           </AppText>
           <AppText
             textVariant="bodySemibold"

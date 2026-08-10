@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import SearchResultSkeleton from '@/components/screens-components/search/search-result-skeleton';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
@@ -15,6 +17,7 @@ export type ResultsLoadingProps = {
  *  only horizontal padding belongs to the "Searching for…" label,
  *  which sits inside the regular text gutter. */
 export default function ResultsLoading({ query }: ResultsLoadingProps) {
+  const { t } = useTranslation();
   return (
     <AppView gap={10}>
       <AppText
@@ -22,7 +25,7 @@ export default function ResultsLoading({ query }: ResultsLoadingProps) {
         colorName="gray400"
         style={{ paddingHorizontal: 16 }}
       >
-        Searching for “{query.trim()}”…
+        {t('search.searchingFor', { query: query.trim() })}
       </AppText>
       <AppView gap={16}>
         {Array.from({ length: SKELETON_ROWS }).map((_, i) => (

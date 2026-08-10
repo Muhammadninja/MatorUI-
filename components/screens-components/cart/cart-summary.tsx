@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Animated, Easing } from 'react-native';
 
 import { AppText } from '@/components/shared/app-text';
@@ -21,8 +22,9 @@ export default function CartSummary({
   freeShippingRemaining,
   formatCurrency,
 }: CartSummaryProps) {
+  const { t } = useTranslation();
   const { tokens, scheme } = useThemeContext();
-  const shippingLabel = totals.shipping > 0 ? formatCurrency(totals.shipping) : 'Free';
+  const shippingLabel = totals.shipping > 0 ? formatCurrency(totals.shipping) : t('cart.free');
   const showDiscount = totals.discount > 0;
 
   const progress =
@@ -54,16 +56,16 @@ export default function CartSummary({
       }}
     >
       <AppText textVariant="subtitle" family="accent">
-        Order summary
+        {t('cart.orderSummary')}
       </AppText>
 
       <AppView gap={6}>
         <AppView row align="center" justify="space-between">
           <AppText textVariant="bodyXs" weight="semibold">
-            {unlocked ? 'Free shipping unlocked' : 'Free shipping'}
+            {unlocked ? t('cart.freeShippingUnlocked') : t('cart.freeShipping')}
           </AppText>
           <AppText textVariant="bodyXs" colorName="gray400">
-            {unlocked ? 'On us' : `Add ${formatCurrency(freeShippingRemaining)} more`}
+            {unlocked ? t('cart.onUs') : t('cart.addMoreForFreeShipping', { amount: formatCurrency(freeShippingRemaining) })}
           </AppText>
         </AppView>
         <AppView
@@ -88,15 +90,15 @@ export default function CartSummary({
       <AppView style={{ height: 1, backgroundColor: tokens.divider }} />
 
       <AppView gap={6}>
-        <SummaryRow label="Subtotal" value={formatCurrency(totals.subtotal)} />
+        <SummaryRow label={t('cart.subtotal')} value={formatCurrency(totals.subtotal)} />
         {showDiscount ? (
           <SummaryRow
-            label={`Discount${appliedPromo ? ` (${appliedPromo.code})` : ''}`}
+            label={appliedPromo ? t('cart.discountWithCode', { code: appliedPromo.code }) : t('cart.discount')}
             value={`- ${formatCurrency(totals.discount)}`}
             accentColor={tokens.success}
           />
         ) : null}
-        <SummaryRow label="Shipping" value={shippingLabel} />
+        <SummaryRow label={t('cart.shipping')} value={shippingLabel} />
       </AppView>
     </AppView>
   );

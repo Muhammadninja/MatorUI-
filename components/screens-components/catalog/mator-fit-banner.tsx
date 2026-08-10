@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { Car, ChevronRight } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
@@ -15,6 +16,7 @@ import { MATOR_VEHICLES } from '@/mocks/mator-catalog';
  * the Garage tab.
  */
 export default function MatorFitBanner() {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const { currentActiveVehicle } = useActiveVehicle();
   const active = currentActiveVehicle?.vehicle;
@@ -27,7 +29,7 @@ export default function MatorFitBanner() {
     <AppPressableView
       onPress={() => router.navigate('/garage')}
       accessibilityRole="button"
-      accessibilityLabel={`Showing fitment for ${label}. Change vehicle.`}
+      accessibilityLabel={t('catalog.fitBannerAccessibility', { label })}
       androidRipple={false}
       pressedOpacity={0.9}
       row
@@ -47,7 +49,7 @@ export default function MatorFitBanner() {
           weight="medium"
           style={{ fontSize: 10, letterSpacing: 0.8, textTransform: 'uppercase', color: tokens.onBrand, opacity: 0.7 }}
         >
-          Showing fitment for
+          {t('catalog.showingFitmentFor')}
         </AppText>
         <AppText family="accent" weight="bold" style={{ fontSize: 14, color: tokens.onBrand }}>
           {label}

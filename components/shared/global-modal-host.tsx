@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     ActivityIndicator,
     Animated,
@@ -86,10 +87,12 @@ function isAuthRequiredPayload(payload?: ModalPayload): payload is AuthRequiredP
   return Boolean(payload && typeof payload === 'object');
 }
 
-const INSTALLMENT_OPTIONS = [
-  { label: 'No installment', value: false },
-  { label: 'Setup installment', value: true },
-] as const;
+function buildInstallmentOptions(t: (key: string) => string) {
+  return [
+    { label: t('modalHost.noInstallment'), value: false },
+    { label: t('modalHost.setupInstallment'), value: true },
+  ] as const;
+}
 
 function isConfirmModalPayload(payload?: ModalPayload): payload is ConfirmModalPayload {
   return Boolean(payload && typeof payload === 'object');
@@ -100,6 +103,7 @@ function isCheckoutSheetPayload(payload?: ModalPayload): payload is CheckoutShee
 }
 
 export default function GlobalModalHost() {
+  const { t } = useTranslation();
   const { scheme, tokens } = useThemeContext();
   const [activeModal, setActiveModal] = useState<GlobalModalState>(null);
   const [checkoutValues, setCheckoutValues] = useState<CheckoutSheetValues>({
@@ -133,10 +137,10 @@ export default function GlobalModalHost() {
 
   if (activeModal.name === 'confirmAction' && isConfirmModalPayload(activeModal.payload)) {
     const {
-      title = 'Confirm action',
-      message = 'Are you sure you want to continue?',
-      confirmLabel = 'Continue',
-      cancelLabel = 'Cancel',
+      title = t('modalHost.confirmAction'),
+      message = t('modalHost.confirmActionMessage'),
+      confirmLabel = t('modalHost.continue'),
+      cancelLabel = t('common.cancel'),
       onConfirm,
       onCancel,
     } = activeModal.payload;
@@ -230,10 +234,10 @@ export default function GlobalModalHost() {
             </AppView>
             <AppView gap={4}>
               <AppText textVariant="title" family="heading" weight="bold">
-                Privacy & Security
+                {t('modalHost.privacySecurity')}
               </AppText>
               <AppText textVariant="bodySm" colorName="gray400">
-                Manage your data, consent, and account security preferences.
+                {t('modalHost.privacySecuritySubtitle')}
               </AppText>
             </AppView>
             <AppView
@@ -245,9 +249,9 @@ export default function GlobalModalHost() {
               }}
             >
               {[
-                { label: 'Data & Personalization', subtitle: 'Control how your data is used' },
-                { label: 'Connected Apps', subtitle: 'Manage third-party access' },
-                { label: 'Delete Account', subtitle: 'Permanently remove your data', danger: true },
+                { label: t('modalHost.dataPersonalization'), subtitle: t('modalHost.dataPersonalizationSub') },
+                { label: t('modalHost.connectedApps'), subtitle: t('modalHost.connectedAppsSub') },
+                { label: t('modalHost.deleteAccount'), subtitle: t('modalHost.deleteAccountSub'), danger: true },
               ].map((item, i, arr) => (
                 <AppView
                   key={item.label}
@@ -272,7 +276,7 @@ export default function GlobalModalHost() {
               ))}
             </AppView>
             <AppButton
-              title="Close"
+              title={t('common.close')}
               kind="secondary"
               variant="outline"
               size="sm"
@@ -300,14 +304,16 @@ export default function GlobalModalHost() {
   }
 
   const {
-    title = 'Checkout details',
-    description = 'Add contact details, choose location delivery, decide on installment, and select a payment method.',
-    confirmLabel = 'Continue to payment',
-    cancelLabel = 'Cancel',
+    title = t('modalHost.checkoutDetails'),
+    description = t('modalHost.checkoutDescription'),
+    confirmLabel = t('modalHost.continueToPayment'),
+    cancelLabel = t('common.cancel'),
     paymentMethods = ['Card', 'Cash on delivery', 'Bank transfer'],
     onSubmit,
     onCancel,
   } = activeModal.payload;
+
+  const installmentOptions = buildInstallmentOptions(t);
 
   const handleSheetClose = () => {
     onCancel?.();
@@ -356,8 +362,8 @@ export default function GlobalModalHost() {
 
           <AppKeyboardController showToolbar={false} offset={120} horizontalPadding={0}>
             <AppTextField
-              label="Full name"
-              placeholder="Enter recipient name"
+              label={t('modalHost.fullName')}
+              placeholder={t('modalHost.enterRecipientName')}
               value={checkoutValues.fullName}
               onChangeText={(value) =>
                 setCheckoutValues((current) => ({ ...current, fullName: value }))
@@ -366,8 +372,8 @@ export default function GlobalModalHost() {
               containerBorderName="border"
             />
             <AppTextField
-              label="Phone number"
-              placeholder="Enter contact number"
+              label={t('modalHost.phoneNumber')}
+              placeholder={t('modalHost.enterContactNumber')}
               value={checkoutValues.phoneNumber}
               onChangeText={(value) =>
                 setCheckoutValues((current) => ({ ...current, phoneNumber: value }))
@@ -387,15 +393,15 @@ export default function GlobalModalHost() {
               }}
             >
               <AppText textVariant="bodySm" weight="semibold">
-                Delivery location
+                {t('modalHost.deliveryLocation')}
               </AppText>
               <AppText textVariant="bodySm" colorName="gray400">
-                Delivery address will be requested from the user location picker in the next step.
+                {t('modalHost.deliveryLocationHint')}
               </AppText>
             </AppView>
             <AppTextField
-              label="Address note"
-              placeholder="Landmark or delivery note"
+              label={t('modalHost.addressNote')}
+              placeholder={t('modalHost.addressNotePlaceholder')}
               value={checkoutValues.addressNote}
               onChangeText={(value) =>
                 setCheckoutValues((current) => ({ ...current, addressNote: value }))
@@ -406,10 +412,10 @@ export default function GlobalModalHost() {
 
             <AppView gap={8}>
               <AppText textVariant="bodySm" weight="semibold">
-                Installment
+                {t('modalHost.installment')}
               </AppText>
               <AppView row gap={8} style={{ flexWrap: 'wrap' }}>
-                {INSTALLMENT_OPTIONS.map((option) => {
+                {installmentOptions.map((option) => {
                   const isSelected = checkoutValues.wantsInstallment === option.value;
 
                   return (
@@ -437,7 +443,7 @@ export default function GlobalModalHost() {
 
             <AppView gap={8}>
               <AppText textVariant="bodySm" weight="semibold">
-                Payment method
+                {t('modalHost.paymentMethod')}
               </AppText>
               <AppView row gap={8} style={{ flexWrap: 'wrap' }}>
                 {paymentMethods.map((method) => {
@@ -465,7 +471,7 @@ export default function GlobalModalHost() {
 
           <AppView row gap={10}>
             <AppButton
-              title="Close"
+              title={t('common.close')}
               kind="secondary"
               variant="outline"
               size="sm"
@@ -492,12 +498,13 @@ export default function GlobalModalHost() {
 // ── Auth-required modal ────────────────────────────────────────────────────
 
 function AuthRequiredModal({ payload }: { payload: AuthRequiredPayload }) {
+  const { t } = useTranslation();
   const { tokens, scheme } = useThemeContext();
   const isDark = scheme === 'dark';
 
   const {
-    title = 'Sign in to continue',
-    message = 'Log in or sign up with your phone before you can place an order. Your cart will stay saved.',
+    title = t('modalHost.signInToContinue'),
+    message = t('modalHost.signInMessage'),
     onCancel,
     redirectTo,
   } = payload;
@@ -585,14 +592,14 @@ function AuthRequiredModal({ payload }: { payload: AuthRequiredPayload }) {
 
             <AppView gap={10} style={{ width: '100%' }}>
               <AppButton
-                title="Continue with phone"
+                title={t('modalHost.continueWithPhone')}
                 kind="brand"
                 size="md"
                 fullWidth
                 onPress={handleContinue}
               />
               <AppButton
-                title="Not now"
+                title={t('modalHost.notNow')}
                 kind="text"
                 variant="ghost"
                 size="sm"
@@ -623,6 +630,7 @@ function vehicleToContext(v: Vehicle): AiChatVehicleContext {
 }
 
 function CarSelectionModal({ payload }: { payload: CarSelectionPayload }) {
+  const { t } = useTranslation();
   const { tokens, scheme } = useThemeContext();
   const { vehicles, state, primaryVehicle } = useGarage();
   const isDark = scheme === 'dark';
@@ -771,10 +779,10 @@ function CarSelectionModal({ payload }: { payload: CarSelectionPayload }) {
               </AppView>
               <AppView gap={2}>
                 <AppText textVariant="bodySemibold" weight="bold">
-                  Pick a vehicle
+                  {t('modalHost.pickAVehicle')}
                 </AppText>
                 <AppText textVariant="bodyXs" colorName="gray400">
-                  Answers below will use this context
+                  {t('modalHost.answersUseContext')}
                 </AppText>
               </AppView>
             </AppView>
@@ -783,7 +791,7 @@ function CarSelectionModal({ payload }: { payload: CarSelectionPayload }) {
               rounded={999}
               onPress={handleClose}
               accessibilityRole="button"
-              accessibilityLabel="Close"
+              accessibilityLabel={t('common.close')}
               style={{
                 width: 32,
                 height: 32,
@@ -827,7 +835,7 @@ function CarSelectionModal({ payload }: { payload: CarSelectionPayload }) {
                 <Car size={20} strokeWidth={2} color={tokens.gray400} />
               </AppView>
               <AppText textVariant="bodySemibold" align="center">
-                No cars found in your list
+                {t('modalHost.noCarsFound')}
               </AppText>
               <AppText
                 textVariant="bodyXs"
@@ -835,7 +843,7 @@ function CarSelectionModal({ payload }: { payload: CarSelectionPayload }) {
                 align="center"
                 style={{ maxWidth: 280 }}
               >
-                Add a vehicle from your Garage to get fitment-aware answers here.
+                {t('modalHost.noCarsFoundHint')}
               </AppText>
             </AppView>
           ) : (
@@ -847,7 +855,7 @@ function CarSelectionModal({ payload }: { payload: CarSelectionPayload }) {
                     key={v.id}
                     onPress={() => handleSelect(v)}
                     accessibilityRole="button"
-                    accessibilityLabel={`Select ${vehicleLabel(v)}`}
+                    accessibilityLabel={t('modalHost.selectVehicle', { vehicle: vehicleLabel(v) })}
                     style={({ pressed }) => ({
                       borderRadius: 14,
                       paddingHorizontal: 14,
@@ -883,7 +891,7 @@ function CarSelectionModal({ payload }: { payload: CarSelectionPayload }) {
                       </AppText>
                       {v.nickname || v.isPrimary ? (
                         <AppText textVariant="bodyXs" colorName="gray400" numberOfLines={1}>
-                          {v.isPrimary ? 'Primary' : v.nickname}
+                          {v.isPrimary ? t('modalHost.primary') : v.nickname}
                           {v.isPrimary && v.nickname ? ` · ${v.nickname}` : ''}
                         </AppText>
                       ) : null}

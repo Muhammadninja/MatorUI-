@@ -1,5 +1,6 @@
 import { AlertTriangle } from 'lucide-react-native';
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { AppButton } from '@/components/shared/app-button';
 import { AppText } from '@/components/shared/app-text';
@@ -65,6 +66,7 @@ function DefaultFallback({
   retry: () => void;
   label: string;
 }) {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
 
   return (
@@ -78,13 +80,13 @@ function DefaultFallback({
       </AppView>
       <AppView gap="sm" align="center">
         <AppText textVariant="bodySemibold" weight="semibold" align="center">
-          Something went wrong with {label}
+          {t('errorBoundary.somethingWrong', { label })}
         </AppText>
         <AppText textVariant="bodySm" colorName="gray400" align="center">
-          {__DEV__ ? error.message : 'Please try again.'}
+          {__DEV__ ? error.message : t('errorBoundary.pleaseTryAgain')}
         </AppText>
       </AppView>
-      <AppButton title="Try again" onPress={retry} kind="brand" size="md" />
+      <AppButton title={t('common.tryAgain')} onPress={retry} kind="brand" size="md" />
     </AppView>
   );
 }

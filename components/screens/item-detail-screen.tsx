@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { AlertCircle, ArrowLeft, Heart } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -35,6 +36,7 @@ import { triggerHaptic } from '@/utils/haptics';
  * carry (rating, was-price, reviews, related) are omitted rather than faked.
  */
 export default function ItemDetailScreen() {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
@@ -73,14 +75,14 @@ export default function ItemDetailScreen() {
       <AppView flex={1} colorName="background" center px="xl" gap={12} style={{ paddingTop: insets.top }}>
         <AlertCircle size={32} strokeWidth={2} color={tokens.error} />
         <AppText family="heading" weight="bold" style={{ fontSize: 18, color: tokens.text }}>
-          {state === 'not_found' ? 'Product not found' : "Couldn't load product"}
+          {state === 'not_found' ? t('itemDetail.notFoundTitle') : t('itemDetail.loadErrorTitle')}
         </AppText>
         <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted, textAlign: 'center', maxWidth: 280 }}>
-          {error ?? 'This item may no longer be available.'}
+          {error ?? t('itemDetail.unavailableBody')}
         </AppText>
         <AppView row gap={10}>
-          <AppButton title="Go back" kind="secondary" size="sm" onPress={() => router.back()} />
-          {state === 'error' ? <AppButton title="Retry" kind="brand" size="sm" onPress={refresh} /> : null}
+          <AppButton title={t('itemDetail.goBack')} kind="secondary" size="sm" onPress={() => router.back()} />
+          {state === 'error' ? <AppButton title={t('common.retry')} kind="brand" size="sm" onPress={refresh} /> : null}
         </AppView>
       </AppView>
     );
@@ -91,7 +93,7 @@ export default function ItemDetailScreen() {
 
   const toggleFavorite = () => {
     const nowFav = toggleLike(item.id);
-    toast.info(nowFav ? 'Saved to favorites' : 'Removed from favorites');
+    toast.info(nowFav ? t('itemDetail.savedToFavorites') : t('itemDetail.removedFromFavorites'));
   };
 
   // Actually add the real catalog item `qty` times (one unit per `addItem`)
@@ -124,13 +126,13 @@ export default function ItemDetailScreen() {
       triggerHaptic('warning');
       const name = activeVehicle
         ? `${activeVehicle.year} ${activeVehicle.make} ${activeVehicle.model}`.trim()
-        : 'выбранным авто';
+        : t('itemDetail.selectedVehicleFallback');
       Alert.alert(
-        'Деталь не подходит',
-        `Эта запчасть не совместима с ${name}. Вы уверены, что хотите добавить её в заказ?`,
+        t('itemDetail.notCompatibleTitle'),
+        t('itemDetail.notCompatibleBody', { name }),
         [
-          { text: 'Отмена', style: 'cancel' },
-          { text: 'Всё равно добавить', style: 'destructive', onPress: commitAddToCart },
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('itemDetail.addAnyway'), style: 'destructive', onPress: commitAddToCart },
         ],
       );
       return;
@@ -150,7 +152,7 @@ export default function ItemDetailScreen() {
             borderWidth={1}
             borderName="border"
             accessibilityRole="button"
-            accessibilityLabel="Back"
+            accessibilityLabel={t('itemDetail.back')}
             style={{ width: 40, height: 40 }}
           >
             <ArrowLeft size={22} strokeWidth={2.2} color={tokens.text} />
@@ -162,7 +164,7 @@ export default function ItemDetailScreen() {
             borderWidth={1}
             borderName="border"
             accessibilityRole="button"
-            accessibilityLabel={isFavorite ? 'Remove from favorites' : 'Save to favorites'}
+            accessibilityLabel={isFavorite ? t('itemDetail.removeFromFavorites') : t('itemDetail.saveToFavorites')}
             style={{ width: 40, height: 40 }}
           >
             <Heart
@@ -180,7 +182,7 @@ export default function ItemDetailScreen() {
             onPress={() => image && setViewerOpen(true)}
             androidRipple={false}
             accessibilityRole="imagebutton"
-            accessibilityLabel={`View ${item.title} full screen`}
+            accessibilityLabel={t('itemDetail.viewFullScreen', { title: item.title })}
           >
             {/* `contain` on a white tile shows the whole part (no cropping),
                 since catalog photos are shot on white and vary in shape. */}
@@ -252,7 +254,7 @@ export default function ItemDetailScreen() {
 
           {/* Quantity */}
           <AppText family="heading" weight="bold" style={{ fontSize: 16, color: tokens.text, marginTop: 4 }}>
-            Quantity
+            {t('itemDetail.quantity')}
           </AppText>
           <AppView row align="center" gap={18}>
             <AppQtyStepper value={qty} onIncrement={() => setQty((q) => q + 1)} onDecrement={() => setQty((q) => Math.max(1, q - 1))} size="md" />
@@ -288,11 +290,11 @@ export default function ItemDetailScreen() {
         style={{ paddingTop: 14, paddingBottom: Math.max(insets.bottom, 16), borderTopWidth: 1, borderTopColor: tokens.divider }}
       >
         <AppView>
-          <AppText family="default" style={{ fontSize: 11, color: tokens.textMuted }}>Total</AppText>
+          <AppText family="default" style={{ fontSize: 11, color: tokens.textMuted }}>{t('itemDetail.total')}</AppText>
           <AppPrice value={formatCurrency(parsePrice(item.price) * qty)} size={20} color={tokens.text} />
         </AppView>
         <AppView flex={1}>
-          <AppButton testID="add-to-cart-btn" title="Add to cart" kind="brand" size="lg" fullWidth onPress={addToCart} />
+          <AppButton testID="add-to-cart-btn" title={t('itemDetail.addToCart')} kind="brand" size="lg" fullWidth onPress={addToCart} />
         </AppView>
       </AppView>
 
@@ -302,7 +304,7 @@ export default function ItemDetailScreen() {
         images={item.images.map((uri) => ({ uri }))}
         onClose={() => setViewerOpen(false)}
         renderCaption={(i) =>
-          item.images.length > 1 ? `${i + 1} of ${item.images.length}` : null
+          item.images.length > 1 ? t('itemDetail.imageCounter', { current: i + 1, total: item.images.length }) : null
         }
       />
     </AppView>
@@ -323,6 +325,7 @@ function FitBadge({
   subtitle: string | null;
   onShowAlternatives: () => void;
 }) {
+  const { t } = useTranslation();
   const colorFor = (c: CompatibilityColor) =>
     c === 'green' ? tokens.success : c === 'red' ? tokens.error : tokens.warning;
   const accent = colorFor(result.badge.color);
@@ -349,7 +352,7 @@ function FitBadge({
       </AppView>
       {result.status === 'NOT_COMPATIBLE' ? (
         <AppButton
-          title="Показать подходящие аналоги"
+          title={t('itemDetail.showAlternatives')}
           kind="secondary"
           size="sm"
           fullWidth
@@ -364,6 +367,7 @@ function FitBadge({
 // mirrors the green FitBadge chrome so the two read as one family. Kept inline
 // to avoid a new shared file.
 function UniversalFitBadge({ tokens }: { tokens: ThemeTokens }) {
+  const { t } = useTranslation();
   return (
     <AppView row align="center" gap={10} rounded={14} p={14} colorName="backgroundSecondary" borderWidth={1} borderName="border">
       <AppView center rounded={999} style={{ width: 22, height: 22, backgroundColor: tokens.success }}>
@@ -373,10 +377,10 @@ function UniversalFitBadge({ tokens }: { tokens: ThemeTokens }) {
       </AppView>
       <AppView flex={1}>
         <AppText family="accent" weight="bold" style={{ fontSize: 14, color: tokens.text }}>
-          Подходит для всех
+          {t('itemDetail.universalFitTitle')}
         </AppText>
         <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted }}>
-          Универсальный товар — совместимость проверять не нужно
+          {t('itemDetail.universalFitSubtitle')}
         </AppText>
       </AppView>
     </AppView>

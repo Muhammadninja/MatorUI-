@@ -1,5 +1,6 @@
 import { CheckCircle2, X } from 'lucide-react-native';
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Animated, Dimensions, Modal, Pressable, View } from 'react-native';
 
 import { AppText } from '@/components/shared/app-text';
@@ -26,6 +27,7 @@ export type LanguagePickerSheetProps = {
  */
 export default function LanguagePickerSheet({ visible, onClose }: LanguagePickerSheetProps) {
   const { tokens, scheme } = useThemeContext();
+  const { t } = useTranslation();
   const { language, setLanguage } = useLanguageContext();
   const isDark = scheme === 'dark';
 
@@ -44,12 +46,6 @@ export default function LanguagePickerSheet({ visible, onClose }: LanguagePicker
     }
   }, [visible, translateY]);
 
-  const titles = {
-    en: 'Choose your language',
-    ru: 'Выберите язык',
-    uz: 'Tilni tanlang',
-  } as const;
-
   const handlePick = async (code: LanguageCode) => {
     triggerHaptic('selection');
     await setLanguage(code);
@@ -64,7 +60,7 @@ export default function LanguagePickerSheet({ visible, onClose }: LanguagePicker
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={handleClose}>
       <AppView flex={1} justify="flex-end" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}>
-        <AppPressableView style={{ flex: 1 }} onPress={handleClose} accessibilityLabel="Dismiss" />
+        <AppPressableView style={{ flex: 1 }} onPress={handleClose} accessibilityLabel={t('languageSheet.dismiss')} />
         <Animated.View style={{ width: '100%', transform: [{ translateY }] }}>
         <AppView
           roundedTop={28}
@@ -87,12 +83,12 @@ export default function LanguagePickerSheet({ visible, onClose }: LanguagePicker
           {/* Header row: title + close */}
           <AppView row align="center" justify="space-between" px={20} pb={8}>
             <AppText textVariant="bodySemibold" family="heading" weight="bold">
-              {titles[language]}
+              {t('languageSheet.title')}
             </AppText>
             <Pressable
               onPress={handleClose}
               accessibilityRole="button"
-              accessibilityLabel="Close"
+              accessibilityLabel={t('common.close')}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={({ pressed }) => ({
                 width: 32,

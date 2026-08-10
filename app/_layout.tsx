@@ -17,6 +17,10 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+// Eagerly initialize i18next at the app entry, before any screen renders, so
+// `useTranslation()` always has resources bound (never renders raw keys).
+import '@/services/i18n';
+
 // Android Fast Refresh / activity-lifecycle races can bubble bare
 // `java.lang.reflect.InvocationTargetException` text through the JS log bridge
 // (expo-modules-core's NativeJSLogger). They're dev-only noise — no inner

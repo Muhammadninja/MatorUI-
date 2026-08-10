@@ -1,3 +1,6 @@
+import React from 'react';
+import { useTranslation } from 'react-i18next';
+
 import { UZ_BRANDS, getModelsForBrand } from '@/services/uz-vehicle-catalog';
 import AppTextField from '@/components/shared/app-text-field';
 import { AppView } from '@/components/shared/app-view';
@@ -38,39 +41,42 @@ const PLACEHOLDER_MODEL =
   getModelsForBrand(UZ_BRANDS.find((b) => b.tier === 'uz_top')?.id ?? 'chevrolet')[0]?.label ??
   'Cobalt';
 
-const SCHEMA: FieldRow[] = [
-  [
-    { key: 'year', label: 'Year', placeholder: '2024', flex: 1, required: true },
+/** Build the field schema with translated labels/placeholders. `t` comes from
+ *  the caller so the copy re-resolves when the language changes. */
+function buildSchema(t: (key: string) => string): FieldRow[] {
+  return [
+    [
+      { key: 'year', label: t('addVehicle.fieldYear'), placeholder: '2024', flex: 1, required: true },
+      {
+        key: 'make',
+        label: t('addVehicle.fieldMake'),
+        placeholder: PLACEHOLDER_BRAND,
+        autoCapitalize: 'words',
+        flex: 2,
+        required: true,
+      },
+    ],
     {
-      key: 'make',
-      label: 'Make',
-      placeholder: PLACEHOLDER_BRAND,
+      key: 'model',
+      label: t('addVehicle.fieldModel'),
+      placeholder: PLACEHOLDER_MODEL,
       autoCapitalize: 'words',
-      flex: 2,
       required: true,
     },
-  ],
-  {
-    key: 'model',
-    label: 'Model',
-    placeholder: PLACEHOLDER_MODEL,
-    autoCapitalize: 'words',
-    required: true,
-  },
-  [
-    { key: 'trim', label: 'Trim', placeholder: 'Premier', autoCapitalize: 'words', flex: 1 },
-    { key: 'nickname', label: 'Nickname', placeholder: 'Daily driver', flex: 1 },
-  ],
-  { key: 'mileage', label: 'Mileage', placeholder: '52,840' },
-  { key: 'plate', label: 'Plate', placeholder: '01A123BC', autoCapitalize: 'characters' },
-  // VIN is entered manually in this form field.
-  { key: 'vin', label: 'VIN', placeholder: '17-character VIN', autoCapitalize: 'characters' },
-];
+    [
+      { key: 'trim', label: t('addVehicle.fieldTrim'), placeholder: 'Premier', autoCapitalize: 'words', flex: 1 },
+      { key: 'nickname', label: t('addVehicle.fieldNickname'), placeholder: t('addVehicle.nicknamePlaceholder'), flex: 1 },
+    ],
+    { key: 'mileage', label: t('addVehicle.fieldMileage'), placeholder: '52,840' },
+    { key: 'plate', label: t('addVehicle.fieldPlate'), placeholder: '01A123BC', autoCapitalize: 'characters' },
+    // VIN is entered manually in this form field.
+    { key: 'vin', label: t('addVehicle.fieldVin'), placeholder: t('addVehicle.vinPlaceholder'), autoCapitalize: 'characters' },
+  ];
+}
 
-/** Exposed so the wizard can know which keys are required without duplicating the schema. */
-export const REQUIRED_FIELD_KEYS: VehicleFieldKey[] = SCHEMA.flatMap((row) =>
-  Array.isArray(row) ? row.filter((c) => c.required).map((c) => c.key) : row.required ? [row.key] : [],
-);
+/** Exposed so the wizard can know which keys are required without duplicating the
+ *  schema. Keys-only, so it needs no translation and stays a module constant. */
+export const REQUIRED_FIELD_KEYS: VehicleFieldKey[] = ['year', 'make', 'model'];
 
 const FIELD_CHROME = {
   containerRounded: 16,
@@ -104,7 +110,9 @@ function filterSchema(schema: FieldRow[], only?: VehicleFieldKey[]): FieldRow[] 
 }
 
 export function AddVehicleFields({ values, onChange, errors, only, mt }: AddVehicleFieldsProps) {
-  const rows = filterSchema(SCHEMA, only);
+  const { t } = useTranslation();
+  const schema = React.useMemo(() => buildSchema(t), [t]);
+  const rows = filterSchema(schema, only);
 
   return (
     <AppView gap="lg" mt={mt}>

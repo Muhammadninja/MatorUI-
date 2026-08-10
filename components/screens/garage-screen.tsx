@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { AlertCircle } from 'lucide-react-native';
 import { RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -31,6 +32,7 @@ import useGarage from '@/hooks/use-garage';
  * lives on that detail screen rather than inline on the cards.
  */
 export default function GarageScreen() {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
   const { isAuthenticated } = useUserContext();
@@ -59,7 +61,7 @@ export default function GarageScreen() {
           colorName="textMuted"
           style={{ fontSize: 13.5, paddingHorizontal: 20, paddingBottom: 4 }}
         >
-          Set an active vehicle to filter every part by exact fit.
+          {t('garage.subtitle')}
         </AppText>
       </AppView>
 
@@ -78,16 +80,16 @@ export default function GarageScreen() {
           <AlertCircle size={34} strokeWidth={2} color={tokens.error} />
           <AppView gap={4} align="center">
             <AppText family="heading" weight="bold" style={{ fontSize: 17, color: tokens.text }}>
-              Couldn&apos;t load your garage
+              {t('garage.errorTitle')}
             </AppText>
             <AppText
               family="default"
               style={{ fontSize: 13, color: tokens.textMuted, textAlign: 'center', maxWidth: 280 }}
             >
-              {error ?? 'Something went wrong. Please try again.'}
+              {error ?? t('garage.errorGeneric')}
             </AppText>
           </AppView>
-          <AppButton title="Retry" kind="secondary" size="sm" onPress={refresh} />
+          <AppButton title={t('common.retry')} kind="secondary" size="sm" onPress={refresh} />
         </AppView>
       ) : state === 'empty' ? (
         <GarageEmptyState onAddVehicle={openAdd} />
@@ -130,7 +132,7 @@ export default function GarageScreen() {
                 transform="uppercase"
                 style={{ fontSize: 11, letterSpacing: 0.8, marginTop: 4 }}
               >
-                Also in the garage
+                {t('garage.alsoInGarage')}
               </AppText>
               {secondaryVehicles.map((v) => (
                 <GarageVehicleTile

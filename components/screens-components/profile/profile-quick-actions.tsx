@@ -1,48 +1,54 @@
 import { CreditCard, Headphones, Package, Repeat2 } from 'lucide-react-native';
+import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import { triggerHaptic } from '@/utils/haptics';
 
-const QUICK_ACTIONS = [
-  {
-    key: 'orders',
-    title: 'Your Orders',
-    subtitle: 'Track active deliveries and recent purchases',
-    Icon: Package,
-  },
-  {
-    key: 'buy-again',
-    title: 'Buy Again',
-    subtitle: 'Reorder filters, oils, and essentials in one tap',
-    Icon: Repeat2,
-  },
-  {
-    key: 'payments',
-    title: 'Wallet',
-    subtitle: 'Cards, COD preferences, and billing methods',
-    Icon: CreditCard,
-  },
-  {
-    key: 'support',
-    title: 'Support',
-    subtitle: 'Warranty, returns, and order assistance',
-    Icon: Headphones,
-  },
-] as const;
+function buildQuickActions(t: (key: string) => string) {
+  return [
+    {
+      key: 'orders',
+      title: t('profileCards.quickOrdersTitle'),
+      subtitle: t('profileCards.quickOrdersSub'),
+      Icon: Package,
+    },
+    {
+      key: 'buy-again',
+      title: t('profileCards.quickBuyAgainTitle'),
+      subtitle: t('profileCards.quickBuyAgainSub'),
+      Icon: Repeat2,
+    },
+    {
+      key: 'payments',
+      title: t('profileCards.quickWalletTitle'),
+      subtitle: t('profileCards.quickWalletSub'),
+      Icon: CreditCard,
+    },
+    {
+      key: 'support',
+      title: t('profileCards.quickSupportTitle'),
+      subtitle: t('profileCards.quickSupportSub'),
+      Icon: Headphones,
+    },
+  ] as const;
+}
 
 export default function ProfileQuickActions() {
   const { tokens } = useThemeContext();
+  const { t } = useTranslation();
+  const quickActions = React.useMemo(() => buildQuickActions(t), [t]);
 
   return (
     <AppView gap={10}>
       <AppText textVariant="subtitle" family="accent" colorName="text">
-        Shortcuts
+        {t('profileCards.shortcuts')}
       </AppText>
 
       <AppView row gap={10} style={{ flexWrap: 'wrap' }}>
-        {QUICK_ACTIONS.map(({ key, title, subtitle, Icon }) => (
+        {quickActions.map(({ key, title, subtitle, Icon }) => (
           <AppPressableView
             key={key}
             rounded={24}

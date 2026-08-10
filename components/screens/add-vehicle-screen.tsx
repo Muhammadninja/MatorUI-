@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { Sparkles } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
@@ -22,6 +23,7 @@ import { triggerHaptic } from '@/utils/haptics';
  * camera / scanner.
  */
 export default function AddVehicleScreen() {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
   const { addVehicle, isMutating } = useGarage();
@@ -45,8 +47,8 @@ export default function AddVehicleScreen() {
   const handleSave = useCallback(async () => {
     if (!decoded || !canSave) {
       triggerHaptic('warning');
-      toastService.info('Decode a VIN first', {
-        description: 'Enter a 17-character VIN to identify the vehicle.',
+      toastService.info(t('addVehicle.decodeFirstToast'), {
+        description: t('addVehicle.decodeFirstToastDesc'),
       });
       return;
     }
@@ -65,20 +67,20 @@ export default function AddVehicleScreen() {
         color: 'midnight',
         setAsPrimary: true,
       });
-      toastService.success('Vehicle added', {
+      toastService.success(t('addVehicle.addedToast'), {
         description: `${decoded.year} ${decoded.make} ${decoded.model}`,
       });
       router.back();
     } catch {
       // useGarage() already surfaces the error state; the toast below
       // gives the user immediate, screen-local feedback.
-      toastService.danger('Couldn’t add vehicle', {
-        description: 'Please check your connection and try again.',
+      toastService.danger(t('addVehicle.addErrorToast'), {
+        description: t('addVehicle.addErrorToastDesc'),
       });
     } finally {
       setSaving(false);
     }
-  }, [decoded, canSave, vin, addVehicle]);
+  }, [decoded, canSave, vin, addVehicle, t]);
 
   // Decode a VIN via the provider-agnostic VinDecoderService. Never throws —
   // domain errors surface as a screen-local toast so a provider outage can't
@@ -92,23 +94,23 @@ export default function AddVehicleScreen() {
     if (!result.ok) {
       setDecoded(null);
       triggerHaptic('warning');
-      toastService.danger('Couldn’t decode VIN', { description: result.error.message });
+      toastService.danger(t('addVehicle.decodeErrorToast'), { description: result.error.message });
       return;
     }
 
     setDecoded(result.data);
     if (result.data.isVerified) {
       triggerHaptic('success');
-      toastService.success('Vehicle identified', {
+      toastService.success(t('addVehicle.identifiedToast'), {
         description: `${result.data.year} ${result.data.make} ${result.data.model}`.trim(),
       });
     } else {
       triggerHaptic('warning');
-      toastService.info('Partial VIN match', {
-        description: 'We couldn’t fully identify this VIN — try another.',
+      toastService.info(t('addVehicle.partialMatchToast'), {
+        description: t('addVehicle.partialMatchToastDesc'),
       });
     }
-  }, []);
+  }, [t]);
 
   return (
     <AppView flex={1} colorName="background">
@@ -129,7 +131,7 @@ export default function AddVehicleScreen() {
           onPress={() => router.back()}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('addVehicle.goBack')}
           style={{ width: 40, height: 40 }}
         >
           <AppText colorName="text" style={{ fontSize: 20 }}>‹</AppText>
@@ -141,7 +143,7 @@ export default function AddVehicleScreen() {
           style={{ fontSize: 20, lineHeight: 26 }}
           accessibilityRole="header"
         >
-          Add vehicle
+          {t('addVehicle.title')}
         </AppText>
       </AppView>
 
@@ -162,14 +164,13 @@ export default function AddVehicleScreen() {
             colorName="textMuted"
             style={{ fontSize: 13.5, lineHeight: 20 }}
           >
-            Enter your 17-character VIN — we’ll identify the make, model, and year
-            automatically.
+            {t('addVehicle.intro')}
           </AppText>
 
           {/* VIN input */}
           <AppTextField
-            label="VIN"
-            placeholder="17-character VIN"
+            label={t('addVehicle.vinLabel')}
+            placeholder={t('addVehicle.vinPlaceholder')}
             value={vin}
             onChangeText={handleVinChange}
             autoCapitalize="characters"
@@ -190,7 +191,7 @@ export default function AddVehicleScreen() {
               disabled={decoding}
               androidRipple={false}
               accessibilityRole="button"
-              accessibilityLabel="Identify vehicle from VIN"
+              accessibilityLabel={t('addVehicle.identifyFromVin')}
               style={{ alignSelf: 'flex-start', paddingVertical: 4 }}
             >
               {decoding ? (
@@ -203,7 +204,7 @@ export default function AddVehicleScreen() {
                 weight="semibold"
                 style={{ fontSize: 13, color: tokens.brand }}
               >
-                {decoding ? 'Decoding VIN…' : 'Identify vehicle from VIN'}
+                {decoding ? t('addVehicle.decodingVin') : t('addVehicle.identifyFromVin')}
               </AppText>
             </AppPressableView>
           ) : null}
@@ -223,7 +224,7 @@ export default function AddVehicleScreen() {
                   style={{ fontSize: 11, letterSpacing: 0.7 }}
                   transform="uppercase"
                 >
-                  Decoded vehicle
+                  {t('addVehicle.decodedVehicle')}
                 </AppText>
                 <AppView
                   rounded={999}
@@ -243,7 +244,7 @@ export default function AddVehicleScreen() {
                     }}
                     transform="uppercase"
                   >
-                    {decoded.isVerified ? 'Verified' : 'Partial'}
+                    {decoded.isVerified ? t('addVehicle.verified') : t('addVehicle.partial')}
                   </AppText>
                 </AppView>
               </AppView>
@@ -251,7 +252,7 @@ export default function AddVehicleScreen() {
               <AppText family="heading" weight="bold" colorName="text" style={{ fontSize: 18 }}>
                 {[decoded.year > 0 ? decoded.year : null, decoded.make, decoded.model]
                   .filter(Boolean)
-                  .join(' ') || 'Unidentified vehicle'}
+                  .join(' ') || t('addVehicle.unidentified')}
               </AppText>
 
               {decoded.engineDisplacement || decoded.fuelType ? (
@@ -280,7 +281,7 @@ export default function AddVehicleScreen() {
           borderName="divider"
         >
           <AppButton
-            title={saving || isMutating ? 'Saving…' : 'Save vehicle'}
+            title={saving || isMutating ? t('addVehicle.saving') : t('addVehicle.saveVehicle')}
             kind="brand"
             size="lg"
             fullWidth

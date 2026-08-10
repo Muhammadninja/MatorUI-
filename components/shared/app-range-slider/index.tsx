@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import { FieldShell, TextEntryField } from '@/components/shared/form-field-primitives';
@@ -28,6 +30,7 @@ export function AppRangeSlider({
   onChange,
   onChangeEnd,
 }: AppRangeSliderProps) {
+  const { t } = useTranslation();
   const [start, end] = value;
 
   return (
@@ -36,7 +39,7 @@ export function AppRangeSlider({
         <AppView row gap={8}>
           <AppView flex={1}>
             <TextEntryField
-              label="From"
+              label={t('common.from')}
               value={String(start)}
               keyboardType="number-pad"
               disabled={disabled}
@@ -46,7 +49,7 @@ export function AppRangeSlider({
           </AppView>
           <AppView flex={1}>
             <TextEntryField
-              label="To"
+              label={t('common.to')}
               value={String(end)}
               keyboardType="number-pad"
               disabled={disabled}
@@ -56,7 +59,7 @@ export function AppRangeSlider({
           </AppView>
         </AppView>
         <AppText textVariant="bodyXs" muted>
-          Allowed range: {min} - {max}
+          {t('fields.allowedRange', { min, max })}
         </AppText>
       </AppView>
     </FieldShell>

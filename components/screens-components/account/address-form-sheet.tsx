@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { ScrollView } from 'react-native';
 
+import { useTranslation } from 'react-i18next';
+
 import { AppBottomSheet } from '@/components/shared/app-bottom-sheet';
 import { AppButton } from '@/components/shared/app-button';
 import AppTextField from '@/components/shared/app-text-field';
@@ -30,6 +32,7 @@ const EMPTY: AddressFormValues = { label: '', name: '', line1: '', city: '' };
  * drag handle down to dismiss.
  */
 export default function AddressFormSheet({ visible, onClose, initial, onSubmit }: AddressFormSheetProps) {
+  const { t } = useTranslation();
   const [values, setValues] = useState<AddressFormValues>(EMPTY);
 
   // Reset the form whenever the sheet (re)opens, from the edited address or empty.
@@ -82,7 +85,7 @@ export default function AddressFormSheet({ visible, onClose, initial, onSubmit }
     <AppBottomSheet visible={visible} onClose={onClose} expandable={false} heightFraction={0.4}>
       <AppView flex={1} px={20} pb={6}>
         <AppText family="heading" weight="bold" style={{ fontSize: 20, lineHeight: 26, marginBottom: 6 }} colorName="text">
-          {initial ? 'Edit address' : 'Add address'}
+          {initial ? t('account.editAddress') : t('account.addAddress')}
         </AppText>
 
         <ScrollView
@@ -91,11 +94,11 @@ export default function AddressFormSheet({ visible, onClose, initial, onSubmit }
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ gap: 14, paddingTop: 6, paddingBottom: 14 }}
         >
-          <AppTextField label="Street address" placeholder="2140 Chestnut St, Apt 6" value={values.line1} onChangeText={set('line1')} autoCapitalize="words" {...field} />
-          <AppTextField label="City, State ZIP" placeholder="Philadelphia, PA 19103" value={values.city} onChangeText={set('city')} autoCapitalize="words" {...field} />
+          <AppTextField label={t('account.streetAddress')} placeholder={t('account.streetPlaceholder')} value={values.line1} onChangeText={set('line1')} autoCapitalize="words" {...field} />
+          <AppTextField label={t('account.cityStateZip')} placeholder={t('account.cityPlaceholder')} value={values.city} onChangeText={set('city')} autoCapitalize="words" {...field} />
         </ScrollView>
 
-        <AppButton title={initial ? 'Save changes' : 'Add address'} kind="brand" size="lg" fullWidth disabled={!canSave} onPress={handleSave} />
+        <AppButton title={initial ? t('account.saveChanges') : t('account.addAddress')} kind="brand" size="lg" fullWidth disabled={!canSave} onPress={handleSave} />
       </AppView>
     </AppBottomSheet>
   );

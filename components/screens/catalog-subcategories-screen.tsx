@@ -2,6 +2,7 @@ import { FlashList } from '@shopify/flash-list';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AlertCircle, ChevronRight } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CategoryRowsSkeleton } from '@/components/screens-components/catalog/category-grid-skeleton';
@@ -26,6 +27,7 @@ type LoadState = 'loading' | 'error' | 'loaded';
  * offer "View all parts" so the buyer is never dead-ended.
  */
 export default function CatalogSubcategoriesScreen() {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
   const { parentId, parentLabel, make, model, brandId } = useLocalSearchParams<{
@@ -102,23 +104,23 @@ export default function CatalogSubcategoriesScreen() {
 
   return (
     <AppView flex={1} colorName="background">
-      <AppSettingsHeader title={parentLabel || 'Categories'} fallbackHref="/explore" />
+      <AppSettingsHeader title={parentLabel || t('catalog.categories')} fallbackHref="/explore" />
 
       {state === 'error' ? (
         <AppView flex={1} center px="xl" gap={12}>
           <AlertCircle size={30} strokeWidth={2} color={tokens.error} />
           <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted, textAlign: 'center' }}>
-            Couldn&apos;t load subcategories.
+            {t('catalog.loadSubcategoriesError')}
           </AppText>
-          <AppButton title="Retry" kind="brand" size="sm" onPress={() => load()} />
-          <AppButton title={`View all ${parentLabel ?? ''} parts`.trim()} kind="secondary" variant="outline" size="sm" onPress={viewAllParts} />
+          <AppButton title={t('common.retry')} kind="brand" size="sm" onPress={() => load()} />
+          <AppButton title={parentLabel ? t('catalog.viewAllLabelParts', { label: parentLabel }) : t('catalog.viewAllParts')} kind="secondary" variant="outline" size="sm" onPress={viewAllParts} />
         </AppView>
       ) : state === 'loaded' && items.length === 0 ? (
         <AppView flex={1} center px="xl" gap={12}>
           <AppText family="heading" weight="bold" style={{ fontSize: 17, color: tokens.text }}>
-            No subcategories
+            {t('catalog.noSubcategories')}
           </AppText>
-          <AppButton title={`View all ${parentLabel ?? ''} parts`.trim()} kind="brand" size="md" onPress={viewAllParts} />
+          <AppButton title={parentLabel ? t('catalog.viewAllLabelParts', { label: parentLabel }) : t('catalog.viewAllParts')} kind="brand" size="md" onPress={viewAllParts} />
         </AppView>
       ) : (
         <FlashList
@@ -130,7 +132,7 @@ export default function CatalogSubcategoriesScreen() {
             <AppView gap={12} style={{ paddingBottom: 12 }}>
               <VehicleContextBar />
               <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.7 }}>
-                {parentLabel ? `${parentLabel} · categories` : 'Categories'}
+                {parentLabel ? `${parentLabel} · ${t('catalog.categoriesSuffix')}` : t('catalog.categories')}
               </AppText>
             </AppView>
           }

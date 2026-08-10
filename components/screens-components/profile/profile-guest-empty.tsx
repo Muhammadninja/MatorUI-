@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { ChevronRight, LogIn, Settings, UserRound } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { Platform } from 'react-native';
 
 import { AppButton } from '@/components/shared/app-button';
@@ -24,6 +25,7 @@ const CARD_ELEVATION = Platform.select({
 
 export default function ProfileGuestEmpty() {
   const { tokens } = useThemeContext();
+  const { t } = useTranslation();
   const { guestId } = useUserContext();
   const { openAuthRequired } = useGlobalModal();
 
@@ -35,9 +37,8 @@ export default function ProfileGuestEmpty() {
   const handleLogin = () => {
     triggerHaptic('selection');
     openAuthRequired({
-      title: 'Welcome to Mator',
-      message:
-        'Log in to access your garage and orders, or create an account to get started.',
+      title: t('profileCards.welcomeTitle'),
+      message: t('profileCards.welcomeMessage'),
       redirectTo: '/profile',
     });
   };
@@ -80,7 +81,7 @@ export default function ProfileGuestEmpty() {
             transform="uppercase"
             style={{ color: tokens.textMuted, letterSpacing: 1.4 }}
           >
-            Guest session
+            {t('profileCards.guestSession')}
           </AppText>
           <AppText
             textVariant="title"
@@ -97,8 +98,7 @@ export default function ProfileGuestEmpty() {
             colorName="textMuted"
             style={{ textAlign: 'center', maxWidth: 260 }}
           >
-            You&apos;re browsing as a guest. Your ID is only used for support and
-            activity on this device.
+            {t('profileCards.guestExplanation')}
           </AppText>
         </AppView>
 
@@ -107,13 +107,13 @@ export default function ProfileGuestEmpty() {
           size="md"
           fullWidth
           onPress={handleLogin}
-          accessibilityLabel="Log in to your account"
+          accessibilityLabel={t('profileCards.logInToAccount')}
           containerStyle={{ width: '100%', marginTop: 4 }}
         >
           <AppView row align="center" gap="sm">
             <LogIn size={16} strokeWidth={2.2} color={tokens.onBrand} />
             <AppText weight="semibold" colorName="onBrand">
-              Log in
+              {t('profileCards.logIn')}
             </AppText>
           </AppView>
         </AppButton>
@@ -124,7 +124,7 @@ export default function ProfileGuestEmpty() {
         rounded={16}
         androidRipple
         accessibilityRole="button"
-        accessibilityLabel="Open settings"
+        accessibilityLabel={t('profileCards.openSettings')}
         onPress={handleSettings}
         style={{
           borderWidth: 1,
@@ -143,10 +143,10 @@ export default function ProfileGuestEmpty() {
           </AppView>
           <AppView gap={2} style={{ flex: 1 }}>
             <AppText textVariant="body" family="heading" weight="semibold" colorName="text">
-              Settings
+              {t('profileCards.settings')}
             </AppText>
             <AppText textVariant="bodyXs" colorName="textMuted">
-              Theme, notifications, privacy
+              {t('profileCards.settingsSub')}
             </AppText>
           </AppView>
           <ChevronRight size={18} strokeWidth={2.2} color={tokens.textMuted} />

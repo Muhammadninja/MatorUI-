@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Image } from 'react-native';
 
 import { AppText } from '@/components/shared/app-text';
@@ -25,6 +26,7 @@ export type BrandLogoProps = {
 };
 
 const BrandLogo = ({ logoUrl, name, size = 40, color }: BrandLogoProps) => {
+  const { t } = useTranslation();
   const [failed, setFailed] = useState(false);
 
   if (logoUrl && !failed) {
@@ -34,7 +36,7 @@ const BrandLogo = ({ logoUrl, name, size = 40, color }: BrandLogoProps) => {
         style={{ width: size, height: size }}
         resizeMode="contain"
         onError={() => setFailed(true)}
-        accessibilityLabel={`${name} logo`}
+        accessibilityLabel={t('make.brandLogo', { name })}
       />
     );
   }

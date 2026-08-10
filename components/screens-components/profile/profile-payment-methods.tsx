@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { MoreHorizontal, Plus } from 'lucide-react-native';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActionSheetIOS, Alert, Platform, ScrollView } from 'react-native';
 
 import { AppText } from '@/components/shared/app-text';
@@ -25,6 +26,7 @@ const CARD_ELEVATION = Platform.select({
 
 export default function ProfilePaymentMethods() {
   const { tokens } = useThemeContext();
+  const { t } = useTranslation();
   const [paymentCards, setPaymentCards] = useState<PaymentCard[]>(INITIAL_PAYMENT_CARDS);
 
   const handleAddNew = () => {
@@ -32,10 +34,10 @@ export default function ProfilePaymentMethods() {
   };
 
   const confirmRemove = (cardId: string) => {
-    Alert.alert('Delete Card', 'Remove this card from your profile list?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('profileCards.deleteCard'), t('profileCards.removeCardConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('profileCards.delete'),
         style: 'destructive',
         onPress: () => {
           setPaymentCards((currentCards) => currentCards.filter((card) => card.id !== cardId));
@@ -45,25 +47,28 @@ export default function ProfilePaymentMethods() {
   };
 
   const openCardActions = (cardId: string) => {
-    const options = ['Manage Card', 'Delete Card', 'Cancel'];
-    const cancelButtonIndex = options.indexOf('Cancel');
-    const destructiveButtonIndex = options.indexOf('Delete Card');
+    const manageLabel = t('profileCards.manageCard');
+    const deleteLabel = t('profileCards.deleteCard');
+    const cancelLabel = t('common.cancel');
+    const options = [manageLabel, deleteLabel, cancelLabel];
+    const cancelButtonIndex = options.indexOf(cancelLabel);
+    const destructiveButtonIndex = options.indexOf(deleteLabel);
 
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
         { options, cancelButtonIndex, destructiveButtonIndex },
         (index) => {
-          if (options[index] === 'Manage Card') router.push('/payment-methods');
-          if (options[index] === 'Delete Card') confirmRemove(cardId);
+          if (options[index] === manageLabel) router.push('/payment-methods');
+          if (options[index] === deleteLabel) confirmRemove(cardId);
         },
       );
       return;
     }
 
-    Alert.alert('Card options', undefined, [
-      { text: 'Manage Card', onPress: () => router.push('/payment-methods') },
-      { text: 'Delete Card', style: 'destructive', onPress: () => confirmRemove(cardId) },
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('profileCards.cardOptions'), undefined, [
+      { text: manageLabel, onPress: () => router.push('/payment-methods') },
+      { text: deleteLabel, style: 'destructive', onPress: () => confirmRemove(cardId) },
+      { text: cancelLabel, style: 'cancel' },
     ]);
   };
 
@@ -82,7 +87,7 @@ export default function ProfilePaymentMethods() {
           pressedScale={0.97}
           onPress={() => router.push('/payment-methods')}
           accessibilityRole="button"
-          accessibilityLabel={`${card.brand} ending in ${card.last4}`}
+          accessibilityLabel={t('profileCards.cardEndingIn', { brand: card.brand, last4: card.last4 })}
           style={{
             width: CARD_W,
             height: CARD_H,
@@ -150,7 +155,7 @@ export default function ProfilePaymentMethods() {
               pressedOpacity={0.6}
               onPress={() => openCardActions(card.id)}
               accessibilityRole="button"
-              accessibilityLabel="Card actions"
+              accessibilityLabel={t('profileCards.cardActions')}
               style={{
                 width: 28,
                 height: 28,
@@ -185,7 +190,7 @@ export default function ProfilePaymentMethods() {
                 textVariant="caption"
                 style={{ color: 'rgba(255,255,255,0.4)', letterSpacing: 0.5 }}
               >
-                EXPIRES
+                {t('profileCards.expires')}
               </AppText>
               <AppText textVariant="caption" weight="semibold" style={{ color: tokens.white }}>
                 {card.expiry}
@@ -205,7 +210,7 @@ export default function ProfilePaymentMethods() {
         pressedOpacity={0.7}
         onPress={handleAddNew}
         accessibilityRole="button"
-        accessibilityLabel="Add a payment method"
+        accessibilityLabel={t('profileCards.addPaymentMethod')}
         style={{
           width: 72,
           height: CARD_H,

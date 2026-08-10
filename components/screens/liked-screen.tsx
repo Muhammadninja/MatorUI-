@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { Heart } from 'lucide-react-native';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FlatList, type ListRenderItem } from 'react-native';
 
 import ProductRow from '@/components/screens-components/catalog/product-row';
@@ -23,6 +24,7 @@ import { triggerHaptic } from '@/utils/haptics';
  * empty state until the user hearts something.
  */
 export default function LikedScreen() {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const { state, items } = useLikedProducts();
   const { addItem } = useCartContext();
@@ -43,9 +45,9 @@ export default function LikedScreen() {
       }
       triggerHaptic('success');
       addItem({ id: it.id, title: it.title, description: it.description, price: it.price, imageUrl: it.images?.[0] });
-      toast.success('Added to cart');
+      toast.success(t('liked.addedToCart'));
     },
-    [addItem, isAuthenticated, toast],
+    [addItem, isAuthenticated, toast, t],
   );
 
   const renderItem = useCallback<ListRenderItem<CatalogItem>>(
@@ -55,7 +57,7 @@ export default function LikedScreen() {
 
   return (
     <AppView flex={1} colorName="background">
-      <AppSettingsHeader title="Liked" fallbackHref="/profile" />
+      <AppSettingsHeader title={t('liked.title')} fallbackHref="/profile" />
 
       {state === 'loading' ? (
         <AppView flex={1} center>
@@ -66,14 +68,14 @@ export default function LikedScreen() {
           <Heart size={30} strokeWidth={2} color={tokens.textMuted} />
           <AppView align="center" gap={4}>
             <AppText family="heading" colorName="text" style={{ fontSize: 17, lineHeight: 22 }}>
-              No liked parts yet
+              {t('liked.emptyTitle')}
             </AppText>
             <AppText
               family="default"
               colorName="textMuted"
               style={{ fontSize: 13, lineHeight: 18, textAlign: 'center', maxWidth: 280 }}
             >
-              Tap the heart on any part to save it here.
+              {t('liked.emptyBody')}
             </AppText>
           </AppView>
         </AppView>

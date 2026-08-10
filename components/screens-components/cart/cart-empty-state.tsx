@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { ShoppingCart } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 
 import { AppButton } from '@/components/shared/app-button';
 import { AppText } from '@/components/shared/app-text';
@@ -8,6 +9,7 @@ import { useThemeContext } from '@/contexts/theme.context';
 import { triggerHaptic } from '@/utils/haptics';
 
 export default function CartEmptyState() {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
 
   const handleBrowse = () => {
@@ -40,15 +42,15 @@ export default function CartEmptyState() {
 
         <AppView gap={6} align="center">
           <AppText textVariant="title" family="heading" colorName="text" align="center">
-            Your cart is empty
+            {t('cart.emptyTitle')}
           </AppText>
           <AppText textVariant="bodySm" colorName="gray400" align="center">
-            Find parts that fit your build and add them here to check out in one tap.
+            {t('cart.emptyCardSubtitle')}
           </AppText>
         </AppView>
 
         <AppButton
-          title="Browse parts"
+          title={t('cart.browseParts')}
           kind="brand"
           size="lg"
           fullWidth

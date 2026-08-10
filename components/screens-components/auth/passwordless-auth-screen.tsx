@@ -3,6 +3,7 @@ import { ArrowLeft, X } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Dimensions, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/shared/app-button';
@@ -20,11 +21,14 @@ import { triggerHaptic } from '@/utils/haptics';
  *  (global rate limit) gets an explicit "too many attempts" message that
  *  honors the server's `Retry-After` cooldown; everything else surfaces the
  *  backend's own message. */
-function describeAuthError(err: unknown): string | undefined {
+function describeAuthError(
+  err: unknown,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+): string | undefined {
   if (err instanceof ApiError && err.isRateLimited) {
     return err.retryAfterSeconds
-      ? `Too many attempts. Try again in ${err.retryAfterSeconds}s.`
-      : 'Too many attempts. Please wait a moment and try again.';
+      ? t('auth.tooManyAttemptsRetry', { seconds: err.retryAfterSeconds })
+      : t('auth.tooManyAttempts');
   }
   return err instanceof Error ? err.message : undefined;
 }
@@ -79,6 +83,7 @@ export default function PasswordlessAuthScreen() {
   const { tokens, scheme } = useThemeContext();
   const insets = useSafeAreaInsets();
   const toast = useToast();
+  const { t } = useTranslation();
   const { requestOtp, verifyOtp, isLoading } = useUserContext();
 
   // Slide the panel up over the (fading) scrim on mount so the screen underneath
@@ -124,7 +129,7 @@ export default function PasswordlessAuthScreen() {
     const identifier = phone.trim();
     if (!isValidPhone(identifier)) {
       triggerHaptic('error');
-      toast.danger(identifier ? 'Enter a valid phone number' : 'Enter your phone number');
+      toast.danger(identifier ? t('auth.enterValidPhone') : t('auth.enterPhone'));
       return;
     }
     try {
@@ -141,10 +146,10 @@ export default function PasswordlessAuthScreen() {
       // DEMO/E2E: auto-fill the code the mock handed back. Real backends omit it.
       setCode(devCode ?? '');
       setPhase('otp');
-      toast.info(`Code sent to ${identifier}`);
+      toast.info(t('auth.codeSentTo', { phone: identifier }));
     } catch (err) {
       triggerHaptic('error');
-      toast.danger('Could not send the code', { description: describeAuthError(err) });
+      toast.danger(t('auth.couldNotSend'), { description: describeAuthError(err, t) });
     }
   };
 
@@ -156,7 +161,7 @@ export default function PasswordlessAuthScreen() {
       dismiss();
     } catch (err) {
       triggerHaptic('error');
-      toast.danger('That code did not work', { description: describeAuthError(err) });
+      toast.danger(t('auth.codeDidNotWork'), { description: describeAuthError(err, t) });
     }
   };
 
@@ -170,9 +175,9 @@ export default function PasswordlessAuthScreen() {
       });
       setOtpToken(token);
       setCode(devCode ?? '');
-      toast.info('New code sent');
+      toast.info(t('auth.newCodeSent'));
     } catch (err) {
-      toast.danger('Could not resend the code', { description: describeAuthError(err) });
+      toast.danger(t('auth.couldNotResend'), { description: describeAuthError(err, t) });
     }
   };
 
@@ -188,7 +193,7 @@ export default function PasswordlessAuthScreen() {
       <Pressable
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
         onPress={dismiss}
-        accessibilityLabel="Dismiss"
+        accessibilityLabel={t('auth.dismiss')}
       />
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -220,7 +225,7 @@ export default function PasswordlessAuthScreen() {
                 center
                 rounded={999}
                 accessibilityRole="button"
-                accessibilityLabel="Back"
+                accessibilityLabel={t('auth.back')}
                 style={{ width: 34, height: 34, borderWidth: 1, borderColor: tokens.border }}
               >
                 <ArrowLeft size={18} strokeWidth={2.2} color={tokens.text} />
@@ -237,7 +242,7 @@ export default function PasswordlessAuthScreen() {
               center
               rounded={999}
               accessibilityRole="button"
-              accessibilityLabel="Close"
+              accessibilityLabel={t('common.close')}
               style={{ width: 34, height: 34, borderWidth: 1, borderColor: tokens.border }}
             >
               <X size={16} strokeWidth={2.2} color={tokens.text} />
@@ -248,16 +253,16 @@ export default function PasswordlessAuthScreen() {
             <>
               <AppView gap={6}>
                 <AppText family="heading" weight="bold" style={{ fontSize: 22, lineHeight: 28, color: tokens.text }}>
-                  Log in or sign up
+                  {t('auth.logInOrSignUp')}
                 </AppText>
                 <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted }}>
-                  Enter your phone number — we’ll text you a code.
+                  {t('auth.phoneSubtitle')}
                 </AppText>
               </AppView>
 
               <AppTextField
                 testID="auth-phone-field"
-                label="Phone number"
+                label={t('auth.phoneLabel')}
                 placeholder="+998 90 123 45 67"
                 value={phone}
                 onChangeText={setPhone}
@@ -270,7 +275,7 @@ export default function PasswordlessAuthScreen() {
 
               <AppButton
                 testID="auth-send-code-btn"
-                title={isLoading ? 'Sending code…' : 'Next'}
+                title={isLoading ? t('auth.sendingCode') : t('auth.next')}
                 kind="brand"
                 size="lg"
                 fullWidth
@@ -278,23 +283,23 @@ export default function PasswordlessAuthScreen() {
                 onPress={sendCode}
               />
               <AppText family="default" style={{ fontSize: 11, color: tokens.textMuted, textAlign: 'center', lineHeight: 16 }}>
-                By continuing you agree to the Terms of Service and Privacy Policy.
+                {t('auth.termsNotice')}
               </AppText>
             </>
           ) : (
             <>
               <AppView gap={6}>
                 <AppText family="heading" weight="bold" style={{ fontSize: 22, lineHeight: 28, color: tokens.text }}>
-                  Enter the code
+                  {t('auth.enterCode')}
                 </AppText>
                 <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted }}>
-                  We sent a 6-digit code to {phone.trim()}.
+                  {t('auth.codeSentDetail', { phone: phone.trim() })}
                 </AppText>
               </AppView>
 
               <AppTextField
                 testID="auth-otp-field"
-                label="Verification code"
+                label={t('auth.verificationCodeLabel')}
                 placeholder="123456"
                 value={code}
                 onChangeText={(v: string) => setCode(v.replace(/\D/g, '').slice(0, 6))}
@@ -307,7 +312,7 @@ export default function PasswordlessAuthScreen() {
 
               <AppButton
                 testID="auth-verify-btn"
-                title={isLoading ? 'Verifying…' : 'Verify & continue'}
+                title={isLoading ? t('auth.verifying') : t('auth.verifyContinue')}
                 kind="brand"
                 size="lg"
                 fullWidth
@@ -320,10 +325,10 @@ export default function PasswordlessAuthScreen() {
                 disabled={isLoading}
                 center
                 accessibilityRole="button"
-                accessibilityLabel="Resend code"
+                accessibilityLabel={t('auth.resendCode')}
               >
                 <AppText family="accent" weight="semibold" style={{ fontSize: 13, color: tokens.textMuted }}>
-                  Didn’t get it? Resend code
+                  {t('auth.didntGetItResend')}
                 </AppText>
               </AppPressableView>
             </>

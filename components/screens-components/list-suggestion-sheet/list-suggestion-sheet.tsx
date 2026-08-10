@@ -1,5 +1,6 @@
 import { Heart, ListPlus, X } from 'lucide-react-native';
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Animated, Dimensions, Modal } from 'react-native';
 
 import { AppButton } from '@/components/shared/app-button';
@@ -25,6 +26,7 @@ export default function ListSuggestionSheet({
   onSkip,
 }: ListSuggestionSheetProps) {
   const { tokens, scheme } = useThemeContext();
+  const { t } = useTranslation();
   const isDark = scheme === 'dark';
 
   // Slide the panel up over a static (fading) backdrop so the screen underneath
@@ -55,7 +57,7 @@ export default function ListSuggestionSheet({
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={handleSkip}>
       <AppView flex={1} justify="flex-end" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}>
-        <AppPressableView style={{ flex: 1 }} onPress={handleSkip} accessibilityLabel="Dismiss" />
+        <AppPressableView style={{ flex: 1 }} onPress={handleSkip} accessibilityLabel={t('listSuggestion.dismiss')} />
         <Animated.View style={{ width: '100%', transform: [{ translateY }] }}>
         <AppView
           roundedTop={28}
@@ -82,7 +84,7 @@ export default function ListSuggestionSheet({
               rounded={36}
               onPress={handleSkip}
               androidRipple
-              accessibilityLabel="Close"
+              accessibilityLabel={t('common.close')}
               style={{
                 width: 32,
                 height: 32,
@@ -114,15 +116,14 @@ export default function ListSuggestionSheet({
 
             <AppView gap={6} align="center">
               <AppText textVariant="title" family="heading" weight="bold">
-                Saved! Want to organize?
+                {t('listSuggestion.title')}
               </AppText>
               <AppText
                 textVariant="bodySm"
                 colorName="gray400"
                 style={{ textAlign: 'center', maxWidth: 320 }}
               >
-                You can group saved items into Lists by build, vehicle, season, or
-                anything else. They show up under Lists in the Cart tab.
+                {t('listSuggestion.body')}
               </AppText>
             </AppView>
 
@@ -132,17 +133,17 @@ export default function ListSuggestionSheet({
                 size="md"
                 fullWidth
                 onPress={handleCreate}
-                accessibilityLabel="Create a new list"
+                accessibilityLabel={t('listSuggestion.createNewList')}
               >
                 <AppView row align="center" justify="center" gap={8}>
                   <ListPlus size={18} strokeWidth={2.4} color={tokens.onBrand} />
                   <AppText weight="semibold" style={{ color: tokens.onBrand }}>
-                    Create a list
+                    {t('listSuggestion.createList')}
                   </AppText>
                 </AppView>
               </AppButton>
               <AppButton
-                title="Maybe later"
+                title={t('listSuggestion.maybeLater')}
                 kind="secondary"
                 variant="outline"
                 size="md"

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Star } from 'lucide-react-native';
 
 import { AppText } from '@/components/shared/app-text';
@@ -10,6 +11,7 @@ export type VehicleDetailHeaderProps = {
 };
 
 export function VehicleDetailHeader({ onBack, isPrimary }: VehicleDetailHeaderProps) {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
 
   return (
@@ -18,7 +20,7 @@ export function VehicleDetailHeader({ onBack, isPrimary }: VehicleDetailHeaderPr
         androidRipple={false}
         onPress={onBack}
         hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        accessibilityLabel="Go back"
+        accessibilityLabel={t('vehicleDetail.goBack')}
       >
         <AppView row align="center">
           <ArrowLeft size={20} strokeWidth={2.2} color={tokens.text} />
@@ -37,7 +39,7 @@ export function VehicleDetailHeader({ onBack, isPrimary }: VehicleDetailHeaderPr
               colorName="onSecondary"
               numberOfLines={1}
             >
-              PRIMARY
+              {t('vehicleDetail.primaryPill')}
             </AppText>
           </AppView>
         </AppView>

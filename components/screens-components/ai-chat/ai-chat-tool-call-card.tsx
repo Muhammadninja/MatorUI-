@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { AlertTriangle, ArrowUpRight, CheckCircle2, Wrench } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { AppText } from '@/components/shared/app-text';
@@ -23,6 +24,7 @@ type AiChatToolCallCardProps = {
  */
 export default function AiChatToolCallCard({ toolCall }: AiChatToolCallCardProps) {
   const { tokens } = useThemeContext();
+  const { t } = useTranslation();
 
   const inFlight = toolCall.status === 'pending' || toolCall.status === 'running';
   const success = toolCall.status === 'success';
@@ -80,7 +82,7 @@ export default function AiChatToolCallCard({ toolCall }: AiChatToolCallCardProps
         </AppView>
         <AppView gap={1} style={{ flex: 1 }}>
           <AppText textVariant="caption" colorName="gray400" weight="semibold">
-            {labelForTool(toolCall.name)}
+            {labelForTool(toolCall.name, t)}
           </AppText>
           <AppText
             textVariant="bodyXs"
@@ -152,21 +154,24 @@ function appendOriginParam(href: string, origin: string): string {
   return `${href}${sep}from=${origin}`;
 }
 
-function labelForTool(name: AiChatToolCall['name']): string {
+function labelForTool(
+  name: AiChatToolCall['name'],
+  t: (key: string) => string,
+): string {
   switch (name) {
     case 'lookup_order':
-      return 'Order lookup';
+      return t('aiChat.toolLookupOrder');
     case 'search_parts':
-      return 'Parts search';
+      return t('aiChat.toolSearchParts');
     case 'add_to_cart':
-      return 'Cart action';
+      return t('aiChat.toolAddToCart');
     case 'apply_promo':
-      return 'Promo';
+      return t('aiChat.toolApplyPromo');
     case 'check_fitment':
-      return 'Fitment check';
+      return t('aiChat.toolCheckFitment');
     case 'identify_part':
-      return 'Part identification';
+      return t('aiChat.toolIdentifyPart');
     default:
-      return 'Tool';
+      return t('aiChat.toolGeneric');
   }
 }

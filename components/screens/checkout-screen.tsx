@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { AlertCircle, ArrowLeft, Check, MapPin, PhoneCall, Plus } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -33,6 +34,7 @@ type Tokens = ReturnType<typeof useThemeContext>['tokens'];
  * the confirmation screen.
  */
 export default function CheckoutScreen() {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
   const { items, totals, appliedPromo, formatCurrency, clearCart } = useCartContext();
@@ -129,10 +131,10 @@ export default function CheckoutScreen() {
       >
         {/* Header */}
         <AppView row align="center" gap={12} px="lg" style={{ paddingBottom: 14 }}>
-          <AppPressableView onPress={() => router.back()} center rounded={12} borderWidth={1} borderName="border" accessibilityRole="button" accessibilityLabel="Back" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ width: 40, height: 40 }}>
+          <AppPressableView onPress={() => router.back()} center rounded={12} borderWidth={1} borderName="border" accessibilityRole="button" accessibilityLabel={t('checkout.back')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ width: 40, height: 40 }}>
             <ArrowLeft size={22} strokeWidth={2.2} color={tokens.text} />
           </AppPressableView>
-          <AppText family="heading" weight="bold" style={{ fontSize: 20, color: tokens.text }}>Checkout</AppText>
+          <AppText family="heading" weight="bold" style={{ fontSize: 20, color: tokens.text }}>{t('checkout.title')}</AppText>
         </AppView>
 
         <AppView px="lg" gap={16}>
@@ -152,7 +154,7 @@ export default function CheckoutScreen() {
 
           {/* Payment method — Payme / Terminal / Cash */}
           <AppView gap={10}>
-            <SectionLabel tokens={tokens}>Payment</SectionLabel>
+            <SectionLabel tokens={tokens}>{t('checkout.payment')}</SectionLabel>
             {PAYMENT_OPTIONS.map((opt) => (
               <PaymentRow
                 key={opt.id}
@@ -167,8 +169,8 @@ export default function CheckoutScreen() {
           {/* Shipping option — only when a concrete address is selected */}
           {addr && shipOption ? (
             <SectionCard
-              label="Shipping"
-              main={`${shipOption.label} · ${shipOption.price === 0 ? 'Free' : formatCurrency(shipOption.price)}`}
+              label={t('checkout.shipping')}
+              main={`${shipOption.label} · ${shipOption.price === 0 ? t('checkout.free') : formatCurrency(shipOption.price)}`}
               sub={shipOption.eta}
               onChange={
                 shipping.options.length > 1
@@ -180,7 +182,7 @@ export default function CheckoutScreen() {
           ) : null}
 
           {/* Order summary */}
-          <AppText family="heading" weight="bold" style={{ fontSize: 16, color: tokens.text, marginTop: 4 }}>Order summary</AppText>
+          <AppText family="heading" weight="bold" style={{ fontSize: 16, color: tokens.text, marginTop: 4 }}>{t('checkout.orderSummary')}</AppText>
           <AppView gap={10}>
             {items.map((item) => (
               <AppView key={item.id} row justify="space-between">
@@ -193,18 +195,18 @@ export default function CheckoutScreen() {
               </AppView>
             ))}
             <AppView style={{ height: 1, backgroundColor: tokens.divider, marginVertical: 4 }} />
-            <SummaryRow label="Subtotal" value={formatCurrency(totals.subtotal)} tokens={tokens} />
+            <SummaryRow label={t('checkout.subtotal')} value={formatCurrency(totals.subtotal)} tokens={tokens} />
             {totals.discount > 0 ? (
-              <SummaryRow label="Discount" value={`−${formatCurrency(totals.discount)}`} tokens={tokens} />
+              <SummaryRow label={t('checkout.discount')} value={`−${formatCurrency(totals.discount)}`} tokens={tokens} />
             ) : null}
             <SummaryRow
-              label="Shipping"
-              value={shipOption && shipOption.price > 0 ? formatCurrency(shipOption.price) : 'Free'}
+              label={t('checkout.shipping')}
+              value={shipOption && shipOption.price > 0 ? formatCurrency(shipOption.price) : t('checkout.free')}
               tokens={tokens}
             />
-            <SummaryRow label="Tax" value={formatCurrency(totals.tax)} tokens={tokens} />
+            <SummaryRow label={t('checkout.tax')} value={formatCurrency(totals.tax)} tokens={tokens} />
             <AppView row justify="space-between">
-              <AppText family="accent" weight="bold" style={{ fontSize: 16, color: tokens.text }}>Total</AppText>
+              <AppText family="accent" weight="bold" style={{ fontSize: 16, color: tokens.text }}>{t('checkout.total')}</AppText>
               <AppPrice value={formatCurrency(grandTotal)} size={18} color={tokens.text} />
             </AppView>
           </AppView>
@@ -222,7 +224,7 @@ export default function CheckoutScreen() {
       <AppView colorName="background" px="lg" style={{ paddingTop: 14, paddingBottom: Math.max(insets.bottom, 20), borderTopWidth: 1, borderTopColor: tokens.divider }}>
         <AppButton
           testID="checkout-place-order-btn"
-          title={create.phase === 'placing' ? 'Placing order…' : `Place order · ${formatCurrency(grandTotal)}`}
+          title={create.phase === 'placing' ? t('checkout.placingOrder') : t('checkout.placeOrder', { total: formatCurrency(grandTotal) })}
           kind="brand"
           size="lg"
           fullWidth
@@ -261,13 +263,14 @@ function DeliverySection({
   onAdd: () => void;
   onSkip: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <AppView rounded={16} p={16} colorName="card" borderWidth={1} borderName="border" gap={10}>
       <AppView row align="center" justify="space-between">
-        <SectionLabel tokens={tokens}>Delivery address</SectionLabel>
+        <SectionLabel tokens={tokens}>{t('checkout.deliveryAddress')}</SectionLabel>
         {addr && canChange ? (
-          <AppPressableView onPress={onChange} accessibilityRole="button" accessibilityLabel="Change address">
-            <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.text }}>Change</AppText>
+          <AppPressableView onPress={onChange} accessibilityRole="button" accessibilityLabel={t('checkout.changeAddress')}>
+            <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.text }}>{t('checkout.change')}</AppText>
           </AppPressableView>
         ) : null}
       </AppView>
@@ -284,8 +287,8 @@ function DeliverySection({
             </AppView>
           </AppView>
           <AppView row gap={18} style={{ marginTop: 2 }}>
-            <LinkAction label="Add new" onPress={onAdd} color={tokens.text} />
-            <LinkAction label="Skip for now" onPress={onSkip} color={tokens.textMuted} />
+            <LinkAction label={t('checkout.addNew')} onPress={onAdd} color={tokens.text} />
+            <LinkAction label={t('checkout.skipForNow')} onPress={onSkip} color={tokens.textMuted} />
           </AppView>
         </>
       ) : skipped ? (
@@ -293,22 +296,22 @@ function DeliverySection({
           <AppView row align="center" gap={10}>
             <PhoneCall size={18} strokeWidth={2} color={tokens.text} />
             <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted, flex: 1 }}>
-              No address — the courier will call you to confirm the delivery location.
+              {t('checkout.noAddressCourier')}
             </AppText>
           </AppView>
-          <LinkAction label="Add an address" onPress={onAdd} color={tokens.text} />
+          <LinkAction label={t('checkout.addAnAddress')} onPress={onAdd} color={tokens.text} />
         </>
       ) : (
         <>
           <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted }}>
-            Add a delivery address, or skip it — the courier will call to confirm your location.
+            {t('checkout.addAddressOrSkip')}
           </AppText>
           <AppView row gap={10}>
-            <AppButton title="Add address" kind="secondary" size="sm" onPress={onAdd} />
+            <AppButton title={t('checkout.addAddress')} kind="secondary" size="sm" onPress={onAdd} />
             {/* variant="ghost" → transparent bg + `tokens.text` label. Without it
                 the default solid text-kind button is white-on-white (invisible)
                 in dark mode. */}
-            <AppButton title="Skip" kind="text" variant="ghost" size="sm" onPress={onSkip} />
+            <AppButton title={t('checkout.skip')} kind="text" variant="ghost" size="sm" onPress={onSkip} />
           </AppView>
         </>
       )}
@@ -384,13 +387,14 @@ function SectionLabel({ tokens, children }: { tokens: Tokens; children: string }
 }
 
 function SectionCard({ label, main, sub, onChange, tokens }: { label: string; main: string; sub: string; onChange?: () => void; tokens: Tokens }) {
+  const { t } = useTranslation();
   return (
     <AppView rounded={16} p={16} colorName="card" borderWidth={1} borderName="border">
       <AppView row align="center" justify="space-between" style={{ marginBottom: 8 }}>
         <SectionLabel tokens={tokens}>{label}</SectionLabel>
         {onChange ? (
-          <AppPressableView onPress={onChange} accessibilityRole="button" accessibilityLabel={`Change ${label}`}>
-            <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.text }}>Change</AppText>
+          <AppPressableView onPress={onChange} accessibilityRole="button" accessibilityLabel={t('checkout.changeLabel', { label })}>
+            <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.text }}>{t('checkout.change')}</AppText>
           </AppPressableView>
         ) : null}
       </AppView>

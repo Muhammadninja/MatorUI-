@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 
@@ -12,6 +14,7 @@ export function AddVehicleStepIndicator({
   current,
   label,
 }: AddVehicleStepIndicatorProps) {
+  const { t } = useTranslation();
   return (
     <AppView gap="sm" px={20} pb="xs">
       <AppView row align="center" justify="space-between" gap={10}>
@@ -22,7 +25,7 @@ export function AddVehicleStepIndicator({
           transform="uppercase"
           numberOfLines={1}
         >
-          {`Step ${current} of ${total}`}
+          {t('addVehicle.stepProgress', { current, total })}
         </AppText>
         {label ? (
           <AppText textVariant="bodySemibold" colorName="text" numberOfLines={1}>

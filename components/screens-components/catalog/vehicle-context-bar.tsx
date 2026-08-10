@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { ChevronRight } from 'lucide-react-native';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
@@ -13,6 +14,7 @@ import { useThemeContext } from '@/contexts/theme.context';
  * amber "Select a vehicle …" warning that routes to the Garage otherwise.
  */
 function VehicleContextBar() {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const { currentActiveVehicle } = useActiveVehicle();
   const v = currentActiveVehicle?.vehicle;
@@ -25,7 +27,7 @@ function VehicleContextBar() {
         onPress={() => router.navigate('/garage')}
         androidRipple={false}
         accessibilityRole="button"
-        accessibilityLabel={`Fitting parts for ${label}. Change vehicle.`}
+        accessibilityLabel={t('catalog.fittingPartsAccessibility', { label })}
         row
         align="center"
         gap={10}
@@ -43,7 +45,7 @@ function VehicleContextBar() {
             weight="medium"
             style={{ fontSize: 10, letterSpacing: 0.7, textTransform: 'uppercase', color: tokens.textMuted }}
           >
-            Fitting parts for
+            {t('catalog.fittingPartsFor')}
           </AppText>
           <AppText family="accent" weight="bold" numberOfLines={1} style={{ fontSize: 13.5, color: tokens.text }}>
             {label}
@@ -59,7 +61,7 @@ function VehicleContextBar() {
       onPress={() => router.navigate('/garage')}
       androidRipple={false}
       accessibilityRole="button"
-      accessibilityLabel="Select a vehicle to guarantee fitment accuracy"
+      accessibilityLabel={t('catalog.selectVehiclePrompt')}
       row
       align="center"
       gap={10}
@@ -71,7 +73,7 @@ function VehicleContextBar() {
     >
       <AppView rounded={999} style={{ width: 8, height: 8, backgroundColor: tokens.warning }} />
       <AppText family="accent" weight="semibold" numberOfLines={2} style={{ flex: 1, fontSize: 13, color: tokens.text }}>
-        Select a vehicle to guarantee fitment accuracy
+        {t('catalog.selectVehiclePrompt')}
       </AppText>
       <ChevronRight size={18} strokeWidth={2.2} color={tokens.text} />
     </AppPressableView>

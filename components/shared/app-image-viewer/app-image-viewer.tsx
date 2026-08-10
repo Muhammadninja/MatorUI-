@@ -1,5 +1,6 @@
 import { X } from 'lucide-react-native';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StatusBar } from 'react-native';
 import ImageView from 'react-native-image-viewing';
 
@@ -32,6 +33,7 @@ function AppImageViewerBase({
   renderCaption,
 }: AppImageViewerProps) {
   const { tokens } = useThemeContext();
+  const { t } = useTranslation();
 
   const HeaderComponent = useCallback(
     () => (
@@ -47,7 +49,7 @@ function AppImageViewerBase({
           center
           rounded={36}
           onPress={onClose}
-          accessibilityLabel="Close image viewer"
+          accessibilityLabel={t('fields.closeImageViewer')}
           androidRipple
           style={{
             width: 40,
@@ -59,7 +61,7 @@ function AppImageViewerBase({
         </AppPressableView>
       </AppView>
     ),
-    [onClose],
+    [onClose, t],
   );
 
   const FooterComponent = useCallback(

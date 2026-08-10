@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { AppOemPill } from '@/components/shared/app-oem-pill';
 import { AppText } from '@/components/shared/app-text';
@@ -20,6 +21,7 @@ export type ProductCardProps = {
  * price (+ struck was) / rating row. Taps through to Item Detail.
  */
 function ProductCard({ product: p }: ProductCardProps) {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const save = savePercent(p);
 
@@ -53,7 +55,7 @@ function ProductCard({ product: p }: ProductCardProps) {
             }}
           >
             <AppText family="accent" weight="bold" style={{ fontSize: 10, color: tokens.onValue }}>
-              SAVE {save}%
+              {t('home.savePercent', { percent: save })}
             </AppText>
           </AppView>
         ) : null}

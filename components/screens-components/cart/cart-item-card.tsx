@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { X } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 
 import AppImage from '@/components/shared/app-image';
 import { AppOemPill } from '@/components/shared/app-oem-pill';
@@ -31,6 +32,7 @@ function CartItemCard({
   onDecrement,
   onRemove,
 }: CartItemCardProps) {
+  const { t } = useTranslation();
   const { tokens, scheme } = useThemeContext();
   const imageSource = item.imageUrl ? { uri: item.imageUrl } : FALLBACK_IMAGE;
   const oem = (item as CartItem & { oem?: string }).oem;
@@ -71,7 +73,7 @@ function CartItemCard({
             pressedOpacity={0.6}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
-            accessibilityLabel={`Remove ${item.title} from cart`}
+            accessibilityLabel={t('cart.removeItemFromCart', { title: item.title })}
             style={{ width: 26, height: 26 }}
           >
             <X size={16} strokeWidth={2.2} color={tokens.textMuted} />

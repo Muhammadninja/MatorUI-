@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import type { Family } from '@/components/shared/app-icon';
 import { SelectTriggerField } from '@/components/shared/form-field-primitives';
 import type { ColorName } from '@/themes';
@@ -26,11 +28,12 @@ export function AppCarSelectionField({
   selectedCarName,
   ...props
 }: AppCarSelectionFieldProps) {
+  const { t } = useTranslation();
   return (
     <SelectTriggerField
       labelColorName={labelColorName}
       valueLabel={selectedCarName}
-      placeholder="Choose vehicle"
+      placeholder={t('fields.chooseVehicle')}
       {...props}
     />
   );

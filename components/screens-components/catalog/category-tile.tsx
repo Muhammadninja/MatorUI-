@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import AutoPartIcon from '@/components/screens-components/catalog/auto-part-icon';
 import { AppText } from '@/components/shared/app-text';
@@ -21,13 +22,14 @@ export type CategoryTileProps = {
  * data + tap handler.
  */
 function CategoryTile({ name, iconKey, count, onPress }: CategoryTileProps) {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   return (
     <AppPressableView
       onPress={() => onPress(name)}
       androidRipple={false}
       accessibilityRole="button"
-      accessibilityLabel={`${name}, ${count} parts`}
+      accessibilityLabel={`${name}, ${t('category.partsCount', { count })}`}
       center
       borderBottomWidth={0.6}
       borderName="border"
@@ -46,7 +48,7 @@ function CategoryTile({ name, iconKey, count, onPress }: CategoryTileProps) {
           {name}
         </AppText>
         <AppText family="default" style={{ fontSize: 10.5, color: tokens.textMuted, marginTop: 2 }}>
-          {count} parts
+          {t('category.partsCount', { count })}
         </AppText>
       </AppView>
     </AppPressableView>

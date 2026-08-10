@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   TextInput,
   type KeyboardTypeOptions,
@@ -248,6 +249,7 @@ export function SelectTriggerField({
   trailingLabel?: string;
   labelColorName?: ColorName;
 }) {
+  const { t } = useTranslation();
   const isEmpty = !valueLabel;
 
   return (
@@ -284,7 +286,7 @@ export function SelectTriggerField({
             </AppText>
           ) : null}
           {onClear && valueLabel ? (
-            <AppButton title="Clear" size="xs" variant="ghost" kind="text" onPress={onClear} />
+            <AppButton title={t('common.clear')} size="xs" variant="ghost" kind="text" onPress={onClear} />
           ) : null}
         </AppView>
       </AppPressableView>

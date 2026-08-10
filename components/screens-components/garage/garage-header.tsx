@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Plus } from 'lucide-react-native';
 
 import { RADIUS_PILL } from '@/components/screens-components/search/radii';
@@ -11,10 +12,12 @@ export type GarageHeaderProps = {
 };
 
 export function GarageHeader({
-  title = 'My Garage',
+  title,
   onAddPress,
 }: GarageHeaderProps) {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
+  const resolvedTitle = title ?? t('garage.title');
 
   return (
     <AppView row align="center" justify="space-between" px={20} py="lg" gap="md">
@@ -26,7 +29,7 @@ export function GarageHeader({
         accessibilityRole="header"
         style={{ fontSize: 26, lineHeight: 32 }}
       >
-        {title}
+        {resolvedTitle}
       </AppText>
 
       <AppPressableView
@@ -37,8 +40,8 @@ export function GarageHeader({
         androidRipple
         onPress={onAddPress}
         accessibilityRole="button"
-        accessibilityLabel="Add vehicle"
-        accessibilityHint="Opens a sheet to add a new vehicle to your garage"
+        accessibilityLabel={t('garage.addVehicle')}
+        accessibilityHint={t('garage.addVehicleHint')}
       >
         <AppView row align="center" gap={6}>
           <Plus size={16} strokeWidth={2} color={tokens.onBrand} />
@@ -48,7 +51,7 @@ export function GarageHeader({
             colorName="onBrand"
             numberOfLines={1}
           >
-            Add
+            {t('garage.add')}
           </AppText>
         </AppView>
       </AppPressableView>

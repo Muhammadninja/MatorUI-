@@ -1,5 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { memo, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import ImageBox from '@/components/screens-components/home/image-box';
@@ -45,6 +46,7 @@ function hashId(id: string): number {
  * states — it never routes.
  */
 function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
+  const { t } = useTranslation();
   const product = item as ProductRowItem;
   const { tokens, scheme } = useThemeContext();
   const { currentActiveVehicle } = useActiveVehicle();
@@ -66,10 +68,11 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
     timerRef.current = setTimeout(() => {
       if (vehicleLabel) {
         setFitState('fits');
-        toast.success(`Confirmed fit — ${activeVehicle!.year} ${activeVehicle!.make} ${activeVehicle!.model ?? ''}`.trim());
+        const vehicle = `${activeVehicle!.year} ${activeVehicle!.make} ${activeVehicle!.model ?? ''}`.trim();
+        toast.success(t('catalog.confirmedFit', { vehicle }));
       } else {
         setFitState('idle');
-        toast.info('Add a vehicle to confirm fit');
+        toast.info(t('catalog.addVehicleToConfirmFit'));
       }
     }, FIT_CHECK_MS);
   };
@@ -129,11 +132,11 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
   const fitLabel =
     fitState === 'fits'
       ? vehicleLabel
-        ? `Fits your ${vehicleLabel}`
-        : 'Fits your vehicle'
+        ? t('catalog.fitsYourVehicleLabel', { vehicle: vehicleLabel })
+        : t('catalog.fitsYourVehicle')
       : fitState === 'checking'
-        ? 'Checking…'
-        : 'Check fit';
+        ? t('catalog.checking')
+        : t('catalog.checkFit');
   const fitTextColor = fitState === 'fits' ? tokens.success : fitState === 'checking' ? tokens.textMuted : tokens.text;
 
   return (
@@ -198,7 +201,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
                   >
                     <MaterialIcons name="verified" size={11} color="#16a34a" />
                     <AppText family="accent" weight="bold" style={{ fontSize: 10, color: '#16a34a' }}>
-                      Certified
+                      {t('catalog.certified')}
                     </AppText>
                   </View>
                 ) : null}
@@ -216,7 +219,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
                   >
                     <MaterialIcons name="local-offer" size={11} color="#2563eb" />
                     <AppText family="accent" weight="bold" style={{ fontSize: 10, color: '#2563eb' }}>
-                      Lowest price
+                      {t('catalog.lowestPrice')}
                     </AppText>
                   </View>
                 ) : null}
@@ -276,7 +279,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
             >
               <MaterialIcons name="check-circle" size={14} color={tokens.success} />
               <AppText family="accent" weight="bold" numberOfLines={1} style={{ fontSize: 11.5, color: tokens.success }}>
-                Подходит для всех
+                {t('catalog.universalFit')}
               </AppText>
             </AppView>
           ) : (
@@ -291,7 +294,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
               rounded={999}
               hitSlop={{ top: 8, bottom: 8, left: 6, right: 8 }}
               accessibilityRole="button"
-              accessibilityLabel={fitState === 'fits' ? fitLabel : 'Check if this part fits your car'}
+              accessibilityLabel={fitState === 'fits' ? fitLabel : t('catalog.checkFitAccessibility')}
               style={{ alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, backgroundColor: fitChipBg }}
             >
               {fitState === 'checking' ? (
@@ -360,7 +363,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
         <AppPressableView
           onPress={() => onAdd(item)}
           accessibilityRole="button"
-          accessibilityLabel={`Add ${item.title} to cart`}
+          accessibilityLabel={t('catalog.addToCartAccessibility', { title: item.title })}
           androidRipple={false}
           pressedOpacity={0.9}
           row
@@ -371,7 +374,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
         >
           <MaterialIcons name="add-shopping-cart" size={16} color={tokens.background} />
           <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.background }}>
-            Add
+            {t('catalog.add')}
           </AppText>
         </AppPressableView>
       </AppView>

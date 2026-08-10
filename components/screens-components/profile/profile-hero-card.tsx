@@ -2,6 +2,7 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { Pencil } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Platform } from 'react-native';
 
 import { AppText } from '@/components/shared/app-text';
@@ -24,6 +25,7 @@ const CARD_ELEVATION = Platform.select({
 
 export default function ProfileHeroCard() {
   const { tokens } = useThemeContext();
+  const { t } = useTranslation();
   const { profile } = useUserContext();
 
   const hasProfile = !!profile;
@@ -31,7 +33,7 @@ export default function ProfileHeroCard() {
   // character access and fall back to sensible labels rather than rendering
   // an empty avatar/name.
   const fullName = profile ? `${profile.firstName ?? ''} ${profile.lastName ?? ''}`.trim() : '';
-  const displayName = !profile ? 'Loading…' : fullName || 'Your Profile';
+  const displayName = !profile ? t('profileCards.loading') : fullName || t('profileCards.yourProfile');
   const initials = profile
     ? `${profile.firstName?.[0] ?? ''}${profile.lastName?.[0] ?? ''}`.toUpperCase() || 'M'
     : '••';
@@ -79,7 +81,7 @@ export default function ProfileHeroCard() {
               contentFit="cover"
               transition={150}
               onError={() => setImgFailed(true)}
-              accessibilityLabel="Profile photo"
+              accessibilityLabel={t('profileCards.profilePhoto')}
             />
           ) : (
             <AppText textVariant="title" family="heading" weight="bold" colorName="text">
@@ -95,7 +97,7 @@ export default function ProfileHeroCard() {
             pressedOpacity={0.7}
             onPress={() => router.push('/edit-profile')}
             accessibilityRole="button"
-            accessibilityLabel="Edit profile"
+            accessibilityLabel={t('profileCards.editProfile')}
             style={{
               position: 'absolute',
               bottom: 0,

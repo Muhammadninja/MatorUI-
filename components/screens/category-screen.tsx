@@ -1,5 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { PackageOpen } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -25,6 +26,7 @@ import { triggerHaptic } from '@/utils/haptics';
  * "No results found" empty state when the catalog returns nothing.
  */
 export default function CategoryScreen() {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ cat?: string; label?: string }>();
@@ -58,7 +60,7 @@ export default function CategoryScreen() {
     }
     triggerHaptic('success');
     addItem({ id: it.id, title: it.title, description: it.description, price: it.price, imageUrl: it.images?.[0] });
-    toast.success('Added to cart');
+    toast.success(t('catalog.addedToCart'));
   };
 
   return (
@@ -88,7 +90,7 @@ export default function CategoryScreen() {
             <PackageOpen size={28} strokeWidth={2} color={tokens.text} />
           </AppView>
           <AppText textVariant="title" family="heading" colorName="text" align="center">
-            No parts found
+            {t('catalog.noPartsFound')}
           </AppText>
         </AppView>
       ) : (
@@ -103,7 +105,7 @@ export default function CategoryScreen() {
         >
           {state === 'success' ? (
             <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>
-              {total || items.length} result{(total || items.length) === 1 ? '' : 's'}
+              {t('catalog.resultCount', { count: total || items.length })}
             </AppText>
           ) : null}
 
@@ -117,7 +119,7 @@ export default function CategoryScreen() {
         </ScrollView>
       )}
 
-      <ListLoadingOverlay visible={state === 'loading'} label="Finding parts…" />
+      <ListLoadingOverlay visible={state === 'loading'} label={t('catalog.findingParts')} />
     </AppView>
   );
 }

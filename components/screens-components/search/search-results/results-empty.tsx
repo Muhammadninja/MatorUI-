@@ -1,4 +1,5 @@
 import { Filter, SearchX, Sparkles } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
@@ -31,6 +32,7 @@ export default function ResultsEmpty({
   onClearFilters,
   onUseSuggestion,
 }: ResultsEmptyProps) {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
 
   // 1) Server returned a spelling correction — surface it as a tappable suggestion.
@@ -39,13 +41,13 @@ export default function ResultsEmpty({
       <AppView gap={14} px={16} pt={40} align="center">
         <Sparkles size={40} strokeWidth={2} color={tokens.text} />
         <AppView gap={6} align="center">
-          <AppText textVariant="bodySemibold">No matches for “{query.trim()}”</AppText>
+          <AppText textVariant="bodySemibold">{t('search.noMatchesFor', { query: query.trim() })}</AppText>
           <AppText textVariant="bodySm" colorName="gray400" style={{ textAlign: 'center' }}>
-            Did you mean…
+            {t('search.didYouMean')}
           </AppText>
           <AppPressableView
             onPress={() => onUseSuggestion?.(didYouMean)}
-            accessibilityLabel={`Use suggestion ${didYouMean}`}
+            accessibilityLabel={t('search.useSuggestionA11y', { query: didYouMean })}
             androidRipple={false}
             style={{
               marginTop: 6,
@@ -71,19 +73,19 @@ export default function ResultsEmpty({
       <AppView gap={14} px={16} pt={40} align="center">
         <Filter size={40} strokeWidth={2} color={tokens.gray400} />
         <AppView gap={4} align="center">
-          <AppText textVariant="bodySemibold">No results match your filters</AppText>
+          <AppText textVariant="bodySemibold">{t('search.noFilterMatchTitle')}</AppText>
           <AppText
             textVariant="bodySm"
             colorName="gray400"
             style={{ textAlign: 'center', maxWidth: 280 }}
           >
-            Try removing one to widen the search.
+            {t('search.noFilterMatchSubtitle')}
           </AppText>
         </AppView>
         {onClearFilters ? (
           <AppPressableView
             onPress={onClearFilters}
-            accessibilityLabel="Clear all filters"
+            accessibilityLabel={t('search.clearAllFilters')}
             androidRipple={false}
             style={{
               marginTop: 4,
@@ -94,7 +96,7 @@ export default function ResultsEmpty({
             }}
           >
             <AppText weight="semibold" style={{ color: tokens.background }}>
-              Clear filters
+              {t('search.clearFilters')}
             </AppText>
           </AppPressableView>
         ) : null}
@@ -107,9 +109,9 @@ export default function ResultsEmpty({
     <AppView gap={14} px={16} pt={40} align="center">
       <SearchX size={48} strokeWidth={2} color={tokens.gray400} />
       <AppView gap={4} align="center">
-        <AppText textVariant="bodySemibold">No matches</AppText>
+        <AppText textVariant="bodySemibold">{t('search.noMatchesTitle')}</AppText>
         <AppText textVariant="bodySm" colorName="gray400" style={{ textAlign: 'center' }}>
-          Nothing found for “{query.trim()}”. Try a different word or check the spelling.
+          {t('search.noMatchesBody', { query: query.trim() })}
         </AppText>
       </AppView>
     </AppView>

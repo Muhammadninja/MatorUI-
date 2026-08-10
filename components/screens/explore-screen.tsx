@@ -2,6 +2,7 @@ import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
 import { Bell, Search } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -66,6 +67,7 @@ function HeaderFade({ color, height }: { color: string; height: number }) {
  * custom part icons. Tiles route to the Make / Category screens.
  */
 export default function ExploreScreen() {
+  const { t } = useTranslation();
   const { tokens, scheme } = useThemeContext();
   const insets = useSafeAreaInsets();
   const dark = scheme === 'dark';
@@ -90,9 +92,9 @@ export default function ExploreScreen() {
     setRefreshing(true);
     void refreshCategories().finally(() => {
       setRefreshing(false);
-      toast.success('Prices & stock updated');
+      toast.success(t('explore.pricesStockUpdated'));
     });
-  }, [refreshCategories, toast]);
+  }, [refreshCategories, toast, t]);
 
   // Route by the backend category id (e.g. "ENGINE") so the Category listing
   // filters /v1/catalog/parts correctly; the display name is the header label.
@@ -107,12 +109,12 @@ export default function ExploreScreen() {
       // empty model list.
       const make = makes.find((m) => m.id === brandId);
       if (make?.comingSoon) {
-        toast.info(`${make.name} — coming soon`);
+        toast.info(t('explore.brandComingSoon', { name: make.name }));
         return;
       }
       router.push({ pathname: '/make', params: { make: brandId } });
     },
-    [makes, toast],
+    [makes, toast, t],
   );
 
   return (
@@ -145,7 +147,7 @@ export default function ExploreScreen() {
             <AppPressableView
               onPress={() => router.push('/notifications')}
               accessibilityRole="button"
-              accessibilityLabel="Notifications"
+              accessibilityLabel={t('explore.notifications')}
               androidRipple={false}
               center
               style={{ width: 42, height: 42 }}
@@ -173,7 +175,7 @@ export default function ExploreScreen() {
             testID="explore-search-entry"
             onPress={() => router.push('/search')}
             accessibilityRole="search"
-            accessibilityLabel="Search parts, brands, OEM number"
+            accessibilityLabel={t('explore.searchAccessibility')}
             androidRipple={false}
             row
             align="center"
@@ -187,7 +189,7 @@ export default function ExploreScreen() {
           >
             <Search size={20} strokeWidth={2.2} color={tokens.textMuted} />
             <AppText family="default" style={{ fontSize: 15, color: tokens.textMuted }}>
-              Search parts, brands, OEM #
+              {t('explore.searchPlaceholder')}
             </AppText>
           </AppPressableView>
         </AppView>
@@ -217,7 +219,7 @@ export default function ExploreScreen() {
         >
           <WheelLoader size={22} color={tokens.text} />
           <AppText family="accent" weight="semibold" style={{ fontSize: 13, color: tokens.textMuted }}>
-            Refreshing…
+            {t('explore.refreshing')}
           </AppText>
         </AppView>
       ) : null}
@@ -245,11 +247,11 @@ export default function ExploreScreen() {
         {/* ── Shop by vehicle ── */}
         <AppView row align="center" justify="space-between" style={{ marginTop: 2 }}>
           <AppText family="heading" weight="bold" style={{ fontSize: 18}}>
-            Shop by vehicle
+            {t('explore.shopByVehicle')}
           </AppText>
           <AppPressableView onPress={() => router.navigate('/garage')} androidRipple={false} accessibilityRole="button">
             <AppText family="accent" weight="semibold" style={{ fontSize: 13, color: tokens.textMuted }}>
-              My garage ›
+              {t('explore.myGarage')}
             </AppText>
           </AppPressableView>
         </AppView>
@@ -280,7 +282,7 @@ export default function ExploreScreen() {
 
         {/* ── Shop by category ── */}
         <AppText family="heading" weight="bold" style={{ fontSize: 18, color: tokens.text, marginTop: 6 }}>
-          Shop by category
+          {t('explore.shopByCategory')}
         </AppText>
         {categoriesState === 'loading' ? (
           <CategoryGridSkeleton />

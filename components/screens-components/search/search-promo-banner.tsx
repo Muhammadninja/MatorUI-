@@ -1,5 +1,7 @@
 import { router } from 'expo-router';
 import { ArrowUpRight, Sparkles, Tag } from 'lucide-react-native';
+import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import AppImage from '@/components/shared/app-image';
@@ -16,18 +18,25 @@ import { triggerHaptic } from '@/utils/haptics';
  * to it and pull every field (`headline`, `body`, `imageUrl`, `href`,
  * `accentLabel`) from the live response.
  */
-const MOCK_CAMPAIGN = {
-  accentLabel: 'Limited drop',
-  headline: 'Save up to 28% on suspension upgrades',
-  body: 'Curated KW, Bilstein, and Öhlins kits ready for your build, free shipping over $500.',
-  ctaLabel: 'Shop the deals',
-  imageSeed: 'matorui-suspension-promo',
-  href: '/item-detail/mator-elite',
-};
+/** Build the promo campaign copy with translated strings. `t` comes from
+ *  the caller so the copy re-resolves when the language changes. The
+ *  `imageSeed` and `href` are not user-facing and stay stable. */
+function buildMockCampaign(t: (key: string) => string) {
+  return {
+    accentLabel: t('search.promoAccentLabel'),
+    headline: t('search.promoHeadline'),
+    body: t('search.promoBody'),
+    ctaLabel: t('search.promoCta'),
+    imageSeed: 'matorui-suspension-promo',
+    href: '/item-detail/mator-elite',
+  };
+}
 
 export default function SearchPromoBanner() {
+  const { t } = useTranslation();
   const { tokens, scheme } = useThemeContext();
   const isDark = scheme === 'dark';
+  const MOCK_CAMPAIGN = useMemo(() => buildMockCampaign(t), [t]);
 
   const handlePress = () => {
     triggerHaptic('selection');
@@ -39,7 +48,10 @@ export default function SearchPromoBanner() {
       <Pressable
         onPress={handlePress}
         accessibilityRole="button"
-        accessibilityLabel={`${MOCK_CAMPAIGN.headline}. ${MOCK_CAMPAIGN.ctaLabel}.`}
+        accessibilityLabel={t('search.promoBannerA11y', {
+          headline: MOCK_CAMPAIGN.headline,
+          cta: MOCK_CAMPAIGN.ctaLabel,
+        })}
         style={({ pressed }) => ({
           borderRadius: 20,
           overflow: 'hidden',

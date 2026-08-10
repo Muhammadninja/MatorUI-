@@ -1,5 +1,6 @@
 import { X } from 'lucide-react-native';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Animated, Dimensions, Modal } from 'react-native';
 
 import { AppButton } from '@/components/shared/app-button';
@@ -30,18 +31,24 @@ export type SearchFiltersSheetProps = {
   onClose: () => void;
 };
 
-const PRICE_BUCKETS: { key: PriceBucket; label: string }[] = [
-  { key: 'any', label: 'Any price' },
-  { key: 'under_1k', label: 'Under $1,000' },
-  { key: '1k_to_10k', label: '$1k - $10k' },
-  { key: 'over_10k', label: 'Over $10,000' },
-];
+/** Price band chips. Built from `t` so labels re-resolve on language
+ *  change. `key` values are logic enums and stay untranslated. */
+function buildPriceBuckets(t: (key: string) => string): { key: PriceBucket; label: string }[] {
+  return [
+    { key: 'any', label: t('search.priceAny') },
+    { key: 'under_1k', label: t('search.priceUnder1k') },
+    { key: '1k_to_10k', label: t('search.price1kTo10k') },
+    { key: 'over_10k', label: t('search.priceOver10k') },
+  ];
+}
 
-const RATING_BUCKETS: { key: RatingBucket; label: string }[] = [
-  { key: 'any', label: 'Any rating' },
-  { key: '3_plus', label: '3.0 ★ & up' },
-  { key: '4_plus', label: '4.0 ★ & up' },
-];
+function buildRatingBuckets(t: (key: string) => string): { key: RatingBucket; label: string }[] {
+  return [
+    { key: 'any', label: t('search.ratingAny') },
+    { key: '3_plus', label: t('search.rating3Plus') },
+    { key: '4_plus', label: t('search.rating4Plus') },
+  ];
+}
 
 /**
  * Basic facet sheet — category, price band, minimum rating. Edits stage
@@ -55,9 +62,12 @@ export default function SearchFiltersSheet({
   onApply,
   onClose,
 }: SearchFiltersSheetProps) {
+  const { t } = useTranslation();
   const { tokens, scheme } = useThemeContext();
   const isDark = scheme === 'dark';
   const [draft, setDraft] = useState<SearchFilters>(filters);
+  const priceBuckets = useMemo(() => buildPriceBuckets(t), [t]);
+  const ratingBuckets = useMemo(() => buildRatingBuckets(t), [t]);
 
   useEffect(() => {
     if (visible) setDraft(filters);
@@ -112,7 +122,7 @@ export default function SearchFiltersSheet({
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
       <AppView flex={1} justify="flex-end" style={{ backgroundColor: tokens.scrim }}>
-        <AppPressableView style={{ flex: 1 }} onPress={onClose} accessibilityLabel="Dismiss" />
+        <AppPressableView style={{ flex: 1 }} onPress={onClose} accessibilityLabel={t('search.dismiss')} />
         <Animated.View style={{ width: '100%', transform: [{ translateY }] }}>
         <AppView
           roundedTop={28}
@@ -133,14 +143,14 @@ export default function SearchFiltersSheet({
 
           <AppView row align="center" justify="space-between" px={20} pb="sm">
             <AppText textVariant="title" family="heading" weight="bold">
-              Filters
+              {t('search.filters')}
             </AppText>
             <AppPressableView
               center
               rounded={36}
               onPress={onClose}
               androidRipple
-              accessibilityLabel="Close filters"
+              accessibilityLabel={t('search.closeFilters')}
               hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
               style={{
                 width: 32,
@@ -155,7 +165,7 @@ export default function SearchFiltersSheet({
 
           <AppView px={20} pb="lg" gap={20}>
             {availableCategories.length > 0 ? (
-              <FilterSection title="Category">
+              <FilterSection title={t('search.categorySection')}>
                 <AppView row gap="sm" style={{ flexWrap: 'wrap' }}>
                   {availableCategories.map((cat) => {
                     const count = facetCounts?.categories?.[cat];
@@ -172,9 +182,9 @@ export default function SearchFiltersSheet({
               </FilterSection>
             ) : null}
 
-            <FilterSection title="Price">
+            <FilterSection title={t('search.priceSection')}>
               <AppView row gap="sm" style={{ flexWrap: 'wrap' }}>
-                {PRICE_BUCKETS.map((b) => {
+                {priceBuckets.map((b) => {
                   const count = b.key === 'any' ? undefined : facetCounts?.price?.[b.key];
                   return (
                     <FilterChip
@@ -188,9 +198,9 @@ export default function SearchFiltersSheet({
               </AppView>
             </FilterSection>
 
-            <FilterSection title="Minimum rating">
+            <FilterSection title={t('search.minRatingSection')}>
               <AppView row gap="sm" style={{ flexWrap: 'wrap' }}>
-                {RATING_BUCKETS.map((b) => {
+                {ratingBuckets.map((b) => {
                   const count =
                     b.key === 'any' ? undefined : facetCounts?.minRating?.[b.key];
                   return (
@@ -215,7 +225,7 @@ export default function SearchFiltersSheet({
             style={{ borderTopWidth: 1, borderTopColor: tokens.divider }}
           >
             <AppButton
-              title="Reset"
+              title={t('search.reset')}
               kind="secondary"
               variant="outline"
               size="md"
@@ -224,7 +234,7 @@ export default function SearchFiltersSheet({
               containerStyle={{ flex: 1 }}
             />
             <AppButton
-              title="Apply"
+              title={t('search.apply')}
               kind="brand"
               size="md"
               onPress={handleApply}

@@ -1,4 +1,5 @@
 import { Plus } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 
 import { AppIconButton } from '@/components/shared/app-icon-button';
 import { useThemeContext } from '@/contexts/theme.context';
@@ -14,6 +15,7 @@ import { triggerHaptic } from '@/utils/haptics';
  * detail page, not in the list row.
  */
 export default function AddToCartButton({ onPress }: { onPress: () => void }) {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
 
   const handlePress = () => {
@@ -31,7 +33,7 @@ export default function AddToCartButton({ onPress }: { onPress: () => void }) {
       backgroundColorName="gray100"
       borderColorName="border"
       color={tokens.text}
-      accessibilityLabel="Add to cart"
+      accessibilityLabel={t('search.addToCart')}
     />
   );
 }

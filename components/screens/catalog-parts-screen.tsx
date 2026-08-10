@@ -2,6 +2,7 @@ import { FlashList } from '@shopify/flash-list';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AlertCircle, ArrowLeft, PackageOpen, Search, X } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Keyboard, ScrollView, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -43,6 +44,7 @@ function brandOf(item: CatalogItem): string {
  * Region + GM go to the backend; the rest refine the fetched page client-side.
  */
 export default function CatalogPartsScreen() {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
   // `categoryId` is the real backend category id (e.g. "cat_engine_belts")
@@ -129,10 +131,10 @@ export default function CatalogPartsScreen() {
   // chip. Replaces the old bottom sheet entirely.
   const chips = useMemo<QuickChip[]>(() => {
     const list: QuickChip[] = [
-      { key: 'sort:price_asc', label: 'Price ↑', active: filter.sortBy === 'price_asc', onPress: () => toggleSort('price_asc') },
-      { key: 'sort:price_desc', label: 'Price ↓', active: filter.sortBy === 'price_desc', onPress: () => toggleSort('price_desc') },
-      { key: 'gm', label: 'GM', active: filter.gmOnly, onPress: () => setFilter((s) => ({ ...s, gmOnly: !s.gmOnly })) },
-      { key: 'oem', label: 'OEM Quality', active: filter.oemOnly, onPress: () => setFilter((s) => ({ ...s, oemOnly: !s.oemOnly })) },
+      { key: 'sort:price_asc', label: t('catalog.priceAsc'), active: filter.sortBy === 'price_asc', onPress: () => toggleSort('price_asc') },
+      { key: 'sort:price_desc', label: t('catalog.priceDesc'), active: filter.sortBy === 'price_desc', onPress: () => toggleSort('price_desc') },
+      { key: 'gm', label: t('catalog.chipGm'), active: filter.gmOnly, onPress: () => setFilter((s) => ({ ...s, gmOnly: !s.gmOnly })) },
+      { key: 'oem', label: t('catalog.chipOemQuality'), active: filter.oemOnly, onPress: () => setFilter((s) => ({ ...s, oemOnly: !s.oemOnly })) },
     ];
     for (const b of brands) {
       list.push({ key: `brand:${b}`, label: b, active: filter.brands.includes(b), onPress: () => toggleBrand(b), testID: `filter-brand-${b}` });
@@ -154,9 +156,9 @@ export default function CatalogPartsScreen() {
       }
       triggerHaptic('success');
       addItem({ id: it.id, title: it.title, description: it.description, price: it.price, imageUrl: it.images?.[0] });
-      toast.success('Added to cart');
+      toast.success(t('catalog.addedToCart'));
     },
-    [addItem, isAuthenticated, toast],
+    [addItem, isAuthenticated, toast, t],
   );
 
   const renderItem = useCallback(
@@ -176,7 +178,7 @@ export default function CatalogPartsScreen() {
             borderWidth={1}
             borderName="border"
             accessibilityRole="button"
-            accessibilityLabel="Back"
+            accessibilityLabel={t('catalog.back')}
             style={{ width: 40, height: 40 }}
           >
             <ArrowLeft size={22} strokeWidth={2.2} color={tokens.text} />
@@ -197,7 +199,7 @@ export default function CatalogPartsScreen() {
             <TextInput
               value={search}
               onChangeText={setSearch}
-              placeholder={categoryLabel ? `Search ${categoryLabel}` : 'Search parts'}
+              placeholder={categoryLabel ? t('catalog.searchIn', { label: categoryLabel }) : t('catalog.searchParts')}
               placeholderTextColor={tokens.textMuted}
               autoCorrect={false}
               autoCapitalize="none"
@@ -206,7 +208,7 @@ export default function CatalogPartsScreen() {
               style={{ flex: 1, fontSize: 15, color: tokens.text, paddingVertical: 0 }}
             />
             {search.length > 0 ? (
-              <AppPressableView onPress={() => setSearch('')} accessibilityRole="button" accessibilityLabel="Clear search" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <AppPressableView onPress={() => setSearch('')} accessibilityRole="button" accessibilityLabel={t('catalog.clearSearch')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <X size={18} strokeWidth={2.2} color={tokens.textMuted} />
               </AppPressableView>
             ) : null}
@@ -226,7 +228,7 @@ export default function CatalogPartsScreen() {
           {activeFilterCount > 0 ? (
             <QuickPill
               testID="filter-clear-btn"
-              label="Clear"
+              label={t('catalog.clear')}
               active={false}
               onPress={() => {
                 triggerHaptic('selection');
@@ -258,20 +260,20 @@ export default function CatalogPartsScreen() {
         <AppView flex={1} center px="xl" gap={12}>
           <AlertCircle size={30} strokeWidth={2} color={tokens.error} />
           <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted, textAlign: 'center' }}>
-            Couldn&apos;t load parts.
+            {t('catalog.loadPartsError')}
           </AppText>
           <AppPressableView onPress={refresh} rounded={999} px={16} py={9} colorName="backgroundSecondary" borderWidth={1} borderName="border" accessibilityRole="button">
-            <AppText family="accent" weight="semibold" style={{ fontSize: 13, color: tokens.text }}>Retry</AppText>
+            <AppText family="accent" weight="semibold" style={{ fontSize: 13, color: tokens.text }}>{t('common.retry')}</AppText>
           </AppPressableView>
         </AppView>
       ) : results.length === 0 ? (
         <AppView flex={1} center px="xl" gap={10}>
           <PackageOpen size={30} strokeWidth={2} color={tokens.textMuted} />
           <AppText family="heading" weight="bold" style={{ fontSize: 17, color: tokens.text }}>
-            No parts found
+            {t('catalog.noPartsFound')}
           </AppText>
           <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted, textAlign: 'center', maxWidth: 280 }}>
-            Try clearing filters or a different search.
+            {t('catalog.tryClearingFilters')}
           </AppText>
         </AppView>
       ) : (
@@ -286,7 +288,7 @@ export default function CatalogPartsScreen() {
               <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>
                 {categoryLabel ? `${categoryLabel} · ` : ''}
                 {vehicleLabel ? `${vehicleLabel} · ` : ''}
-                {results.length} part{results.length === 1 ? '' : 's'}
+                {t('catalog.partCount', { count: results.length })}
               </AppText>
             </AppView>
           }

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Switch } from 'react-native';
 
 import { AppText } from '@/components/shared/app-text';
@@ -14,10 +15,13 @@ export type AddVehiclePrimaryToggleProps = {
 export function AddVehiclePrimaryToggle({
   value,
   onChange,
-  title = 'Set as primary',
-  hint = 'Filter parts by this vehicle by default.',
+  title,
+  hint,
 }: AddVehiclePrimaryToggleProps) {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
+  const resolvedTitle = title ?? t('addVehicle.setPrimaryTitle');
+  const resolvedHint = hint ?? t('addVehicle.setPrimaryHint');
 
   return (
     <AppView
@@ -29,10 +33,10 @@ export function AddVehiclePrimaryToggle({
       <AppView row align="center" justify="space-between" gap="md" p="lg">
         <AppView flex={1} gap={2}>
           <AppText textVariant="bodySemibold" colorName="text" numberOfLines={1}>
-            {title}
+            {resolvedTitle}
           </AppText>
           <AppText textVariant="bodyXs" colorName="gray400">
-            {hint}
+            {resolvedHint}
           </AppText>
         </AppView>
         <Switch

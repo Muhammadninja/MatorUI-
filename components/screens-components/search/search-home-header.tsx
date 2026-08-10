@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import { useUserContext } from '@/contexts/user.context';
@@ -10,12 +12,15 @@ import { useUserContext } from '@/contexts/user.context';
  * it is intentionally not repeated here.
  */
 export default function SearchHomeHeader() {
+  const { t } = useTranslation();
   const { profile, isAuthenticated } = useUserContext();
 
   const hour = new Date().getHours();
-  const partOfDay = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
+  const partOfDay = hour < 12 ? 'Morning' : hour < 18 ? 'Afternoon' : 'Evening';
   const firstName = isAuthenticated ? profile?.firstName?.trim() : undefined;
-  const greeting = firstName ? `Good ${partOfDay}, ${firstName}` : `Good ${partOfDay}`;
+  const greeting = firstName
+    ? t(`search.greeting${partOfDay}Named`, { name: firstName })
+    : t(`search.greeting${partOfDay}`);
 
   return (
     <AppView px="md" pt="sm" pb="md" gap={2}>
@@ -23,7 +28,7 @@ export default function SearchHomeHeader() {
         {greeting}
       </AppText>
       <AppText textVariant="h3" family="heading" weight="bold">
-        Find your part
+        {t('search.findYourPart')}
       </AppText>
     </AppView>
   );

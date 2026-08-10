@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { AppButton } from '@/components/shared/app-button';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
@@ -26,6 +28,7 @@ export function AppLocationField({
   onChange,
   disabled,
 }: AppLocationFieldProps) {
+  const { t } = useTranslation();
   return (
     <FieldShell label={label} required={required} helperText={helperText} errorText={errorText}>
       <AppView gap={8}>
@@ -42,7 +45,7 @@ export function AppLocationField({
         ) : null}
         {!!value ? (
           <AppButton
-            title="Clear location"
+            title={t('fields.clearLocation')}
             size="xs"
             variant="ghost"
             kind="text"

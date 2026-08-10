@@ -1,6 +1,7 @@
 import React from 'react';
 import { Image } from 'react-native';
 
+import { useTranslation } from 'react-i18next';
 import { router, useFocusEffect } from 'expo-router';
 import {
   Heart,
@@ -40,54 +41,60 @@ type AccountItem = {
   onPress: () => void;
 };
 
-const ACCOUNT_ITEMS: AccountItem[] = [
-  {
-    key: 'edit-profile',
-    title: 'Edit profile',
-    subtitle: 'Name, email, phone',
-    leading: <AppIconBox Icon={User} rounded={11} />,
-    rightChevron: true,
-    onPress: () => router.push('/edit-profile'),
-  },
-  {
-    key: 'orders',
-    title: 'Order history',
-    subtitle: 'View your orders',
-    leading: <AppIconBox Icon={ReceiptText} rounded={11} />,
-    rightChevron: true,
-    onPress: () => router.push('/order-history'),
-  },
-  {
-    key: 'addresses',
-    title: 'Shipping addresses',
-    subtitle: 'Manage delivery addresses',
-    leading: <AppIconBox Icon={MapPin} rounded={11} />,
-    rightChevron: true,
-    onPress: () => router.push('/shipping-addresses'),
-  },
-  {
-    key: 'liked',
-    title: 'Liked',
-    subtitle: 'Parts you saved',
-    leading: <AppIconBox Icon={Heart} rounded={11} />,
-    rightChevron: true,
-    onPress: () => router.push('/liked'),
-  },
-  {
-    key: 'settings',
-    title: 'Settings',
-    subtitle: 'Language, terms, account',
-    leading: <AppIconBox Icon={Shield} rounded={11} />,
-    rightChevron: true,
-    onPress: () => router.push('/settings-security'),
-  },
-];
+/** Build the account rows with translated copy. `t` comes from the caller so
+ *  the labels re-resolve when the language changes. */
+function buildAccountItems(t: (key: string) => string): AccountItem[] {
+  return [
+    {
+      key: 'edit-profile',
+      title: t('profile.editProfileTitle'),
+      subtitle: t('profile.editProfileSub'),
+      leading: <AppIconBox Icon={User} rounded={11} />,
+      rightChevron: true,
+      onPress: () => router.push('/edit-profile'),
+    },
+    {
+      key: 'orders',
+      title: t('profile.orderHistoryTitle'),
+      subtitle: t('profile.orderHistorySub'),
+      leading: <AppIconBox Icon={ReceiptText} rounded={11} />,
+      rightChevron: true,
+      onPress: () => router.push('/order-history'),
+    },
+    {
+      key: 'addresses',
+      title: t('profile.addressesTitle'),
+      subtitle: t('profile.addressesSub'),
+      leading: <AppIconBox Icon={MapPin} rounded={11} />,
+      rightChevron: true,
+      onPress: () => router.push('/shipping-addresses'),
+    },
+    {
+      key: 'liked',
+      title: t('profile.likedTitle'),
+      subtitle: t('profile.likedSub'),
+      leading: <AppIconBox Icon={Heart} rounded={11} />,
+      rightChevron: true,
+      onPress: () => router.push('/liked'),
+    },
+    {
+      key: 'settings',
+      title: t('profile.settingsTitle'),
+      subtitle: t('profile.settingsSub'),
+      leading: <AppIconBox Icon={Shield} rounded={11} />,
+      rightChevron: true,
+      onPress: () => router.push('/settings-security'),
+    },
+  ];
+}
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 export default function ProfileScreen() {
+  const { t } = useTranslation();
   const toast = useToast();
   const { profile, isAuthenticated, isHydrating, signOut, refreshProfile } = useUserContext();
+  const accountItems = React.useMemo(() => buildAccountItems(t), [t]);
 
   // Re-fetch GET /v1/me every time the tab gains focus so freshly-saved fields
   // (avatar_url, name) show up without an app restart. The context was only
@@ -112,7 +119,7 @@ export default function ProfileScreen() {
 
   const handleSignOut = async () => {
     await signOut();
-    toast.info('Signed out');
+    toast.info(t('profile.signedOutToast'));
     router.replace('/explore');
   };
 
@@ -148,22 +155,22 @@ export default function ProfileScreen() {
 
           {/* 3-equal stats cards — real counts (0 = the honest empty state). */}
           <AppView row gap="sm" px="lg">
-            <StatCard label="Orders" value={String(orderCount)} />
-            <StatCard label="Vehicles" value={String(vehicles.length)} />
-            <StatCard label="Saved" value={String(likedIds.size)} />
+            <StatCard label={t('profile.statOrders')} value={String(orderCount)} />
+            <StatCard label={t('profile.statVehicles')} value={String(vehicles.length)} />
+            <StatCard label={t('profile.statSaved')} value={String(likedIds.size)} />
           </AppView>
 
           {/* Handoff §17: list rows with icon tile 11-radius + title + sub + chevron */}
           <AppView gap={10} px="lg">
             <AppView rounded={SECTION_RADIUS} colorName="card" borderWidth={1} borderName="border">
-              {ACCOUNT_ITEMS.map(({ key, ...item }, index) => (
+              {accountItems.map(({ key, ...item }, index) => (
                 <AppListItem
                   key={key}
                   {...item}
                   _isFirst={index === 0}
-                  _isLast={index === ACCOUNT_ITEMS.length - 1}
+                  _isLast={index === accountItems.length - 1}
                   _parentRounded={SECTION_RADIUS}
-                  divider={index !== ACCOUNT_ITEMS.length - 1}
+                  divider={index !== accountItems.length - 1}
                   colorName="card"
                 />
               ))}
@@ -175,7 +182,7 @@ export default function ProfileScreen() {
               text color so it reads in both light and dark. */}
           <AppView px="lg">
             <AppButton
-              title="Sign out"
+              title={t('profile.signOut')}
               variant="ghost"
               kind="text"
               size="lg"
@@ -192,6 +199,7 @@ export default function ProfileScreen() {
 // ── Profile Header ────────────────────────────────────────────────────────────
 
 function ProfileHeader({ profile }: { profile: UserProfile }) {
+  const { t } = useTranslation();
   const avatarUri = profile.avatarUrl;
   const { tokens } = useThemeContext();
   const fullName = `${profile.firstName ?? ''} ${profile.lastName ?? ''}`.trim();
@@ -251,7 +259,7 @@ function ProfileHeader({ profile }: { profile: UserProfile }) {
           weight="bold"
           style={{ fontSize: 21, lineHeight: 26, color: tokens.text }}
         >
-          {fullName || 'Your Profile'}
+          {fullName || t('profile.namePlaceholder')}
         </AppText>
         <AppText
           family="default"

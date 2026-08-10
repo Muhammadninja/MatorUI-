@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { AppButton } from '@/components/shared/app-button';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
@@ -34,9 +36,10 @@ function ResetButton<TValue>({
   emptyValue: TValue;
   onChange?: (value: TValue) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <AppButton
-      title="Clear"
+      title={t('common.clear')}
       size="xs"
       variant="ghost"
       kind="text"
@@ -57,13 +60,14 @@ export default function AppImagePairField({
   value,
   onChange,
 }: AppImagePairFieldProps) {
+  const { t } = useTranslation();
   const current = value ?? { front: null, back: null };
 
   return (
     <FieldShell label={label} required={required} helperText={helperText} errorText={errorText}>
       <AppView gap={10}>
         <ValuePreview
-          emptyLabel="No images selected"
+          emptyLabel={t('fields.noImagesSelected')}
           lines={[
             current.front ? `Front: ${current.front}` : '',
             current.back ? `Back: ${current.back}` : '',
@@ -90,11 +94,12 @@ export function AppImageField({
   value,
   onChange,
 }: AppImageFieldProps) {
+  const { t } = useTranslation();
   return (
     <FieldShell label={label} required={required} helperText={helperText} errorText={errorText}>
       <AppView gap={10}>
         <AppText textVariant="bodyXs" muted>
-          {value || 'No image selected'}
+          {value || t('fields.noImageSelected')}
         </AppText>
         <ResetButton disabled={disabled} emptyValue={null} onChange={onChange} />
       </AppView>
@@ -111,10 +116,11 @@ export function AppImageMultipleField({
   value = [],
   onChange,
 }: AppImageMultipleFieldProps) {
+  const { t } = useTranslation();
   return (
     <FieldShell label={label} required={required} helperText={helperText} errorText={errorText}>
       <AppView gap={10}>
-        <ValuePreview emptyLabel="No images selected" lines={value} />
+        <ValuePreview emptyLabel={t('fields.noImagesSelected')} lines={value} />
         <ResetButton disabled={disabled} emptyValue={[]} onChange={onChange} />
       </AppView>
     </FieldShell>

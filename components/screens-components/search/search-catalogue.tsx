@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { AlertCircle, PackageOpen } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { ScrollView } from 'react-native';
 
 import { AppButton } from '@/components/shared/app-button';
@@ -30,6 +31,7 @@ const FALLBACK_IMAGE = require('@/assets/images/test-image.png');
  * place — only the content area swaps.
  */
 export default function SearchCatalogue() {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const { state, items, error, refresh } = useCatalogList({
     page: 1,
@@ -40,7 +42,7 @@ export default function SearchCatalogue() {
     <AppView mt={14} gap="lg">
       <AppView px="lg">
         <AppText textVariant="title" family="heading" weight="bold">
-          Catalogue
+          {t('search.catalogue')}
         </AppText>
       </AppView>
 
@@ -50,16 +52,16 @@ export default function SearchCatalogue() {
         <AppView px="lg" gap="md" align="center" py="xl">
           <AlertCircle size={32} strokeWidth={2} color={tokens.error} />
           <AppView gap="xs" align="center">
-            <AppText textVariant="bodySemibold">Couldn't load catalogue</AppText>
+            <AppText textVariant="bodySemibold">{t('search.catalogueLoadError')}</AppText>
             <AppText
               textVariant="bodySm"
               colorName="gray400"
               style={{ textAlign: 'center', maxWidth: 280 }}
             >
-              {error ?? 'Something went wrong. Try again.'}
+              {error ?? t('search.genericError')}
             </AppText>
           </AppView>
-          <AppButton title="Retry" kind="secondary" size="sm" onPress={refresh} />
+          <AppButton title={t('common.retry')} kind="secondary" size="sm" onPress={refresh} />
         </AppView>
       ) : state === 'empty' ? (
         <AppView px="lg" gap={10} align="center" py="xl">
@@ -69,7 +71,7 @@ export default function SearchCatalogue() {
             colorName="gray400"
             style={{ textAlign: 'center' }}
           >
-            No catalogue items yet.
+            {t('search.catalogueEmpty')}
           </AppText>
         </AppView>
       ) : (

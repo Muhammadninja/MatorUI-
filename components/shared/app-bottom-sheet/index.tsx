@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Animated,
   Dimensions,
@@ -50,6 +51,7 @@ export function AppBottomSheet({
   swipeToClose = true,
   children,
 }: AppBottomSheetProps) {
+  const { t } = useTranslation();
   const { tokens, scheme } = useThemeContext();
   const insets = useSafeAreaInsets();
   const screenHeight = Dimensions.get('window').height;
@@ -162,7 +164,7 @@ export function AppBottomSheet({
           style={styles.overlayPressable}
           onPress={dismissOnOverlayPress ? onClose : undefined}
           accessibilityRole="button"
-          accessibilityLabel="Dismiss sheet"
+          accessibilityLabel={t('fields.dismissSheet')}
         >
           <AppView flex={1} style={{ backgroundColor: 'rgba(0, 0, 0, 0.42)' }} />
         </Pressable>

@@ -1,6 +1,7 @@
 import { ArrowLeft, Bell, Mic, Sparkles, X } from 'lucide-react-native';
 import { useEffect, useMemo, useRef } from 'react';
 import { Controller } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet } from 'react-native';
 
 import { AppForm, type FieldRegistry } from '@/components/shared/app-form';
@@ -46,7 +47,7 @@ export type SmartSearchBarProps = {
 };
 
 export function SmartSearchBar({
-  placeholder = 'Smart search...',
+  placeholder,
   onPress,
   onVoicePress,
   onImageSearchPress,
@@ -57,7 +58,9 @@ export function SmartSearchBar({
   onBackPress,
   formResetKey,
 }: SmartSearchBarProps) {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
+  const resolvedPlaceholder = placeholder ?? t('search.smartSearchPlaceholder');
 
   // CRITICAL: searchField and searchRegistry MUST be memoized. AppForm's
   // renderField does `const Renderer = registry[fieldType]; <Renderer .../>`.
@@ -88,13 +91,13 @@ export function SmartSearchBar({
     () => ({
       name: 'query',
       type: 'text',
-      placeholder,
+      placeholder: resolvedPlaceholder,
       props: {
         autoCapitalize: 'none',
         autoCorrect: false,
       },
     }),
-    [placeholder],
+    [resolvedPlaceholder],
   );
 
   const searchRegistry = useMemo<Partial<FieldRegistry>>(
@@ -135,7 +138,7 @@ export function SmartSearchBar({
                       rhf.onChange('');
                     }}
                     androidRipple
-                    accessibilityLabel="Clear search"
+                    accessibilityLabel={t('search.clearSearch')}
                     style={[
                       styles.adornmentIcon,
                       { backgroundColor: tokens.gray200 },
@@ -149,7 +152,7 @@ export function SmartSearchBar({
                     rounded={36}
                     onPress={() => onVoicePressRef.current?.()}
                     androidRipple
-                    accessibilityLabel="Voice search"
+                    accessibilityLabel={t('search.voiceSearch')}
                     style={styles.adornmentIcon}
                   >
                     <Mic size={18} strokeWidth={2} color={tokens.text} />
@@ -183,7 +186,7 @@ export function SmartSearchBar({
           rounded={36}
           onPress={onBackPress}
           androidRipple
-          accessibilityLabel="Back to home"
+          accessibilityLabel={t('search.backToHome')}
           style={styles.notificationButton}
         >
           <ArrowLeft size={20} strokeWidth={2} color={tokens.text} />
@@ -218,7 +221,7 @@ export function SmartSearchBar({
           colorName="brand"
           onPress={onNotificationPress}
           androidRipple
-          accessibilityLabel="Notifications"
+          accessibilityLabel={t('search.notifications')}
           style={styles.notificationButton}
         >
           <Bell size={18} strokeWidth={2} color={tokens.onBrand} />

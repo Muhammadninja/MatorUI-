@@ -1,4 +1,5 @@
 import type { ComponentProps } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { AppButton } from '@/components/shared/app-button';
 import { TextEntryField } from '@/components/shared/form-field-primitives';
@@ -14,6 +15,7 @@ export function AppTextField({
   value,
   ...props
 }: AppTextFieldProps) {
+  const { t } = useTranslation();
   return (
     <TextEntryField
       value={value}
@@ -21,7 +23,7 @@ export function AppTextField({
         rightAdornment ??
         (onRightIconPress && value ? (
           <AppButton
-            title="Clear"
+            title={t('common.clear')}
             size="xs"
             variant="ghost"
             kind="text"

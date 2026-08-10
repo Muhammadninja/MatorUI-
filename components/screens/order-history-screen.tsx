@@ -1,6 +1,7 @@
 import React from 'react';
 import { router } from 'expo-router';
 import { AlertCircle, PackageOpen } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { RefreshControl, ScrollView } from 'react-native';
 
 import { WheelLoader } from '@/components/shared/wheel-loader';
@@ -12,7 +13,12 @@ import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useOrders } from '@/hooks/use-orders';
-import { formatOrderNo, type OrderListRow, type OrderListStatus } from '@/services/orders-service';
+import {
+  formatOrderNo,
+  ORDER_LIST_STATUS_I18N,
+  type OrderListRow,
+  type OrderListStatus,
+} from '@/services/orders-service';
 import { triggerHaptic } from '@/utils/haptics';
 
 /**
@@ -21,12 +27,13 @@ import { triggerHaptic } from '@/utils/haptics';
  * state machine. Each row taps through to Track Order carrying its `orderId`.
  */
 export default function OrderHistoryScreen() {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const { state, page, error, refresh } = useOrders();
 
   return (
     <AppView flex={1} colorName="background" testID="order-history-screen">
-      <AppSettingsHeader title="Order history" fallbackHref="/profile" />
+      <AppSettingsHeader title={t('orderHistory.title')} fallbackHref="/profile" />
 
       {state === 'loading' ? (
         <AppView flex={1} center>
@@ -36,17 +43,17 @@ export default function OrderHistoryScreen() {
         <AppView flex={1} center px="xl" gap={12}>
           <AlertCircle size={32} strokeWidth={2} color={tokens.error} />
           <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted, textAlign: 'center', maxWidth: 280 }}>
-            {error ?? 'Could not load your orders.'}
+            {error ?? t('orderHistory.loadError')}
           </AppText>
-          <AppButton title="Retry" kind="secondary" size="sm" onPress={refresh} />
+          <AppButton title={t('common.retry')} kind="secondary" size="sm" onPress={refresh} />
         </AppView>
       ) : state === 'empty' ? (
         <AppView flex={1} center px="xl" gap={12}>
           <PackageOpen size={30} strokeWidth={2} color={tokens.textMuted} />
           <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted, textAlign: 'center' }}>
-            You haven&apos;t placed any orders yet.
+            {t('orderHistory.emptyText')}
           </AppText>
-          <AppButton title="Start shopping" kind="brand" size="sm" onPress={() => router.navigate('/explore')} />
+          <AppButton title={t('orderHistory.startShopping')} kind="brand" size="sm" onPress={() => router.navigate('/explore')} />
         </AppView>
       ) : (
         <ScrollView
@@ -76,10 +83,14 @@ const statusToneMap: Record<OrderListStatus, 'success' | 'warning' | 'error'> = 
 };
 
 const OrderCard = React.memo(function OrderCard({ order }: { order: OrderListRow }) {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
 
   const tone = statusToneMap[order.status] ?? 'warning';
   const statusColor = tone === 'success' ? tokens.success : tone === 'error' ? tokens.error : tokens.warning;
+  // Localized display label, derived from the stable status value. Falls back
+  // to the raw server string if it's a status we don't have a key for.
+  const statusText = t(ORDER_LIST_STATUS_I18N[order.status] ?? '', { defaultValue: order.status });
 
   const handlePress = () => {
     triggerHaptic('selection');
@@ -93,7 +104,7 @@ const OrderCard = React.memo(function OrderCard({ order }: { order: OrderListRow
       pressedScale={0.99}
       onPress={handlePress}
       accessibilityRole="button"
-      accessibilityLabel={`Order ${order.id}, ${order.status}`}
+      accessibilityLabel={t('orderHistory.orderAccessibility', { id: order.id, status: statusText })}
       style={{
         backgroundColor: tokens.card,
         borderWidth: 1,
@@ -134,7 +145,7 @@ const OrderCard = React.memo(function OrderCard({ order }: { order: OrderListRow
             weight="bold"
             style={{ fontSize: 11, color: statusColor }}
           >
-            {order.status}
+            {statusText}
           </AppText>
         </AppView>
       </AppView>
@@ -155,7 +166,7 @@ const OrderCard = React.memo(function OrderCard({ order }: { order: OrderListRow
           family="default"
           style={{ fontSize: 13, color: tokens.textMuted }}
         >
-          {order.date} · {order.items} item{order.items > 1 ? 's' : ''}
+          {t('orderHistory.dateItems', { date: order.date, count: order.items })}
         </AppText>
         <AppPrice value={order.total} size={16} color={tokens.text} />
       </AppView>

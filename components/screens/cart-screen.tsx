@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { AlertCircle, Package, ShoppingBag, X } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { RefreshControl, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -25,6 +26,7 @@ import { parsePrice } from '@/services/cart-math';
  * moment `EXPO_PUBLIC_API_BASE_URL` is set — no code change here.
  */
 export default function CartScreen() {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
   const { isAuthenticated } = useUserContext();
@@ -58,19 +60,19 @@ export default function CartScreen() {
     return (
       <AppView flex={1} colorName="background" style={{ paddingTop: insets.top + 8 }}>
         <AppText family="heading" colorName="text" style={{ fontSize: 26, lineHeight: 32, paddingHorizontal: 20, paddingTop: 6 }}>
-          Cart
+          {t('cart.title')}
         </AppText>
         <AppView flex={1} center gap={14} px="xl">
           {error ? (
             <>
               <AlertCircle size={30} strokeWidth={2} color={tokens.error} />
               <AppText family="heading" colorName="text" style={{ fontSize: 18, lineHeight: 24 }}>
-                Couldn&apos;t load your cart
+                {t('cart.loadErrorTitle')}
               </AppText>
               <AppText family="default" colorName="textMuted" style={{ fontSize: 13, lineHeight: 18, textAlign: 'center', maxWidth: 280 }}>
                 {error}
               </AppText>
-              <AppButton title="Retry" kind="secondary" size="sm" onPress={refresh} />
+              <AppButton title={t('common.retry')} kind="secondary" size="sm" onPress={refresh} />
             </>
           ) : (
             <WheelLoader size={30} color={tokens.text} />
@@ -84,17 +86,17 @@ export default function CartScreen() {
     return (
       <AppView flex={1} colorName="background" testID="cart-screen" style={{ paddingTop: insets.top + 8 }}>
         <AppText family="heading" colorName="text" style={{ fontSize: 26, lineHeight: 32, paddingHorizontal: 20, paddingTop: 6 }}>
-          Cart
+          {t('cart.title')}
         </AppText>
         <AppView flex={1} center gap={14} px="xl">
           <AppView center rounded={999} style={{ width: 72, height: 72, backgroundColor: tokens.backgroundSecondary }}>
             <ShoppingBag size={30} strokeWidth={1.8} color={tokens.textMuted} />
           </AppView>
-          <AppText family="heading" colorName="text" style={{ fontSize: 20, lineHeight: 26 }}>Your cart is empty</AppText>
+          <AppText family="heading" colorName="text" style={{ fontSize: 20, lineHeight: 26 }}>{t('cart.emptyTitle')}</AppText>
           <AppText family="default" colorName="textMuted" style={{ fontSize: 14, lineHeight: 20, textAlign: 'center', maxWidth: 280 }}>
-            Browse parts that fit your vehicle and add them here.
+            {t('cart.emptySubtitle')}
           </AppText>
-          <AppButton title="Start shopping" kind="brand" size="md" onPress={() => router.navigate('/explore')} />
+          <AppButton title={t('cart.startShopping')} kind="brand" size="md" onPress={() => router.navigate('/explore')} />
         </AppView>
       </AppView>
     );
@@ -110,7 +112,7 @@ export default function CartScreen() {
         }
       >
         <AppText family="heading" weight="bold" style={{ fontSize: 26, lineHeight: 32, color: tokens.text, paddingTop: 6 }}>
-          Cart · {itemCount} item{itemCount === 1 ? '' : 's'}
+          {t('cart.titleWithCount', { count: itemCount })}
         </AppText>
 
         {error ? (
@@ -175,7 +177,7 @@ export default function CartScreen() {
                 onPress={() => removeItem(item.id)}
                 testID={`cart-remove-${item.id}`}
                 accessibilityRole="button"
-                accessibilityLabel={`Remove ${item.title}`}
+                accessibilityLabel={t('cart.removeItem', { title: item.title })}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 style={{ alignSelf: 'flex-start' }}
               >
@@ -188,16 +190,16 @@ export default function CartScreen() {
 
       {/* Sticky footer */}
       <AppView colorName="background" px="lg" style={{ paddingTop: 16, paddingBottom: Math.max(insets.bottom, 20), borderTopWidth: 1, borderTopColor: tokens.divider }}>
-        <SummaryRow label="Subtotal" value={formatCurrency(totals.subtotal)} tokens={tokens} />
+        <SummaryRow label={t('cart.subtotal')} value={formatCurrency(totals.subtotal)} tokens={tokens} />
         {totals.discount > 0 ? (
-          <SummaryRow label="Discount" value={`−${formatCurrency(totals.discount)}`} tokens={tokens} />
+          <SummaryRow label={t('cart.discount')} value={`−${formatCurrency(totals.discount)}`} tokens={tokens} />
         ) : null}
-        <SummaryRow label="Est. tax" value={formatCurrency(totals.tax)} tokens={tokens} />
+        <SummaryRow label={t('cart.estTax')} value={formatCurrency(totals.tax)} tokens={tokens} />
         <AppView row justify="space-between" style={{ marginBottom: 12 }}>
-          <AppText family="accent" weight="bold" style={{ fontSize: 16, color: tokens.text }}>Total</AppText>
+          <AppText family="accent" weight="bold" style={{ fontSize: 16, color: tokens.text }}>{t('cart.total')}</AppText>
           <AppText family="heading" weight="bold" style={{ fontSize: 20, color: tokens.text }}>{formatCurrency(totals.total)}</AppText>
         </AppView>
-        <AppButton testID="cart-checkout-btn" title="Checkout" kind="brand" size="lg" fullWidth onPress={goCheckout} />
+        <AppButton testID="cart-checkout-btn" title={t('cart.checkout')} kind="brand" size="lg" fullWidth onPress={goCheckout} />
       </AppView>
     </AppView>
   );

@@ -8,6 +8,7 @@ import {
   type PropsWithChildren,
 } from 'react';
 
+import { changeAppLanguage, SUPPORTED_LANGUAGES } from '@/services/i18n';
 import {
   loadLanguage,
   saveLanguage,
@@ -15,6 +16,25 @@ import {
 } from '@/services/language-storage';
 
 export type { LanguageCode };
+
+/**
+ * Best-effort device-locale guess, constrained to a language we ship.
+ * Uses Hermes' built-in `Intl` (no native module) so it works in the current
+ * dev client without a rebuild. Falls back to the default if Intl is
+ * unavailable or the device language isn't one we support.
+ */
+function detectDeviceLanguage(): LanguageCode {
+  try {
+    const locale = Intl.DateTimeFormat().resolvedOptions().locale; // e.g. "ru-RU"
+    const tag = locale?.split('-')[0]?.toLowerCase();
+    if (tag && (SUPPORTED_LANGUAGES as string[]).includes(tag)) {
+      return tag as LanguageCode;
+    }
+  } catch {
+    // Intl missing/disabled — fall through to the default.
+  }
+  return DEFAULT_LANGUAGE;
+}
 
 export type LanguageOption = {
   code: LanguageCode;
@@ -63,6 +83,13 @@ export function LanguageProvider({ children }: PropsWithChildren) {
         if (stored) {
           setLanguageState(stored);
           setHasChosen(true);
+          void changeAppLanguage(stored);
+        } else {
+          // No saved choice yet — preview the device language in the UI
+          // (still not "chosen", so onboarding picker is shown).
+          const guess = detectDeviceLanguage();
+          setLanguageState(guess);
+          void changeAppLanguage(guess);
         }
       })
       .catch((err) => {
@@ -84,6 +111,7 @@ export function LanguageProvider({ children }: PropsWithChildren) {
   const setLanguage = useCallback(async (code: LanguageCode) => {
     setLanguageState(code);
     setHasChosen(true);
+    await changeAppLanguage(code);
     await saveLanguage(code);
   }, []);
 

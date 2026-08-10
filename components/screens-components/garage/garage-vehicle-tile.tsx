@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { CarFront, MoreVertical } from 'lucide-react-native';
 
 import AppImage from '@/components/shared/app-image';
@@ -13,9 +14,9 @@ export type GarageVehicleTileProps = {
   onOpenDetail?: (id: string) => void;
 };
 
-function formatMileage(km?: number): string {
+function formatMileage(km: number | undefined, unit: string): string {
   if (!km && km !== 0) return '';
-  return `${km.toLocaleString('en-US')} mi`;
+  return `${km.toLocaleString('en-US')} ${unit}`;
 }
 
 function titleCase(s: string): string {
@@ -26,13 +27,14 @@ export function GarageVehicleTile({
   vehicle,
   onOpenDetail,
 }: GarageVehicleTileProps) {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
 
   const headline = `${vehicle.year} ${vehicle.make} ${vehicle.model}`.toUpperCase();
   const subParts = [
     vehicle.trim,
     vehicle.color ? titleCase(vehicle.color) : undefined,
-    formatMileage(vehicle.mileage) || undefined,
+    formatMileage(vehicle.mileage, t('garage.mileageUnit')) || undefined,
   ].filter(Boolean);
   const subline = subParts.join(' · ');
 
@@ -55,7 +57,7 @@ export function GarageVehicleTile({
           priority="normal"
           cachePolicy="memory-disk"
           transition={180}
-          alt={`${vehicle.year} ${vehicle.make} ${vehicle.model} photo`}
+          alt={t('garage.vehiclePhotoAlt', { vehicle: `${vehicle.year} ${vehicle.make} ${vehicle.model}` })}
           fallback={
             <AppView flex={1} center colorName="backgroundSecondary">
               <CarFront size={36} strokeWidth={2} color={tokens.gray400} />
@@ -94,7 +96,7 @@ export function GarageVehicleTile({
           borderWidth={1}
           borderName="border"
           accessibilityRole="button"
-          accessibilityLabel="Vehicle details"
+          accessibilityLabel={t('garage.vehicleDetails')}
           hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           style={{ width: 40, height: 40 }}
         >

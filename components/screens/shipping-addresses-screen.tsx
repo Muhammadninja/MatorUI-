@@ -1,6 +1,8 @@
 import React, { useCallback, useState } from 'react';
 import { ScrollView } from 'react-native';
 
+import { useTranslation } from 'react-i18next';
+
 import { WheelLoader } from '@/components/shared/wheel-loader';
 import { AlertCircle, MapPin } from 'lucide-react-native';
 
@@ -26,6 +28,7 @@ import { debugLog } from '@/services/debug-log';
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 export default function ShippingAddressesScreen() {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const toast = useToast();
 
@@ -54,43 +57,43 @@ export default function ShippingAddressesScreen() {
           debugLog('address', `→ update ${editing.id}`, values);
           const updated = await updateAddress.mutateAsync({ id: editing.id, input: values });
           debugLog('address', '← updated (stored)', updated);
-          toast.info('Address updated');
+          toast.info(t('addresses.updated'));
         } else {
           debugLog('address', '→ create', values);
           const created = await createAddress.mutateAsync(values);
           debugLog('address', '← created (stored)', created);
-          toast.info('Address added');
+          toast.info(t('addresses.added'));
         }
       } catch (err) {
         debugLog('address', '✗ save FAILED', { message: (err as Error)?.message });
-        toast.info('Couldn’t save address. Please try again.');
+        toast.info(t('addresses.saveFailed'));
       }
     },
-    [editing, updateAddress, createAddress, toast],
+    [editing, updateAddress, createAddress, toast, t],
   );
 
   const handleRemove = useCallback(
     async (id: string) => {
       try {
         await removeAddress.mutateAsync(id);
-        toast.info('Address removed');
+        toast.info(t('addresses.removed'));
       } catch {
-        toast.info('Couldn’t remove address. Please try again.');
+        toast.info(t('addresses.removeFailed'));
       }
     },
-    [removeAddress, toast],
+    [removeAddress, toast, t],
   );
 
   const handleSetDefault = useCallback(
     async (id: string) => {
       try {
         await setDefaultAddress.mutateAsync(id);
-        toast.info('Default address updated');
+        toast.info(t('addresses.defaultUpdated'));
       } catch {
-        toast.info('Couldn’t update default. Please try again.');
+        toast.info(t('addresses.defaultFailed'));
       }
     },
-    [setDefaultAddress, toast],
+    [setDefaultAddress, toast, t],
   );
 
   const addButton = (
@@ -98,7 +101,7 @@ export default function ShippingAddressesScreen() {
       androidRipple={false}
       onPress={openAdd}
       accessibilityRole="button"
-      accessibilityLabel="Add new address"
+      accessibilityLabel={t('addresses.addNew')}
       style={{
         backgroundColor: tokens.brandBg,
         borderRadius: 10,
@@ -111,7 +114,7 @@ export default function ShippingAddressesScreen() {
         weight="bold"
         style={{ fontSize: 12, color: tokens.onBrand }}
       >
-        + Add
+        {t('addresses.addShort')}
       </AppText>
     </AppPressableView>
   );
@@ -119,7 +122,7 @@ export default function ShippingAddressesScreen() {
   return (
     <AppView flex={1} colorName="background">
       <AppSettingsHeader
-        title="Shipping addresses"
+        title={t('addresses.title')}
         fallbackHref="/profile"
         right={addButton}
       />
@@ -132,16 +135,16 @@ export default function ShippingAddressesScreen() {
           <AlertCircle size={34} strokeWidth={2} color={tokens.error} />
           <AppView gap={4} align="center">
             <AppText family="heading" weight="bold" style={{ fontSize: 17, color: tokens.text }}>
-              Couldn&apos;t load your addresses
+              {t('addresses.loadErrorTitle')}
             </AppText>
             <AppText
               family="default"
               style={{ fontSize: 13, color: tokens.textMuted, textAlign: 'center', maxWidth: 280 }}
             >
-              {error ?? 'Something went wrong. Please try again.'}
+              {error ?? t('addresses.loadErrorBody')}
             </AppText>
           </AppView>
-          <AppButton title="Retry" kind="secondary" size="sm" onPress={refresh} />
+          <AppButton title={t('common.retry')} kind="secondary" size="sm" onPress={refresh} />
         </AppView>
       ) : addresses.length === 0 ? (
         <AppView flex={1} center px={20} gap={10}>
@@ -150,7 +153,7 @@ export default function ShippingAddressesScreen() {
             family="default"
             style={{ fontSize: 13, color: tokens.textMuted, textAlign: 'center' }}
           >
-            No shipping addresses yet. Add one to get started.
+            {t('addresses.emptyText')}
           </AppText>
         </AppView>
       ) : (
@@ -195,6 +198,7 @@ const AddressCard = React.memo(function AddressCard({
   onRemove,
   onSetDefault,
 }: AddressCardProps) {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
 
   return (
@@ -230,7 +234,7 @@ const AddressCard = React.memo(function AddressCard({
               weight="bold"
               style={{ fontSize: 10, color: tokens.onBrand }}
             >
-              DEFAULT
+              {t('addresses.defaultPill')}
             </AppText>
           </AppView>
         ) : null}
@@ -259,28 +263,28 @@ const AddressCard = React.memo(function AddressCard({
         <AppPressableView
           onPress={() => onEdit(address)}
           accessibilityRole="button"
-          accessibilityLabel={`Edit ${address.label} address`}
+          accessibilityLabel={t('addresses.editA11y', { label: address.label })}
         >
           <AppText
             family="accent"
             weight="bold"
             style={{ fontSize: 13, color: tokens.text }}
           >
-            Edit
+            {t('addresses.edit')}
           </AppText>
         </AppPressableView>
 
         <AppPressableView
           onPress={() => onRemove(address.id)}
           accessibilityRole="button"
-          accessibilityLabel={`Remove ${address.label} address`}
+          accessibilityLabel={t('addresses.removeA11y', { label: address.label })}
         >
           <AppText
             family="accent"
             weight="bold"
             style={{ fontSize: 13, color: tokens.error }}
           >
-            Remove
+            {t('addresses.remove')}
           </AppText>
         </AppPressableView>
 
@@ -288,14 +292,14 @@ const AddressCard = React.memo(function AddressCard({
           <AppPressableView
             onPress={() => onSetDefault(address.id)}
             accessibilityRole="button"
-            accessibilityLabel={`Set ${address.label} as default address`}
+            accessibilityLabel={t('addresses.setDefaultA11y', { label: address.label })}
           >
             <AppText
               family="accent"
               weight="bold"
               style={{ fontSize: 13, color: tokens.brandBg }}
             >
-              Set default
+              {t('addresses.setDefault')}
             </AppText>
           </AppPressableView>
         ) : null}

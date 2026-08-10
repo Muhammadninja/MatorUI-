@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -28,6 +29,7 @@ type DecodeResponse = {
 };
 
 export default function VinFinderScreen() {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
 
@@ -40,7 +42,7 @@ export default function VinFinderScreen() {
     const clean = normalizeVin(vin);
     if (clean.length !== 17) {
       setStatus('error');
-      setErrorMsg('A VIN must be exactly 17 characters.');
+      setErrorMsg(t('vinFinder.vinLength'));
       return;
     }
     setStatus('loading');
@@ -48,15 +50,15 @@ export default function VinFinderScreen() {
     try {
       const res = await apiClient.post<DecodeResponse>('/v1/auth/decode-vin', { vin: clean });
       if (!res?.success || !res.car) {
-        throw new Error(res?.error?.message ?? "We couldn't decode that VIN.");
+        throw new Error(res?.error?.message ?? t('vinFinder.decodeFailed'));
       }
       setCar(res.car);
       setStatus('idle');
     } catch (err) {
       setStatus('error');
-      setErrorMsg(err instanceof Error ? err.message : "We couldn't decode that VIN.");
+      setErrorMsg(err instanceof Error ? err.message : t('vinFinder.decodeFailed'));
     }
-  }, [vin]);
+  }, [vin, t]);
 
   const browseSystems = useCallback(() => {
     if (!car) return;
@@ -72,10 +74,10 @@ export default function VinFinderScreen() {
       gap={16}
     >
       <AppText family="heading" weight="bold" style={{ fontSize: 26, color: tokens.text }}>
-        VIN Finder
+        {t('vinFinder.title')}
       </AppText>
       <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted }}>
-        Enter your 17-character VIN to fit parts to your exact vehicle.
+        {t('vinFinder.subtitle')}
       </AppText>
 
       {/* VIN input */}
@@ -91,7 +93,7 @@ export default function VinFinderScreen() {
           testID="vin-input-field"
           value={vin}
           onChangeText={setVin}
-          placeholder="17-character VIN"
+          placeholder={t('vinFinder.placeholder')}
           placeholderTextColor={tokens.textMuted}
           autoCapitalize="characters"
           autoCorrect={false}
@@ -107,7 +109,7 @@ export default function VinFinderScreen() {
         testID="vin-submit-button"
         onPress={submit}
         accessibilityRole="button"
-        accessibilityLabel="Decode VIN"
+        accessibilityLabel={t('vinFinder.decode')}
         pressedOpacity={0.85}
         center
         rounded={14}
@@ -115,7 +117,7 @@ export default function VinFinderScreen() {
         style={{ backgroundColor: tokens.brandBg, opacity: status === 'loading' ? 0.6 : 1 }}
       >
         <AppText family="accent" weight="bold" style={{ fontSize: 15, color: tokens.onBrand }}>
-          {status === 'loading' ? 'Decoding…' : 'Find my parts'}
+          {status === 'loading' ? t('vinFinder.decoding') : t('vinFinder.findParts')}
         </AppText>
       </AppPressableView>
 
@@ -145,7 +147,7 @@ export default function VinFinderScreen() {
             style={{ width: 9, height: 9, backgroundColor: tokens.success }}
           />
           <AppText family="accent" weight="bold" numberOfLines={1} style={{ flex: 1, fontSize: 14, color: tokens.text }}>
-            🟢 Fitting parts for: {car.year} {car.make} {car.model}
+            {t('vinFinder.fittingFor', { vehicle: `${car.year} ${car.make} ${car.model}` })}
           </AppText>
         </AppView>
       ) : null}
@@ -155,7 +157,7 @@ export default function VinFinderScreen() {
           testID="browse-systems-btn"
           onPress={browseSystems}
           accessibilityRole="button"
-          accessibilityLabel="Browse systems for this vehicle"
+          accessibilityLabel={t('vinFinder.browseSystems')}
           pressedOpacity={0.85}
           center
           rounded={14}
@@ -164,7 +166,7 @@ export default function VinFinderScreen() {
           borderName="border"
         >
           <AppText family="accent" weight="bold" style={{ fontSize: 15, color: tokens.text }}>
-            Browse systems ›
+            {t('vinFinder.browseSystemsCta')}
           </AppText>
         </AppPressableView>
       ) : null}

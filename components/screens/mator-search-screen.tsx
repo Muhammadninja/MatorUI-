@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Search, X } from 'lucide-react-native';
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Keyboard, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -23,6 +24,7 @@ import { hasActiveFilters, useSearch } from '@/hooks/use-search';
  * service.
  */
 export default function MatorSearchScreen() {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
   const { q: initialQuery } = useLocalSearchParams<{ q?: string }>();
@@ -62,7 +64,7 @@ export default function MatorSearchScreen() {
           borderWidth={1}
           borderName="border"
           accessibilityRole="button"
-          accessibilityLabel="Back"
+          accessibilityLabel={t('search.back')}
           style={{ width: 40, height: 40 }}
         >
           <ArrowLeft size={22} strokeWidth={2.2} color={tokens.text} />
@@ -85,7 +87,7 @@ export default function MatorSearchScreen() {
             testID="search-input"
             value={query}
             onChangeText={setQuery}
-            placeholder="Search parts, brands, OEM #"
+            placeholder={t('search.inputPlaceholder')}
             placeholderTextColor={tokens.textMuted}
             autoFocus
             autoCorrect={false}
@@ -101,7 +103,7 @@ export default function MatorSearchScreen() {
               center
               rounded={999}
               accessibilityRole="button"
-              accessibilityLabel="Clear search"
+              accessibilityLabel={t('search.clearSearch')}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <X size={18} strokeWidth={2.2} color={tokens.textMuted} />
@@ -120,7 +122,7 @@ export default function MatorSearchScreen() {
             family="default"
             style={{ fontSize: 14, color: tokens.textMuted, textAlign: 'center' }}
           >
-            Search parts, brands, or OEM numbers.
+            {t('search.idleHint')}
           </AppText>
         </AppView>
       ) : (

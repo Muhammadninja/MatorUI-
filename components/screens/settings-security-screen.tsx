@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { FileText, Globe } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 
 import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
@@ -12,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { triggerHaptic } from '@/utils/haptics';
 
 export default function SettingsSecurityScreen() {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const { languageLabel } = useLanguageContext();
   const { signOut } = useUserContext();
@@ -21,7 +23,7 @@ export default function SettingsSecurityScreen() {
     <AppView flex={1} colorName="background">
       {/* The app follows the phone's light/dark appearance automatically — there
           is no in-app theme toggle. */}
-      <AppSettingsHeader title="Settings" fallbackHref="/profile" />
+      <AppSettingsHeader title={t('settings.title')} fallbackHref="/profile" />
       <AppScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: 8, paddingBottom: 40 }}
@@ -29,7 +31,7 @@ export default function SettingsSecurityScreen() {
         <AppView gap={20}>
           {/* ── Preferences ─────────────────────────────────────────────── */}
           <AppView px="lg" gap={8}>
-            <SectionLabel>Preferences</SectionLabel>
+            <SectionLabel>{t('settings.preferences')}</SectionLabel>
 
             <AppView
               rounded={14}
@@ -48,7 +50,7 @@ export default function SettingsSecurityScreen() {
                   router.push('/select-language');
                 }}
                 accessibilityRole="button"
-                accessibilityLabel="Language"
+                accessibilityLabel={t('settings.language')}
                 row
                 align="center"
                 gap="md"
@@ -58,7 +60,7 @@ export default function SettingsSecurityScreen() {
                 <IconBox Icon={Globe} />
                 <AppView style={{ flex: 1 }}>
                   <AppText family="accent" weight="semibold" style={{ fontSize: 14.5, color: tokens.text }}>
-                    Language
+                    {t('settings.language')}
                   </AppText>
                 </AppView>
                 <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>
@@ -71,7 +73,7 @@ export default function SettingsSecurityScreen() {
 
           {/* ── Legal ───────────────────────────────────────────────────── */}
           <AppView px="lg" gap={8}>
-            <SectionLabel>Legal</SectionLabel>
+            <SectionLabel>{t('settings.legal')}</SectionLabel>
 
             <AppView
               rounded={14}
@@ -90,7 +92,7 @@ export default function SettingsSecurityScreen() {
                   router.push('/terms');
                 }}
                 accessibilityRole="button"
-                accessibilityLabel="Terms and Conditions"
+                accessibilityLabel={t('settings.terms')}
                 row
                 align="center"
                 gap="md"
@@ -100,7 +102,7 @@ export default function SettingsSecurityScreen() {
                 <IconBox Icon={FileText} />
                 <AppView style={{ flex: 1 }}>
                   <AppText family="accent" weight="semibold" style={{ fontSize: 14.5, color: tokens.text }}>
-                    Terms & Conditions
+                    {t('settings.terms')}
                   </AppText>
                 </AppView>
                 <ChevronRight />
@@ -114,18 +116,18 @@ export default function SettingsSecurityScreen() {
               androidRipple={false}
               onPress={async () => {
                 await signOut();
-                toast.info('Account deleted');
+                toast.info(t('settings.accountDeletedToast'));
                 router.replace('/explore');
               }}
               accessibilityRole="button"
-              accessibilityLabel="Delete account"
+              accessibilityLabel={t('settings.deleteAccount')}
             >
               <AppText
                 family="accent"
                 weight="bold"
                 style={{ fontSize: 14, color: tokens.error, paddingVertical: 8 }}
               >
-                Delete account
+                {t('settings.deleteAccount')}
               </AppText>
             </AppPressableView>
           </AppView>

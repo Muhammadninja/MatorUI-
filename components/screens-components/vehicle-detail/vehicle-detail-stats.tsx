@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import Animated, {
   FadeIn,
   FadeOut,
@@ -23,6 +24,7 @@ export type VehicleDetailStatsProps = {
 };
 
 export function VehicleDetailStats({ mileage, plate, color, liveStatus }: VehicleDetailStatsProps) {
+  const { t } = useTranslation();
   const { tokens, scheme } = useThemeContext();
 
   return (
@@ -46,11 +48,11 @@ export function VehicleDetailStats({ mileage, plate, color, liveStatus }: Vehicl
           ) : null}
 
           <AppView row gap={14}>
-            <Cell label="Mileage" value={mileage} />
+            <Cell label={t('vehicleDetail.mileage')} value={mileage} />
             <AppView style={{ width: 1, backgroundColor: tokens.divider }} />
-            <Cell label="Plate" value={plate} />
+            <Cell label={t('vehicleDetail.plate')} value={plate} />
             <AppView style={{ width: 1, backgroundColor: tokens.divider }} />
-            <Cell label="Color" value={color} />
+            <Cell label={t('vehicleDetail.color')} value={color} />
           </AppView>
         </Animated.View>
       </AppView>
@@ -82,6 +84,7 @@ function Cell({ label, value }: CellProps) {
 type LiveStatusCellProps = { status: VehicleLiveStatus };
 
 function LiveStatusCell({ status }: LiveStatusCellProps) {
+  const { t } = useTranslation();
   const { tokens, scheme } = useThemeContext();
   const tone = resolveTone(status.stage, tokens, scheme === 'dark');
 
@@ -120,7 +123,7 @@ function LiveStatusCell({ status }: LiveStatusCellProps) {
             transform="uppercase"
             numberOfLines={1}
           >
-            Live · {stageLabel(status.stage)}
+            {t('vehicleDetail.liveLabel')} · {stageLabel(status.stage, t)}
             {status.mechanic ? ` · ${status.mechanic}` : ''}
           </AppText>
           <AppText
@@ -146,18 +149,18 @@ function LiveStatusCell({ status }: LiveStatusCellProps) {
   );
 }
 
-function stageLabel(stage: VehicleLiveStatus['stage']): string {
+function stageLabel(stage: VehicleLiveStatus['stage'], t: (key: string) => string): string {
   switch (stage) {
     case 'queued':
-      return 'Queued';
+      return t('vehicleDetail.stageQueued');
     case 'in_progress':
-      return 'In progress';
+      return t('vehicleDetail.stageInProgress');
     case 'awaiting_parts':
-      return 'Awaiting parts';
+      return t('vehicleDetail.stageAwaitingParts');
     case 'ready':
-      return 'Ready';
+      return t('vehicleDetail.stageReady');
     case 'flagged':
-      return 'Flagged';
+      return t('vehicleDetail.stageFlagged');
   }
 }
 

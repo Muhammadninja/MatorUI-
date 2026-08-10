@@ -1,4 +1,5 @@
 import { memo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Modal, Pressable, StyleSheet } from 'react-native';
 
 import AppImage from '@/components/shared/app-image';
@@ -45,6 +46,7 @@ function SearchResultRow({
   isCheapest,
   onPress,
 }: SearchResultRowProps) {
+  const { t } = useTranslation();
   const { tokens, scheme } = useThemeContext();
   const isDark = scheme === 'dark';
   const variant = deriveCardVariant(result.id);
@@ -69,7 +71,7 @@ function SearchResultRow({
       badge: result.badge,
       status: result.status,
     });
-    toastService.success('Added to cart', { description: result.title });
+    toastService.success(t('search.addedToCart'), { description: result.title });
   };
 
   return (
@@ -85,7 +87,7 @@ function SearchResultRow({
       androidRipple
       testID={`part-card-${result.id}`}
       accessibilityRole="button"
-      accessibilityLabel={`Open ${result.title}`}
+      accessibilityLabel={t('search.openItemA11y', { title: result.title })}
       style={{
         backgroundColor: isDark ? tokens.card : tokens.white,
         borderBottomWidth: StyleSheet.hairlineWidth,

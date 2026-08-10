@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type {
   VehicleFieldErrors,
@@ -26,7 +27,10 @@ export type AddVehicleWizardProps = {
 };
 
 const TOTAL_STEPS = 3;
-const STEP_LABELS = ['Vehicle', 'Details', 'Style'];
+
+function buildStepLabels(t: (key: string) => string): string[] {
+  return [t('addVehicle.stepVehicle'), t('addVehicle.stepDetails'), t('addVehicle.stepStyle')];
+}
 
 function parseIntOrUndefined(value: string): number | undefined {
   const cleaned = value.replace(/[^0-9]/g, '');
@@ -49,6 +53,8 @@ function buildInitialValues(editing?: Vehicle): VehicleFieldValues {
 }
 
 export function AddVehicleWizard({ editing, onSubmit, onCancel }: AddVehicleWizardProps) {
+  const { t } = useTranslation();
+  const stepLabels = useMemo(() => buildStepLabels(t), [t]);
   const [step, setStep] = useState(1);
   const [values, setValues] = useState<VehicleFieldValues>(() => buildInitialValues(editing));
   const [color, setColor] = useState<VehicleColor>(editing?.color ?? 'midnight');
@@ -70,14 +76,14 @@ export function AddVehicleWizard({ editing, onSubmit, onCancel }: AddVehicleWiza
 
   const errors: VehicleFieldErrors = useMemo(() => {
     const e: VehicleFieldErrors = {};
-    if (values.year && !yearValid) e.year = 'Enter a year between 1900 and 2100';
+    if (values.year && !yearValid) e.year = t('addVehicle.errorYearRange');
     if (submitAttempted) {
-      if (!yearValid) e.year = e.year ?? 'Required';
-      if (!makeValid) e.make = 'Required';
-      if (!modelValid) e.model = 'Required';
+      if (!yearValid) e.year = e.year ?? t('addVehicle.errorRequired');
+      if (!makeValid) e.make = t('addVehicle.errorRequired');
+      if (!modelValid) e.model = t('addVehicle.errorRequired');
     }
     return e;
-  }, [values.year, yearValid, makeValid, modelValid, submitAttempted]);
+  }, [values.year, yearValid, makeValid, modelValid, submitAttempted, t]);
 
   const isLast = step === TOTAL_STEPS;
 
@@ -131,7 +137,7 @@ export function AddVehicleWizard({ editing, onSubmit, onCancel }: AddVehicleWiza
       <AddVehicleStepIndicator
         total={TOTAL_STEPS}
         current={step}
-        label={STEP_LABELS[step - 1]}
+        label={stepLabels[step - 1]}
       />
       <AppView px={20} pt="sm">
         {step === 1 ? (
@@ -159,7 +165,7 @@ export function AddVehicleWizard({ editing, onSubmit, onCancel }: AddVehicleWiza
       <AddVehicleWizardFooter
         isLast={isLast}
         canAdvance={!saving}
-        saveLabel={saving ? 'Saving…' : editing ? 'Save changes' : 'Save vehicle'}
+        saveLabel={saving ? t('addVehicle.saving') : editing ? t('addVehicle.saveChanges') : t('addVehicle.saveVehicle')}
         onNext={handleNext}
         onSave={handleSubmit}
       />

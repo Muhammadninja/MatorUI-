@@ -1,5 +1,6 @@
 import { CheckCircle2, Info, X, XCircle } from 'lucide-react-native';
 import { memo, useEffect, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Animated, Easing, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/shared/app-text';
@@ -20,6 +21,7 @@ const PALETTE: Record<ToastKind, { tint: string; tintFg: string; Icon: typeof Ch
 };
 
 function AppToastImpl({ toast, onDismiss }: AppToastProps) {
+  const { t } = useTranslation();
   const { tokens, scheme } = useThemeContext();
   const isDark = scheme === 'dark';
 
@@ -160,7 +162,7 @@ function AppToastImpl({ toast, onDismiss }: AppToastProps) {
           <Pressable
             onPress={handleDismiss}
             hitSlop={8}
-            accessibilityLabel="Dismiss"
+            accessibilityLabel={t('common.dismiss')}
             style={({ pressed }) => [
               styles.dismissButton,
               { opacity: pressed ? 0.5 : 1 },

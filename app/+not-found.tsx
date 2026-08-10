@@ -1,21 +1,23 @@
 import { router, Stack } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { AppButton } from '@/components/shared/app-button';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 
 export default function NotFoundScreen() {
+  const { t } = useTranslation();
   return (
     <>
-      <Stack.Screen options={{ title: 'Not found' }} />
+      <Stack.Screen options={{ title: t('nav.notFound') }} />
       <AppView flex={1} colorName="background" center px="xl" gap="lg" safeArea="all">
         <AppText textVariant="title" family="heading" colorName="text">
-          Page not found
+          {t('nav.pageNotFound')}
         </AppText>
         <AppText textVariant="body" colorName="gray400">
-          We could not find that page.
+          {t('nav.notFoundBody')}
         </AppText>
-        <AppButton title="Back to Explore" kind="brand" onPress={() => router.replace('/explore')} />
+        <AppButton title={t('nav.backToExplore')} kind="brand" onPress={() => router.replace('/explore')} />
       </AppView>
     </>
   );

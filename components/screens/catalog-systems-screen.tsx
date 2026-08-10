@@ -2,6 +2,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useLocalSearchParams } from 'expo-router';
 import { ChevronRight } from 'lucide-react-native';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AutoPartIcon from '@/components/screens-components/catalog/auto-part-icon';
@@ -27,6 +28,7 @@ import type { CategoryTileData } from '@/services/categories-service';
  * make/model context to the parts list.
  */
 export default function CatalogSystemsScreen() {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
   const { make, model, brandId } = useLocalSearchParams<{
@@ -81,7 +83,7 @@ export default function CatalogSystemsScreen() {
 
   return (
     <AppView flex={1} colorName="background">
-      <AppSettingsHeader title={vehicleLabel || 'Catalog'} fallbackHref="/explore" />
+      <AppSettingsHeader title={vehicleLabel || t('catalog.catalogTitle')} fallbackHref="/explore" />
       <FlashList
         testID="systems-grid"
         data={categories}
@@ -91,7 +93,7 @@ export default function CatalogSystemsScreen() {
           <AppView gap={12} style={{ paddingBottom: 12 }}>
             {vehicleLabel ? null : <VehicleContextBar />}
             <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.7 }}>
-              {vehicleLabel ? `Systems for ${vehicleLabel}` : 'Shop by system'}
+              {vehicleLabel ? t('catalog.systemsFor', { label: vehicleLabel }) : t('catalog.shopBySystem')}
             </AppText>
           </AppView>
         }

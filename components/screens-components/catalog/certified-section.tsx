@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { BadgeCheck, Check, Tag } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { Image, Linking, ScrollView, View } from 'react-native';
 
 import { AppText } from '@/components/shared/app-text';
@@ -20,35 +21,36 @@ import { triggerHaptic } from '@/utils/haptics';
  * `GET /v1/placements` endpoint without changing this component.
  */
 export default function CertifiedSection() {
+  const { t } = useTranslation();
   const { tokens, scheme } = useThemeContext();
   const dark = scheme === 'dark';
   const { placements } = usePlacements();
 
   const open = (p: MatorCertifiedPlacement) => {
     triggerHaptic('selection');
-    const t = p.target;
-    switch (t.kind) {
+    const tgt = p.target;
+    switch (tgt.kind) {
       case 'catalogue':
         // The premium catalogue view — scoped by part quality (OEM/GM) or a
         // search term, never a car-system category.
         router.push({
           pathname: '/catalog/parts',
-          params: { categoryLabel: t.label, certified: t.certified, q: t.query },
+          params: { categoryLabel: tgt.label, certified: tgt.certified, q: tgt.query },
         });
         break;
       case 'dealer':
         // No dealer-scoped filter on the backend yet — open the premium
         // catalogue labeled for the dealer. Add a dealer filter when it exists.
-        router.push({ pathname: '/catalog/parts', params: { categoryLabel: t.label } });
+        router.push({ pathname: '/catalog/parts', params: { categoryLabel: tgt.label } });
         break;
       case 'category':
-        router.push({ pathname: '/category', params: { cat: t.id, label: t.label } });
+        router.push({ pathname: '/category', params: { cat: tgt.id, label: tgt.label } });
         break;
       case 'search':
-        router.push({ pathname: '/search', params: { q: t.query } });
+        router.push({ pathname: '/search', params: { q: tgt.query } });
         break;
       case 'url':
-        void Linking.openURL(t.href);
+        void Linking.openURL(tgt.href);
         break;
     }
   };
@@ -65,11 +67,11 @@ export default function CertifiedSection() {
           <BadgeCheck size={14} strokeWidth={2.6} color={tokens.white} />
         </AppView>
         <AppText family="heading" weight="bold" style={{ flex: 1, fontSize: 18, color: tokens.text }}>
-          MATOR Certified
+          {t('catalog.matorCertified')}
         </AppText>
       </AppView>
       <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted, marginTop: -8 }}>
-        Verified dealers. Genuine parts, guaranteed fitment & returns.
+        {t('catalog.certifiedSubtitle')}
       </AppText>
 
       {/* Placement carousel */}
@@ -87,7 +89,7 @@ export default function CertifiedSection() {
               onPress={() => open(p)}
               androidRipple={false}
               accessibilityRole="button"
-              accessibilityLabel={`${p.title}, MATOR certified`}
+              accessibilityLabel={t('catalog.certifiedAccessibility', { title: p.title })}
               rounded={18}
               colorName="card"
               borderWidth={1}
@@ -102,7 +104,7 @@ export default function CertifiedSection() {
                 {p.sponsor?.sponsored ? (
                   <AppView rounded={5} px={6} py={2} style={{ position: 'absolute', top: 8, right: 10, backgroundColor: 'rgba(0,0,0,0.28)' }}>
                     <AppText family="accent" weight="bold" style={{ fontSize: 9, letterSpacing: 0.3, color: tokens.white }}>
-                      SPONSORED
+                      {t('catalog.sponsored')}
                     </AppText>
                   </AppView>
                 ) : null}
@@ -151,7 +153,7 @@ export default function CertifiedSection() {
                     </AppText>
                     <AppView rounded={5} px={6} py={2} style={{ marginLeft: 'auto', backgroundColor: `${tokens.success}${dark ? '29' : '1a'}` }}>
                       <AppText family="accent" weight="bold" style={{ fontSize: 10, color: tokens.success }}>
-                        GUARANTEED
+                        {t('catalog.guaranteed')}
                       </AppText>
                     </AppView>
                   </AppView>

@@ -1,5 +1,6 @@
 import { ArrowDownToLine, WifiOff } from 'lucide-react-native';
 import type { ComponentType } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Linking } from 'react-native';
 
 import { AppBottomSheet } from '@/components/shared/app-bottom-sheet';
@@ -23,6 +24,7 @@ import { triggerHaptic } from '@/utils/haptics';
  * can only act on the CTA. Mount once near the app root.
  */
 export function AppGateHost() {
+  const { t } = useTranslation();
   const { updateRequired, storeUrl } = useAppUpdateGate();
   const { isOffline, recheck } = useNetworkStatus();
 
@@ -32,9 +34,9 @@ export function AppGateHost() {
       <GateSheet
         icon={ArrowDownToLine}
         tone="brand"
-        title="Update required"
-        body="A new version of Mator is required to keep going. Please update to continue."
-        cta="Update now"
+        title={t('gate.updateTitle')}
+        body={t('gate.updateBody')}
+        cta={t('gate.updateCta')}
         onPress={() => {
           triggerHaptic('selection');
           void Linking.openURL(storeUrl);
@@ -48,9 +50,9 @@ export function AppGateHost() {
       <GateSheet
         icon={WifiOff}
         tone="muted"
-        title="No internet connection"
-        body="You're offline. Check your Wi-Fi or mobile data — we'll reconnect automatically."
-        cta="Try again"
+        title={t('gate.offlineTitle')}
+        body={t('gate.offlineBody')}
+        cta={t('common.tryAgain')}
         onPress={() => {
           triggerHaptic('selection');
           recheck();

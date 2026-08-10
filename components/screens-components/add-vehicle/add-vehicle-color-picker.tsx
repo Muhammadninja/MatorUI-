@@ -1,13 +1,20 @@
+import React from 'react';
+import { useTranslation } from 'react-i18next';
+
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import type { VehicleColor } from '@/services/garage-service';
 
-const COLOR_OPTIONS: { value: VehicleColor; label: string }[] = [
-  { value: 'midnight', label: 'Midnight' },
-  { value: 'graphite', label: 'Graphite' },
-  { value: 'pearl', label: 'Pearl' },
-  { value: 'matte', label: 'Matte' },
-];
+function buildColorOptions(
+  t: (key: string) => string,
+): { value: VehicleColor; label: string }[] {
+  return [
+    { value: 'midnight', label: t('addVehicle.colorMidnight') },
+    { value: 'graphite', label: t('addVehicle.colorGraphite') },
+    { value: 'pearl', label: t('addVehicle.colorPearl') },
+    { value: 'matte', label: t('addVehicle.colorMatte') },
+  ];
+}
 
 export type AddVehicleColorPickerProps = {
   value: VehicleColor;
@@ -15,6 +22,8 @@ export type AddVehicleColorPickerProps = {
 };
 
 export function AddVehicleColorPicker({ value, onChange }: AddVehicleColorPickerProps) {
+  const { t } = useTranslation();
+  const colorOptions = React.useMemo(() => buildColorOptions(t), [t]);
   return (
     <AppView gap={10}>
       <AppText
@@ -23,10 +32,10 @@ export function AddVehicleColorPicker({ value, onChange }: AddVehicleColorPicker
         colorName="gray400"
         transform="uppercase"
       >
-        Color
+        {t('addVehicle.colorLabel')}
       </AppText>
       <AppView row wrap gap="sm">
-        {COLOR_OPTIONS.map((opt) => {
+        {colorOptions.map((opt) => {
           const selected = opt.value === value;
           return (
             <AppPressableView
@@ -37,7 +46,7 @@ export function AddVehicleColorPicker({ value, onChange }: AddVehicleColorPicker
               borderWidth={selected ? 0 : 1}
               androidRipple
               onPress={() => onChange(opt.value)}
-              accessibilityLabel={`Color ${opt.label}`}
+              accessibilityLabel={t('addVehicle.colorOption', { color: opt.label })}
             >
               <AppView px={14} py="sm">
                 <AppText

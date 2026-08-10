@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Pressable } from 'react-native';
 
+import { useTranslation } from 'react-i18next';
+
 import { AppBottomSheet } from '@/components/shared/app-bottom-sheet';
 import { AppButton } from '@/components/shared/app-button';
 import AppTextField from '@/components/shared/app-text-field';
@@ -28,6 +30,7 @@ export function PhoneChangeSheet({
   onClose: () => void;
   currentPhone: string | null;
 }) {
+  const { t } = useTranslation();
   const { requestPhoneChange, confirmPhoneChange } = useUserContext();
   const toast = useToast();
 
@@ -48,7 +51,7 @@ export function PhoneChangeSheet({
 
   const sendCode = async () => {
     if (!isValidPhone(phone)) {
-      toast.danger('Enter a valid phone number');
+      toast.danger(t('account.invalidPhone'));
       return;
     }
     setBusy(true);
@@ -56,9 +59,9 @@ export function PhoneChangeSheet({
       const { devCode } = await requestPhoneChange(phone);
       if (devCode) setCode(devCode); // dev/demo convenience
       setStep('otp');
-      toast.info(`Code sent to ${phone}`);
+      toast.info(t('account.codeSent', { phone }));
     } catch (err) {
-      toast.danger('Could not send the code', {
+      toast.danger(t('account.codeSendFailed'), {
         description: (err as Error)?.message,
       });
     } finally {
@@ -70,10 +73,10 @@ export function PhoneChangeSheet({
     setBusy(true);
     try {
       await confirmPhoneChange(phone, code.trim());
-      toast.success('Phone number updated');
+      toast.success(t('account.phoneUpdated'));
       onClose();
     } catch (err) {
-      toast.danger('That code did not work', {
+      toast.danger(t('account.codeInvalid'), {
         description: (err as Error)?.message,
       });
     } finally {
@@ -85,16 +88,16 @@ export function PhoneChangeSheet({
     <AppBottomSheet visible={visible} onClose={onClose} expandable={false} heightFraction={0.44}>
       <AppView flex={1} px={20} pb={6} gap={14}>
         <AppText family="heading" weight="bold" style={{ fontSize: 20, lineHeight: 26 }} colorName="text">
-          Change phone number
+          {t('account.changePhoneTitle')}
         </AppText>
 
         {step === 'phone' ? (
           <>
             <AppText family="default" colorName="textMuted" style={{ fontSize: 13, marginTop: -4 }}>
-              We&apos;ll text a verification code to the new number.
+              {t('account.phoneStepHint')}
             </AppText>
             <AppTextField
-              label="New phone number"
+              label={t('account.newPhone')}
               placeholder="+998 90 123 45 67"
               value={phone}
               onChangeText={setPhone}
@@ -102,7 +105,7 @@ export function PhoneChangeSheet({
               autoCorrect={false}
             />
             <AppButton
-              title={busy ? 'Sending…' : 'Send code'}
+              title={busy ? t('account.sending') : t('account.sendCode')}
               kind="brand"
               size="lg"
               fullWidth
@@ -113,10 +116,10 @@ export function PhoneChangeSheet({
         ) : (
           <>
             <AppText family="default" colorName="textMuted" style={{ fontSize: 13, marginTop: -4 }}>
-              Enter the 6-digit code sent to {phone}.
+              {t('account.otpHint', { phone })}
             </AppText>
             <AppTextField
-              label="Verification code"
+              label={t('account.verificationCode')}
               placeholder="123456"
               value={code}
               onChangeText={(v) => setCode(v.replace(/\D/g, '').slice(0, 6))}
@@ -124,7 +127,7 @@ export function PhoneChangeSheet({
               autoCorrect={false}
             />
             <AppButton
-              title={busy ? 'Verifying…' : 'Verify & update'}
+              title={busy ? t('account.verifying') : t('account.verifyUpdate')}
               kind="brand"
               size="lg"
               fullWidth
@@ -133,7 +136,7 @@ export function PhoneChangeSheet({
             />
             <Pressable onPress={() => setStep('phone')} disabled={busy} accessibilityRole="button">
               <AppText family="accent" weight="bold" colorName="brandBg" style={{ fontSize: 13, textAlign: 'center' }}>
-                Use a different number
+                {t('account.useDifferentNumber')}
               </AppText>
             </Pressable>
           </>

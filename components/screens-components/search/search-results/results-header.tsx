@@ -1,4 +1,5 @@
 import { SlidersHorizontal } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
@@ -24,11 +25,12 @@ export default function ResultsHeader({
   onFilterPress,
   hasActiveFilters,
 }: ResultsHeaderProps) {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   return (
     <AppView row align="center" justify="space-between" pb={10}>
       <AppText textVariant="bodyXs" colorName="gray400">
-        {total} result{total === 1 ? '' : 's'} for “{query.trim()}”
+        {t('search.resultCount', { count: total, query: query.trim() })}
       </AppText>
       <AppView row align="center" gap={10}>
         {__DEV__ && durationMs != null ? (
@@ -42,7 +44,7 @@ export default function ResultsHeader({
             rounded={36}
             onPress={onFilterPress}
             androidRipple
-            accessibilityLabel="Filters"
+            accessibilityLabel={t('search.filters')}
             hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
             style={{ width: 28, height: 28 }}
           >

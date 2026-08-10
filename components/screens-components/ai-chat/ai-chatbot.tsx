@@ -21,6 +21,7 @@ import {
     type NativeSyntheticEvent,
 } from 'react-native';
 import { KeyboardStickyView } from 'react-native-keyboard-controller';
+import { useTranslation } from 'react-i18next';
 
 import AiChatComposer from '@/components/screens-components/ai-chat/ai-chat-composer';
 import AiChatMessageBubble from '@/components/screens-components/ai-chat/ai-chat-message-bubble';
@@ -44,13 +45,16 @@ import type {
 import { triggerHaptic } from '@/utils/haptics';
 import { router } from 'expo-router';
 
-/** Handoff §16 suggestion chips — tap fills the composer. */
-const SUGGESTION_CHIPS = [
-  { key: 'brakes', label: 'Brakes squeaking' },
-  { key: 'oil', label: 'Need an oil filter' },
-  { key: 'engine', label: 'Check engine light' },
-  { key: 'spark', label: 'Best spark plugs' },
-] as const;
+/** Handoff §16 suggestion chips — tap fills the composer. Built via a
+ *  factory so the labels re-resolve when the language changes. */
+function buildSuggestionChips(t: (key: string) => string) {
+  return [
+    { key: 'brakes', label: t('aiChat.chipBrakes') },
+    { key: 'oil', label: t('aiChat.chipOilFilter') },
+    { key: 'engine', label: t('aiChat.chipCheckEngine') },
+    { key: 'spark', label: t('aiChat.chipSparkPlugs') },
+  ];
+}
 
 type StreamingReply = {
   id: string;
@@ -66,16 +70,20 @@ type TimelineEntry =
   | { kind: 'message'; key: string; message: AiChatMessage }
   | { kind: 'system'; key: string; label: string };
 
-function formatDateLabel(iso: string, now = Date.now()): string {
+function formatDateLabel(
+  iso: string,
+  t: (key: string) => string,
+  now = Date.now(),
+): string {
   const ts = Date.parse(iso);
-  if (Number.isNaN(ts)) return 'Today';
+  if (Number.isNaN(ts)) return t('aiChat.dateToday');
   const d = new Date(ts);
   const today = new Date(now);
   const startOf = (x: Date) =>
     new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   const diffDays = Math.floor((startOf(today) - startOf(d)) / 86_400_000);
-  if (diffDays <= 0) return 'Today';
-  if (diffDays === 1) return 'Yesterday';
+  if (diffDays <= 0) return t('aiChat.dateToday');
+  if (diffDays === 1) return t('aiChat.dateYesterday');
   if (diffDays < 7) return d.toLocaleDateString(undefined, { weekday: 'long' });
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
@@ -89,6 +97,8 @@ function dateBucket(iso: string): string {
 
 export default function AiChatbot() {
   const { tokens } = useThemeContext();
+  const { t } = useTranslation();
+  const suggestionChips = useMemo(() => buildSuggestionChips(t), [t]);
   const { openConfirm } = useGlobalModal();
   const { currentActiveVehicle } = useActiveVehicle();
   const [historyItems, setHistoryItems] = useState<AiChatConversationSummary[]>([]);
@@ -211,7 +221,7 @@ export default function AiChatbot() {
           {
             id: finalUserId,
             role: 'user',
-            caption: 'Now',
+            caption: t('aiChat.captionNow'),
             body: trimmed,
             createdAt: new Date().toISOString(),
           },
@@ -259,7 +269,7 @@ export default function AiChatbot() {
       try {
         let body = '';
         let replyId = replyDraft.id;
-        let title = 'Mator AI';
+        let title = t('aiChat.assistantName');
         let createdAt = new Date().toISOString();
         let suggestions: string[] = [];
         let convoId = conversationId;
@@ -326,7 +336,7 @@ export default function AiChatbot() {
           role: 'assistant',
           title,
           body,
-          caption: 'Now',
+          caption: t('aiChat.captionNow'),
           createdAt,
           toolCalls: finalToolCalls.length > 0 ? finalToolCalls : undefined,
         };
@@ -361,7 +371,7 @@ export default function AiChatbot() {
         sendingRef.current = false;
       }
     },
-    [conversationId, isSending, scrollToEnd],
+    [conversationId, isSending, scrollToEnd, t],
   );
 
   const stopGenerating = useCallback(() => {
@@ -411,10 +421,10 @@ export default function AiChatbot() {
   // component stays presentational.
   const handleAssistantAvatarPress = useCallback(() => {
     triggerHaptic('selection');
-    toastService.info('Mator AI', {
-      description: 'AI assistant for parts, fitment, and orders. Answers improve as the backend tools come online.',
+    toastService.info(t('aiChat.assistantName'), {
+      description: t('aiChat.assistantAbout'),
     });
-  }, []);
+  }, [t]);
 
   const handleUserAvatarPress = useCallback(() => {
     triggerHaptic('selection');
@@ -434,10 +444,10 @@ export default function AiChatbot() {
         setMessages((current) =>
           current.map((m) => (m.id === message.id ? { ...m, feedback: null } : m)),
         );
-        toastService.danger('Could not submit feedback');
+        toastService.danger(t('aiChat.feedbackError'));
       }
     },
-    [],
+    [t],
   );
 
   // ── History / clear / overflow ──────────────────────────────────────
@@ -459,13 +469,13 @@ export default function AiChatbot() {
       return;
     }
     openConfirm({
-      title: 'Open previous chat?',
-      message: 'Your current conversation will be replaced.',
-      confirmLabel: 'Open',
-      cancelLabel: 'Cancel',
+      title: t('aiChat.openPreviousTitle'),
+      message: t('aiChat.openPreviousMessage'),
+      confirmLabel: t('aiChat.open'),
+      cancelLabel: t('common.cancel'),
       onConfirm: loadHistory,
     });
-  }, [loadHistory, messages.length, openConfirm]);
+  }, [loadHistory, messages.length, openConfirm, t]);
 
   const performClear = useCallback(() => {
     triggerHaptic('warning');
@@ -483,23 +493,26 @@ export default function AiChatbot() {
   const requestClear = useCallback(() => {
     if (messages.length === 0 && !streamingReply) return;
     openConfirm({
-      title: 'Clear this conversation?',
-      message: 'All messages in this chat will be removed.',
-      confirmLabel: 'Clear',
-      cancelLabel: 'Cancel',
+      title: t('aiChat.clearTitle'),
+      message: t('aiChat.clearMessage'),
+      confirmLabel: t('aiChat.clear'),
+      cancelLabel: t('common.cancel'),
       onConfirm: performClear,
     });
-  }, [messages.length, openConfirm, performClear, streamingReply]);
+  }, [messages.length, openConfirm, performClear, streamingReply, t]);
 
   const openOverflowMenu = useCallback(() => {
     triggerHaptic('selection');
-    const options = ['Open previous chat', 'Clear conversation', 'Cancel'];
-    const destructiveIndex = options.indexOf('Clear conversation');
-    const cancelIndex = options.indexOf('Cancel');
+    const openLabel = t('aiChat.menuOpenPrevious');
+    const clearLabel = t('aiChat.menuClear');
+    const cancelLabel = t('common.cancel');
+    const options = [openLabel, clearLabel, cancelLabel];
+    const destructiveIndex = 1;
+    const cancelIndex = 2;
 
-    const handlePick = (label?: string) => {
-      if (label === 'Open previous chat') requestLoadHistory();
-      else if (label === 'Clear conversation') requestClear();
+    const handlePick = (index?: number) => {
+      if (index === 0) requestLoadHistory();
+      else if (index === 1) requestClear();
     };
 
     if (Platform.OS === 'ios') {
@@ -509,20 +522,20 @@ export default function AiChatbot() {
           cancelButtonIndex: cancelIndex,
           destructiveButtonIndex: destructiveIndex,
         },
-        (index) => handlePick(options[index]),
+        (index) => handlePick(index),
       );
       return;
     }
-    Alert.alert('Chat options', undefined, [
-      { text: 'Open previous chat', onPress: () => handlePick('Open previous chat') },
+    Alert.alert(t('aiChat.chatOptions'), undefined, [
+      { text: openLabel, onPress: () => handlePick(0) },
       {
-        text: 'Clear conversation',
+        text: clearLabel,
         style: 'destructive',
-        onPress: () => handlePick('Clear conversation'),
+        onPress: () => handlePick(1),
       },
-      { text: 'Cancel', style: 'cancel' },
+      { text: cancelLabel, style: 'cancel' },
     ]);
-  }, [requestClear, requestLoadHistory]);
+  }, [requestClear, requestLoadHistory, t]);
 
   // ── Timeline assembly: weave date pills + system notes into messages.
   const timeline = useMemo<TimelineEntry[]>(() => {
@@ -541,7 +554,7 @@ export default function AiChatbot() {
         entries.push({
           kind: 'date',
           key: `date-${bucket}`,
-          label: formatDateLabel(m.createdAt),
+          label: formatDateLabel(m.createdAt, t),
         });
         lastBucket = bucket;
       }
@@ -554,7 +567,7 @@ export default function AiChatbot() {
       }
     }
     return entries;
-  }, [messages, systemNotes]);
+  }, [messages, systemNotes, t]);
 
   const latestAssistantId = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -588,7 +601,7 @@ export default function AiChatbot() {
   // header compact, matching handoff copy "● Online · fits your Camry".
   const activeVehicleModel = currentActiveVehicle?.vehicle?.model ?? null;
   const onlineLabel = activeVehicleModel
-    ? `fits your ${activeVehicleModel}`
+    ? t('aiChat.fitsYourVehicle', { model: activeVehicleModel })
     : null;
 
   return (
@@ -635,7 +648,7 @@ export default function AiChatbot() {
                 colorName="text"
                 style={{ lineHeight: 18 }}
               >
-                Parts Assistant
+                {t('aiChat.partsAssistant')}
               </AppText>
               <AppView row align="center" gap={4}>
                 {/* Online dot */}
@@ -649,7 +662,7 @@ export default function AiChatbot() {
                   weight="semibold"
                   style={{ color: tokens.success, lineHeight: 14 }}
                 >
-                  Online{onlineLabel ? ` · ${onlineLabel}` : ''}
+                  {t('aiChat.online')}{onlineLabel ? ` · ${onlineLabel}` : ''}
                 </AppText>
               </AppView>
             </AppView>
@@ -658,7 +671,7 @@ export default function AiChatbot() {
           <AppIconButton
             Icon={MoreVertical}
             onPress={openOverflowMenu}
-            accessibilityLabel="Chat options"
+            accessibilityLabel={t('aiChat.chatOptions')}
           />
         </AppView>
 
@@ -708,7 +721,7 @@ export default function AiChatbot() {
                     colorName="text"
                     align="center"
                   >
-                    Hello! I&apos;m your Mator AI assistant.
+                    {t('aiChat.greetingTitle')}
                   </AppText>
                   <AppText
                     textVariant="bodySm"
@@ -716,7 +729,7 @@ export default function AiChatbot() {
                     align="center"
                     style={{ lineHeight: 22, maxWidth: 320 }}
                   >
-                    Tell me about your vehicle so I can give personalized parts and fitment help.
+                    {t('aiChat.greetingSubtitle')}
                   </AppText>
                 </AppView>
               </AppView>
@@ -730,14 +743,14 @@ export default function AiChatbot() {
                   colorName="textMuted"
                   style={{ textTransform: 'uppercase', letterSpacing: 0.6, fontSize: 11 }}
                 >
-                  Try asking
+                  {t('aiChat.tryAsking')}
                 </AppText>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={{ gap: 8, paddingRight: 12 }}
                 >
-                  {SUGGESTION_CHIPS.map((item) => (
+                  {suggestionChips.map((item) => (
                     <AppPressableView
                       key={item.key}
                       rounded={999}
@@ -771,7 +784,7 @@ export default function AiChatbot() {
                 colorName="gray400"
                 style={{ lineHeight: 18 }}
               >
-                My answers are powered by AI, so I may not always get things right.
+                {t('aiChat.disclaimerLong')}
               </AppText>
             </AppView>
           ) : (
@@ -808,7 +821,7 @@ export default function AiChatbot() {
                           <Pressable
                             onPress={() => retryFailed(message)}
                             accessibilityRole="button"
-                            accessibilityLabel="Retry message"
+                            accessibilityLabel={t('aiChat.retryMessage')}
                             style={({ pressed }) => ({
                               flexDirection: 'row',
                               alignItems: 'center',
@@ -828,7 +841,7 @@ export default function AiChatbot() {
                               weight="semibold"
                               style={{ color: tokens.error, lineHeight: 14, includeFontPadding: false }}
                             >
-                              Tap to retry
+                              {t('aiChat.tapToRetry')}
                             </AppText>
                           </Pressable>
                         </AppView>
@@ -838,7 +851,7 @@ export default function AiChatbot() {
                           <Pressable
                             onPress={regenerateLastReply}
                             accessibilityRole="button"
-                            accessibilityLabel="Regenerate response"
+                            accessibilityLabel={t('aiChat.regenerateResponse')}
                             style={({ pressed }) => ({
                               flexDirection: 'row',
                               alignItems: 'center',
@@ -859,7 +872,7 @@ export default function AiChatbot() {
                               colorName="gray400"
                               style={{ lineHeight: 14, includeFontPadding: false }}
                             >
-                              Regenerate
+                              {t('aiChat.regenerate')}
                             </AppText>
                           </Pressable>
                           <FeedbackButton
@@ -882,9 +895,9 @@ export default function AiChatbot() {
                   streamingReply.body || streamingReply.toolCalls.length > 0 ? (
                     <AiChatMessageBubble
                       role="assistant"
-                      title="Mator AI"
+                      title={t('aiChat.assistantName')}
                       body={streamingReply.body}
-                      caption={streamingReply.body ? 'Typing' : undefined}
+                      caption={streamingReply.body ? t('aiChat.captionTyping') : undefined}
                       toolCalls={
                         streamingReply.toolCalls.length > 0
                           ? streamingReply.toolCalls
@@ -900,7 +913,7 @@ export default function AiChatbot() {
                 {!streamingReply && lastSuggestions.length > 0 ? (
                   <AppView gap="sm" mt={6}>
                     <AppText textVariant="bodyXs" colorName="gray400">
-                      Follow up
+                      {t('aiChat.followUp')}
                     </AppText>
                     <ScrollView
                       horizontal
@@ -950,7 +963,7 @@ export default function AiChatbot() {
               rounded={999}
               onPress={() => scrollToEnd()}
               accessibilityRole="button"
-              accessibilityLabel="Scroll to latest message"
+              accessibilityLabel={t('aiChat.scrollToLatest')}
               hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               style={{
                 width: 36,
@@ -993,7 +1006,7 @@ export default function AiChatbot() {
                 align="center"
                 style={{ fontSize: 10, lineHeight: 14 }}
               >
-                Powered by AI · may make mistakes
+                {t('aiChat.disclaimerShort')}
               </AppText>
             </AppView>
           </ComposerBlurWrapper>
@@ -1017,6 +1030,7 @@ function FeedbackButton({
   onPress: () => void;
 }) {
   const { tokens } = useThemeContext();
+  const { t } = useTranslation();
   const Icon = kind === 'up' ? ThumbsUp : ThumbsDown;
   const color = active ? tokens.brand : tokens.gray400;
   return (
@@ -1025,7 +1039,7 @@ function FeedbackButton({
       rounded={999}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={kind === 'up' ? 'Good response' : 'Bad response'}
+      accessibilityLabel={kind === 'up' ? t('aiChat.goodResponse') : t('aiChat.badResponse')}
       hitSlop={{ top: 9, bottom: 9, left: 9, right: 9 }}
       style={{
         width: 26,

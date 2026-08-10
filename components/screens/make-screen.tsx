@@ -1,5 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { ChevronRight } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -19,6 +20,7 @@ import { useMakes, useModels } from '@/hooks/use-vehicle-catalog';
  * screen for that make + model. Reachable from Explore's "Shop by vehicle".
  */
 export default function MakeScreen() {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
   const { make: makeParam } = useLocalSearchParams<{ make?: string }>();
@@ -30,7 +32,7 @@ export default function MakeScreen() {
   const { makes } = useMakes();
   const { state: modelsState, models } = useModels(brandId);
   const make = makes.find((m) => m.id === brandId);
-  const label = make?.name ?? makeParam ?? 'Vehicle';
+  const label = make?.name ?? makeParam ?? t('make.vehicleFallback');
   const logoUrl = make?.logoUrl ?? null;
   const color = brandColor(brandId);
   const loading = modelsState === 'loading';
@@ -77,7 +79,7 @@ export default function MakeScreen() {
               {label}
             </AppText>
             <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>
-              Select your model to see listings
+              {t('make.selectModel')}
             </AppText>
           </AppView>
         </AppView>
@@ -88,7 +90,7 @@ export default function MakeScreen() {
           weight="bold"
           style={{ fontSize: 12, color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.7, marginTop: 2 }}
         >
-          Models
+          {t('make.models')}
         </AppText>
         {loading ? (
           <CategoryRowsSkeleton showIcon={false} count={4} />
@@ -97,7 +99,7 @@ export default function MakeScreen() {
             family="default"
             style={{ fontSize: 14, color: tokens.textMuted, paddingVertical: 12 }}
           >
-            No models available for {label} yet.
+            {t('make.noModels', { label })}
           </AppText>
         ) : (
           <AppView>

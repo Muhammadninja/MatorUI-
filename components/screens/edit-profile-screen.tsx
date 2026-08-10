@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { useTranslation } from 'react-i18next';
 import { useEffect, useState } from 'react';
 import {
   Image,
@@ -41,6 +42,7 @@ function initials(name: string): string {
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 export default function EditProfileScreen() {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const toast = useToast();
   const { profile, updateProfile } = useUserContext();
@@ -67,7 +69,7 @@ export default function EditProfileScreen() {
   const pickPhoto = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      toast.info('Photo access is needed to change your picture');
+      toast.info(t('editProfile.photoPermission'));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -125,14 +127,14 @@ export default function EditProfileScreen() {
         avatarUrl,
       });
       if (photoFailed) {
-        toast.info('Saved, but the photo couldn’t be uploaded. Try again.');
+        toast.info(t('editProfile.savedPhotoFailed'));
       } else {
-        toast.success('Profile updated');
+        toast.success(t('editProfile.profileUpdated'));
       }
       router.back();
     } catch (err) {
       debugLog('profile', 'handleSave FAILED', { message: (err as Error)?.message });
-      toast.danger('Could not save changes. Please try again.');
+      toast.danger(t('editProfile.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -140,7 +142,7 @@ export default function EditProfileScreen() {
 
   return (
     <AppView flex={1} colorName="background">
-      <AppSettingsHeader title="Edit profile" fallbackHref="/profile" />
+      <AppSettingsHeader title={t('editProfile.title')} fallbackHref="/profile" />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -189,7 +191,7 @@ export default function EditProfileScreen() {
                 <Pressable
                   onPress={pickPhoto}
                   accessibilityRole="button"
-                  accessibilityLabel="Change profile photo"
+                  accessibilityLabel={t('editProfile.changePhoto')}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   style={({ pressed }) => ({
                     position: 'absolute',
@@ -214,8 +216,8 @@ export default function EditProfileScreen() {
             {/* Form fields */}
             <AppView px="lg" gap="lg">
               <AppTextField
-                label="Full name"
-                placeholder="Enter your full name"
+                label={t('editProfile.fullName')}
+                placeholder={t('editProfile.fullNamePlaceholder')}
                 value={fullName}
                 onChangeText={setFullName}
                 autoCapitalize="words"
@@ -223,8 +225,8 @@ export default function EditProfileScreen() {
               />
 
               <AppTextField
-                label="Email"
-                placeholder="Not linked"
+                label={t('editProfile.email')}
+                placeholder={t('editProfile.notLinked')}
                 value={email}
                 disabled
                 autoCapitalize="none"
@@ -233,7 +235,7 @@ export default function EditProfileScreen() {
               />
 
               <AppTextField
-                label="Phone"
+                label={t('editProfile.phone')}
                 placeholder="+998 90 123 45 67"
                 value={profile?.phone ?? ''}
                 disabled
@@ -243,7 +245,7 @@ export default function EditProfileScreen() {
               <Pressable
                 onPress={() => setPhoneSheetVisible(true)}
                 accessibilityRole="button"
-                accessibilityLabel="Change phone number"
+                accessibilityLabel={t('editProfile.changePhone')}
                 style={{ marginTop: -6 }}
               >
                 <AppText
@@ -252,7 +254,7 @@ export default function EditProfileScreen() {
                   colorName="brandBg"
                   style={{ fontSize: 13 }}
                 >
-                  Change phone number
+                  {t('editProfile.changePhone')}
                 </AppText>
               </Pressable>
             </AppView>
@@ -260,7 +262,7 @@ export default function EditProfileScreen() {
             {/* Save CTA */}
             <AppView px="lg" style={{ marginTop: 8 }}>
               <AppButton
-                title="Save changes"
+                title={t('editProfile.saveChanges')}
                 kind="brand"
                 size="lg"
                 fullWidth

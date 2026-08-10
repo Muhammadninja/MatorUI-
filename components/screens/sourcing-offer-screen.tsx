@@ -1,7 +1,8 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Check, Package, ShoppingCart, X } from 'lucide-react-native';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import AppBottomSheet from '@/components/shared/app-bottom-sheet';
 import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
@@ -21,23 +22,31 @@ import {
   type SourcingOfferDetail,
 } from '@/services/sourcing-service';
 
-const CONDITION_RU: Record<string, string> = {
-  NEW: 'Новый',
-  USED: 'Б/у',
-  OEM: 'Оригинал',
-  AFTERMARKET: 'Аналог',
-};
-const AVAILABILITY_RU: Record<string, string> = {
-  IN_STOCK: 'В наличии',
-  ON_ORDER: 'Под заказ',
-};
+type TFn = (key: string) => string;
 
-const REJECT_REASONS: { key: SourcingOfferDeclineReason; label: string }[] = [
-  { key: 'TOO_EXPENSIVE', label: 'Слишком дорого' },
-  { key: 'FOUND_CHEAPER', label: 'Нашёл дешевле' },
-  { key: 'NO_LONGER_NEEDED', label: 'Уже не нужно' },
-  { key: 'OTHER', label: 'Другое' },
-];
+function buildConditionLabels(t: TFn): Record<string, string> {
+  return {
+    NEW: t('sourcing.conditionNew'),
+    USED: t('sourcing.conditionUsed'),
+    OEM: t('sourcing.conditionOem'),
+    AFTERMARKET: t('sourcing.conditionAftermarket'),
+  };
+}
+function buildAvailabilityLabels(t: TFn): Record<string, string> {
+  return {
+    IN_STOCK: t('sourcing.availabilityInStock'),
+    ON_ORDER: t('sourcing.availabilityOnOrder'),
+  };
+}
+
+function buildRejectReasons(t: TFn): { key: SourcingOfferDeclineReason; label: string }[] {
+  return [
+    { key: 'TOO_EXPENSIVE', label: t('sourcing.reasonTooExpensive') },
+    { key: 'FOUND_CHEAPER', label: t('sourcing.reasonFoundCheaper') },
+    { key: 'NO_LONGER_NEEDED', label: t('sourcing.reasonNoLongerNeeded') },
+    { key: 'OTHER', label: t('sourcing.reasonOther') },
+  ];
+}
 
 /** 250000 → "250 000 сум". */
 function formatSom(price?: number): string | null {
@@ -83,6 +92,7 @@ function BuyButton({
   onPress: () => void;
   tokens: Tokens;
 }) {
+  const { t } = useTranslation();
   return (
     <AppPressableView
       onPress={onPress}
@@ -114,7 +124,7 @@ function BuyButton({
             <ShoppingCart size={16} color={tokens.onBrand} />
           </AppView>
           <AppText family="accent" weight="bold" style={{ fontSize: 16, color: tokens.onBrand }}>
-            {priceText ? `Купить · ${priceText}` : 'Добавить в корзину'}
+            {priceText ? t('sourcing.buyWithPrice', { price: priceText }) : t('sourcing.addToCart')}
           </AppText>
         </>
       )}
@@ -132,6 +142,7 @@ function RejectButton({
   onPress: () => void;
   tokens: Tokens;
 }) {
+  const { t } = useTranslation();
   return (
     <AppPressableView
       onPress={onPress}
@@ -151,7 +162,7 @@ function RejectButton({
     >
       <X size={15} color={tokens.textMuted} />
       <AppText family="accent" weight="semibold" style={{ fontSize: 14.5, color: tokens.textMuted }}>
-        Не подходит
+        {t('sourcing.doesNotFit')}
       </AppText>
     </AppPressableView>
   );
@@ -166,9 +177,14 @@ type LoadState = 'loading' | 'ready' | 'error';
  * tonal placeholder instead of an empty photo box.
  */
 export default function SourcingOfferScreen() {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const { refresh: refreshCart } = useCartContext();
   const { id } = useLocalSearchParams<{ id: string }>();
+
+  const conditionLabels = useMemo(() => buildConditionLabels(t), [t]);
+  const availabilityLabels = useMemo(() => buildAvailabilityLabels(t), [t]);
+  const rejectReasons = useMemo(() => buildRejectReasons(t), [t]);
 
   const [state, setState] = useState<LoadState>('loading');
   const [offer, setOffer] = useState<SourcingOfferDetail | null>(null);
@@ -204,18 +220,18 @@ export default function SourcingOfferScreen() {
       await acceptSourcingOffer(offer.id);
       await refreshCart();
       setStatus('ACCEPTED');
-      toastService.success('Добавлено в корзину');
+      toastService.success(t('sourcing.addedToCart'));
       router.navigate('/cart');
     } catch (err) {
       const conflict = (err as { status?: number })?.status === 409;
       if (conflict) setStatus('EXPIRED');
       toastService.danger(
-        conflict ? 'Предложение больше недоступно' : 'Не удалось добавить в корзину',
+        conflict ? t('sourcing.offerUnavailable') : t('sourcing.addToCartFailed'),
       );
     } finally {
       setBusy(null);
     }
-  }, [offer, refreshCart]);
+  }, [offer, refreshCart, t]);
 
   const handleReject = useCallback(async () => {
     if (!offer || !reason) return;
@@ -224,31 +240,33 @@ export default function SourcingOfferScreen() {
       await rejectSourcingOffer(offer.id, reason);
       setStatus('DECLINED');
       setRejectOpen(false);
-      toastService.info('Предложение отклонено');
+      toastService.info(t('sourcing.offerDeclined'));
       router.back();
     } catch {
-      toastService.danger('Не удалось отклонить предложение');
+      toastService.danger(t('sourcing.declineFailed'));
     } finally {
       setBusy(null);
     }
-  }, [offer, reason]);
+  }, [offer, reason, t]);
 
   const priceText = formatSom(offer?.price);
-  const conditionLabel = offer ? CONDITION_RU[offer.condition] : undefined;
-  const availabilityLabel = offer ? AVAILABILITY_RU[offer.availability] : undefined;
+  const conditionLabel = offer ? conditionLabels[offer.condition] : undefined;
+  const availabilityLabel = offer ? availabilityLabels[offer.availability] : undefined;
   const chips = offer
     ? [
         conditionLabel,
         availabilityLabel
           ? availabilityLabel +
-            (offer.availability === 'ON_ORDER' && offer.etaDays ? ` · ~${offer.etaDays} дн.` : '')
+            (offer.availability === 'ON_ORDER' && offer.etaDays
+              ? ` · ${t('sourcing.etaDays', { days: offer.etaDays })}`
+              : '')
           : undefined,
       ].filter((c): c is string => Boolean(c))
     : [];
 
   return (
     <AppView flex={1} colorName="background">
-      <AppSettingsHeader title="Предложение" fallbackHref="/notifications" />
+      <AppSettingsHeader title={t('sourcing.offerTitle')} fallbackHref="/notifications" />
 
       {state === 'loading' ? (
         <AppView flex={1} center>
@@ -258,13 +276,13 @@ export default function SourcingOfferScreen() {
         <AppView flex={1} center px="xl" gap={8}>
           <Package size={30} strokeWidth={2} color={tokens.textMuted} />
           <AppText family="heading" weight="bold" style={{ fontSize: 16, color: tokens.text }}>
-            Предложение недоступно
+            {t('sourcing.offerUnavailableTitle')}
           </AppText>
           <AppText
             family="default"
             style={{ fontSize: 13, color: tokens.textMuted, textAlign: 'center', maxWidth: 280 }}
           >
-            Возможно, оно устарело или было закрыто.
+            {t('sourcing.offerUnavailableBody')}
           </AppText>
         </AppView>
       ) : (
@@ -308,7 +326,7 @@ export default function SourcingOfferScreen() {
 
               <AppView gap={2} style={{ marginTop: 16 }}>
                 <AppText family="default" style={{ fontSize: 12, color: tokens.textMuted }}>
-                  Цена от продавца
+                  {t('sourcing.priceFromSeller')}
                 </AppText>
                 {priceText ? (
                   <AppText family="heading" weight="bold" style={{ fontSize: 28, color: tokens.brand }}>
@@ -327,7 +345,7 @@ export default function SourcingOfferScreen() {
                   }}
                 >
                   <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.brand, marginBottom: 3 }}>
-                    Комментарий продавца
+                    {t('sourcing.sellerNote')}
                   </AppText>
                   <AppText family="default" style={{ fontSize: 14, color: tokens.text, lineHeight: 20 }}>
                     {offer.note}
@@ -364,7 +382,7 @@ export default function SourcingOfferScreen() {
                 <AppView row center gap={6} style={{ paddingVertical: 2 }}>
                   <Check size={16} color={tokens.success} />
                   <AppText family="accent" weight="bold" style={{ fontSize: 14, color: tokens.success }}>
-                    Добавлено в корзину
+                    {t('sourcing.addedToCart')}
                   </AppText>
                 </AppView>
                 <BuyButton priceText={null} busy={false} disabled={false} onPress={() => router.navigate('/cart')} tokens={tokens} />
@@ -374,14 +392,14 @@ export default function SourcingOfferScreen() {
                 family="default"
                 style={{ fontSize: 13.5, color: tokens.textMuted, textAlign: 'center', paddingVertical: 8 }}
               >
-                Вы отклонили это предложение.
+                {t('sourcing.youDeclined')}
               </AppText>
             ) : (
               <AppText
                 family="default"
                 style={{ fontSize: 13.5, color: tokens.textMuted, textAlign: 'center', paddingVertical: 8 }}
               >
-                Предложение больше не действительно.
+                {t('sourcing.offerNoLongerValid')}
               </AppText>
             )}
           </AppView>
@@ -397,9 +415,9 @@ export default function SourcingOfferScreen() {
       >
         <AppView style={{ paddingHorizontal: 20, paddingBottom: 28, gap: 8 }}>
           <AppText family="heading" weight="bold" style={{ fontSize: 17, color: tokens.text, marginBottom: 4 }}>
-            Причина отказа
+            {t('sourcing.declineReasonTitle')}
           </AppText>
-          {REJECT_REASONS.map((r) => {
+          {rejectReasons.map((r) => {
             const active = reason === r.key;
             return (
               <AppPressableView
@@ -444,7 +462,7 @@ export default function SourcingOfferScreen() {
               <WheelLoader size={18} color={tokens.background} />
             ) : (
               <AppText family="accent" weight="bold" style={{ fontSize: 15.5, color: tokens.background }}>
-                Отклонить
+                {t('sourcing.decline')}
               </AppText>
             )}
           </AppPressableView>

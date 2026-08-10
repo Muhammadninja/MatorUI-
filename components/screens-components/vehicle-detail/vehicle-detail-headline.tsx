@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 
@@ -8,10 +10,12 @@ export type VehicleDetailHeadlineProps = {
 };
 
 export function VehicleDetailHeadline({
-  eyebrow = 'In the garage',
+  eyebrow,
   headline,
   subline,
 }: VehicleDetailHeadlineProps) {
+  const { t } = useTranslation();
+  const resolvedEyebrow = eyebrow ?? t('vehicleDetail.eyebrow');
   return (
     <AppView px={20} gap={6}>
       <AppText
@@ -21,7 +25,7 @@ export function VehicleDetailHeadline({
         transform="uppercase"
         numberOfLines={1}
       >
-        {eyebrow}
+        {resolvedEyebrow}
       </AppText>
       <AppText textVariant="title" family="heading" weight="bold" colorName="text">
         {headline}

@@ -1,5 +1,7 @@
 import { useState } from 'react';
 
+import { useTranslation } from 'react-i18next';
+
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
 import AppTextField from '@/components/shared/app-text-field';
@@ -23,6 +25,7 @@ export type NewAddressFormProps = {
  *  The parent screen routes between this and the list view; this
  *  component never knows about the list. */
 export default function NewAddressForm({ onSubmit, onCancel }: NewAddressFormProps) {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const [draft, setDraft] = useState<AddressDraft>(EMPTY_ADDRESS_DRAFT);
   const isValid = isAddressDraftValid(draft);
@@ -33,14 +36,14 @@ export default function NewAddressForm({ onSubmit, onCancel }: NewAddressFormPro
   return (
     <AppView flex={1} colorName="background">
       <AppSettingsHeader
-        title="New Address"
+        title={t('addresses.newAddressTitle')}
         onBack={onCancel}
-        backAccessibilityLabel="Cancel new address"
+        backAccessibilityLabel={t('addresses.cancelNewAddress')}
       />
       <AppView flex={1} style={{ paddingTop: 8 }}>
         <AppView px="lg" gap="xs">
           <AppText textVariant="bodySm" colorName="gray400">
-            Add a delivery location for future orders.
+            {t('addresses.newAddressHint')}
           </AppText>
         </AppView>
 
@@ -52,32 +55,32 @@ export default function NewAddressForm({ onSubmit, onCancel }: NewAddressFormPro
         >
           <AppView gap="md">
             <AppTextField
-              label="Label"
-              placeholder="Home, Work, Garage..."
+              label={t('addresses.label')}
+              placeholder={t('addresses.labelPlaceholder')}
               value={draft.label}
               onChangeText={(v) => update('label', v)}
               autoCapitalize="words"
               autoCorrect={false}
             />
             <AppTextField
-              label="Recipient"
-              placeholder="Full name"
+              label={t('addresses.recipient')}
+              placeholder={t('addresses.recipientPlaceholder')}
               value={draft.name}
               onChangeText={(v) => update('name', v)}
               autoCapitalize="words"
               autoCorrect={false}
             />
             <AppTextField
-              label="Address line 1"
-              placeholder="Street address"
+              label={t('addresses.line1')}
+              placeholder={t('addresses.line1Placeholder')}
               value={draft.line1}
               onChangeText={(v) => update('line1', v)}
               autoCapitalize="words"
               autoCorrect={false}
             />
             <AppTextField
-              label="Address line 2"
-              placeholder="City, state, ZIP, country"
+              label={t('addresses.line2')}
+              placeholder={t('addresses.line2Placeholder')}
               value={draft.line2}
               onChangeText={(v) => update('line2', v)}
               autoCapitalize="words"
@@ -100,7 +103,7 @@ export default function NewAddressForm({ onSubmit, onCancel }: NewAddressFormPro
               }}
             >
               <AppText textVariant="bodySemibold" weight="semibold" colorName="gray400">
-                Cancel
+                {t('common.cancel')}
               </AppText>
             </AppPressableView>
 
@@ -122,7 +125,7 @@ export default function NewAddressForm({ onSubmit, onCancel }: NewAddressFormPro
                 weight="semibold"
                 style={{ color: tokens.onBrand }}
               >
-                Save address
+                {t('addresses.saveAddress')}
               </AppText>
             </AppPressableView>
           </AppView>

@@ -1,4 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, CarFront, Trash2 } from 'lucide-react-native';
 import { ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,9 +13,9 @@ import { useThemeContext } from '@/contexts/theme.context';
 import useGarage from '@/hooks/use-garage';
 import { toastService } from '@/services/toast-service';
 
-function formatMileage(km?: number): string {
+function formatMileage(km: number | undefined, unit: string): string {
   if (km === undefined) return '—';
-  return `${km.toLocaleString('en-US')} mi`;
+  return `${km.toLocaleString('en-US')} ${unit}`;
 }
 
 function titleCase(s: string): string {
@@ -35,6 +36,7 @@ function titleCase(s: string): string {
  * `useGarage().removeVehicle`, triggered by the trash icon in the header.
  */
 export default function VehicleDetailScreen() {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -49,9 +51,9 @@ export default function VehicleDetailScreen() {
       <AppView flex={1} center colorName="background" px={20} gap={12}>
         <CarFront size={34} strokeWidth={2} color={tokens.textMuted} />
         <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted }}>
-          Vehicle not found.
+          {t('vehicleDetail.notFound')}
         </AppText>
-        <AppButton title="Back to garage" kind="secondary" size="sm" onPress={() => router.back()} />
+        <AppButton title={t('vehicleDetail.backToGarage')} kind="secondary" size="sm" onPress={() => router.back()} />
       </AppView>
     );
   }
@@ -62,6 +64,7 @@ export default function VehicleDetailScreen() {
   const headline = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
   const vinValue = vehicle.vin ?? '—';
   const trimValue = vehicle.trim ?? '—';
+  const mileageValue = formatMileage(vehicle.mileage, t('vehicleDetail.mileageUnit'));
   const colorValue = vehicle.color ? titleCase(vehicle.color) : '—';
   const subline = [vehicle.trim, vehicle.color ? titleCase(vehicle.color) : undefined]
     .filter(Boolean)
@@ -74,18 +77,20 @@ export default function VehicleDetailScreen() {
 
   async function handleSetActive() {
     await setPrimaryVehicle(vehicleId);
-    toastService.success('Active vehicle set', { description: headline });
+    toastService.success(t('vehicleDetail.activeSetToast'), { description: headline });
     router.back();
   }
 
   async function handleRemove() {
     try {
       await removeVehicle(vehicleId);
-      toastService.info(`Removed ${headline}`, { description: 'Vehicle removed from garage' });
+      toastService.info(t('vehicleDetail.removedToast', { vehicle: headline }), {
+        description: t('vehicleDetail.removedToastDesc'),
+      });
       router.back();
     } catch {
-      toastService.danger('Couldn’t remove vehicle', {
-        description: 'Please try again.',
+      toastService.danger(t('vehicleDetail.removeErrorToast'), {
+        description: t('vehicleDetail.removeErrorToastDesc'),
       });
     }
   }
@@ -107,7 +112,7 @@ export default function VehicleDetailScreen() {
             priority="high"
             cachePolicy="memory-disk"
             transition={180}
-            alt={`${headline} photo`}
+            alt={t('vehicleDetail.photoAlt', { vehicle: headline })}
             fallback={
               <AppView flex={1} center colorName="backgroundSecondary">
                 <CarFront size={40} strokeWidth={2} color={tokens.gray400} />
@@ -141,7 +146,7 @@ export default function VehicleDetailScreen() {
                   style={{ fontSize: 10, letterSpacing: 0.8 }}
                   transform="uppercase"
                 >
-                  Active
+                  {t('vehicleDetail.activePill')}
                 </AppText>
               </AppView>
             ) : null}
@@ -170,16 +175,16 @@ export default function VehicleDetailScreen() {
           >
             {/* Row 1: VIN + Mileage */}
             <AppView row style={styles.specRow}>
-              <SpecCell label="VIN" value={vinValue} />
+              <SpecCell label={t('vehicleDetail.vin')} value={vinValue} />
               <AppView style={[styles.specDividerV, { backgroundColor: tokens.border }]} />
-              <SpecCell label="Mileage" value={formatMileage(vehicle.mileage)} />
+              <SpecCell label={t('vehicleDetail.mileage')} value={mileageValue} />
             </AppView>
             <AppView style={[styles.specDividerH, { backgroundColor: tokens.border }]} />
             {/* Row 2: Trim + Color */}
             <AppView row style={styles.specRow}>
-              <SpecCell label="Trim" value={trimValue} />
+              <SpecCell label={t('vehicleDetail.trim')} value={trimValue} />
               <AppView style={[styles.specDividerV, { backgroundColor: tokens.border }]} />
-              <SpecCell label="Color" value={colorValue} />
+              <SpecCell label={t('vehicleDetail.color')} value={colorValue} />
             </AppView>
           </AppView>
         </AppView>
@@ -188,7 +193,7 @@ export default function VehicleDetailScreen() {
         {!isActive ? (
           <AppView px={20} style={{ marginTop: 4 }}>
             <AppButton
-              title="Set as active vehicle"
+              title={t('vehicleDetail.setActive')}
               kind="brand"
               size="lg"
               fullWidth
@@ -221,7 +226,7 @@ export default function VehicleDetailScreen() {
           onPress={() => router.back()}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('vehicleDetail.goBack')}
         >
           <ArrowLeft size={20} strokeWidth={2.2} color={tokens.text} />
         </AppPressableView>
@@ -242,7 +247,7 @@ export default function VehicleDetailScreen() {
           onPress={handleRemove}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           accessibilityRole="button"
-          accessibilityLabel="Delete vehicle"
+          accessibilityLabel={t('vehicleDetail.deleteVehicle')}
         >
           <Trash2 size={20} strokeWidth={2.2} color={tokens.error} />
         </AppPressableView>

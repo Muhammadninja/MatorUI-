@@ -1,5 +1,7 @@
 import { MapPin } from 'lucide-react-native';
 
+import { useTranslation } from 'react-i18next';
+
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
@@ -14,6 +16,7 @@ export type AddressCardProps = {
 /** A single saved shipping address card. Brand border + "DEFAULT" pill for
  *  the default address. "Edit" (ghost) and "Remove" (error-colored) actions. */
 export default function AddressCard({ address, onSetDefault, onRemove }: AddressCardProps) {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
 
   return (
@@ -63,7 +66,7 @@ export default function AddressCard({ address, onSetDefault, onRemove }: Address
               weight="semibold"
               style={{ color: tokens.onBrand, letterSpacing: 0.4 }}
             >
-              DEFAULT
+              {t('addresses.defaultPill')}
             </AppText>
           </AppView>
         ) : null}
@@ -88,7 +91,7 @@ export default function AddressCard({ address, onSetDefault, onRemove }: Address
           androidRipple={false}
           onPress={onSetDefault}
           accessibilityRole="button"
-          accessibilityLabel={`Edit address ${address.label}`}
+          accessibilityLabel={t('addresses.editA11y', { label: address.label })}
           style={{
             borderRadius: 999,
             borderWidth: 1,
@@ -103,7 +106,7 @@ export default function AddressCard({ address, onSetDefault, onRemove }: Address
             weight="semibold"
             colorName="textMuted"
           >
-            Edit
+            {t('addresses.edit')}
           </AppText>
         </AppPressableView>
 
@@ -112,7 +115,7 @@ export default function AddressCard({ address, onSetDefault, onRemove }: Address
           androidRipple={false}
           onPress={onRemove}
           accessibilityRole="button"
-          accessibilityLabel={`Remove address ${address.label}`}
+          accessibilityLabel={t('addresses.removeA11y', { label: address.label })}
           style={{ paddingHorizontal: 4, paddingVertical: 5 }}
         >
           <AppText
@@ -121,7 +124,7 @@ export default function AddressCard({ address, onSetDefault, onRemove }: Address
             weight="semibold"
             style={{ color: tokens.error }}
           >
-            Remove
+            {t('addresses.remove')}
           </AppText>
         </AppPressableView>
       </AppView>

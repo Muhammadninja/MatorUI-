@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import AiChatToolCallCard from '@/components/screens-components/ai-chat/ai-chat-tool-call-card';
 import { AppText } from '@/components/shared/app-text';
@@ -30,6 +31,7 @@ function AiChatMessageBubble({
   toolCalls,
 }: AiChatMessageBubbleProps) {
   const { tokens } = useThemeContext();
+  const { t } = useTranslation();
   const { profile } = useUserContext();
   const isUser = role === 'user';
 
@@ -72,7 +74,7 @@ function AiChatMessageBubble({
           rounded={999}
           onPress={onAvatarPress}
           accessibilityRole={onAvatarPress ? 'button' : undefined}
-          accessibilityLabel={onAvatarPress ? 'About Mator AI' : undefined}
+          accessibilityLabel={onAvatarPress ? t('aiChat.aboutAssistant') : undefined}
           style={{
             width: 32,
             height: 32,
@@ -149,7 +151,7 @@ function AiChatMessageBubble({
           rounded={999}
           onPress={onAvatarPress}
           accessibilityRole={onAvatarPress ? 'button' : undefined}
-          accessibilityLabel={onAvatarPress ? 'Edit profile' : undefined}
+          accessibilityLabel={onAvatarPress ? t('aiChat.editProfile') : undefined}
           style={{
             width: 32,
             height: 32,

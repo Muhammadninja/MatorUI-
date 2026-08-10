@@ -1,4 +1,5 @@
 import { Clock, Search } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet } from 'react-native';
 
 import { AppButton } from '@/components/shared/app-button';
@@ -42,6 +43,7 @@ export default function SearchSuggestionsPanel({
   onRemoveRecent,
   onClearRecents,
 }: SearchSuggestionsPanelProps) {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
 
   const showTypeahead = suggestions.length > 0 || isLoadingSuggestions;
@@ -71,7 +73,7 @@ export default function SearchSuggestionsPanel({
                 kind="text"
                 size="xs"
                 rounded={999}
-                accessibilityLabel="Loading suggestions"
+                accessibilityLabel={t('search.loadingSuggestions')}
                 containerStyle={styles.loadingIndicatorContainer}
                 contentStyle={styles.loadingIndicatorContent}
               />
@@ -79,7 +81,7 @@ export default function SearchSuggestionsPanel({
               <Search size={16} strokeWidth={2} color={tokens.gray400} />
             )}
             <AppText textVariant="bodySm" colorName="gray400">
-              {isLoadingSuggestions ? 'Searching…' : 'No suggestions'}
+              {isLoadingSuggestions ? t('search.searching') : t('search.noSuggestions')}
             </AppText>
           </AppView>
         ) : (
@@ -102,13 +104,13 @@ export default function SearchSuggestionsPanel({
                   rightAccessory={
                     suggestion.kind === 'product' ? (
                       <AppText textVariant="bodyXs" colorName="gray400">
-                        Product
+                        {t('search.productTag')}
                       </AppText>
                     ) : null
                   }
                   divider={false}
                   onPress={() => onSelectSuggestion(suggestion)}
-                  accessibilityLabel={`Search for ${suggestion.text}`}
+                  accessibilityLabel={t('search.searchForA11y', { query: suggestion.text })}
                   contentStyle={styles.listItemContent}
                 />
               </AppView>
@@ -123,12 +125,12 @@ export default function SearchSuggestionsPanel({
         <AppView py={6}>
           <AppView row align="center" justify="space-between" px={14} py={6}>
             <AppText textVariant="bodyXs" colorName="gray400" weight="semibold">
-              Recent · matches “{trimmedPrefix}”
+              {t('search.recentMatches', { query: trimmedPrefix })}
             </AppText>
             <AppButton
-              title="Clear all"
+              title={t('search.clearAll')}
               onPress={onClearRecents}
-              accessibilityLabel="Clear all recent searches"
+              accessibilityLabel={t('search.clearAllRecents')}
               variant="ghost"
               kind="text"
               size="xs"
@@ -154,11 +156,11 @@ export default function SearchSuggestionsPanel({
                   style={styles.recentItem}
                   contentStyle={styles.listItemContent}
                   onPress={() => onSelectRecent(query)}
-                  accessibilityLabel={`Search again for ${query}`}
+                  accessibilityLabel={t('search.searchAgainA11y', { query })}
                 />
                 <AppButton
                   onPress={() => onRemoveRecent(query)}
-                  accessibilityLabel={`Remove ${query} from recents`}
+                  accessibilityLabel={t('search.removeRecentA11y', { query })}
                   title=""
                   startIcon={{
                     name: 'xmark.circle.fill',

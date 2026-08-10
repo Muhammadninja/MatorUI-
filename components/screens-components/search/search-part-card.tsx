@@ -4,6 +4,7 @@ import { useThemeContext } from '@/contexts/theme.context';
 import { toastService } from '@/services/toast-service';
 import { triggerHaptic } from '@/utils/haptics';
 import { memo, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { StyleProp, ViewStyle } from 'react-native';
 
 import { AppButton } from '../../shared/app-button';
@@ -51,9 +52,9 @@ function SearchPartCard({
   status = 'Ready to ship',
   title,
   description,
-  priceLabel = 'Starting at',
+  priceLabel,
   price,
-  actionLabel = 'Add to cart',
+  actionLabel,
   image,
   imageSource,
   compact = false,
@@ -61,8 +62,11 @@ function SearchPartCard({
   onPress,
   oem,
 }: SearchPartCardProps) {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const { addItem } = useCartContext();
+  const resolvedPriceLabel = priceLabel ?? t('search.startingAt');
+  const resolvedActionLabel = actionLabel ?? t('search.addToCart');
   const [wasJustAdded, setWasJustAdded] = useState(false);
   // Resolve the image source: prefer a URL string, fall back to a static
   // require result, fall back to the built-in placeholder. Empty string
@@ -99,7 +103,7 @@ function SearchPartCard({
       title,
       description,
       price,
-      priceLabel,
+      priceLabel: resolvedPriceLabel,
       badge,
       status,
       imageUrl: image && image.length > 0 ? image : undefined,
@@ -108,7 +112,7 @@ function SearchPartCard({
     // card all fire the same "Added to cart" toast on add. Without it,
     // catalogue / top-featured cards felt silent compared to the other
     // entry points.
-    toastService.success('Added to cart', { description: title });
+    toastService.success(t('search.addedToCart'), { description: title });
     setWasJustAdded(true);
 
     if (resetAddedTimeoutRef.current) {
@@ -180,14 +184,14 @@ function SearchPartCard({
           <AppView gap={8}>
             <AppView gap={2}>
               <AppText textVariant="bodyXs" colorName="textMuted">
-                {priceLabel}
+                {resolvedPriceLabel}
               </AppText>
               <AppText textVariant={priceVariant} family="heading">
                 {price}
               </AppText>
             </AppView>
             <AppButton
-              title={wasJustAdded ? 'Added' : actionLabel}
+              title={wasJustAdded ? t('search.added') : resolvedActionLabel}
               kind="secondary"
               size="xs"
               fullWidth
@@ -199,7 +203,7 @@ function SearchPartCard({
             <AppView row align="center" justify="space-between" gap={12}>
               <AppView gap={2} style={{ flex: 1 }}>
                 <AppText textVariant="bodyXs" colorName="textMuted">
-                  {priceLabel}
+                  {resolvedPriceLabel}
                 </AppText>
                 {/* numberOfLines + adjustsFontSizeToFit: long prices
                  *  (e.g. "UZS 11,008,400") would otherwise wrap to a
@@ -218,7 +222,7 @@ function SearchPartCard({
                 </AppText>
               </AppView>
               <AppButton
-                title={wasJustAdded ? 'Added' : actionLabel}
+                title={wasJustAdded ? t('search.added') : resolvedActionLabel}
                 kind="secondary"
                 size="sm"
                 containerStyle={{ flexShrink: 0 }}

@@ -1,5 +1,7 @@
 import { MapPinOff, Plus } from 'lucide-react-native';
 
+import { useTranslation } from 'react-i18next';
+
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
@@ -11,6 +13,7 @@ export type EmptyAddressesCardProps = {
 /** Empty state shown when the user has no saved addresses yet. Includes
  *  a primary CTA into the new-address form. */
 export default function EmptyAddressesCard({ onAdd }: EmptyAddressesCardProps) {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
 
   return (
@@ -34,20 +37,20 @@ export default function EmptyAddressesCard({ onAdd }: EmptyAddressesCardProps) {
         <MapPinOff size={22} strokeWidth={2} color={tokens.gray400} />
       </AppView>
       <AppView align="center" gap="xs">
-        <AppText textVariant="bodySemibold">No addresses</AppText>
+        <AppText textVariant="bodySemibold">{t('addresses.emptyTitle')}</AppText>
         <AppText
           textVariant="bodySm"
           colorName="gray400"
           style={{ textAlign: 'center', maxWidth: 240 }}
         >
-          Add a delivery location so orders ship to the right place.
+          {t('addresses.emptySubtitle')}
         </AppText>
       </AppView>
       <AppPressableView
         androidRipple={false}
         onPress={onAdd}
         accessibilityRole="button"
-        accessibilityLabel="Add new address"
+        accessibilityLabel={t('addresses.addNew')}
         row
         align="center"
         gap="sm"
@@ -60,7 +63,7 @@ export default function EmptyAddressesCard({ onAdd }: EmptyAddressesCardProps) {
       >
         <Plus size={14} strokeWidth={2.4} color={tokens.onBrand} />
         <AppText weight="semibold" style={{ color: tokens.onBrand }}>
-          Add address
+          {t('addresses.addAddress')}
         </AppText>
       </AppPressableView>
     </AppView>

@@ -1,5 +1,6 @@
 import { Link, Tabs } from 'expo-router';
 import { Bell, Car, Search, ShoppingBag, Sparkles, User } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 
 import AppTabBar from '@/components/shared/app-tab-bar';
 import { AppPressableView } from '@/components/shared/app-view';
@@ -24,6 +25,7 @@ const TAB_META = {
 type TabKey = keyof typeof TAB_META;
 
 export default function TabLayout() {
+  const { t } = useTranslation();
   const colorScheme = useColorScheme();
   const { tokens } = useThemeContext();
   const { itemCount } = useCartContext();
@@ -113,7 +115,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="(explore)"
         options={{
-          title: 'Explore',
+          title: t('nav.explore'),
           headerShown: false,
           headerRight: () => (
             <Link href="/modal" asChild>
@@ -124,10 +126,10 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen name="(garage)" options={{ title: 'Garage', headerShown: false }} />
-      <Tabs.Screen name="(ai-chat)" options={{ title: 'Assistant', headerShown: false }} />
-      <Tabs.Screen name="(cart)" options={{ title: 'Cart', headerShown: false }} />
-      <Tabs.Screen name="(profile)" options={{ title: 'Profile', headerShown: false }} />
+      <Tabs.Screen name="(garage)" options={{ title: t('nav.garage'), headerShown: false }} />
+      <Tabs.Screen name="(ai-chat)" options={{ title: t('nav.assistant'), headerShown: false }} />
+      <Tabs.Screen name="(cart)" options={{ title: t('nav.cart'), headerShown: false }} />
+      <Tabs.Screen name="(profile)" options={{ title: t('nav.profile'), headerShown: false }} />
     </Tabs>
   );
 }
