@@ -11,10 +11,12 @@ import {
   PackageCheck,
   RotateCcw,
   Truck,
+  X,
   XCircle,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Modal, Pressable } from 'react-native';
 
 import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
@@ -26,7 +28,12 @@ import { useThemeContext } from '@/contexts/theme.context';
 import { useNotifications } from '@/hooks/use-notifications';
 import { toastService } from '@/services/toast-service';
 import { ORDER_STATUS_MACHINE_I18N } from '@/services/orders-service';
-import { acceptSourcingOffer, fetchSourcingOffer } from '@/services/sourcing-service';
+import {
+  acceptSourcingOffer,
+  fetchSourcingOffer,
+  rejectSourcingOffer,
+  type SourcingOfferDeclineReason,
+} from '@/services/sourcing-service';
 import type { NotificationItem } from '@/services/notifications-service';
 
 type Tokens = ReturnType<typeof useThemeContext>['tokens'];
@@ -46,6 +53,15 @@ function buildAvailabilityLabels(t: TFn): Record<string, string> {
     IN_STOCK: t('sourcing.availabilityInStockShort'),
     ON_ORDER: t('sourcing.availabilityOnOrderShort'),
   };
+}
+
+function buildRejectReasons(t: TFn): { key: SourcingOfferDeclineReason; label: string }[] {
+  return [
+    { key: 'TOO_EXPENSIVE', label: t('sourcing.reasonTooExpensive') },
+    { key: 'FOUND_CHEAPER', label: t('sourcing.reasonFoundCheaper') },
+    { key: 'NO_LONGER_NEEDED', label: t('sourcing.reasonNoLongerNeeded') },
+    { key: 'OTHER', label: t('sourcing.reasonOther') },
+  ];
 }
 
 /** 250000 → "250 000 сум". */
@@ -114,16 +130,22 @@ function SourcingOfferCard({
   tokens,
   busy,
   added,
+  canDecline,
   vehicle,
   onAdd,
+  onReject,
 }: {
   n: NotificationItem;
   tokens: Tokens;
   busy: boolean;
   added: boolean;
+  /** Whether the decline (✕) affordance applies — hidden once the offer is
+   *  declined/gone so a declined offer only offers "add to cart" again. */
+  canDecline: boolean;
   /** "Chevrolet Cobalt" — the car the part was requested for (already formatted). */
   vehicle: string;
   onAdd: () => void;
+  onReject: () => void;
 }) {
   const { t } = useTranslation();
   const conditionLabels = useMemo(() => buildConditionLabels(t), [t]);
@@ -178,7 +200,8 @@ function SourcingOfferCard({
         </AppView>
       </AppView>
 
-      {/* Right-corner action: Added (in cart) OR Add to cart */}
+      {/* Right-corner action: "Added" once in cart; otherwise a compact
+          decline (✕) + Add-to-cart pair. */}
       {added ? (
         <AppView row align="center" gap={5} style={{ flexShrink: 0 }}>
           <Check size={15} color={tokens.success} />
@@ -187,29 +210,47 @@ function SourcingOfferCard({
           </AppText>
         </AppView>
       ) : (
-        <AppPressableView
-          onPress={onAdd}
-          disabled={busy}
-          pressedOpacity={0.9}
-          accessibilityRole="button"
-          accessibilityLabel={t('sourcing.addToCartA11y')}
-          row
-          align="center"
-          gap={5}
-          rounded={999}
-          style={{ flexShrink: 0, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: tokens.text }}
-        >
-          {busy ? (
-            <WheelLoader size={14} color={tokens.background} />
-          ) : (
-            <>
-              <MaterialIcons name="add-shopping-cart" size={14} color={tokens.background} />
-              <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.background }}>
-                {t('sourcing.toCart')}
-              </AppText>
-            </>
-          )}
-        </AppPressableView>
+        <AppView row align="center" gap={8} style={{ flexShrink: 0 }}>
+          {/* Decline (✕) — opens the reason picker; hidden once declined/gone */}
+          {canDecline ? (
+            <AppPressableView
+              onPress={onReject}
+              disabled={busy}
+              pressedOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={t('sourcing.declineOfferA11y')}
+              center
+              style={{ width: 34, height: 34, borderRadius: 999, borderWidth: 1, borderColor: tokens.divider }}
+            >
+              <X size={16} color={tokens.textMuted} />
+            </AppPressableView>
+          ) : null}
+
+          {/* Add to cart */}
+          <AppPressableView
+            onPress={onAdd}
+            disabled={busy}
+            pressedOpacity={0.9}
+            accessibilityRole="button"
+            accessibilityLabel={t('sourcing.addToCartA11y')}
+            row
+            align="center"
+            gap={5}
+            rounded={999}
+            style={{ paddingHorizontal: 14, paddingVertical: 8, backgroundColor: tokens.text }}
+          >
+            {busy ? (
+              <WheelLoader size={14} color={tokens.background} />
+            ) : (
+              <>
+                <MaterialIcons name="add-shopping-cart" size={14} color={tokens.background} />
+                <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.background }}>
+                  {t('sourcing.toCart')}
+                </AppText>
+              </>
+            )}
+          </AppPressableView>
+        </AppView>
       )}
     </AppView>
   );
@@ -220,6 +261,7 @@ export default function NotificationsScreen() {
   const { tokens } = useThemeContext();
   const { state, notifications, unreadCount, markRead, markAllRead, refresh } = useNotifications();
   const { refresh: refreshCart } = useCartContext();
+  const rejectReasons = useMemo(() => buildRejectReasons(t), [t]);
 
   // offerId → LIVE status ('SENT'|'ACCEPTED'|'DECLINED'|'EXPIRED'|'GONE').
   // Fetched from the server on load so a card reflects reality (already bought /
@@ -231,6 +273,8 @@ export default function NotificationsScreen() {
   // (a snapshot) predates the vehicle fields.
   const [liveVehicle, setLiveVehicle] = useState<Record<string, string>>({});
   const [busyOffer, setBusyOffer] = useState<string | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<string | null>(null);
+  const [rejectBusy, setRejectBusy] = useState(false);
 
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
@@ -353,6 +397,37 @@ export default function NotificationsScreen() {
     [refreshCart, markRead, t],
   );
 
+  const openReject = (n: NotificationItem) => {
+    if (!n.offer?.offerId) return;
+    setRejectTarget(n.offer.offerId);
+    if (n.unread) markRead(n.id);
+  };
+
+  // One tap on a reason declines with it — no separate confirm step.
+  const rejectWith = useCallback(
+    async (reasonKey: SourcingOfferDeclineReason) => {
+      const target = rejectTarget;
+      if (!target || rejectBusy) return;
+      setRejectBusy(true);
+      try {
+        await rejectSourcingOffer(target, reasonKey);
+        setLiveStatus((s) => ({ ...s, [target]: 'DECLINED' }));
+        toastService.info(t('sourcing.offerDeclined'));
+      } catch (err) {
+        if ((err as { status?: number })?.status === 404) {
+          setLiveStatus((s) => ({ ...s, [target]: 'GONE' }));
+          toastService.info(t('sourcing.offerUnavailable'));
+        } else {
+          toastService.danger(t('sourcing.declineFailed'));
+        }
+      } finally {
+        setRejectBusy(false);
+        setRejectTarget(null);
+      }
+    },
+    [rejectTarget, rejectBusy, t],
+  );
+
   return (
     <AppView flex={1} colorName="background">
       <AppSettingsHeader
@@ -410,15 +485,20 @@ export default function NotificationsScreen() {
                 capitalizeWords(
                   [n.offer?.vehicleBrand, n.offer?.vehicleModel].filter(Boolean).join(' '),
                 ) || (liveVehicle[offerId] ?? '');
+              const status = liveStatus[offerId];
               return (
                 <SourcingOfferCard
                   key={n.id}
                   n={n}
                   tokens={tokens}
                   busy={busyOffer === offerId}
-                  added={liveStatus[offerId] === 'ACCEPTED'}
+                  added={status === 'ACCEPTED'}
+                  // Decline only applies to a live (SENT / not-yet-resolved) offer —
+                  // once declined/expired/gone, the card just re-offers "add to cart".
+                  canDecline={status === undefined || status === 'SENT'}
                   vehicle={vehicle}
                   onAdd={() => addToCart(n)}
+                  onReject={() => openReject(n)}
                 />
               );
             }
@@ -496,6 +576,59 @@ export default function NotificationsScreen() {
           })}
         </AppScrollView>
       )}
+
+      {/* Decline-reason picker — a small centered modal (no arrows). */}
+      <Modal
+        transparent
+        animationType="fade"
+        visible={rejectTarget !== null}
+        onRequestClose={() => setRejectTarget(null)}
+      >
+        <AppView flex={1} center px="xl" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}>
+          {/* Backdrop — tap outside the card to dismiss. */}
+          <Pressable
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+            onPress={() => setRejectTarget(null)}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.close')}
+          />
+          <AppView
+            rounded={20}
+            style={{
+              width: '100%',
+              maxWidth: 320,
+              backgroundColor: tokens.card ?? tokens.background,
+              borderWidth: 1,
+              borderColor: tokens.divider,
+              paddingHorizontal: 16,
+              paddingTop: 14,
+              paddingBottom: 6,
+            }}
+          >
+            <AppText family="heading" weight="bold" style={{ fontSize: 15.5, color: tokens.text, marginBottom: 2 }}>
+              {t('sourcing.declineReasonTitle')}
+            </AppText>
+            {rejectReasons.map((r, i) => (
+              <AppPressableView
+                key={r.key}
+                onPress={() => rejectWith(r.key)}
+                disabled={rejectBusy}
+                pressedOpacity={0.55}
+                style={{
+                  paddingVertical: 12,
+                  borderTopWidth: i === 0 ? 0 : 1,
+                  borderTopColor: tokens.divider,
+                  opacity: rejectBusy ? 0.5 : 1,
+                }}
+              >
+                <AppText family="default" weight="semibold" style={{ fontSize: 14.5, color: tokens.text }}>
+                  {r.label}
+                </AppText>
+              </AppPressableView>
+            ))}
+          </AppView>
+        </AppView>
+      </Modal>
     </AppView>
   );
 }
