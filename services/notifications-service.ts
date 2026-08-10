@@ -30,6 +30,9 @@ export type SourcingOfferPayload = {
   offerId?: string;
   ticketId?: string;
   partName?: string | null;
+  /** The vehicle the customer asked the part for (chat-extracted), for display. */
+  vehicleBrand?: string | null;
+  vehicleModel?: string | null;
   price?: number;
   currency?: string;
   condition?: string;
@@ -55,6 +58,12 @@ export type NotificationItem = {
   deeplinkPath?: string | null;
   /** Structured offer, present on `sourcing_offer` rows — drives the found-part card. */
   offer?: SourcingOfferPayload;
+  /** Order id from `data.order_id` on order-related rows (order_status_changed /
+   *  order_paid) — the feed taps through to `/track-order` with it. */
+  orderId?: string;
+  /** Lowercased backend order status from `data.status` (e.g. "delivered") —
+   *  the feed renders a LOCALIZED label from it instead of the backend's copy. */
+  orderStatus?: string;
 };
 
 export interface NotificationsTransport {
@@ -180,6 +189,14 @@ export function mapRawNotification(raw: RawNotification): NotificationItem {
   // the feed can render the rich card (image, price, condition).
   if (type === 'sourcing_offer' && raw.data && typeof raw.data === 'object') {
     item.offer = raw.data as SourcingOfferPayload;
+  }
+  // Order rows carry `{ order_id, status }` in `data`; surface both so the feed
+  // can deep-link to the order-status screen and render a localized status word
+  // (the backend body embeds the raw English status, e.g. "delivered").
+  if ((type === 'order_status_changed' || type === 'order_paid') && raw.data && typeof raw.data === 'object') {
+    const d = raw.data as { order_id?: unknown; status?: unknown };
+    if (typeof d.order_id === 'string') item.orderId = d.order_id;
+    if (typeof d.status === 'string') item.orderStatus = d.status;
   }
   return item;
 }

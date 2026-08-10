@@ -1,10 +1,21 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
-import { BellOff, Check, ChevronRight, X } from 'lucide-react-native';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  AlertCircle,
+  BellOff,
+  Check,
+  Clock,
+  CreditCard,
+  Package,
+  PackageCheck,
+  RotateCcw,
+  Truck,
+  XCircle,
+} from 'lucide-react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
-import AppBottomSheet from '@/components/shared/app-bottom-sheet';
 import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
@@ -14,33 +25,28 @@ import { useCartContext } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useNotifications } from '@/hooks/use-notifications';
 import { toastService } from '@/services/toast-service';
-import {
-  acceptSourcingOffer,
-  fetchSourcingOffer,
-  rejectSourcingOffer,
-  type SourcingOfferDeclineReason,
-} from '@/services/sourcing-service';
+import { ORDER_STATUS_MACHINE_I18N } from '@/services/orders-service';
+import { acceptSourcingOffer, fetchSourcingOffer } from '@/services/sourcing-service';
 import type { NotificationItem } from '@/services/notifications-service';
 
 type Tokens = ReturnType<typeof useThemeContext>['tokens'];
 
-const CONDITION_RU: Record<string, string> = {
-  NEW: 'новый',
-  USED: 'б/у',
-  OEM: 'оригинал',
-  AFTERMARKET: 'аналог',
-};
-const AVAILABILITY_RU: Record<string, string> = {
-  IN_STOCK: 'в наличии',
-  ON_ORDER: 'под заказ',
-};
+type TFn = (key: string) => string;
 
-const REJECT_REASONS: { key: SourcingOfferDeclineReason; label: string }[] = [
-  { key: 'TOO_EXPENSIVE', label: 'Слишком дорого' },
-  { key: 'FOUND_CHEAPER', label: 'Нашёл дешевле' },
-  { key: 'NO_LONGER_NEEDED', label: 'Уже не нужно' },
-  { key: 'OTHER', label: 'Другое' },
-];
+function buildConditionLabels(t: TFn): Record<string, string> {
+  return {
+    NEW: t('sourcing.conditionNewShort'),
+    USED: t('sourcing.conditionUsedShort'),
+    OEM: t('sourcing.conditionOemShort'),
+    AFTERMARKET: t('sourcing.conditionAftermarketShort'),
+  };
+}
+function buildAvailabilityLabels(t: TFn): Record<string, string> {
+  return {
+    IN_STOCK: t('sourcing.availabilityInStockShort'),
+    ON_ORDER: t('sourcing.availabilityOnOrderShort'),
+  };
+}
 
 /** 250000 → "250 000 сум". */
 function formatSom(price?: number): string | null {
@@ -48,168 +54,169 @@ function formatSom(price?: number): string | null {
   return `${price.toLocaleString('ru-RU').replace(/ /g, ' ')} сум`;
 }
 
-/** Live display state for an offer card, derived from the offer's server status. */
-type OfferCardState = 'actionable' | 'in_cart' | 'declined' | 'unavailable';
+/** Display polish for the part name, which is the raw user query from chat
+ *  (e.g. "salon filtri"): uppercase the first letter only, leaving the rest —
+ *  multi-word RU/UZ names shouldn't be title-cased. Data is left untouched. */
+function capitalizeFirst(s?: string | null): string {
+  const name = s?.trim();
+  if (!name) return '';
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
 
-/** Raw offer status (or GONE for a 404) → card state. Unknown/undefined (still
- *  loading) is treated as actionable — the common case is a fresh SENT offer. */
-function deriveOfferState(raw: string | undefined): OfferCardState {
-  if (raw === 'ACCEPTED') return 'in_cart';
-  if (raw === 'DECLINED') return 'declined';
-  if (raw === 'EXPIRED' || raw === 'GONE') return 'unavailable';
-  return 'actionable';
+/** Title-case each word — brand/model are proper nouns ("chevrolet cobalt" →
+ *  "Chevrolet Cobalt"), unlike the free-text part name. */
+function capitalizeWords(s?: string | null): string {
+  const v = s?.trim();
+  if (!v) return '';
+  return v.replace(/\S+/g, (w) => w.charAt(0).toUpperCase() + w.slice(1));
+}
+
+type LucideIcon = typeof Check;
+
+/** A colored icon per order status (from `data.status`) so an order-update row
+ *  reads at a glance: green ✓ delivered/paid, red ✕ cancelled, blue in-transit,
+ *  amber pending/refunded. Returns null for non-order or unknown statuses. */
+function orderStatusVisual(
+  status: string | undefined,
+  tokens: Tokens,
+): { Icon: LucideIcon; color: string } | null {
+  switch (status) {
+    case 'delivered':
+      return { Icon: PackageCheck, color: tokens.success };
+    case 'paid':
+      return { Icon: CreditCard, color: tokens.success };
+    case 'shipped':
+      return { Icon: Truck, color: tokens.info };
+    case 'processing':
+      return { Icon: Package, color: tokens.info };
+    case 'pending_payment':
+      return { Icon: Clock, color: tokens.warning };
+    case 'refunded':
+      return { Icon: RotateCcw, color: tokens.warning };
+    case 'cancelled':
+      return { Icon: XCircle, color: tokens.error };
+    case 'expired':
+      return { Icon: AlertCircle, color: tokens.textMuted };
+    default:
+      return null;
+  }
 }
 
 /**
- * Found-part offer card — a self-contained product-row-style row for a
- * `sourcing_offer`. The seller's photo shows only when present (no placeholder),
- * and the customer acts right here: an "add to cart" pill and an "✕" that opens
- * the decline sheet. No navigation away from the feed.
+ * Found-part offer row — a COMPACT product-style row for a `sourcing_offer`.
+ * Thumb (only when a photo exists) + name/price on the left, and a single
+ * right-corner action: "Added" once it's in the cart, otherwise an "Add to
+ * cart" button (shown for every non-added state — fresh, declined, expired —
+ * so the customer can always (re)add). No navigation away from the feed.
  */
 function SourcingOfferCard({
   n,
   tokens,
   busy,
-  state,
+  added,
+  vehicle,
   onAdd,
-  onReject,
 }: {
   n: NotificationItem;
   tokens: Tokens;
   busy: boolean;
-  state: OfferCardState;
+  added: boolean;
+  /** "Chevrolet Cobalt" — the car the part was requested for (already formatted). */
+  vehicle: string;
   onAdd: () => void;
-  onReject: () => void;
 }) {
+  const { t } = useTranslation();
+  const conditionLabels = useMemo(() => buildConditionLabels(t), [t]);
+  const availabilityLabels = useMemo(() => buildAvailabilityLabels(t), [t]);
   const offer = n.offer ?? {};
   const priceText = formatSom(offer.price);
-  const chips = [CONDITION_RU[offer.condition ?? ''], AVAILABILITY_RU[offer.availability ?? '']].filter(
+  const chips = [conditionLabels[offer.condition ?? ''], availabilityLabels[offer.availability ?? '']].filter(
     (c): c is string => Boolean(c),
   );
 
   return (
     <AppView
+      row
+      align="center"
+      gap={10}
       style={{
-        borderWidth: 1,
-        borderColor: n.unread ? tokens.brand : tokens.divider,
-        backgroundColor: tokens.card ?? tokens.background,
-        borderRadius: 16,
-        padding: 12,
-        marginVertical: 6,
-        gap: 12,
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: tokens.divider,
       }}
     >
-      {/* Content row: thumb (only if a photo exists) + details */}
-      <AppView row gap={12}>
-        {offer.imageUrl ? (
-          <Image
-            source={{ uri: offer.imageUrl }}
-            style={{ width: 64, height: 64, borderRadius: 12 }}
-            contentFit="cover"
-            transition={150}
-          />
-        ) : null}
+      {offer.imageUrl ? (
+        <Image
+          source={{ uri: offer.imageUrl }}
+          style={{ width: 44, height: 44, borderRadius: 10 }}
+          contentFit="cover"
+          transition={150}
+        />
+      ) : null}
 
-        <AppView style={{ flex: 1 }}>
-          <AppView row justify="space-between" gap={8}>
-            <AppText family="default" weight="bold" style={{ fontSize: 14.5, color: tokens.text, flex: 1 }} numberOfLines={2}>
-              {offer.partName || n.title || 'Найденная запчасть'}
-            </AppText>
-            <AppText family="default" style={{ fontSize: 11, color: tokens.textMuted, flexShrink: 0 }}>
-              {n.time}
-            </AppText>
-          </AppView>
+      {/* Name + price/condition — left, flexes to fill */}
+      <AppView style={{ flex: 1 }} gap={2}>
+        <AppText family="default" weight="bold" numberOfLines={1} style={{ fontSize: 13.5, color: tokens.text }}>
+          {capitalizeFirst(offer.partName) || n.title || t('sourcing.foundPart')}
+        </AppText>
+        {vehicle ? (
+          <AppText family="default" numberOfLines={1} style={{ fontSize: 11.5, color: tokens.textMuted }}>
+            {t('sourcing.forVehicle', { vehicle })}
+          </AppText>
+        ) : null}
+        <AppView row align="center" gap={6}>
           {priceText ? (
-            <AppText family="accent" weight="bold" style={{ fontSize: 18, color: tokens.brand, marginTop: 2 }}>
+            <AppText family="accent" weight="bold" style={{ fontSize: 14, color: tokens.brand, flexShrink: 0 }}>
               {priceText}
             </AppText>
           ) : null}
           {chips.length ? (
-            <AppText family="default" style={{ fontSize: 12, color: tokens.textMuted, marginTop: 2 }}>
-              {chips.join(' · ')}
+            <AppText family="default" numberOfLines={1} style={{ fontSize: 11.5, color: tokens.textMuted, flexShrink: 1 }}>
+              {(priceText ? '· ' : '') + chips.join(' · ')}
             </AppText>
           ) : null}
         </AppView>
       </AppView>
 
-      {/* Actions — reflect the live offer status */}
-      {state === 'unavailable' ? (
-        <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted }}>
-          Предложение больше недоступно
-        </AppText>
-      ) : state === 'declined' ? (
-        <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted }}>
-          Вы отклонили это предложение
-        </AppText>
+      {/* Right-corner action: Added (in cart) OR Add to cart */}
+      {added ? (
+        <AppView row align="center" gap={5} style={{ flexShrink: 0 }}>
+          <Check size={15} color={tokens.success} />
+          <AppText family="accent" weight="bold" style={{ fontSize: 12.5, color: tokens.success }}>
+            {t('sourcing.inCart')}
+          </AppText>
+        </AppView>
       ) : (
-        <AppView row justify="flex-end" align="center" gap={10}>
-          {state === 'in_cart' ? (
-            <AppView
-              row
-              align="center"
-              gap={6}
-              rounded={999}
-              style={{ paddingHorizontal: 16, paddingVertical: 9, backgroundColor: tokens.success }}
-            >
-              <Check size={15} color={tokens.background} />
-              <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.background }}>
-                В корзине
-              </AppText>
-            </AppView>
+        <AppPressableView
+          onPress={onAdd}
+          disabled={busy}
+          pressedOpacity={0.9}
+          accessibilityRole="button"
+          accessibilityLabel={t('sourcing.addToCartA11y')}
+          row
+          align="center"
+          gap={5}
+          rounded={999}
+          style={{ flexShrink: 0, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: tokens.text }}
+        >
+          {busy ? (
+            <WheelLoader size={14} color={tokens.background} />
           ) : (
             <>
-              {/* Decline (✕) */}
-              <AppPressableView
-                onPress={onReject}
-                disabled={busy}
-                pressedOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel="Отклонить предложение"
-                center
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 999,
-                  borderWidth: 1,
-                  borderColor: tokens.divider,
-                }}
-              >
-                <X size={18} color={tokens.textMuted} />
-              </AppPressableView>
-
-              {/* Add to cart */}
-              <AppPressableView
-                onPress={onAdd}
-                disabled={busy}
-                pressedOpacity={0.9}
-                accessibilityRole="button"
-                accessibilityLabel="Добавить в корзину"
-                row
-                align="center"
-                gap={6}
-                rounded={999}
-                style={{ paddingHorizontal: 18, paddingVertical: 10, backgroundColor: tokens.text, minWidth: 128, justifyContent: 'center' }}
-              >
-                {busy ? (
-                  <WheelLoader size={16} color={tokens.background} />
-                ) : (
-                  <>
-                    <MaterialIcons name="add-shopping-cart" size={16} color={tokens.background} />
-                    <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.background }}>
-                      В корзину
-                    </AppText>
-                  </>
-                )}
-              </AppPressableView>
+              <MaterialIcons name="add-shopping-cart" size={14} color={tokens.background} />
+              <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.background }}>
+                {t('sourcing.toCart')}
+              </AppText>
             </>
           )}
-        </AppView>
+        </AppPressableView>
       )}
     </AppView>
   );
 }
 
 export default function NotificationsScreen() {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const { state, notifications, unreadCount, markRead, markAllRead, refresh } = useNotifications();
   const { refresh: refreshCart } = useCartContext();
@@ -219,9 +226,11 @@ export default function NotificationsScreen() {
   // declined / expired / deleted), and updated optimistically after an action —
   // not just this session's taps.
   const [liveStatus, setLiveStatus] = useState<Record<string, string>>({});
+  // offerId → "Chevrolet Cobalt", resolved from the offer detail on load. Lets
+  // EXISTING offers show the requested car even though the notification payload
+  // (a snapshot) predates the vehicle fields.
+  const [liveVehicle, setLiveVehicle] = useState<Record<string, string>>({});
   const [busyOffer, setBusyOffer] = useState<string | null>(null);
-  const [rejectTarget, setRejectTarget] = useState<string | null>(null);
-  const [rejectBusy, setRejectBusy] = useState(false);
 
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
@@ -248,6 +257,7 @@ export default function NotificationsScreen() {
       const results = await Promise.allSettled(pending.map((id) => fetchSourcingOffer(id)));
       if (cancelled) return;
       const next: Record<string, string> = {};
+      const vehicles: Record<string, string> = {};
       results.forEach((r, i) => {
         const id = pending[i];
         next[id] =
@@ -256,8 +266,15 @@ export default function NotificationsScreen() {
             : (r.reason as { status?: number })?.status === 404
               ? 'GONE'
               : 'SENT'; // network error → assume actionable; retries next open
+        if (r.status === 'fulfilled') {
+          const v = capitalizeWords(
+            [r.value.vehicleBrand, r.value.vehicleModel].filter(Boolean).join(' '),
+          );
+          if (v) vehicles[id] = v;
+        }
       });
       setLiveStatus((prev) => ({ ...prev, ...next }));
+      if (Object.keys(vehicles).length) setLiveVehicle((prev) => ({ ...prev, ...vehicles }));
     })();
     return () => {
       cancelled = true;
@@ -267,12 +284,20 @@ export default function NotificationsScreen() {
 
   const handleMarkAll = () => {
     markAllRead();
-    toastService.success('All marked read');
+    toastService.success(t('notifications.allMarkedRead'));
   };
 
-  // Regular (non-offer) notifications: mark read + follow a deep link if present.
+  // Regular (non-offer) notifications: mark read + navigate.
   const openNotification = (n: NotificationItem) => {
     if (n.unread) markRead(n.id);
+    // Order-STATUS-change rows go to the order-status (track-order) screen. The
+    // backend's deeplink for these points at the cart's order-confirmation,
+    // which is the wrong destination — the order id in `data` is the real
+    // target. Other order rows (e.g. order_paid) keep their own deeplink.
+    if (n.type === 'order_status_changed' && n.orderId) {
+      router.push(`/track-order?orderId=${encodeURIComponent(n.orderId)}` as never);
+      return;
+    }
     if (n.deeplinkPath) {
       try {
         router.push(n.deeplinkPath as never);
@@ -281,6 +306,22 @@ export default function NotificationsScreen() {
       }
     }
   };
+
+  // Order-status rows: render a LOCALIZED title/body from `data` instead of the
+  // backend copy, which embeds the raw English status word (e.g. "delivered").
+  const displayText = useCallback(
+    (n: NotificationItem): { title: string; body: string } => {
+      if (n.type !== 'order_status_changed') return { title: n.title, body: n.body };
+      const statusLabel = n.orderStatus
+        ? t(ORDER_STATUS_MACHINE_I18N[n.orderStatus] ?? ' ', { defaultValue: n.orderStatus })
+        : '';
+      return {
+        title: t('notifications.orderStatusTitle'),
+        body: statusLabel ? t('notifications.orderStatusBody', { status: statusLabel }) : n.body,
+      };
+    },
+    [t],
+  );
 
   const addToCart = useCallback(
     async (n: NotificationItem) => {
@@ -292,61 +333,30 @@ export default function NotificationsScreen() {
         await refreshCart();
         setLiveStatus((s) => ({ ...s, [offerId]: 'ACCEPTED' }));
         if (n.unread) markRead(n.id);
-        toastService.success('Добавлено в корзину');
+        toastService.success(t('sourcing.addedToCart'));
       } catch (err) {
         const status = (err as { status?: number })?.status;
         if (status === 409) {
           setLiveStatus((s) => ({ ...s, [offerId]: 'ACCEPTED' }));
-          toastService.info('Уже в корзине');
+          toastService.info(t('sourcing.alreadyInCart'));
         } else if (status === 404) {
           // Offer was deleted (e.g. its ticket removed) → stale notification.
           setLiveStatus((s) => ({ ...s, [offerId]: 'GONE' }));
-          toastService.info('Предложение больше недоступно');
+          toastService.info(t('sourcing.offerUnavailable'));
         } else {
-          toastService.danger('Не удалось добавить в корзину');
+          toastService.danger(t('sourcing.addToCartFailed'));
         }
       } finally {
         setBusyOffer(null);
       }
     },
-    [refreshCart, markRead],
-  );
-
-  const openReject = (n: NotificationItem) => {
-    if (!n.offer?.offerId) return;
-    setRejectTarget(n.offer.offerId);
-    if (n.unread) markRead(n.id);
-  };
-
-  // One tap on a reason declines with it — no separate confirm step.
-  const rejectWith = useCallback(
-    async (reasonKey: SourcingOfferDeclineReason) => {
-      const target = rejectTarget;
-      if (!target || rejectBusy) return;
-      setRejectBusy(true);
-      try {
-        await rejectSourcingOffer(target, reasonKey);
-        setLiveStatus((s) => ({ ...s, [target]: 'DECLINED' }));
-        toastService.info('Предложение отклонено');
-      } catch (err) {
-        if ((err as { status?: number })?.status === 404) {
-          setLiveStatus((s) => ({ ...s, [target]: 'GONE' }));
-          toastService.info('Предложение больше недоступно');
-        } else {
-          toastService.danger('Не удалось отклонить предложение');
-        }
-      } finally {
-        setRejectBusy(false);
-        setRejectTarget(null);
-      }
-    },
-    [rejectTarget, rejectBusy],
+    [refreshCart, markRead, t],
   );
 
   return (
     <AppView flex={1} colorName="background">
       <AppSettingsHeader
-        title="Notifications"
+        title={t('notifications.title')}
         fallbackHref="/profile"
         right={
           unreadCount > 0 ? (
@@ -354,11 +364,11 @@ export default function NotificationsScreen() {
               onPress={handleMarkAll}
               pressedOpacity={0.6}
               accessibilityRole="button"
-              accessibilityLabel="Mark all notifications as read"
+              accessibilityLabel={t('notifications.markAllReadA11y')}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <AppText family="accent" weight="bold" style={{ fontSize: 12.5, color: tokens.text }}>
-                Mark all read
+                {t('notifications.markAllRead')}
               </AppText>
             </AppPressableView>
           ) : undefined
@@ -374,13 +384,13 @@ export default function NotificationsScreen() {
           <BellOff size={30} strokeWidth={2} color={tokens.textMuted} />
           <AppView align="center" gap={4}>
             <AppText family="heading" weight="bold" style={{ fontSize: 17, color: tokens.text }}>
-              You&apos;re all caught up
+              {t('notifications.emptyTitle')}
             </AppText>
             <AppText
               family="default"
               style={{ fontSize: 13, color: tokens.textMuted, textAlign: 'center', maxWidth: 280 }}
             >
-              Order updates, price drops, and back-in-stock alerts will show up here.
+              {t('notifications.emptyBody')}
             </AppText>
           </AppView>
         </AppView>
@@ -391,21 +401,30 @@ export default function NotificationsScreen() {
           padding={0}
         >
           {notifications.map((n) => {
-            // Found-part offers act inline (add to cart / decline) — no navigation.
+            // Found-part offers act inline (add to cart) — no navigation.
             if (n.type === 'sourcing_offer' || n.offer) {
               const offerId = n.offer?.offerId ?? '';
+              // Prefer the notification snapshot (instant, for new offers); fall
+              // back to the value resolved from the offer detail (existing offers).
+              const vehicle =
+                capitalizeWords(
+                  [n.offer?.vehicleBrand, n.offer?.vehicleModel].filter(Boolean).join(' '),
+                ) || (liveVehicle[offerId] ?? '');
               return (
                 <SourcingOfferCard
                   key={n.id}
                   n={n}
                   tokens={tokens}
                   busy={busyOffer === offerId}
-                  state={deriveOfferState(liveStatus[offerId])}
+                  added={liveStatus[offerId] === 'ACCEPTED'}
+                  vehicle={vehicle}
                   onAdd={() => addToCart(n)}
-                  onReject={() => openReject(n)}
                 />
               );
             }
+            const { title: rowTitle, body: rowBody } = displayText(n);
+            const statusVisual =
+              n.type === 'order_status_changed' ? orderStatusVisual(n.orderStatus, tokens) : null;
             return (
               <AppPressableView
                 key={n.id}
@@ -413,9 +432,14 @@ export default function NotificationsScreen() {
                 androidRipple={false}
                 pressedOpacity={n.unread ? 0.6 : 1}
                 accessibilityRole="button"
-                accessibilityLabel={`${n.title}. ${n.unread ? 'Unread. Tap to mark read.' : 'Read.'}`}
+                accessibilityLabel={`${rowTitle}. ${n.unread ? t('notifications.unreadHint') : t('notifications.readHint')}`}
                 row
                 gap={12}
+                // Without this the inner Pressable shrinks to its content width, so
+                // the flex:1 content column collapses to ~0 and the row renders as a
+                // full-width divider with (near-)invisible text. fillContainer makes
+                // the Pressable fill the row so the content lays out at full width.
+                fillContainer
                 style={{
                   paddingVertical: 14,
                   borderBottomWidth: 1,
@@ -423,74 +447,55 @@ export default function NotificationsScreen() {
                 }}
               >
                 <AppView style={{ flex: 1 }}>
-                  <AppView row justify="space-between" gap={8}>
-                    <AppText family="accent" weight="bold" style={{ fontSize: 14.5, color: tokens.text }}>
-                      {n.title}
-                    </AppText>
+                  <AppView row align="center" justify="space-between" gap={8}>
+                    <AppView row align="center" gap={9} style={{ flex: 1 }}>
+                      {/* Order rows get a colored status icon badge; other rows
+                          show the small leading unread dot. */}
+                      {statusVisual ? (
+                        <AppView
+                          center
+                          style={{
+                            width: 30,
+                            height: 30,
+                            borderRadius: 999,
+                            backgroundColor: `${statusVisual.color}22`,
+                            flexShrink: 0,
+                          }}
+                        >
+                          <statusVisual.Icon size={16} color={statusVisual.color} />
+                        </AppView>
+                      ) : n.unread ? (
+                        <AppView
+                          style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: tokens.brand, flexShrink: 0 }}
+                        />
+                      ) : null}
+                      <AppText
+                        family="accent"
+                        weight="bold"
+                        numberOfLines={2}
+                        style={{ fontSize: 14.5, color: tokens.text, flexShrink: 1 }}
+                      >
+                        {rowTitle}
+                      </AppText>
+                    </AppView>
                     <AppText family="default" style={{ fontSize: 11.5, color: tokens.textMuted, flexShrink: 0 }}>
                       {n.time}
                     </AppText>
                   </AppView>
-                  {n.body ? (
+                  {rowBody ? (
                     <AppText
                       family="default"
                       style={{ fontSize: 13, color: tokens.textMuted, marginTop: 3, lineHeight: 18 }}
                     >
-                      {n.body}
+                      {rowBody}
                     </AppText>
                   ) : null}
                 </AppView>
-                {n.unread ? (
-                  <AppView
-                    style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: tokens.brandBg, marginTop: 6, flexShrink: 0 }}
-                  />
-                ) : (
-                  <AppView style={{ width: 8, flexShrink: 0 }} />
-                )}
               </AppPressableView>
             );
           })}
         </AppScrollView>
       )}
-
-      {/* Shared decline-reason sheet */}
-      <AppBottomSheet
-        visible={rejectTarget !== null}
-        onClose={() => setRejectTarget(null)}
-        heightFraction={0.52}
-        expandable={false}
-      >
-        <AppView style={{ paddingHorizontal: 20, paddingBottom: 28, gap: 10 }}>
-          <AppText family="heading" weight="bold" style={{ fontSize: 18, color: tokens.text, marginBottom: 2 }}>
-            Причина отказа
-          </AppText>
-          {REJECT_REASONS.map((r) => (
-            <AppPressableView
-              key={r.key}
-              onPress={() => rejectWith(r.key)}
-              disabled={rejectBusy}
-              pressedOpacity={0.6}
-              pressedScale={0.98}
-              row
-              justify="space-between"
-              align="center"
-              style={{
-                paddingVertical: 16,
-                paddingHorizontal: 16,
-                borderRadius: 12,
-                borderWidth: 1,
-                borderColor: tokens.divider,
-                opacity: rejectBusy ? 0.5 : 1,
-              }}
-            >
-              <AppText family="default" weight="semibold" style={{ fontSize: 15, color: tokens.text }}>
-                {r.label}
-              </AppText>
-              <ChevronRight size={18} color={tokens.textMuted} />
-            </AppPressableView>
-          ))}
-        </AppView>
-      </AppBottomSheet>
     </AppView>
   );
 }

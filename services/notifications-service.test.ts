@@ -52,9 +52,26 @@ describe('mapRawNotification — sourcing offers', () => {
       type: 'ORDER_PAID',
       title: 'Заказ оплачен',
       body: 'Ваш заказ оплачен',
+      data: { order_id: 'ord_9', payment_id: 'pay_1' },
     });
 
     expect(item.offer).toBeUndefined();
     expect(item.tone).toBe('info'); // "order" matches before "paid" (pre-existing)
+    expect(item.orderId).toBe('ord_9'); // surfaced so the feed can deep-link
+  });
+
+  it('surfaces order id + status from an order_status_changed row', () => {
+    const item = mapRawNotification({
+      id: 'ntf_4',
+      type: 'ORDER_STATUS_CHANGED',
+      title: 'Buyurtma holati yangilandi',
+      body: 'Buyurtmangiz holati "delivered" ga o\'zgardi.',
+      deeplink_path: '/(tabs)/(cart)/order-confirmation',
+      data: { order_id: 'ord_42', status: 'delivered' },
+    });
+
+    expect(item.type).toBe('order_status_changed');
+    expect(item.orderId).toBe('ord_42');
+    expect(item.orderStatus).toBe('delivered');
   });
 });

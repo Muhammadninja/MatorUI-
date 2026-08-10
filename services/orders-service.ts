@@ -31,6 +31,65 @@ export type OrderListStatus =
   | 'Delivered'
   | 'Cancelled';
 
+/**
+ * i18n key maps for status labels. The stable machine values (`OrderStatus`)
+ * and the loose display union (`OrderListStatus`) are the source of truth; the
+ * UI resolves these keys to localized copy via `t(key, { defaultValue })`, so a
+ * label the server sends that isn't in the map still renders (untranslated)
+ * rather than blank. Kept in this pure module so screens and tests share it.
+ */
+export const ORDER_LIST_STATUS_I18N: Record<OrderListStatus, string> = {
+  Processing: 'orderStatus.list.processing',
+  'In Transit': 'orderStatus.list.inTransit',
+  'Out for delivery': 'orderStatus.list.outForDelivery',
+  Delivered: 'orderStatus.list.delivered',
+  Cancelled: 'orderStatus.list.cancelled',
+};
+
+export const ORDER_STEP_I18N: Record<OrderStatus, string> = {
+  placed: 'orderStatus.step.placed',
+  packed: 'orderStatus.step.packed',
+  shipped: 'orderStatus.step.shipped',
+  out_for_delivery: 'orderStatus.step.outForDelivery',
+  delivered: 'orderStatus.step.delivered',
+  cancelled: 'orderStatus.step.cancelled',
+};
+
+/**
+ * The transport layer emits English display strings for the richer *raw*
+ * backend statuses (e.g. `statusLabel`/`etaWindow` = "Awaiting payment",
+ * "On the way", "Delivered"). This maps those exact strings to i18n keys so
+ * a screen can localize a status word while passing real ETA/date strings
+ * (which aren't in the map) through unchanged. Keyed by the English label.
+ */
+export const ORDER_STATUS_LABEL_I18N: Record<string, string> = {
+  'Awaiting payment': 'orderStatus.raw.pendingPayment',
+  'Payment received': 'orderStatus.raw.paid',
+  Processing: 'orderStatus.raw.processing',
+  'On the way': 'orderStatus.raw.shipped',
+  Delivered: 'orderStatus.raw.delivered',
+  Cancelled: 'orderStatus.raw.cancelled',
+  Expired: 'orderStatus.raw.expired',
+  Refunded: 'orderStatus.raw.refunded',
+};
+
+/**
+ * Backend `OrderStatus` enum, lowercased exactly as it arrives in a
+ * notification's `data.status` (e.g. `order_status_changed` emits
+ * `to.toLowerCase()`), → i18n key. Lets the notification feed show a localized
+ * status word instead of the raw English the backend embeds in its copy.
+ */
+export const ORDER_STATUS_MACHINE_I18N: Record<string, string> = {
+  pending_payment: 'orderStatus.raw.pendingPayment',
+  paid: 'orderStatus.raw.paid',
+  processing: 'orderStatus.raw.processing',
+  shipped: 'orderStatus.raw.shipped',
+  delivered: 'orderStatus.raw.delivered',
+  cancelled: 'orderStatus.raw.cancelled',
+  refunded: 'orderStatus.raw.refunded',
+  expired: 'orderStatus.raw.expired',
+};
+
 export type OrderStep = {
   key: OrderStatus;
   label: string;

@@ -19,6 +19,9 @@ export type SourcingOfferDetail = {
   id: string;
   ticketId: string;
   partName: string | null;
+  /** Vehicle the part was requested for (from the ticket's chat-extracted data). */
+  vehicleBrand: string | null;
+  vehicleModel: string | null;
   price: number;
   currency: string;
   /** NEW | USED | OEM | AFTERMARKET | UNKNOWN */
