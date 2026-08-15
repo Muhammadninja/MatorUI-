@@ -2,9 +2,9 @@ import { router } from 'expo-router';
 import { Heart } from 'lucide-react-native';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FlatList, type ListRenderItem } from 'react-native';
 
 import ProductRow from '@/components/screens-components/catalog/product-row';
+import AppList from '@/components/shared/app-list';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
@@ -16,6 +16,7 @@ import { useLikedProducts } from '@/hooks/use-liked-products';
 import { useToast } from '@/hooks/use-toast';
 import type { CatalogItem } from '@/services/catalog-service';
 import { triggerHaptic } from '@/utils/haptics';
+import { openItemDetail } from '@/utils/nav';
 
 /**
  * Liked — the user's favorited parts. Like state is stored locally
@@ -31,10 +32,7 @@ export default function LikedScreen() {
   const { isAuthenticated } = useUserContext();
   const toast = useToast();
 
-  const openItem = useCallback(
-    (it: CatalogItem) => router.push({ pathname: '/item-detail/[id]', params: { id: it.id } }),
-    [],
-  );
+  const openItem = useCallback((it: CatalogItem) => openItemDetail(it.id), []);
 
   const addToCart = useCallback(
     (it: CatalogItem) => {
@@ -50,8 +48,10 @@ export default function LikedScreen() {
     [addItem, isAuthenticated, toast, t],
   );
 
-  const renderItem = useCallback<ListRenderItem<CatalogItem>>(
-    ({ item }) => <ProductRow item={item} onOpen={openItem} onAdd={addToCart} />,
+  const renderItem = useCallback(
+    ({ item }: { item: CatalogItem }) => (
+      <ProductRow item={item} onOpen={openItem} onAdd={addToCart} />
+    ),
     [openItem, addToCart],
   );
 
@@ -80,11 +80,12 @@ export default function LikedScreen() {
           </AppView>
         </AppView>
       ) : (
-        <FlatList<CatalogItem>
+        <AppList<CatalogItem>
           data={items}
           keyExtractor={(it) => it.id}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingTop: 4, paddingBottom: 32, gap: 14, paddingHorizontal: 16 }}
+          contentContainerStyle={{ paddingTop: 4, paddingBottom: 32, paddingHorizontal: 16 }}
+          ItemSeparatorComponent={() => <AppView style={{ height: 14 }} />}
           renderItem={renderItem}
         />
       )}

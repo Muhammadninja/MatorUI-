@@ -11,7 +11,7 @@ import {
     Pressable,
     View,
 } from 'react-native';
-import { Car, CheckCircle2, Lock, X } from 'lucide-react-native';
+import { Car, CheckCircle2, Clock, Lock, X } from 'lucide-react-native';
 
 import { AppButton } from '@/components/shared/app-button';
 import { AppChip } from '@/components/shared/app-chip';
@@ -37,6 +37,11 @@ type ConfirmModalPayload = {
   cancelLabel?: string;
   onConfirm?: () => void;
   onCancel?: () => void;
+};
+
+type ComingSoonPayload = {
+  /** Brand/feature name shown in the title. */
+  name?: string;
 };
 
 export type CheckoutSheetValues = {
@@ -95,6 +100,10 @@ function buildInstallmentOptions(t: (key: string) => string) {
 }
 
 function isConfirmModalPayload(payload?: ModalPayload): payload is ConfirmModalPayload {
+  return Boolean(payload && typeof payload === 'object');
+}
+
+function isComingSoonPayload(payload?: ModalPayload): payload is ComingSoonPayload {
   return Boolean(payload && typeof payload === 'object');
 }
 
@@ -200,6 +209,83 @@ export default function GlobalModalHost() {
               />
             </AppView>
           </AppView>
+        </AppView>
+      </Modal>
+    );
+  }
+
+  // ── Coming-soon teaser (disabled brand/feature tapped) ────────────────────
+  if (activeModal.name === 'comingSoon' && isComingSoonPayload(activeModal.payload)) {
+    const isDark = scheme === 'dark';
+    const { name } = activeModal.payload;
+    const handleClose = () => modalService.closeModal();
+
+    return (
+      <Modal transparent animationType="fade" visible onRequestClose={handleClose}>
+        <AppView flex={1} center px={20} style={{ backgroundColor: 'rgba(0, 0, 0, 0.55)' }}>
+          <View
+            style={{
+              width: '100%',
+              maxWidth: 380,
+              borderRadius: 28,
+              borderWidth: 1,
+              borderColor: isDark ? `${tokens.border}80` : tokens.border,
+              backgroundColor: isDark ? tokens.card : tokens.white,
+              overflow: 'hidden',
+              ...Platform.select({
+                ios: {
+                  shadowColor: '#000000',
+                  shadowOffset: { width: 0, height: 22 },
+                  shadowOpacity: isDark ? 0.55 : 0.22,
+                  shadowRadius: 32,
+                },
+                android: { elevation: 22 },
+              }),
+            }}
+          >
+            <AppView px={22} pt={26} pb={20} gap={18} align="center">
+              <View
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 32,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: `${tokens.brand}18`,
+                  borderWidth: 1,
+                  borderColor: `${tokens.brand}30`,
+                }}
+              >
+                <Clock size={26} strokeWidth={2.1} color={tokens.brand} />
+              </View>
+
+              <AppView gap={6} align="center">
+                <AppText
+                  textVariant="title"
+                  family="heading"
+                  weight="bold"
+                  style={{ textAlign: 'center' }}
+                >
+                  {name ? t('modalHost.comingSoonTitleNamed', { name }) : t('modalHost.comingSoonTitle')}
+                </AppText>
+                <AppText
+                  textVariant="bodySm"
+                  colorName="gray400"
+                  style={{ textAlign: 'center', maxWidth: 300 }}
+                >
+                  {t('modalHost.comingSoonMessage')}
+                </AppText>
+              </AppView>
+
+              <AppButton
+                title={t('modalHost.gotIt')}
+                kind="brand"
+                size="md"
+                fullWidth
+                onPress={handleClose}
+              />
+            </AppView>
+          </View>
         </AppView>
       </Modal>
     );

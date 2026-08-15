@@ -1,6 +1,6 @@
+import { Image } from 'expo-image';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Image } from 'react-native';
 
 import { AppText } from '@/components/shared/app-text';
 
@@ -34,7 +34,9 @@ const BrandLogo = ({ logoUrl, name, size = 40, color }: BrandLogoProps) => {
       <Image
         source={{ uri: logoUrl }}
         style={{ width: size, height: size }}
-        resizeMode="contain"
+        contentFit="contain"
+        cachePolicy="memory-disk"
+        transition={120}
         onError={() => setFailed(true)}
         accessibilityLabel={t('make.brandLogo', { name })}
       />

@@ -48,6 +48,9 @@ export interface UserTransport {
   requestPhoneChange(phone: string, signal?: AbortSignal): Promise<PhoneChangeRequest>;
   /** Verify the OTP and rebind the account to `phone`; returns fresh session+user. */
   confirmPhoneChange(phone: string, otp: string, signal?: AbortSignal): Promise<PhoneChangeResult>;
+  /** Permanently delete the signed-in account server-side. The caller clears the
+   *  local session afterward; this only asks the backend to erase the account. */
+  deleteMe(signal?: AbortSignal): Promise<void>;
 }
 
 /** Strip spaces/dashes so "+998 90 123 45 67" → "+998901234567". */
@@ -113,6 +116,12 @@ class MockUserTransport implements UserTransport {
       user: { ...this.state },
       session: { accessToken: 'mock_access', refreshToken: 'mock_refresh' },
     };
+  }
+
+  async deleteMe(): Promise<void> {
+    await delay(250);
+    this.state = { ...EMPTY_PROFILE };
+    debugLog('profile', 'deleteMe (MOCK — in-memory reset)');
   }
 }
 
@@ -202,6 +211,16 @@ class HttpUserTransport implements UserTransport {
     };
     debugLog('profile', 'confirmPhoneChange ← rebound + new session', { phone: user.phone });
     return { user, session };
+  }
+
+  async deleteMe(signal?: AbortSignal): Promise<void> {
+    // Backend contract (PROPOSED — build to honor self-serve deletion, required
+    // for App Store / Play Store data-deletion policy): DELETE /v1/me erases the
+    // signed-in account and returns 204. Auth'd (bearer). The caller clears the
+    // local session on success. If the endpoint 404s, this rejects and the UI
+    // keeps the account — we never fake a deletion.
+    await apiClient.delete<void>('/v1/me', { signal });
+    debugLog('profile', 'deleteMe → account erased server-side');
   }
 }
 

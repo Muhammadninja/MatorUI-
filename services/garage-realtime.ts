@@ -122,11 +122,18 @@ export class GarageRealtimeClient {
   private async connect(): Promise<void> {
     if (!this.config) return;
     this.setState('connecting');
-    let token: string | null = null;
+    let token: string | null;
     try {
       token = await this.config.getAuthToken();
     } catch {
-      token = null;
+      // A THROW here is a transient failure to READ a token that likely exists —
+      // NOT a genuine "signed out" (that resolves to `null`, handled below).
+      // Connecting token-less would draw a terminal 4401 close and kill realtime
+      // for the whole session, so back off and retry instead. `scheduleReconnect`
+      // uses capped exponential backoff, so a persistent throw won't hot-loop.
+      if (this.explicitClose) return;
+      this.scheduleReconnect();
+      return;
     }
     if (this.explicitClose) return;
     const url = this.buildUrl(token);

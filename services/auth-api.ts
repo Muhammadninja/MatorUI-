@@ -25,7 +25,7 @@
  * builds can auto-fill it. A real backend omits it — the user types the code.
  */
 
-import { apiClient } from '@/services/api-client';
+import { apiClient, ApiError } from '@/services/api-client';
 import { debugLog } from '@/services/debug-log';
 import type { AuthSession } from '@/services/auth-storage';
 
@@ -76,8 +76,13 @@ export interface AuthTransport {
   /** Exchanges a valid code for a session + user. Throws on an invalid/expired code. */
   verifyOtp(input: VerifyOtpInput, signal?: AbortSignal): Promise<AuthResult>;
   /** Exchanges the current refresh token for a fresh access + refresh pair.
-   *  Returns `null` when the refresh token is invalid/expired — callers should
-   *  sign the user out in that case. */
+   *  Contract (so callers can react correctly):
+   *   - resolves to `AuthResult` on success;
+   *   - resolves to `null` ONLY when the refresh token is DEFINITIVELY rejected
+   *     (401/403) — it will never succeed again, so the caller must sign out;
+   *   - THROWS on a transient failure (offline, timeout, 5xx, rate-limit, or an
+   *     unparseable 2xx body) — the token may still be valid, so the caller
+   *     should keep the session and retry on the next request. */
   refresh(refreshToken: string, signal?: AbortSignal): Promise<AuthResult | null>;
   signOut(refreshToken: string, signal?: AbortSignal): Promise<void>;
 }
@@ -332,47 +337,67 @@ class HttpAuthTransport implements AuthTransport {
   }
 
   async refresh(refreshToken: string, signal?: AbortSignal): Promise<AuthResult | null> {
+    let r: Record<string, unknown>;
     try {
-      const r = await apiClient.post<Record<string, unknown>>(
+      r = await apiClient.post<Record<string, unknown>>(
         '/v1/auth/token/refresh',
         { refresh_token: refreshToken },
         { signal, skipAuth: true, maxRetries: 0 },
       );
-      // Tolerate every plausible shape the backend might return, so a mismatch
-      // never silently fails the refresh (which used to log the user out):
-      //   { tokens: { access_token, refresh_token } }  (nested, snake)
-      //   { access_token, refresh_token }               (flat, snake)
-      //   { accessToken, refreshToken }                 (flat, camel)
-      const nested = r && typeof (r as { tokens?: unknown }).tokens === 'object'
-        ? ((r as { tokens: Record<string, unknown> }).tokens)
-        : (r as Record<string, unknown>);
-      const t = (nested ?? {}) as Record<string, unknown>;
-      const accessToken = (t.access_token ?? t.accessToken) as string | undefined;
-      // Backends that don't rotate the refresh token return only a new access
-      // token — keep the current refresh token in that case.
-      const newRefresh = (t.refresh_token ?? t.refreshToken ?? refreshToken) as string;
-      if (!accessToken) {
-        debugLog('auth', 'refresh: no access token in response — cannot parse', {
-          responseKeys: Object.keys((r ?? {}) as object),
-          tokenKeys: Object.keys(t),
+    } catch (err) {
+      // Distinguish a DEFINITIVE rejection of the refresh token (401/403 → it
+      // will never work again, sign out) from a TRANSIENT failure (offline,
+      // timeout, 5xx, rate-limit → the token may still be valid, keep session).
+      // Collapsing both to `null` is what could strand a user on a dead session;
+      // collapsing both to a throw is what logged users out on every flaky
+      // launch. So return null ONLY for 401/403, and rethrow everything else.
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        debugLog('auth', 'refresh rejected — refresh token invalid/expired', {
+          status: err.status,
+          code: err.code,
         });
         return null;
       }
-      const expiresAt = epochFromIso(
-        (t.access_token_expires_at ?? t.accessTokenExpiresAt) as string | undefined,
-      );
-      const rawUser = ((r as { user?: RawBackendUser }).user ??
-        (t.user as RawBackendUser | undefined));
-      return {
-        session: { accessToken, refreshToken: newRefresh, expiresAt },
-        user: rawUser
-          ? mapBackendUser(rawUser)
-          : { id: '', firstName: '', lastName: '', email: '', username: '', avatarUrl: null, memberSince: '' },
-      };
-    } catch (err) {
-      debugLog('auth', 'refresh threw', { message: (err as Error)?.message });
-      return null;
+      debugLog('auth', 'refresh transient failure — keeping session, will retry', {
+        message: (err as Error)?.message,
+      });
+      throw err;
     }
+
+    // Tolerate every plausible shape the backend might return, so a mismatch
+    // never silently fails the refresh (which used to log the user out):
+    //   { tokens: { access_token, refresh_token } }  (nested, snake)
+    //   { access_token, refresh_token }               (flat, snake)
+    //   { accessToken, refreshToken }                 (flat, camel)
+    const nested = r && typeof (r as { tokens?: unknown }).tokens === 'object'
+      ? ((r as { tokens: Record<string, unknown> }).tokens)
+      : (r as Record<string, unknown>);
+    const t = (nested ?? {}) as Record<string, unknown>;
+    const accessToken = (t.access_token ?? t.accessToken) as string | undefined;
+    // Backends that don't rotate the refresh token return only a new access
+    // token — keep the current refresh token in that case.
+    const newRefresh = (t.refresh_token ?? t.refreshToken ?? refreshToken) as string;
+    if (!accessToken) {
+      // A 2xx with an unparseable body is a backend bug, NOT a dead token — treat
+      // it as transient (throw → caller keeps the session) rather than signing
+      // the user out, which returning null here would trigger.
+      debugLog('auth', 'refresh: no access token in 2xx response — treating as transient', {
+        responseKeys: Object.keys((r ?? {}) as object),
+        tokenKeys: Object.keys(t),
+      });
+      throw new Error('refresh: unparseable token response');
+    }
+    const expiresAt = epochFromIso(
+      (t.access_token_expires_at ?? t.accessTokenExpiresAt) as string | undefined,
+    );
+    const rawUser = ((r as { user?: RawBackendUser }).user ??
+      (t.user as RawBackendUser | undefined));
+    return {
+      session: { accessToken, refreshToken: newRefresh, expiresAt },
+      user: rawUser
+        ? mapBackendUser(rawUser)
+        : { id: '', firstName: '', lastName: '', email: '', username: '', avatarUrl: null, memberSince: '' },
+    };
   }
 
   async signOut(_refreshToken: string, _signal?: AbortSignal): Promise<void> {

@@ -1,10 +1,10 @@
-import { router } from 'expo-router';
 import { useCallback, useMemo } from 'react';
 
 import SearchResultRow from '@/components/screens-components/search/search-result-row';
 import AppList from '@/components/shared/app-list';
 import { AppView } from '@/components/shared/app-view';
 import type { SearchResult, SearchState } from '@/types/search';
+import { openItemDetail } from '@/utils/nav';
 
 import FooterSpinner from './footer-spinner';
 import { findCheapestId } from './helpers';
@@ -66,10 +66,7 @@ export default function SearchResults({
   const cheapestId = useMemo(() => findCheapestId(results), [results]);
 
   const handleOpen = useCallback((result: SearchResult) => {
-    router.push({
-      pathname: '/item-detail/[id]',
-      params: { id: result.id },
-    });
+    openItemDetail(result.id);
   }, []);
 
   const renderItem = useCallback(

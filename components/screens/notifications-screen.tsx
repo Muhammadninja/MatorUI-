@@ -26,6 +26,7 @@ import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useCartContext } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useNotifications } from '@/hooks/use-notifications';
+import { debugLog } from '@/services/debug-log';
 import { toastService } from '@/services/toast-service';
 import { ORDER_STATUS_MACHINE_I18N } from '@/services/orders-service';
 import {
@@ -345,8 +346,15 @@ export default function NotificationsScreen() {
     if (n.deeplinkPath) {
       try {
         router.push(n.deeplinkPath as never);
-      } catch {
-        // Unknown/relative deeplink — leave the user on the feed.
+      } catch (err) {
+        // A bad/renamed backend deeplink can't route — keep the user on the feed,
+        // but LOG the offending path (dev console / EXPO_PUBLIC_DEBUG_API release
+        // logs) so broken deeplinks are detectable instead of a silent dead tap.
+        debugLog('nav', 'notification deeplink failed to route', {
+          path: n.deeplinkPath,
+          type: n.type,
+          message: (err as Error)?.message,
+        });
       }
     }
   };

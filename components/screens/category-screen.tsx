@@ -17,6 +17,7 @@ import { useCatalogList } from '@/hooks/use-catalog-list';
 import { useToast } from '@/hooks/use-toast';
 import type { CatalogItem } from '@/services/catalog-service';
 import { triggerHaptic } from '@/utils/haptics';
+import { openItemDetail } from '@/utils/nav';
 
 /**
  * Category (`category`) — vertical list of product result rows for a category
@@ -48,8 +49,7 @@ export default function CategoryScreen() {
   const { isAuthenticated } = useUserContext();
   const toast = useToast();
 
-  const openItem = (it: CatalogItem) =>
-    router.push({ pathname: '/item-detail/[id]', params: { id: it.id } });
+  const openItem = (it: CatalogItem) => openItemDetail(it.id);
 
   // Guest-first purchase gate, mirroring Item Detail.
   const addToCart = (it: CatalogItem) => {

@@ -19,6 +19,7 @@ import { AppText } from '@/components/shared/app-text';
 import { AppTextArea } from '@/components/shared/app-text-area';
 import { AppTextField } from '@/components/shared/app-text-field';
 import { AppView } from '@/components/shared/app-view';
+import { debugLog } from '@/services/debug-log';
 import { modalService } from '@/services/global-modal-service/global-modal.service';
 import AppAccessoriesField from '../app-accessories-field';
 import { AppColorField } from '../app-color-field';
@@ -488,10 +489,14 @@ export const PhoneDialFieldRenderer: FieldRenderer<'phone-dial'> = ({
             value={(rhf.value as any) ?? ''}
             onChangeText={(text) => {
               rhf.onChange(text);
-              // Sync phoneCode to +998
+              // Keep the hidden phoneCode field in sync (+998). Log instead of
+              // silently swallowing — a broken field name would otherwise let a
+              // phone submit without its dialing code with zero signal.
               try {
                 (methods.setValue as any)('phoneCode', '+998');
-              } catch {}
+              } catch (err) {
+                debugLog('form', 'phoneCode sync failed', { message: (err as Error)?.message });
+              }
             }}
             onBlur={rhf.onBlur as any}
             disabled={isDisabled}

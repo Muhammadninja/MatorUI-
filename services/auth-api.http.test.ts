@@ -16,14 +16,21 @@ vi.mock('@/config/api', () => ({
   shouldUseHttpTransport: () => true,
 }));
 
-// Controlled apiClient — we assert the calls the transport makes.
+// Controlled apiClient — we assert the calls the transport makes. We keep the
+// REAL `ApiError` export (via importOriginal) so the transport's
+// `err instanceof ApiError` status check works against realistic rejections.
 const post = vi.fn();
 const get = vi.fn();
 const patch = vi.fn();
-vi.mock('@/services/api-client', () => ({
-  apiClient: { post: (...a: unknown[]) => post(...a), get: (...a: unknown[]) => get(...a), patch: (...a: unknown[]) => patch(...a) },
-}));
+vi.mock('@/services/api-client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/api-client')>();
+  return {
+    ...actual,
+    apiClient: { post: (...a: unknown[]) => post(...a), get: (...a: unknown[]) => get(...a), patch: (...a: unknown[]) => patch(...a) },
+  };
+});
 
+import { ApiError } from '@/services/api-client';
 import { authTransport, mapBackendUser } from './auth-api';
 
 beforeEach(() => {
@@ -143,7 +150,7 @@ describe('HttpAuthTransport — refresh', () => {
   });
 
   test('returns null when the refresh token is rejected (so context signs out)', async () => {
-    post.mockRejectedValueOnce(new Error('401 invalid_grant'));
+    post.mockRejectedValueOnce(new ApiError(401, 'invalid_grant', '401 invalid_grant'));
     const result = await authTransport.refresh('rt_expired');
     expect(result).toBeNull();
   });
@@ -218,13 +225,25 @@ describe('HttpAuthTransport — refresh (shape tolerance regression)', () => {
     expect(r?.session).toMatchObject({ accessToken: 'A4', refreshToken: 'old-refresh' });
   });
 
-  test('a response with no access token → null (genuinely dead refresh)', async () => {
+  test('a 2xx response with no access token → throws (backend bug is transient, keep session)', async () => {
     post.mockResolvedValueOnce({ message: 'nope' });
+    await expect(authTransport.refresh('old')).rejects.toThrow();
+  });
+
+  test('a 401 ApiError → null (definitive rejection → caller signs out)', async () => {
+    post.mockRejectedValueOnce(new ApiError(401, 'UNAUTHORIZED', 'Unauthorized'));
     expect(await authTransport.refresh('old')).toBeNull();
   });
 
-  test('a thrown error (401/network) → null', async () => {
-    post.mockRejectedValueOnce(new Error('Unauthorized'));
+  test('a 403 ApiError → null (definitive rejection)', async () => {
+    post.mockRejectedValueOnce(new ApiError(403, 'FORBIDDEN', 'Forbidden'));
     expect(await authTransport.refresh('old')).toBeNull();
+  });
+
+  test('a network/5xx error → throws (transient, keep session and retry)', async () => {
+    post.mockRejectedValueOnce(new ApiError(0, 'NETWORK', 'offline'));
+    await expect(authTransport.refresh('old')).rejects.toThrow();
+    post.mockRejectedValueOnce(new ApiError(503, 'HTTP_503', 'unavailable'));
+    await expect(authTransport.refresh('old')).rejects.toThrow();
   });
 });

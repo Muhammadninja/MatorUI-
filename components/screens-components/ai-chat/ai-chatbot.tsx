@@ -619,7 +619,7 @@ export default function AiChatbot() {
           borderColor={tokens.border}
         >
           <AppView row align="center" gap={10}>
-            {/* Brand "AI" avatar */}
+            {/* Mator AI brand monogram avatar */}
             <AppView
               center
               rounded={999}
@@ -632,10 +632,10 @@ export default function AiChatbot() {
               <AppText
                 textVariant="caption"
                 family="accent"
-                weight="semibold"
-                style={{ color: tokens.onBrand, fontSize: 11, letterSpacing: 0.4 }}
+                weight="bold"
+                style={{ color: tokens.onBrand, fontSize: 16, letterSpacing: 0.2 }}
               >
-                AI
+                M
               </AppText>
             </AppView>
 
@@ -648,7 +648,7 @@ export default function AiChatbot() {
                 colorName="text"
                 style={{ lineHeight: 18 }}
               >
-                {t('aiChat.partsAssistant')}
+                {t('aiChat.assistantName')}
               </AppText>
               <AppView row align="center" gap={4}>
                 {/* Online dot */}

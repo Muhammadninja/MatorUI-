@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -7,6 +6,7 @@ import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import { money, savePercent, type MatorProduct } from '@/mocks/mator-catalog';
+import { openItemDetail } from '@/utils/nav';
 
 import ImageBox from './image-box';
 import Rating from './rating';
@@ -27,7 +27,7 @@ function ProductCard({ product: p }: ProductCardProps) {
 
   return (
     <AppPressableView
-      onPress={() => router.push(`/item-detail/${p.id}`)}
+      onPress={() => openItemDetail(p.id)}
       accessibilityRole="button"
       accessibilityLabel={p.title}
       androidRipple={false}

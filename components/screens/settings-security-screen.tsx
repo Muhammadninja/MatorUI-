@@ -10,14 +10,35 @@ import { useLanguageContext } from '@/contexts/language.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useUserContext } from '@/contexts/user.context';
 import { useToast } from '@/hooks/use-toast';
+import { modalService } from '@/services/global-modal-service/global-modal.service';
 import { triggerHaptic } from '@/utils/haptics';
 
 export default function SettingsSecurityScreen() {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const { languageLabel } = useLanguageContext();
-  const { signOut } = useUserContext();
+  const { deleteAccount } = useUserContext();
   const toast = useToast();
+
+  const confirmDeleteAccount = () => {
+    triggerHaptic('warning');
+    modalService.openModal('confirmAction', {
+      title: t('settings.deleteAccountConfirmTitle'),
+      message: t('settings.deleteAccountConfirmMessage'),
+      confirmLabel: t('settings.deleteAccountConfirm'),
+      cancelLabel: t('common.cancel'),
+      onConfirm: async () => {
+        try {
+          await deleteAccount();
+          toast.info(t('settings.accountDeletedToast'));
+          router.replace('/explore');
+        } catch {
+          // Deletion failed server-side — the user stays signed in.
+          toast.danger(t('settings.accountDeleteFailedToast'));
+        }
+      },
+    });
+  };
 
   return (
     <AppView flex={1} colorName="background">
@@ -114,11 +135,7 @@ export default function SettingsSecurityScreen() {
           <AppView px="lg" style={{ marginTop: 4 }}>
             <AppPressableView
               androidRipple={false}
-              onPress={async () => {
-                await signOut();
-                toast.info(t('settings.accountDeletedToast'));
-                router.replace('/explore');
-              }}
+              onPress={confirmDeleteAccount}
               accessibilityRole="button"
               accessibilityLabel={t('settings.deleteAccount')}
             >

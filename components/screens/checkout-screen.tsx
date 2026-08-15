@@ -1,4 +1,6 @@
+import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { AlertCircle, ArrowLeft, Check, MapPin, PhoneCall, Plus } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -17,13 +19,37 @@ import { DEFAULT_PAYMENT_TYPE, PAYMENT_OPTIONS, type PaymentOption } from '@/con
 import { useCartContext } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useUserContext } from '@/contexts/user.context';
+import { useToast } from '@/hooks/use-toast';
 import { useAddresses, useCreateAddress, useCreateOrder, useShippingQuote } from '@/hooks/use-orders';
 import { parsePrice } from '@/services/cart-math';
 import garageService from '@/services/garage-service';
 import type { Address, PaymentType } from '@/services/orders-service';
+import { paymentsTransport } from '@/services/payments-service';
 import { triggerHaptic } from '@/utils/haptics';
 
 type Tokens = ReturnType<typeof useThemeContext>['tokens'];
+
+/**
+ * Drives online Payme payment for a just-created (`pending_payment`) order:
+ * requests a hosted checkout URL, opens it in an auth-session browser, and
+ * reports whether the user completed the redirect back. The backend webhook is
+ * the source of truth for actual payment — the confirmation screen shows the
+ * real order status; this only steers the post-checkout toast.
+ *   'skip'       → gateway not live yet → behave exactly as today (no online step)
+ *   'paid'       → user completed the hosted flow (redirected back to returnUrl)
+ *   'incomplete' → user cancelled / dismissed / it errored
+ */
+async function collectPaymePayment(orderId: string): Promise<'skip' | 'paid' | 'incomplete'> {
+  const returnUrl = Linking.createURL('payment-return');
+  try {
+    const start = await paymentsTransport.startPayment({ orderId, provider: 'payme', returnUrl });
+    if (start.status === 'unsupported') return 'skip';
+    const res = await WebBrowser.openAuthSessionAsync(start.checkoutUrl, returnUrl);
+    return res.type === 'success' ? 'paid' : 'incomplete';
+  } catch {
+    return 'incomplete';
+  }
+}
 
 /**
  * Checkout — the Uzbek-market flow. Delivery address is OPTIONAL (the courier
@@ -40,6 +66,7 @@ export default function CheckoutScreen() {
   const { items, totals, appliedPromo, formatCurrency, clearCart } = useCartContext();
   const { profile } = useUserContext();
 
+  const toast = useToast();
   const addresses = useAddresses();
   const createAddress = useCreateAddress();
   const create = useCreateOrder();
@@ -108,6 +135,20 @@ export default function CheckoutScreen() {
       contactPhone: profile?.phone ?? undefined,
     });
     if (!result) return; // hook surfaced the error; stay on the screen.
+
+    // Payme is paid online: hand the just-created (pending_payment) order to the
+    // hosted checkout before finishing. Terminal/Cash are pay-on-delivery, so
+    // they skip this entirely. The order exists regardless of payment outcome
+    // (backend models it as pending_payment); an incomplete online payment just
+    // means the buyer can still pay — surface a note and land them on the
+    // confirmation screen, which shows the real status.
+    if (paymentType === 'payme') {
+      const outcome = await collectPaymePayment(result.orderId);
+      if (outcome === 'incomplete') {
+        toast.info(t('checkout.paymentIncomplete'));
+      }
+    }
+
     clearCart();
     router.replace({
       pathname: '/order-confirmation',

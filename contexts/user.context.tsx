@@ -96,6 +96,9 @@ type UserContextValue = {
   /** Passwordless: verify the code, establish the session, and load the profile. */
   verifyOtp: (input: VerifyOtpInput) => Promise<void>;
   signOut: () => Promise<void>;
+  /** Permanently delete the account server-side, then clear the local session.
+   *  Rejects (leaving the user signed in) if the backend deletion fails. */
+  deleteAccount: () => Promise<void>;
 };
 
 // ─── Context ─────────────────────────────────────────────────────────────────
@@ -175,6 +178,15 @@ export function UserProvider({ children }: PropsWithChildren) {
       authTransport.signOut(existing.refreshToken).catch(() => undefined);
     }
   }, [persistSession]);
+
+  const deleteAccount = useCallback(async () => {
+    // Erase server-side FIRST; only clear the local session if the backend
+    // confirms. On failure we rethrow so the caller can surface an error and
+    // the user stays signed in (never a fake "deleted").
+    await userTransport.deleteMe();
+    applyProfile(null);
+    await persistSession(null);
+  }, [applyProfile, persistSession]);
 
   const requestOtp = useCallback(async (input: RequestOtpInput) => {
     setIsLoading(true);
@@ -322,14 +334,31 @@ export function UserProvider({ children }: PropsWithChildren) {
       const session = getCurrentSession();
       if (!session) return;
       const work = (async () => {
-        const result = await authTransport.refresh(session.refreshToken).catch(() => null);
+        // The transport now distinguishes the two failure modes (see its doc):
+        //   THROW  → transient (offline / timeout / 5xx / bad body): the token may
+        //            still be valid, so KEEP the session and retry next request.
+        //            This is what stops a flaky network from logging users out.
+        //   null   → DEFINITIVE rejection (401/403): the refresh token is dead and
+        //            will never work again, so sign out rather than loop 401s on a
+        //            broken session forever.
+        let result: Awaited<ReturnType<typeof authTransport.refresh>>;
+        try {
+          result = await authTransport.refresh(session.refreshToken);
+        } catch {
+          debugLog('auth', 'refresh transient — keeping session + cached profile');
+          return false;
+        }
         if (!result) {
-          // Refresh failed. Do NOT sign the user out or wipe the session —
-          // that is exactly what logged users out on every launch. Keep the
-          // persisted session + cached profile so they stay signed in; the
-          // token refreshes on the next request that succeeds. Only an explicit
-          // sign-out (profile / settings) clears the session.
-          debugLog('auth', 'refresh failed — keeping session + cached profile (no auto sign-out)');
+          if (bootingRef.current) {
+            // Never wipe the session mid-cold-boot — a definitive 401 during
+            // hydration still keeps the cached profile; the next in-app 401 after
+            // boot will sign out cleanly. (Matches the hydration contract above.)
+            debugLog('auth', 'refresh rejected during boot — deferring sign-out');
+            return false;
+          }
+          debugLog('auth', 'refresh rejected — signing out and routing to /sign-in');
+          await signOut();
+          router.replace('/sign-in');
           return false;
         }
         await persistSession(result.session);
@@ -365,6 +394,7 @@ export function UserProvider({ children }: PropsWithChildren) {
       requestOtp,
       verifyOtp,
       signOut,
+      deleteAccount,
     }),
     [
       profile,
@@ -378,6 +408,7 @@ export function UserProvider({ children }: PropsWithChildren) {
       requestOtp,
       verifyOtp,
       signOut,
+      deleteAccount,
     ],
   );
 

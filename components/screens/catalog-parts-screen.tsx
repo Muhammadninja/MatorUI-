@@ -20,6 +20,7 @@ import { parsePrice } from '@/services/cart-math';
 import type { CatalogItem } from '@/services/catalog-service';
 import type { CatalogSortBy, FilterState } from '@/types/catalog-nav';
 import { triggerHaptic } from '@/utils/haptics';
+import { openItemDetail } from '@/utils/nav';
 
 const DEFAULT_FILTER: FilterState = {
   brands: [],
@@ -144,7 +145,7 @@ export default function CatalogPartsScreen() {
   }, [filter, brands]);
 
   const openItem = useCallback((it: CatalogItem) => {
-    router.push({ pathname: '/item-detail/[id]', params: { id: it.id } });
+    openItemDetail(it.id);
   }, []);
 
   const addToCart = useCallback(

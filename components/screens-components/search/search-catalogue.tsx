@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { AlertCircle, PackageOpen } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { ScrollView } from 'react-native';
@@ -6,6 +5,7 @@ import { ScrollView } from 'react-native';
 import { AppButton } from '@/components/shared/app-button';
 import { useThemeContext } from '@/contexts/theme.context';
 import useCatalogList from '@/hooks/use-catalog-list';
+import { openItemDetail } from '@/utils/nav';
 
 import { AppText } from '../../shared/app-text';
 import { AppView } from '../../shared/app-view';
@@ -97,12 +97,7 @@ export default function SearchCatalogue() {
                   image={card.images[0]}
                   imageSource={FALLBACK_IMAGE}
                   style={{ width: CARD_WIDTH }}
-                  onPress={() =>
-                    router.push({
-                      pathname: '/item-detail/[id]',
-                      params: { id: card.id },
-                    })
-                  }
+                  onPress={() => openItemDetail(card.id)}
                 />
               ))}
             </AppView>
