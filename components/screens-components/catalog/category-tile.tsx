@@ -47,11 +47,9 @@ function CategoryTile({ name, iconKey, count, onPress }: CategoryTileProps) {
         >
           {name}
         </AppText>
-        {count > 0 ? (
-          <AppText family="default" style={{ fontSize: 10.5, color: tokens.textMuted, marginTop: 2 }}>
-            {t('category.partsCount', { count })}
-          </AppText>
-        ) : null}
+        <AppText family="default" style={{ fontSize: 10.5, color: tokens.textMuted, marginTop: 2 }}>
+          {t('category.partsCount', { count })}
+        </AppText>
       </AppView>
     </AppPressableView>
   );

@@ -18,8 +18,7 @@ import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useThemeContext } from '@/contexts/theme.context';
-import { useCategoryDrill } from '@/hooks/use-category-drill';
-import { useSystemCategories } from '@/hooks/use-system-categories';
+import { useCategories } from '@/hooks/use-categories';
 import { useMakes } from '@/hooks/use-vehicle-catalog';
 import { useNotifications } from '@/hooks/use-notifications';
 import { useToast } from '@/hooks/use-toast';
@@ -78,15 +77,9 @@ export default function ExploreScreen() {
   const [headerHeight, setHeaderHeight] = useState(insets.top + 132);
   const toast = useToast();
 
-  // "Shop by category" grid — the category-tree ROOTS (the 10 systems), same
-  // source as the after-brand systems screen, via GET /v1/reference/categories.
-  // (The old GET /v1/categories buckets were retired from the tree, which is why
-  // the grid collapsed to one tile.) Styled/localized in useSystemCategories.
-  const { state: categoriesState, categories, refresh: refreshCategories } = useSystemCategories();
-  // Tapping a category DRILLS: root → its subcategories (or straight to parts if
-  // it's a leaf), the same behavior as a systems-screen row. No vehicle context
-  // on the home grid.
-  const { drill } = useCategoryDrill({});
+  // "Shop by category" grid — live from GET /v1/categories (per-domain HTTP
+  // gate), falling back to the bundled tiles on error so it never renders blank.
+  const { state: categoriesState, categories, refresh: refreshCategories } = useCategories();
   // "Shop by vehicle" row — live from GET /v1/reference/makes (admin-managed),
   // falling back to the bundled makes on error so it never renders blank.
   const { state: makesState, makes } = useMakes();
@@ -104,14 +97,12 @@ export default function ExploreScreen() {
     });
   }, [refreshCategories, toast, t]);
 
-  // Drill into the tapped system: its subcategories (or parts if it's a leaf).
-  // `drill` already fires the selection haptic and threads no vehicle context.
-  const openCategory = useCallback(
-    (id: string, label: string) => {
-      void drill({ id, name: label });
-    },
-    [drill],
-  );
+  // Route by the backend category id (e.g. "ENGINE") so the Category listing
+  // filters /v1/catalog/parts correctly; the display name is the header label.
+  const openCategory = useCallback((id: string, label: string) => {
+    triggerHaptic('selection');
+    router.push({ pathname: '/category', params: { cat: id, label } });
+  }, []);
   const openMake = useCallback(
     (brandId: string) => {
       triggerHaptic('selection');

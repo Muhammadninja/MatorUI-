@@ -31,6 +31,17 @@ import {
 
 const BASE = '/v1/reference';
 
+/**
+ * The 12 buyer-grid mainCategory buckets. They belong on the home "Shop by
+ * category" grid (GET /v1/categories) — NOT in the reference-tree drill — so we
+ * strip them from category listings here, keeping the after-brand
+ * categories→subcategories flow to real subcategories only.
+ */
+const MAIN_CATEGORY_BUCKET_IDS = new Set([
+  'brakes', 'batteries', 'filters', 'ignition', 'engine', 'electrical-parts',
+  'oil-and-fluids', 'belts-and-hoses', 'wipers', 'lighting', 'suspension', 'exterior',
+]);
+
 export type RefMake = {
   id: string;
   name: string;
@@ -226,7 +237,9 @@ export async function fetchReferenceCategories(
     const res = await apiClient.get<Envelope>(`${BASE}/categories${qs}`, { signal });
     // The reference node ships camelCase (`parentId`, `sortOrder`) per the spec;
     // tolerate snake_case too so a backend tweak can't silently blank the fields.
-    return asItems(res).map((c) => ({
+    return asItems(res)
+      .filter((c) => !MAIN_CATEGORY_BUCKET_IDS.has(str(c.id)))
+      .map((c) => ({
       id: str(c.id),
       name: str(c.name),
       titleRu: (c.titleRu as string | null) ?? (c.title_ru as string | null) ?? null,
