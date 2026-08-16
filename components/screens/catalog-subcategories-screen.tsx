@@ -14,7 +14,7 @@ import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useCategoryDrill } from '@/hooks/use-category-drill';
-import { fetchReferenceCategories, type RefCategory } from '@/services/reference-catalog';
+import { fetchReferenceCategories, localizedCategoryName, type RefCategory } from '@/services/reference-catalog';
 
 type LoadState = 'loading' | 'error' | 'loaded';
 
@@ -27,7 +27,7 @@ type LoadState = 'loading' | 'error' | 'loaded';
  * offer "View all parts" so the buyer is never dead-ended.
  */
 export default function CatalogSubcategoriesScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
   const { parentId, parentLabel, make, model, brandId } = useLocalSearchParams<{
@@ -75,13 +75,15 @@ export default function CatalogSubcategoriesScreen() {
   }, [parentId, parentLabel, make, model, brandId]);
 
   const renderItem = useCallback(
-    ({ item }: { item: RefCategory }) => (
+    ({ item }: { item: RefCategory }) => {
+      const label = localizedCategoryName(item, i18n.language);
+      return (
       <AppPressableView
-        onPress={() => void drill(item)}
+        onPress={() => void drill({ id: item.id, name: label })}
         disabled={resolvingId != null}
         androidRipple={false}
         accessibilityRole="button"
-        accessibilityLabel={item.name}
+        accessibilityLabel={label}
         row
         align="center"
         gap={14}
@@ -89,7 +91,7 @@ export default function CatalogSubcategoriesScreen() {
       >
         <AppView flex={1}>
           <AppText family="heading" weight="bold" style={{ fontSize: 16, color: tokens.text }}>
-            {item.name}
+            {label}
           </AppText>
         </AppView>
         {resolvingId === item.id ? (
@@ -98,8 +100,9 @@ export default function CatalogSubcategoriesScreen() {
           <ChevronRight size={22} strokeWidth={1.5} color={tokens.text} />
         )}
       </AppPressableView>
-    ),
-    [drill, resolvingId, tokens],
+      );
+    },
+    [drill, resolvingId, tokens, i18n.language],
   );
 
   return (

@@ -13,7 +13,7 @@ import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useThemeContext } from '@/contexts/theme.context';
-import { useCategories } from '@/hooks/use-categories';
+import { useSystemCategories } from '@/hooks/use-system-categories';
 import { useCategoryDrill } from '@/hooks/use-category-drill';
 import type { CategoryTileData } from '@/services/categories-service';
 
@@ -21,11 +21,11 @@ import type { CategoryTileData } from '@/services/categories-service';
  * Catalog (Stage 2) — the vehicle-systems landing. Reached from Explore
  * ("Browse by system") or a make → model selection (which passes `make`/`model`).
  *
- * The systems list is the SAME taxonomy as the "Shop by category" grid — both
- * come from `GET /v1/categories` (via `useCategories`) — so the id a seller
- * tags a part with is exactly what a tap sends to `/v1/catalog/parts?category=`.
- * Tapping a system carries the backend category **id** + label plus the
- * make/model context to the parts list.
+ * The systems list is the category-tree ROOTS (`GET /v1/reference/categories`,
+ * via `useSystemCategories`) — Brake System, Engine, Heating & Cooling… — the
+ * same nodes an admin manages in the categories console and the subcategory seed
+ * hangs under. Tapping a system DRILLS into its admin-defined subcategories (or
+ * straight to parts if it's a leaf), carrying the make/model context through.
  */
 export default function CatalogSystemsScreen() {
   const { t } = useTranslation();
@@ -37,7 +37,7 @@ export default function CatalogSystemsScreen() {
     brandId?: string;
   }>();
   const vehicleLabel = [make, model].filter(Boolean).join(' ');
-  const { state, categories } = useCategories();
+  const { state, categories } = useSystemCategories();
 
   // Tapping a system now DRILLS: if the admin gave it subcategories (e.g.
   // Heating & Cooling → Antifreeze, Radiators…), show those first; a leaf system

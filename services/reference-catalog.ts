@@ -50,11 +50,30 @@ export type RefTrim = { id: string; modelId: string; name: string };
 export type RefCategory = {
   id: string;
   name: string;
+  /** Localized display titles (buyer app). Null until an admin/seed sets them;
+   *  the app falls back to `name`. */
+  titleRu: string | null;
+  titleUz: string | null;
   slug: string;
   parentId: string | null;
   level: number;
   sortOrder: number;
 };
+
+/**
+ * The label to show for a category in the given app language: Uzbek → `title_uz`,
+ * everything else → `title_ru`, each falling back to the next and finally to the
+ * raw `name` so a tile is never blank. `lang` is the i18next language code
+ * (`i18n.language`), only its first two chars matter.
+ */
+export function localizedCategoryName(
+  c: Pick<RefCategory, 'name' | 'titleRu' | 'titleUz'>,
+  lang?: string,
+): string {
+  const l = (lang ?? '').slice(0, 2).toLowerCase();
+  if (l === 'uz') return c.titleUz || c.titleRu || c.name;
+  return c.titleRu || c.name;
+}
 export type RefEngine = {
   id: string;
   name: string;
@@ -210,6 +229,8 @@ export async function fetchReferenceCategories(
     return asItems(res).map((c) => ({
       id: str(c.id),
       name: str(c.name),
+      titleRu: (c.titleRu as string | null) ?? (c.title_ru as string | null) ?? null,
+      titleUz: (c.titleUz as string | null) ?? (c.title_uz as string | null) ?? null,
       slug: str(c.slug),
       parentId: (c.parentId as string | null) ?? (c.parent_id as string | null) ?? null,
       level: numOrUndef(c.level) ?? 0,
