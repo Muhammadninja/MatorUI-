@@ -32,28 +32,21 @@ export function GarageHeader({
         {resolvedTitle}
       </AppText>
 
+      {/* Icon-only round button — language-proof (the RU label "Добавить" made a
+       *  text pill wide and heavy next to the title). The medallion reads as an
+       *  "add" affordance in every locale; the label lives on the a11y layer. */}
       <AppPressableView
+        center
         rounded={RADIUS_PILL}
-        px={14}
-        py={10}
         colorName="brand"
         androidRipple
         onPress={onAddPress}
         accessibilityRole="button"
         accessibilityLabel={t('garage.addVehicle')}
         accessibilityHint={t('garage.addVehicleHint')}
+        style={{ width: 44, height: 44 }}
       >
-        <AppView row align="center" gap={6}>
-          <Plus size={16} strokeWidth={2} color={tokens.onBrand} />
-          <AppText
-            textVariant="buttonSm"
-            family="accent"
-            colorName="onBrand"
-            numberOfLines={1}
-          >
-            {t('garage.add')}
-          </AppText>
-        </AppView>
+        <Plus size={22} strokeWidth={2.5} color={tokens.onBrand} />
       </AppPressableView>
     </AppView>
   );
