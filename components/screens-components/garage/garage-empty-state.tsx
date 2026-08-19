@@ -2,16 +2,11 @@ import { useTranslation } from 'react-i18next';
 import { CarFront } from 'lucide-react-native';
 
 import { RADIUS_PILL, RADIUS_SHEET } from '@/components/screens-components/search/radii';
-import { AppButton } from '@/components/shared/app-button';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 
-export type GarageEmptyStateProps = {
-  onAddVehicle: () => void;
-};
-
-export function GarageEmptyState({ onAddVehicle }: GarageEmptyStateProps) {
+export function GarageEmptyState() {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
 
@@ -49,19 +44,8 @@ export function GarageEmptyState({ onAddVehicle }: GarageEmptyStateProps) {
             {t('garage.emptyBody')}
           </AppText>
         </AppView>
-
-        {/* Hug the label instead of stretching full-width: the RU label
-         *  ("Добавить автомобиль") is long, and a full-width button made it read
-         *  as an oversized block that dominated the card. A content-width,
-         *  centered pill stays proportionate in every language. */}
-        <AppButton
-          title={t('garage.addVehicle')}
-          kind="brand"
-          size="lg"
-          numberOfLines={1}
-          onPress={onAddVehicle}
-          containerStyle={{ alignSelf: 'center', maxWidth: '100%' }}
-        />
+        {/* No add button here — the single add affordance is the round "+" in the
+         *  pinned header (works for guests and the empty state alike). */}
       </AppView>
     </AppView>
   );

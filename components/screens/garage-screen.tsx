@@ -68,7 +68,7 @@ export default function GarageScreen() {
       {!isAuthenticated ? (
         // Guest: no garage to load — show the same empty state (with the Add
         // button) as a signed-in user with zero vehicles. Add → auth sheet.
-        <GarageEmptyState onAddVehicle={openAdd} />
+        <GarageEmptyState />
       ) : state === 'loading' || state === 'idle' ? (
         <AppScrollView showsVerticalScrollIndicator={false} padding={0}
           contentContainerStyle={{ paddingTop: 12, paddingHorizontal: 20, paddingBottom: 40 }}
@@ -92,7 +92,7 @@ export default function GarageScreen() {
           <AppButton title={t('common.retry')} kind="secondary" size="sm" onPress={refresh} />
         </AppView>
       ) : state === 'empty' ? (
-        <GarageEmptyState onAddVehicle={openAdd} />
+        <GarageEmptyState />
       ) : (
         <AppScrollView
           showsVerticalScrollIndicator={false}
