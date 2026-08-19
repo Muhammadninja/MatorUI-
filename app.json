@@ -37,7 +37,7 @@
     },
     "android": {
       "predictiveBackGestureEnabled": false,
-      "package": "com.fotih12.mator",
+      "package": "com.mator.myapp",
       "adaptiveIcon": {
         "foregroundImage": "./assets/MATOR-app-icons/expo/adaptive-icon.png",
         "monochromeImage": "./assets/MATOR-app-icons/expo/adaptive-icon.png",
