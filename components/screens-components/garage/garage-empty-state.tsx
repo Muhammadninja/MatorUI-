@@ -50,12 +50,17 @@ export function GarageEmptyState({ onAddVehicle }: GarageEmptyStateProps) {
           </AppText>
         </AppView>
 
+        {/* Hug the label instead of stretching full-width: the RU label
+         *  ("Добавить автомобиль") is long, and a full-width button made it read
+         *  as an oversized block that dominated the card. A content-width,
+         *  centered pill stays proportionate in every language. */}
         <AppButton
           title={t('garage.addVehicle')}
           kind="brand"
           size="lg"
-          fullWidth
+          numberOfLines={1}
           onPress={onAddVehicle}
+          containerStyle={{ alignSelf: 'center', maxWidth: '100%' }}
         />
       </AppView>
     </AppView>
