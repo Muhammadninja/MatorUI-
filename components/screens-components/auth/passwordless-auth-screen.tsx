@@ -306,7 +306,12 @@ export default function PasswordlessAuthScreen() {
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="number-pad"
+                // Surfaces the SMS code as a one-tap suggestion above the
+                // keyboard: `oneTimeCode` = iOS QuickType "From Messages",
+                // `sms-otp` = Android SMS Retriever / autofill.
                 textContentType="oneTimeCode"
+                autoComplete="sms-otp"
+                importantForAutofill="yes"
                 {...field}
               />
 

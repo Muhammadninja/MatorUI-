@@ -33,6 +33,10 @@ export default function ExploreStackLayout() {
         options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }}
       />
       <Stack.Screen
+        name="vehicle-parts"
+        options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }}
+      />
+      <Stack.Screen
         name="search"
         options={{ headerShown: false, animation: 'fade', gestureEnabled: true }}
       />

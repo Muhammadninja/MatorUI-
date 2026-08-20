@@ -540,7 +540,35 @@
     "emptyTitle": "Автомобилей пока нет",
     "emptyBody": "Добавьте первый автомобиль, чтобы открыть доступ к запчастям с гарантированным соответствием.",
     "errorTitle": "Не удалось загрузить гараж",
-    "errorGeneric": "Что-то пошло не так. Попробуйте ещё раз."
+    "errorGeneric": "Что-то пошло не так. Попробуйте ещё раз.",
+    "vehicleSingular": "авто",
+    "vehiclePlural": "авто",
+    "fitCheckedAuto": "соответствие проверяется автоматически",
+    "activeVehicle": "Активный автомобиль",
+    "shopPartsThatFit": "Подходящие запчасти",
+    "statMileage": "Пробег",
+    "statVin": "VIN",
+    "statTrim": "Комплектация",
+    "fitFilterOn": "Фильтр соответствия включён",
+    "fitFilterBody": "Каждая цена и запчасть проверяются по этому автомобилю.",
+    "qaServiceLog": "Журнал ТО",
+    "qaServiceLogSub": "Последнее: масло, 2 мес назад",
+    "qaPastOrders": "Прошлые заказы",
+    "qaPastOrdersSub": "Купленные запчасти",
+    "qaScanVin": "Сканировать VIN",
+    "qaScanVinSub": "Уточнить комплектацию",
+    "qaSavedParts": "Сохранённые",
+    "qaSavedPartsSub": "Ваш список",
+    "otherVehicles": "Другие автомобили",
+    "tapToSwitch": "Нажмите для переключения",
+    "setActive": "Сделать активным",
+    "setActiveVehicle": "Сделать {{vehicle}} активным",
+    "nowActive": "{{vehicle}} теперь активен",
+    "setPrimaryFailed": "Не удалось переключить автомобиль",
+    "addAnotherVehicle": "Добавить ещё автомобиль",
+    "comingSoon": "Скоро",
+    "qaUpdateMileage": "Обновить пробег",
+    "qaUpdateMileageSub": "Держите данные актуальными"
   },
   "vehicleDetail": {
     "eyebrow": "В гараже",
@@ -568,7 +596,20 @@
     "removedToast": "{{vehicle}} удалён",
     "removedToastDesc": "Автомобиль удалён из гаража",
     "removeErrorToast": "Не удалось удалить автомобиль",
-    "removeErrorToastDesc": "Попробуйте ещё раз."
+    "removeErrorToastDesc": "Попробуйте ещё раз.",
+    "notSet": "Не указано",
+    "editTitle": "Изменить авто",
+    "editDetails": "Изменить детали",
+    "saveChanges": "Сохранить",
+    "fieldNickname": "Название",
+    "nicknamePlaceholder": "Ежедневный",
+    "mileagePlaceholder": "напр. 67000",
+    "platePlaceholder": "01 A 123 BC",
+    "trimPlaceholder": "напр. LS AT",
+    "savedToast": "Изменения сохранены",
+    "saveErrorToast": "Не удалось сохранить",
+    "saveErrorToastDesc": "Пожалуйста, попробуйте снова.",
+    "plateInvalid": "Введите номер, напр. 01 A 123 BC"
   },
   "addVehicle": {
     "title": "Добавить автомобиль",
@@ -617,7 +658,21 @@
     "setPrimaryTitle": "Сделать основным",
     "setPrimaryHint": "Фильтровать запчасти по этому автомобилю по умолчанию.",
     "errorYearRange": "Введите год от 1900 до 2100",
-    "errorRequired": "Обязательно"
+    "errorRequired": "Обязательно",
+    "introPicker": "Выберите марку, модель и год. Есть VIN? Расшифруйте его, чтобы заполнить поля.",
+    "selectMakeFirst": "Сначала выберите марку",
+    "loadingModels": "Загрузка моделей…",
+    "noModels": "Для этой марки нет моделей",
+    "yearPlaceholder": "напр. 2019",
+    "vinSectionLabel": "Есть VIN?",
+    "completeFieldsToast": "Заполните данные авто",
+    "completeFieldsToastDesc": "Выберите марку, модель и корректный год.",
+    "vinNotInCatalogToast": "Нет в каталоге",
+    "vinNotInCatalogToastDesc": "VIN расшифрован, но эта марка пока не поддерживается — выберите ниже.",
+    "detailsOptional": "Детали (необязательно)",
+    "mileagePlaceholder": "напр. 67000",
+    "platePlaceholder": "01 A 123 BC",
+    "plateInvalid": "Введите номер, напр. 01 A 123 BC"
   },
   "itemDetail": {
     "notFoundTitle": "Товар не найден",
@@ -815,5 +870,10 @@
     "noCarsFoundHint": "Добавьте автомобиль из Гаража, чтобы получать ответы с учётом совместимости.",
     "selectVehicle": "Выбрать {{vehicle}}",
     "primary": "Основной"
+  },
+  "vehicleParts": {
+    "bestsellers": "Хиты продаж",
+    "fallbackTitle": "Подходящие запчасти",
+    "emptyBody": "Для {{vehicle}} пока нет запчастей. Загляните позже."
   }
 }

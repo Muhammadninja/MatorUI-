@@ -25,6 +25,7 @@
  */
 
 import { isVinChecksumValid, isVinShapeValid, normalizeVin } from '@/utils/vin';
+import { decodeUzVin } from '@/services/uz-vin-catalog';
 
 // ── Public return contract ───────────────────────────────────────────────────
 
@@ -43,6 +44,13 @@ export interface DecodedVehicle {
   isVerified: boolean;
   /** The normalized 17-char VIN this record was decoded from (traceability). */
   vin: string;
+  /** Backend catalog id (e.g. `make_chevrolet`) when the provider resolved
+   *  one — set by the UZ-market decoder, absent for NHTSA. Threading these
+   *  through lets `POST /v1/garage/vehicles` validate make_id/model_id. */
+  makeId?: string;
+  modelId?: string;
+  /** Body silhouette key when known (UZ decoder only). */
+  bodyStyle?: string;
 }
 
 // ── Domain errors ────────────────────────────────────────────────────────────
@@ -106,6 +114,11 @@ export interface RawVinRecord {
   FuelTypePrimary?: string | null;
   ErrorCode?: string | null;
   ErrorText?: string | null;
+  /** Backend catalog ids — populated by providers that resolve against the
+   *  mator catalog (the UZ decoder); NHTSA leaves these unset. */
+  MakeId?: string | null;
+  ModelId?: string | null;
+  BodyStyle?: string | null;
 }
 
 /** Contract every VIN provider adapter must satisfy. */
@@ -170,6 +183,35 @@ export class NhtsaVinDecodeTransport implements VinDecodeTransport {
   }
 }
 
+/**
+ * UZ-market decoder with NHTSA fallback. UzAuto / GM-Uzbekistan VINs aren't
+ * in NHTSA's database, so we resolve them locally against the mator catalog
+ * (returning `MakeId`/`ModelId` so the garage create validates); anything
+ * that isn't a recognised UZ pattern falls through to the wrapped provider.
+ * This is the app-wide default so the existing VIN screen "just works" for
+ * both UZ and foreign vehicles.
+ */
+export class UzMarketVinDecodeTransport implements VinDecodeTransport {
+  constructor(private readonly fallback: VinDecodeTransport = new NhtsaVinDecodeTransport()) {}
+
+  async fetchRaw(vin: string, signal: AbortSignal): Promise<RawVinRecord> {
+    const uz = decodeUzVin(vin);
+    if (uz) {
+      return {
+        Make: uz.make,
+        Model: uz.model,
+        ModelYear: String(uz.year),
+        FuelTypePrimary: uz.fuelType,
+        ErrorCode: '0',
+        MakeId: uz.makeId,
+        ModelId: uz.modelId,
+        BodyStyle: uz.bodyStyle,
+      };
+    }
+    return this.fallback.fetchRaw(vin, signal);
+  }
+}
+
 // ── Configuration ────────────────────────────────────────────────────────────
 
 export interface VinDecoderConfig {
@@ -193,7 +235,7 @@ export class VinDecoderService {
   private readonly requireChecksum: boolean;
 
   constructor(config: VinDecoderConfig = {}) {
-    this.transport = config.transport ?? new NhtsaVinDecodeTransport();
+    this.transport = config.transport ?? new UzMarketVinDecodeTransport();
     this.timeoutMs = config.timeoutMs ?? 10_000;
     this.requireChecksum = config.requireChecksum ?? false;
   }
@@ -351,6 +393,9 @@ function mapRecord(vin: string, record: RawVinRecord): DecodedVehicle {
     engineDisplacement: cleanString(record.DisplacementL),
     fuelType: cleanString(record.FuelTypePrimary),
     isVerified: decodedCleanly && make !== null && model !== null && year > 0,
+    makeId: cleanString(record.MakeId) ?? undefined,
+    modelId: cleanString(record.ModelId) ?? undefined,
+    bodyStyle: cleanString(record.BodyStyle) ?? undefined,
   };
 }
 

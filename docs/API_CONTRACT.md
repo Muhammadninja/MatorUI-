@@ -174,6 +174,29 @@ so every name below must match exactly.
 - Response: bare `ApiCatalogPart` → mapped to `{ item: CatalogItem }`. **404 → not-found.**
 - Detail screen consumes `specs, features, priceLabel, images, oem`.
 
+### Vehicle bestsellers — "Shop parts that fit" (already supported ✅)
+
+The garage active-vehicle hero's **"Shop parts that fit"** button opens
+`vehicle-parts-screen.tsx`, which lists the top parts that fit the active car via:
+
+```
+GET /v1/catalog/parts?make=<make>&model=<model>&sort=bestseller&page=1&page_size=24
+```
+
+**No backend change is required** — the parts endpoint already implements this:
+- `sort=bestseller` is an accepted value (`ListPartsQueryDto`) and is ranked by
+  `isBestseller → salesCount → reviewCount → ratingAvg → createdAt`
+  (`PartsService.buildOrderBy`). The composite degrades gracefully before
+  `isBestseller`/`salesCount` are populated (falls through to rating/newest).
+- `make` / `model` filter to that vehicle's fitment **and** include universal
+  parts (`makeWhere` / `modelWhere`).
+- Response is the standard `ApiCatalogPartsResponse` → `mapPartToCatalogItem`,
+  so no new client mapper.
+
+Client sends `sortBy: 'bestseller'` (mapped to `sort`). The mock server
+(`.maestro/mock-server/standalone-server.mjs`) mirrors this — `make`/`model` (or
+`sort=bestseller`) returns the fit list ranked by `units_sold`.
+
 ---
 
 ## 6. Search — `services/search-service.ts` (domain key `search`)

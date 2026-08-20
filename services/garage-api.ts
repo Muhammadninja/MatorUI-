@@ -210,8 +210,11 @@ type ServerVehicle = {
 };
 
 type ServerVehicleCreatePayload = {
-  make_id: string;
-  model_id: string;
+  // Optional: omitted when the client couldn't resolve a catalog id, signalling
+  // the backend to decode make/model from the `vin` instead. Present for
+  // UZ-market VINs (resolved client-side) and picker-based adds.
+  make_id?: string;
+  model_id?: string;
   year: number;
   trim_id?: string;
   engine_id?: string;
@@ -298,8 +301,10 @@ export function toServerVehicleCreatePayload(
 ): ServerVehicleCreatePayload {
   const colorHex = input.colorHex ?? colorEnumToHex(input.color);
   return {
-    make_id: input.brandId ?? '',
-    model_id: input.modelId ?? '',
+    // Omit (send undefined, never '') when unresolved so the backend treats it
+    // as "decode from VIN" rather than rejecting an empty id as mismatched.
+    make_id: input.brandId || undefined,
+    model_id: input.modelId || undefined,
     year: input.year,
     trim_id: input.trimId,
     engine_id: input.engineId,
@@ -398,11 +403,13 @@ export class HttpGarageTransport implements GarageTransport {
   }
 
   async setPrimary(id: string, signal?: AbortSignal): Promise<Vehicle[]> {
-    // Backend returns only the single updated vehicle, so re-fetch the full
-    // list afterwards to reflect the new primary across the whole garage.
-    await apiClient.post<ServerVehicle>(
-      `${API_BASE}/vehicles/${encodeURIComponent(id)}/set-primary`,
-      undefined,
+    // Primary is set via a PATCH `{ is_primary: true }` — the real backend has
+    // no dedicated `/set-primary` route. It returns only the single updated
+    // vehicle, so re-fetch the whole list afterwards to reflect the new primary
+    // (and the previously-primary vehicle being demoted) across the garage.
+    await apiClient.patch<ServerVehicle>(
+      `${API_BASE}/vehicles/${encodeURIComponent(id)}`,
+      { is_primary: true },
       { signal },
     );
     return this.list(signal);

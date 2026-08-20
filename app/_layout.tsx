@@ -276,6 +276,26 @@ function RootNavigation() {
               gestureDirection: 'horizontal',
             }}
           />
+          {/* Shared destinations pushed from multiple tabs (Profile + Garage).
+              Root-hosted so `back` returns to the origin tab, not Profile. */}
+          <Stack.Screen
+            name="order-history"
+            options={{
+              headerShown: false,
+              animation: 'slide_from_right',
+              gestureEnabled: true,
+              gestureDirection: 'horizontal',
+            }}
+          />
+          <Stack.Screen
+            name="liked"
+            options={{
+              headerShown: false,
+              animation: 'slide_from_right',
+              gestureEnabled: true,
+              gestureDirection: 'horizontal',
+            }}
+          />
         </Stack>
       </NavigationThemeProvider>
       {splashVisible ? (

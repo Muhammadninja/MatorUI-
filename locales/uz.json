@@ -535,7 +535,35 @@
     "emptyTitle": "Hozircha avtomobil yoʻq",
     "emptyBody": "Aniq mos keladigan ehtiyot qismlarni koʻrish uchun birinchi avtomobilingizni qoʻshing.",
     "errorTitle": "Garajni yuklab boʻlmadi",
-    "errorGeneric": "Nimadir xato ketdi. Qayta urinib koʻring."
+    "errorGeneric": "Nimadir xato ketdi. Qayta urinib koʻring.",
+    "vehicleSingular": "avtomobil",
+    "vehiclePlural": "avtomobil",
+    "fitCheckedAuto": "moslik avtomatik tekshiriladi",
+    "activeVehicle": "Faol avtomobil",
+    "shopPartsThatFit": "Mos keladigan qismlar",
+    "statMileage": "Yurgani",
+    "statVin": "VIN",
+    "statTrim": "Komplektatsiya",
+    "fitFilterOn": "Moslik filtri yoqilgan",
+    "fitFilterBody": "Har bir narx va qism shu avtomobilga tekshiriladi.",
+    "qaServiceLog": "Xizmat tarixi",
+    "qaServiceLogSub": "Oxirgi: moy, 2 oy oldin",
+    "qaPastOrders": "Oʻtgan buyurtmalar",
+    "qaPastOrdersSub": "Sotib olingan qismlar",
+    "qaScanVin": "VIN skanerlash",
+    "qaScanVinSub": "Aniq komplektatsiyani tasdiqlang",
+    "qaSavedParts": "Saqlangan qismlar",
+    "qaSavedPartsSub": "Saqlangan ro'yxat",
+    "otherVehicles": "Boshqa avtomobillar",
+    "tapToSwitch": "Almashtirish uchun bosing",
+    "setActive": "Faol qilish",
+    "setActiveVehicle": "{{vehicle}} avtomobilini faol qilish",
+    "nowActive": "{{vehicle}} endi faol",
+    "setPrimaryFailed": "Avtomobilni almashtirib boʻlmadi",
+    "addAnotherVehicle": "Yana avtomobil qoʻshish",
+    "comingSoon": "Tez orada",
+    "qaUpdateMileage": "Yurishni yangilash",
+    "qaUpdateMileageSub": "Ma'lumotni yangilab turing"
   },
   "vehicleDetail": {
     "eyebrow": "Garajda",
@@ -563,7 +591,20 @@
     "removedToast": "{{vehicle}} oʻchirildi",
     "removedToastDesc": "Avtomobil garajdan oʻchirildi",
     "removeErrorToast": "Avtomobilni oʻchirib boʻlmadi",
-    "removeErrorToastDesc": "Qayta urinib koʻring."
+    "removeErrorToastDesc": "Qayta urinib koʻring.",
+    "notSet": "Ko'rsatilmagan",
+    "editTitle": "Avtoni tahrirlash",
+    "editDetails": "Tafsilotlarni tahrirlash",
+    "saveChanges": "Saqlash",
+    "fieldNickname": "Nom",
+    "nicknamePlaceholder": "Kundalik avto",
+    "mileagePlaceholder": "masalan 67000",
+    "platePlaceholder": "01 A 123 BC",
+    "trimPlaceholder": "masalan LS AT",
+    "savedToast": "O'zgarishlar saqlandi",
+    "saveErrorToast": "Saqlab bo'lmadi",
+    "saveErrorToastDesc": "Iltimos, qayta urinib ko'ring.",
+    "plateInvalid": "To'g'ri raqam kiriting, masalan 01 A 123 BC"
   },
   "addVehicle": {
     "title": "Avto qoʻshish",
@@ -612,7 +653,21 @@
     "setPrimaryTitle": "Asosiy qilib belgilash",
     "setPrimaryHint": "Ehtiyot qismlarni sukut boʻyicha shu avto boʻyicha filtrlash.",
     "errorYearRange": "1900 dan 2100 gacha yilni kiriting",
-    "errorRequired": "Majburiy"
+    "errorRequired": "Majburiy",
+    "introPicker": "Marka, model va yilni tanlang. VIN bormi? Uni dekodlab, maydonlarni toʻldiring.",
+    "selectMakeFirst": "Avval markani tanlang",
+    "loadingModels": "Modellar yuklanmoqda…",
+    "noModels": "Bu marka uchun modellar yoʻq",
+    "yearPlaceholder": "masalan, 2019",
+    "vinSectionLabel": "VIN bormi?",
+    "completeFieldsToast": "Avtomobil ma'lumotlarini to'ldiring",
+    "completeFieldsToastDesc": "Marka, model va to'g'ri yilni tanlang.",
+    "vinNotInCatalogToast": "Katalogda yo'q",
+    "vinNotInCatalogToastDesc": "VIN dekodlandi, lekin bu marka hali qo'llab-quvvatlanmaydi — quyidan tanlang.",
+    "detailsOptional": "Tafsilotlar (ixtiyoriy)",
+    "mileagePlaceholder": "masalan 67000",
+    "platePlaceholder": "01 A 123 BC",
+    "plateInvalid": "To'g'ri raqam kiriting, masalan 01 A 123 BC"
   },
   "itemDetail": {
     "notFoundTitle": "Mahsulot topilmadi",
@@ -810,5 +865,10 @@
     "noCarsFoundHint": "Moslikni hisobga olgan javoblarni olish uchun Garajdan avtomobil qoʻshing.",
     "selectVehicle": "{{vehicle}} tanlash",
     "primary": "Asosiy"
+  },
+  "vehicleParts": {
+    "bestsellers": "Ko'p sotilganlar",
+    "fallbackTitle": "Mos keladigan qismlar",
+    "emptyBody": "{{vehicle}} uchun hozircha qismlar yo'q. Keyinroq qarang."
   }
 }

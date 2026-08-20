@@ -23,16 +23,11 @@ export default function ProfileStackLayout() {
         name="edit-profile"
         options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }}
       />
-      <Stack.Screen
-        name="order-history"
-        options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }}
-      />
+      {/* order-history + liked moved to the ROOT stack (app/order-history.tsx,
+          app/liked.tsx) — both Profile and Garage push them, and a root
+          location keeps `back` returning to the origin tab (see track-order). */}
       <Stack.Screen
         name="payment-methods"
-        options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }}
-      />
-      <Stack.Screen
-        name="liked"
         options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }}
       />
       <Stack.Screen

@@ -175,6 +175,60 @@ export async function fetchModels(
   }
 }
 
+/**
+ * Resolve a decoded make/model NAME pair to the backend's canonical
+ * `make_id` / `model_id`. The VIN decoder can only *guess* catalog ids, and
+ * its guesses don't match the live seed — that's the "Unknown or mismatched
+ * make_id/model_id" 400 on `POST /v1/garage/vehicles`. So the garage-create
+ * path resolves real ids here, from the same reference tables the backend
+ * validates against.
+ *
+ * Returns both ids ONLY when both resolve: a `make_id` without a matching
+ * `model_id` is itself a mismatch the backend rejects, so a partial (or no)
+ * match degrades to `{}` and the caller sends the VIN alone for server-side
+ * decode. On HTTP builds a failed reference lookup also degrades to `{}`
+ * (VIN-only) rather than falling back to bundled ids the live backend would
+ * reject. On mock/offline builds it resolves against the bundled catalog —
+ * harmless, since the mock transport doesn't validate ids.
+ */
+export async function resolveCatalogIds(
+  make: string,
+  model: string,
+  signal?: AbortSignal,
+): Promise<{ makeId?: string; modelId?: string }> {
+  const wantMake = make.trim().toLowerCase();
+  const wantModel = model.trim().toLowerCase();
+  if (!wantMake || !wantModel) return {};
+
+  if (!useHttp()) {
+    const lm = localMakes().find((x) => x.name.trim().toLowerCase() === wantMake);
+    if (!lm) return {};
+    const lmd = localModels(lm.id).find((x) => x.name.trim().toLowerCase() === wantModel);
+    return lmd ? { makeId: lm.id, modelId: lmd.id } : {};
+  }
+
+  // Live: read the ids straight off the reference endpoints (not via the
+  // fetchers above — those fall back to local ids on failure, which would
+  // reintroduce the exact mismatch we're fixing). Any failure → {}.
+  try {
+    const makes = asItems(await apiClient.get<Envelope>(`${BASE}/makes`, { signal }));
+    const m = makes.find((x) => str(x.name).trim().toLowerCase() === wantMake);
+    if (!m) return {};
+    const makeId = str(m.id);
+    const models = asItems(
+      await apiClient.get<Envelope>(
+        `${BASE}/models?makeId=${encodeURIComponent(makeId)}`,
+        { signal },
+      ),
+    );
+    const md = models.find((x) => str(x.name).trim().toLowerCase() === wantModel);
+    if (!md) return {};
+    return { makeId, modelId: str(md.id) };
+  } catch {
+    return {};
+  }
+}
+
 export async function fetchTrims(
   modelId: string,
   signal?: AbortSignal,

@@ -104,7 +104,7 @@ export type CatalogListRequest = {
   /** System / category key (from the catalog systems screen). */
   category?: string;
   search?: string | null;
-  sortBy?: 'featured' | 'newest' | 'price_asc' | 'price_desc' | 'relevance';
+  sortBy?: 'featured' | 'newest' | 'price_asc' | 'price_desc' | 'relevance' | 'bestseller';
   /** Vehicle-fit context from the Make → Model flow. */
   make?: string;
   model?: string;

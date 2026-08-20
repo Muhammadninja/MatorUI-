@@ -25,26 +25,68 @@ const SEEDED_CAR = { make: 'CHEVROLET', model: 'Cobalt', year: 2022 };
 
 // Backend `ApiCatalogPart` shape (nested brand/category, snake_case fields) so
 // HttpCatalogTransport maps it correctly — `brand.name` drives the filter chip.
+// `units_sold` powers the vehicle-bestsellers ranking (see the parts handler).
+// Every seeded part fits the demo Chevrolet Cobalt (UZ market), so the garage
+// "Shop parts that fit" screen renders a populated bestsellers list.
 const BRAKE_PARTS = [
   { id: 'brembo-fp', title: 'Brembo Front Brake Pads',
     brand: { id: 'brembo', name: 'Brembo' }, category: { id: 'brakes', name: 'Brake System' },
-    oem_numbers: ['BREMBO P59049'], price_label: '$89.00', in_stock: true, region: 'europe',
+    oem_numbers: ['BREMBO P59049'], price_label: '$89.00', in_stock: true, region: 'europe', units_sold: 1240,
     images: ['https://cdn.mator.local/parts/brembo-fp.png'],
     specs: [{ label: 'Position', value: 'Front axle' }], features: ['Low-dust compound', 'OE-spec fitment'] },
   { id: 'bosch-rotor', title: 'Bosch Brake Rotor',
     brand: { id: 'bosch', name: 'Bosch' }, category: { id: 'brakes', name: 'Brake System' },
-    oem_numbers: ['BOSCH 0986479R89'], price_label: '$54.50', in_stock: true, region: 'europe',
+    oem_numbers: ['BOSCH 0986479R89'], price_label: '$54.50', in_stock: true, region: 'europe', units_sold: 870,
     images: ['https://cdn.mator.local/parts/bosch-rotor.png'],
     specs: [{ label: 'Diameter', value: '256 mm' }], features: ['Vented', 'Anti-corrosion coating'] },
 ];
 
-const CATALOG = { brakes: BRAKE_PARTS };
+const FILTER_PARTS = [
+  { id: 'mann-oil-filter', title: 'MANN Oil Filter W 71/2',
+    brand: { id: 'mann', name: 'MANN-FILTER' }, category: { id: 'filters', name: 'Filters' },
+    oem_numbers: ['MANN W712'], price_label: '$8.90', in_stock: true, region: 'europe', units_sold: 2100,
+    images: ['https://cdn.mator.local/parts/mann-oil-filter.png'],
+    specs: [{ label: 'Type', value: 'Spin-on' }], features: ['OE-spec media', 'Anti-drain valve'] },
+  { id: 'mann-air-filter', title: 'MANN Air Filter C 26 168',
+    brand: { id: 'mann', name: 'MANN-FILTER' }, category: { id: 'filters', name: 'Filters' },
+    oem_numbers: ['MANN C26168'], price_label: '$12.40', in_stock: true, region: 'europe', units_sold: 1580,
+    images: ['https://cdn.mator.local/parts/mann-air-filter.png'],
+    specs: [{ label: 'Shape', value: 'Panel' }], features: ['High dust capacity'] },
+];
 
-// Flat id → part lookup for the detail endpoint (GET /v1/catalog/parts/:id),
-// which the buy-path flows hit when opening Item Detail from a parts row.
-const PARTS_BY_ID = Object.fromEntries(
-  Object.values(CATALOG).flat().map((p) => [p.id, p]),
-);
+const IGNITION_PARTS = [
+  { id: 'ngk-spark-plugs', title: 'NGK Spark Plugs (set of 4)',
+    brand: { id: 'ngk', name: 'NGK' }, category: { id: 'ignition', name: 'Ignition' },
+    oem_numbers: ['NGK BKR6E'], price_label: '$18.00', in_stock: true, region: 'korea', units_sold: 1960,
+    images: ['https://cdn.mator.local/parts/ngk-spark-plugs.png'],
+    specs: [{ label: 'Gap', value: '1.0 mm' }], features: ['Nickel electrode', 'Set of 4'] },
+];
+
+const SERVICE_PARTS = [
+  { id: 'varta-battery', title: 'Varta Blue Dynamic 60Ah Battery',
+    brand: { id: 'varta', name: 'Varta' }, category: { id: 'batteries', name: 'Batteries' },
+    oem_numbers: ['VARTA D59'], price_label: '$96.00', in_stock: true, region: 'europe', units_sold: 640,
+    images: ['https://cdn.mator.local/parts/varta-battery.png'],
+    specs: [{ label: 'Capacity', value: '60 Ah' }], features: ['540A cold-crank'] },
+  { id: 'bosch-wiper', title: 'Bosch Aerotwin Wiper Blades',
+    brand: { id: 'bosch', name: 'Bosch' }, category: { id: 'wipers', name: 'Wipers' },
+    oem_numbers: ['BOSCH A designation'], price_label: '$22.50', in_stock: true, region: 'europe', units_sold: 1120,
+    images: ['https://cdn.mator.local/parts/bosch-wiper.png'],
+    specs: [{ label: 'Length', value: '600/400 mm' }], features: ['Beam design', 'All-season rubber'] },
+];
+
+const CATALOG = {
+  brakes: BRAKE_PARTS,
+  filters: FILTER_PARTS,
+  ignition: IGNITION_PARTS,
+  batteries: [SERVICE_PARTS[0]],
+  wipers: [SERVICE_PARTS[1]],
+};
+
+// Flat list / id lookup. `ALL_PARTS` is every seeded part (used for search and
+// the vehicle-fit / bestsellers list); `PARTS_BY_ID` backs the detail endpoint.
+const ALL_PARTS = Object.values(CATALOG).flat();
+const PARTS_BY_ID = Object.fromEntries(ALL_PARTS.map((p) => [p.id, p]));
 
 // ── BUY PATH: checkout + orders ──────────────────────────────────────────────
 // Ported verbatim from services/orders-api.ts' seed data so the response shapes
@@ -327,16 +369,35 @@ const server = http.createServer(async (req, res) => {
   // FLOW 3 / 9 — GET /v1/catalog/parts
   //   ?systemId=|?category=<sys>  → parts in that system (browse)
   //   ?q=<term>                   → title/brand substring search (browse/category)
+  //   ?make=&model=[&sort=bestseller] → vehicle-fit list, sales-ranked
+  //     (the garage "Shop parts that fit" bestsellers screen). Mirrors the real
+  //     backend's existing `sort=bestseller`. Every seeded part fits the demo
+  //     Cobalt, so make/model returns the full list ranked by units_sold.
   if (req.method === 'GET' && pathname === '/v1/catalog/parts') {
     const q = (url.searchParams.get('q') || '').trim().toLowerCase();
+    const make = (url.searchParams.get('make') || '').trim();
+    const model = (url.searchParams.get('model') || '').trim();
+    const sort = (url.searchParams.get('sort') || '').trim().toLowerCase();
+    const system = (url.searchParams.get('systemId') || url.searchParams.get('category') || '').toLowerCase();
+
     let items;
     if (q) {
-      items = Object.values(PARTS_BY_ID).filter(
+      items = ALL_PARTS.filter(
         (p) => p.title.toLowerCase().includes(q) || (p.brand && p.brand.name.toLowerCase().includes(q)),
       );
-    } else {
-      const system = (url.searchParams.get('systemId') || url.searchParams.get('category') || '').toLowerCase();
+    } else if (make || model) {
+      // Vehicle fitment — the demo catalog fits the seeded Chevrolet Cobalt.
+      items = [...ALL_PARTS];
+    } else if (system) {
       items = CATALOG[system] || [];
+    } else {
+      items = [...ALL_PARTS];
+    }
+
+    // Bestseller ranking — matches the real backend's `sort=bestseller` (singular).
+    // Also the default order for a vehicle-fit request. Highest units_sold first.
+    if (sort === 'bestseller' || make || model) {
+      items = [...items].sort((a, b) => (b.units_sold || 0) - (a.units_sold || 0));
     }
     return send(res, 200, { items, total: items.length, page: 1, page_size: 50, next_page: null });
   }

@@ -12,9 +12,13 @@ import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useThemeContext } from '@/contexts/theme.context';
 import useGarage from '@/hooks/use-garage';
+import { resolveCatalogIds } from '@/services/reference-catalog';
 import { toastService } from '@/services/toast-service';
 import { VinDecoderService, type DecodedVehicle } from '@/services/vin-decoder-service';
 import { triggerHaptic } from '@/utils/haptics';
+import { formatUzPlate, isValidUzPlate, normalizeUzPlate, UZ_PLATE_DISPLAY_MAXLENGTH } from '@/utils/uz-plate';
+import { colorHexToEnum, DEFAULT_VEHICLE_COLOR_HEX } from '@/utils/vehicle-color';
+import VehicleColorPicker from '@/components/screens-components/garage/vehicle-color-picker';
 
 /**
  * Add Vehicle screen — VIN decoder. Enter a 17-character VIN and it runs through
@@ -32,6 +36,12 @@ export default function AddVehicleScreen() {
   const [decoded, setDecoded] = useState<DecodedVehicle | null>(null);
   const [saving, setSaving] = useState(false);
   const [decoding, setDecoding] = useState(false);
+
+  // Optional details captured alongside the VIN. All backend-supported
+  // (mileage_km / license_plate / color_hex); blank ones are simply omitted.
+  const [mileage, setMileage] = useState('');
+  const [plate, setPlate] = useState('');
+  const [colorHex, setColorHex] = useState(DEFAULT_VEHICLE_COLOR_HEX);
 
   // This screen is VIN-only: Make / Model / Year come from the decoder, so Save
   // is gated entirely on a successful decode that resolved all three.
@@ -55,16 +65,35 @@ export default function AddVehicleScreen() {
     triggerHaptic('success');
     setSaving(true);
     try {
+      // Resolve the backend's canonical make_id/model_id from the live
+      // reference catalog by name. The VIN decoder only *guesses* ids and its
+      // guesses don't match the live seed (the "Unknown or mismatched
+      // make_id/model_id" 400). When they don't resolve — foreign VIN, or a
+      // model the catalog doesn't carry — we omit them and let the backend
+      // decode from the VIN instead.
+      const { makeId, modelId } = await resolveCatalogIds(decoded.make, decoded.model);
+
+      // Parse mileage to a whole number of km; blank / non-numeric → omitted.
+      const mileageDigits = mileage.replace(/[^\d]/g, '');
+      const mileageKm = mileageDigits.length > 0 ? Number.parseInt(mileageDigits, 10) : undefined;
+
       // Add through the real garage layer. `setAsPrimary` makes it the active
-      // vehicle (turning on fitment UI across the app). This minimal form
-      // doesn't collect a color — default to 'midnight'; the full wizard lets
-      // the user pick one.
+      // vehicle (turning on fitment UI across the app). Color isn't collected
+      // here — default 'midnight'; it (and everything below) is editable from
+      // the vehicle-detail screen afterwards.
       await addVehicle({
         make: decoded.make,
         model: decoded.model,
         year: decoded.year,
+        brandId: makeId,
+        modelId: modelId,
         vin: decoded.vin || vin.trim() || undefined,
-        color: 'midnight',
+        mileage: Number.isFinite(mileageKm) ? mileageKm : undefined,
+        plate: normalizeUzPlate(plate) || undefined,
+        // Picked hex is the source of truth (color_hex); keep the legacy enum
+        // in sync via nearest-bucket so the required `color` field is set.
+        color: colorHexToEnum(colorHex),
+        colorHex,
         setAsPrimary: true,
       });
       toastService.success(t('addVehicle.addedToast'), {
@@ -80,7 +109,7 @@ export default function AddVehicleScreen() {
     } finally {
       setSaving(false);
     }
-  }, [decoded, canSave, vin, addVehicle, t]);
+  }, [decoded, canSave, vin, mileage, plate, colorHex, addVehicle, t]);
 
   // Decode a VIN via the provider-agnostic VinDecoderService. Never throws —
   // domain errors surface as a screen-local toast so a provider outage can't
@@ -267,6 +296,53 @@ export default function AddVehicleScreen() {
               <AppText family="mono" colorName="textMuted" style={{ fontSize: 12 }}>
                 {decoded.vin}
               </AppText>
+            </AppView>
+          ) : null}
+
+          {/* Optional details — only once a vehicle is decoded. Everything here
+              is skippable and editable later from the vehicle-detail screen. */}
+          {decoded ? (
+            <AppView gap={12}>
+              <AppText
+                family="accent"
+                weight="bold"
+                colorName="textMuted"
+                style={{ fontSize: 11, letterSpacing: 0.7 }}
+                transform="uppercase"
+              >
+                {t('addVehicle.detailsOptional')}
+              </AppText>
+
+              <AppTextField
+                label={`${t('addVehicle.fieldMileage')} (${t('garage.mileageUnit')})`}
+                placeholder={t('addVehicle.mileagePlaceholder')}
+                value={mileage}
+                onChangeText={setMileage}
+                keyboardType="number-pad"
+                maxLength={9}
+                containerRounded={12}
+                containerColorName="backgroundSecondary"
+                containerBorderName="border"
+              />
+              <AppTextField
+                label={t('addVehicle.fieldPlate')}
+                placeholder={t('addVehicle.platePlaceholder')}
+                value={plate}
+                onChangeText={(v) => setPlate(formatUzPlate(v))}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                keyboardType="default"
+                maxLength={UZ_PLATE_DISPLAY_MAXLENGTH}
+                errorText={plate.length > 0 && !isValidUzPlate(plate) ? t('addVehicle.plateInvalid') : undefined}
+                containerRounded={12}
+                containerColorName="backgroundSecondary"
+                containerBorderName="border"
+              />
+              <VehicleColorPicker
+                value={colorHex}
+                onChange={setColorHex}
+                label={t('addVehicle.colorLabel')}
+              />
             </AppView>
           ) : null}
         </ScrollView>

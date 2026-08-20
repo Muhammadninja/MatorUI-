@@ -112,6 +112,8 @@ export function TextEntryField({
     | 'maxLength'
     | 'autoFocus'
     | 'textContentType'
+    | 'autoComplete'
+    | 'importantForAutofill'
   > & {
     value?: string;
     onChangeText?: (value: string) => void;

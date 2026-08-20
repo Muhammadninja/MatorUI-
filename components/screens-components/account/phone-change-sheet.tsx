@@ -125,6 +125,11 @@ export function PhoneChangeSheet({
               onChangeText={(v) => setCode(v.replace(/\D/g, '').slice(0, 6))}
               keyboardType="number-pad"
               autoCorrect={false}
+              // One-tap SMS-code suggestion above the keyboard (iOS QuickType
+              // "From Messages" + Android SMS autofill).
+              textContentType="oneTimeCode"
+              autoComplete="sms-otp"
+              importantForAutofill="yes"
             />
             <AppButton
               title={busy ? t('account.verifying') : t('account.verifyUpdate')}
