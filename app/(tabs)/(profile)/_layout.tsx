@@ -2,6 +2,13 @@ import { Stack } from 'expo-router';
 
 import { useThemeContext } from '@/contexts/theme.context';
 
+// Anchor the stack to its root screen. Without this, expo-router can treat a
+// pushed sub-screen (e.g. shipping-addresses) as the stack root, so `back`
+// exits the whole tab to the tabs' initial route (Explore/home) instead of
+// returning to `profile` — and the tab keeps the stale pushed screen when
+// re-selected. The anchor makes `profile` the guaranteed base of the stack.
+export const unstable_settings = { initialRouteName: 'profile' };
+
 export default function ProfileStackLayout() {
   const { tokens } = useThemeContext();
 

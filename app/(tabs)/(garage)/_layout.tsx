@@ -2,6 +2,10 @@ import { Stack } from 'expo-router';
 
 import { useThemeContext } from '@/contexts/theme.context';
 
+// Anchor the stack to its root so `back` from add-vehicle / vehicle-detail
+// returns to `garage`, never dropping the tab or leaving a stale screen.
+export const unstable_settings = { initialRouteName: 'garage' };
+
 export default function GarageStackLayout() {
   const { tokens } = useThemeContext();
 

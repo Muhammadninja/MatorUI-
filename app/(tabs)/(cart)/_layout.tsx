@@ -2,6 +2,10 @@ import { Stack } from 'expo-router';
 
 import { useThemeContext } from '@/contexts/theme.context';
 
+// Anchor the stack to its root so `back` from checkout / order-confirmation
+// returns to `cart`, never dropping the tab or leaving a stale screen.
+export const unstable_settings = { initialRouteName: 'cart' };
+
 export default function CartStackLayout() {
   const { tokens } = useThemeContext();
 

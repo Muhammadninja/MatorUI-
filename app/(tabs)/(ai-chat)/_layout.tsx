@@ -2,6 +2,9 @@ import { Stack } from 'expo-router';
 
 import { useThemeContext } from '@/contexts/theme.context';
 
+// Anchor the stack to its root screen for consistent back behavior.
+export const unstable_settings = { initialRouteName: 'ai-chat' };
+
 export default function AiChatStackLayout() {
   const { tokens } = useThemeContext();
 

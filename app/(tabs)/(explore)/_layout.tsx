@@ -2,6 +2,10 @@ import { Stack } from 'expo-router';
 
 import { useThemeContext } from '@/contexts/theme.context';
 
+// Anchor the stack to its root so `back` from a pushed sub-screen returns to
+// `explore`, never dropping the tab or leaving a stale screen on re-select.
+export const unstable_settings = { initialRouteName: 'explore' };
+
 export default function ExploreStackLayout() {
   const { tokens } = useThemeContext();
 
