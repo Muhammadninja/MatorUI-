@@ -10,23 +10,30 @@
  * always lands the user on the order-confirmation screen, which renders the real
  * status from `GET /v1/orders/:id`.
  *
- * Backend contract (PROPOSED — build to ship online Payme):
- *   POST /v1/orders/:orderId/payment
- *     body: { provider: "payme", return_url: "mator://payment-return" }
- *     200 → { checkout_url: "https://checkout.paycom.uz/..." }   // hosted page
- *     404 / 501 → endpoint not live yet
- * Auth'd (bearer). Until it exists it 404s → `startPayment` returns
- * `{ status: 'unsupported' }` (FAIL-OPEN), so checkout behaves exactly as it
- * does today (order placed as pending_payment; pay on delivery / reconcile
- * later) and shipping the UI now is safe. Gated per-domain by
- * `shouldUseHttpTransport('orders')` — payment is order-scoped.
+ * Backend contract (LIVE — mator.uz `PaymentsController('v1/payments')`):
+ *   POST /v1/payments/payme/invoices   (also /click/invoices) — auth'd bearer
+ *     body: { order_id: string, return_url?: "mator://payment-return" }
+ *     201 → {
+ *       payment_id, provider, amount_uzs, amount_tiyin?,
+ *       deep_link,        // official Payme/Click checkout URL — open this
+ *       https_fallback,   // same link (https), used if deep_link can't open
+ *       expires_at
+ *     }
+ *   GET /v1/payments/:paymentId → { status, order: { status, next_screen } }
+ * Auth'd (bearer). If the endpoint 404s (older backend) or the order can't be
+ * charged online (400 — e.g. dealer fiscal data missing), `startPayment` returns
+ * `{ status: 'unsupported' }` (FAIL-OPEN), so checkout completes exactly as it
+ * does for cash/terminal (order stays pending_payment; pay on delivery /
+ * reconcile later). Gated per-domain by `shouldUseHttpTransport('orders')` —
+ * payment is order-scoped (there is no separate `payments` HTTP domain flag).
  */
 
 import { shouldUseHttpTransport } from '@/config/api';
 import { apiClient, ApiError } from '@/services/api-client';
 import { debugLog } from '@/services/debug-log';
 
-export type PaymentProvider = 'payme';
+/** Online gateways the backend can create an invoice with. */
+export type PaymentProvider = 'payme' | 'click';
 
 export type StartPaymentInput = {
   /** The just-created `pending_payment` order. */
@@ -37,10 +44,11 @@ export type StartPaymentInput = {
   returnUrl: string;
 };
 
-/** `ready` → open `checkoutUrl`. `unsupported` → the gateway isn't live yet, so
- *  the caller should proceed without an online step (today's behavior). */
+/** `ready` → open `checkoutUrl` (poll the order for the webhook-confirmed
+ *  status; `paymentId` allows GET /v1/payments/:id if a finer check is needed).
+ *  `unsupported` → no online step available, proceed as pay-on-delivery. */
 export type StartPaymentResult =
-  | { status: 'ready'; checkoutUrl: string }
+  | { status: 'ready'; checkoutUrl: string; paymentId?: string }
   | { status: 'unsupported' };
 
 export interface PaymentsTransport {
@@ -65,7 +73,12 @@ function delay(ms: number): Promise<void> {
 
 // ── HTTP transport ─────────────────────────────────────────────────────
 
-type RawStartPayment = {
+/** Shape of `POST /v1/payments/:provider/invoices` (snake_case from NestJS). */
+type RawInvoice = {
+  payment_id?: string | null;
+  deep_link?: string | null;
+  https_fallback?: string | null;
+  // Tolerate a camelCase / legacy `checkout_url` backend without breaking.
   checkout_url?: string | null;
   checkoutUrl?: string | null;
 };
@@ -76,25 +89,34 @@ class HttpPaymentsTransport implements PaymentsTransport {
     signal?: AbortSignal,
   ): Promise<StartPaymentResult> {
     try {
-      const r = await apiClient.post<RawStartPayment>(
-        `/v1/orders/${encodeURIComponent(input.orderId)}/payment`,
-        { provider: input.provider, return_url: input.returnUrl },
+      const r = await apiClient.post<RawInvoice>(
+        `/v1/payments/${input.provider}/invoices`,
+        { order_id: input.orderId, return_url: input.returnUrl },
         { signal },
       );
-      const checkoutUrl = (r.checkout_url ?? r.checkoutUrl) ?? null;
+      // Prefer the deep link (hands off to the installed Payme/Click app),
+      // fall back to the https page, then any legacy checkout_url field.
+      const checkoutUrl =
+        r.deep_link ?? r.https_fallback ?? r.checkout_url ?? r.checkoutUrl ?? null;
       if (!checkoutUrl) {
         // 2xx without a URL — treat as not-live rather than opening nothing.
-        debugLog('payment', 'startPayment: no checkout_url in response — unsupported');
+        debugLog('payment', 'startPayment: no checkout url in response — unsupported');
         return { status: 'unsupported' };
       }
       debugLog('payment', 'startPayment → checkout url ready', { orderId: input.orderId });
-      return { status: 'ready', checkoutUrl };
+      return { status: 'ready', checkoutUrl, paymentId: r.payment_id ?? undefined };
     } catch (err) {
-      // Endpoint not live yet (404 / 501) → fail OPEN so the placed order still
-      // completes without an online step. Other errors (network/5xx/401) rethrow
-      // so the caller can tell the user payment couldn't start.
-      if (err instanceof ApiError && (err.status === 404 || err.status === 501)) {
-        debugLog('payment', 'startPayment: endpoint not live — unsupported (fail open)', {
+      // Fail OPEN so the placed order still completes as pay-on-delivery when an
+      // online charge can't start:
+      //   404/501 → endpoint not live on this backend
+      //   400     → order not chargeable online (e.g. dealer fiscal data missing)
+      // Other errors (network / 5xx / 401) rethrow so the caller can tell the
+      // user payment couldn't start.
+      if (
+        err instanceof ApiError &&
+        (err.status === 404 || err.status === 501 || err.status === 400)
+      ) {
+        debugLog('payment', 'startPayment: cannot charge online — unsupported (fail open)', {
           status: err.status,
         });
         return { status: 'unsupported' };

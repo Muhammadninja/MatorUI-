@@ -690,7 +690,12 @@
     "notCompatibleTitle": "Part doesn't fit",
     "notCompatibleBody": "This part is not compatible with {{name}}. Are you sure you want to add it to your order?",
     "selectedVehicleFallback": "the selected vehicle",
-    "addAnyway": "Add anyway"
+    "addAnyway": "Add anyway",
+    "share": "Share",
+    "shareTitle": "Share this part",
+    "shareMessage": "{{title}} — {{price}}",
+    "shareUnavailable": "Sharing isn't available on this device",
+    "shareFailed": "Couldn't share this item"
   },
   "sourcing": {
     "offerTitle": "Offer",

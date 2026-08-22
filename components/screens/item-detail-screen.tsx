@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { AlertCircle, ArrowLeft, Heart } from 'lucide-react-native';
+import { AlertCircle, ArrowLeft, Heart, Share2 } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, ScrollView } from 'react-native';
@@ -26,6 +26,7 @@ import type { CompatibilityColor, CompatibilityResult } from '@/services/compati
 import { parsePrice } from '@/services/cart-math';
 import type { ThemeTokens } from '@/themes/types';
 import { triggerHaptic } from '@/utils/haptics';
+import { shareItem } from '@/utils/share';
 
 /**
  * Item Detail — backed by the REAL catalog (`useCatalogDetail`). Hero image,
@@ -96,6 +97,18 @@ export default function ItemDetailScreen() {
     toast.info(nowFav ? t('itemDetail.savedToFavorites') : t('itemDetail.removedFromFavorites'));
   };
 
+  const shareCurrentItem = async () => {
+    triggerHaptic('selection');
+    const result = await shareItem({
+      id: item.id,
+      title: item.title,
+      price: item.price,
+      imageUrl: image,
+    });
+    if (result === 'unavailable') toast.info(t('itemDetail.shareUnavailable'));
+    else if (result === 'error') toast.danger(t('itemDetail.shareFailed'));
+  };
+
   // Actually add the real catalog item `qty` times (one unit per `addItem`)
   // and land on Cart.
   const commitAddToCart = () => {
@@ -157,23 +170,37 @@ export default function ItemDetailScreen() {
           >
             <ArrowLeft size={22} strokeWidth={2.2} color={tokens.text} />
           </AppPressableView>
-          <AppPressableView
-            onPress={toggleFavorite}
-            center
-            rounded={12}
-            borderWidth={1}
-            borderName="border"
-            accessibilityRole="button"
-            accessibilityLabel={isFavorite ? t('itemDetail.removeFromFavorites') : t('itemDetail.saveToFavorites')}
-            style={{ width: 40, height: 40 }}
-          >
-            <Heart
-              size={20}
-              strokeWidth={2.2}
-              color={isFavorite ? tokens.error : tokens.text}
-              fill={isFavorite ? tokens.error : 'none'}
-            />
-          </AppPressableView>
+          <AppView row align="center" gap={10}>
+            <AppPressableView
+              onPress={shareCurrentItem}
+              center
+              rounded={12}
+              borderWidth={1}
+              borderName="border"
+              accessibilityRole="button"
+              accessibilityLabel={t('itemDetail.share')}
+              style={{ width: 40, height: 40 }}
+            >
+              <Share2 size={19} strokeWidth={2.2} color={tokens.text} />
+            </AppPressableView>
+            <AppPressableView
+              onPress={toggleFavorite}
+              center
+              rounded={12}
+              borderWidth={1}
+              borderName="border"
+              accessibilityRole="button"
+              accessibilityLabel={isFavorite ? t('itemDetail.removeFromFavorites') : t('itemDetail.saveToFavorites')}
+              style={{ width: 40, height: 40 }}
+            >
+              <Heart
+                size={20}
+                strokeWidth={2.2}
+                color={isFavorite ? tokens.error : tokens.text}
+                fill={isFavorite ? tokens.error : 'none'}
+              />
+            </AppPressableView>
+          </AppView>
         </AppView>
 
         {/* Hero + dots — tap the image to open the full-screen viewer. */}

@@ -57,6 +57,7 @@ export function catalogListQueryKey(req: CatalogListRequest) {
     req.brand,
     req.regions,
     req.gmOnly,
+    req.oemOnly,
     req.search,
     req.sortBy,
   ] as const;

@@ -114,6 +114,8 @@ export type CatalogListRequest = {
   regions?: string[];
   /** Restrict to GM-family brands (Chevrolet / Ravon / Daewoo …). */
   gmOnly?: boolean;
+  /** Restrict to parts carrying an OEM number (server-side `oem_only`). */
+  oemOnly?: boolean;
   /** Product kinds (lowercase, e.g. ["motor_oil"]); repeatable, empty = every kind. */
   kinds?: string[];
   /** Motor-oil facet filters. Any of these implies `kind=motor_oil` server-side.
@@ -341,6 +343,9 @@ export function getCatalogMockList(request: CatalogListRequest): CatalogListResp
   }
   if (request.gmOnly) {
     items = items.filter((item) => isGmBrand(item.title) || isGmBrand(item.description));
+  }
+  if (request.oemOnly) {
+    items = items.filter((item) => Boolean(item.oem));
   }
 
   if (request.sortBy === 'price_asc') {
@@ -645,6 +650,7 @@ const PARTS_PARAM = {
   brand: 'brand',
   region: 'region',
   gmOnly: 'gm_only',
+  oemOnly: 'oem_only',
   sort: 'sort',
   kind: 'kind',
   viscosity: 'viscosity',
@@ -668,6 +674,7 @@ class HttpCatalogTransport implements CatalogTransport {
     // Region is multi-select → repeated `region=` params (e.g. region=china&region=korea).
     request.regions?.forEach((r) => params.append(PARTS_PARAM.region, r));
     if (request.gmOnly) params.set(PARTS_PARAM.gmOnly, 'true');
+    if (request.oemOnly) params.set(PARTS_PARAM.oemOnly, 'true');
     if (request.sortBy) params.set(PARTS_PARAM.sort, request.sortBy);
     // Motor-oil filters — every list is a repeatable query param (kind, viscosity,
     // oil_type, volume_ml). Any of these makes the backend imply kind=motor_oil,

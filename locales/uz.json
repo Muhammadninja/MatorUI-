@@ -690,7 +690,12 @@
     "notCompatibleTitle": "Ehtiyot qism mos kelmaydi",
     "notCompatibleBody": "Bu ehtiyot qism {{name}} bilan mos kelmaydi. Uni buyurtmaga qoʻshmoqchimisiz?",
     "selectedVehicleFallback": "tanlangan avtomobil",
-    "addAnyway": "Baribir qoʻshish"
+    "addAnyway": "Baribir qoʻshish",
+    "share": "Ulashish",
+    "shareTitle": "Ehtiyot qismni ulashish",
+    "shareMessage": "{{title}} — {{price}}",
+    "shareUnavailable": "Bu qurilmada ulashish mavjud emas",
+    "shareFailed": "Mahsulotni ulashib boʻlmadi"
   },
   "sourcing": {
     "offerTitle": "Taklif",

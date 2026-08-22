@@ -136,6 +136,7 @@ describe('HttpOrdersTransport', () => {
       cart_snapshot: { delivery_method: 'courier', delivery_address_id: 'addr_1', promo_code: 'SAVE10' },
       vehicle_id: 'veh_1',
       contact_phone_e164: '+998901234567', // normalized
+      payment_type: 'cash', // chosen method forwarded so the backend can route the webhook
     });
     expect(res.orderId).toBe(RAW.order_id);
     expect(res.totalLabel).toBe("280 000 so'm");
@@ -153,6 +154,7 @@ describe('HttpOrdersTransport', () => {
     const [, body] = post.mock.calls[0]!;
     expect(body).toEqual({
       cart_snapshot: { delivery_method: 'courier', delivery_address_id: null, promo_code: null },
+      payment_type: 'payme',
     });
     expect(body).not.toHaveProperty('vehicle_id');
     expect(body).not.toHaveProperty('contact_phone_e164');

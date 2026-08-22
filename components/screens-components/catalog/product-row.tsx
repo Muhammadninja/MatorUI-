@@ -319,14 +319,18 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
         gap={10}
         style={{ paddingHorizontal: 14, paddingVertical: 11, borderTopWidth: 1, borderTopColor: hairline }}
       >
-        {/* Price (+ struck was) + sale pill */}
-        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        {/* Price (+ struck was) + sale pill. flexWrap so the pill drops to its
+         *  own line — instead of overlapping the price — when the price/"was"
+         *  string or the device's font scale leaves no room to share the line
+         *  (matches PriceBlock's ribbon behavior). rowGap keeps a wrapped pill
+         *  clear of the price. */}
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: 8, rowGap: 4 }}>
           <View style={{ flexShrink: 1, flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
             <AppText
               family="heading"
               weight="bold"
               numberOfLines={1}
-              style={{ fontSize: 19, letterSpacing: -0.4, color: tokens.text }}
+              style={{ fontSize: 19, lineHeight: 23, letterSpacing: -0.4, color: tokens.text }}
             >
               {priceAmount}
             </AppText>
@@ -346,6 +350,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
           {savePct > 0 ? (
             <View
               style={{
+                flexShrink: 0,
                 backgroundColor: '#DC26261a',
                 borderRadius: 999,
                 paddingHorizontal: 7,

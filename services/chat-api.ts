@@ -483,8 +483,15 @@ export class SourcingChatTransport implements ChatTransport {
       ? `${input.message}\n\n[Автомобиль: ${input.vehicleContext.selectedCarName}]`
       : input.message;
     // Prior turns give the stateless endpoint memory (vehicle/part from earlier
-    // messages), so it stops re-asking for details already provided.
-    const history = input.history;
+    // messages), so it stops re-asking for details already provided. Sanitize to
+    // the backend's per-item validation (`SendMessageDto.history`): drop empty
+    // bodies (e.g. tool-call-only turns — `@IsNotEmpty` would 400 the whole
+    // request), clamp each to 2000 chars (`@MaxLength`), and cap at the last 10
+    // turns (`@ArrayMaxSize`).
+    const history = (input.history ?? [])
+      .filter((h) => h.content.trim().length > 0)
+      .map((h) => ({ role: h.role, content: h.content.slice(0, 2000) }))
+      .slice(-10);
 
     return {
       async *[Symbol.asyncIterator]() {
@@ -506,7 +513,8 @@ export class SourcingChatTransport implements ChatTransport {
 
         const res = await apiClient.post<SourcingChatResponse>(
           SOURCING_CHAT_PATH,
-          { message, history },
+          // Clamp to the backend's `@MaxLength(2000)` so a long paste can't 400.
+          { message: message.slice(0, 2000), history },
           { signal },
         );
 

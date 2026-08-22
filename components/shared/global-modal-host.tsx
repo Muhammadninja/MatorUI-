@@ -44,6 +44,20 @@ type ComingSoonPayload = {
   name?: string;
 };
 
+type ActionSheetOption = {
+  label: string;
+  onPress?: () => void;
+  destructive?: boolean;
+};
+
+type ActionSheetPayload = {
+  title?: string;
+  message?: string;
+  options?: ActionSheetOption[];
+  cancelLabel?: string;
+  onCancel?: () => void;
+};
+
 export type CheckoutSheetValues = {
   fullName: string;
   phoneNumber: string;
@@ -105,6 +119,10 @@ function isConfirmModalPayload(payload?: ModalPayload): payload is ConfirmModalP
 
 function isComingSoonPayload(payload?: ModalPayload): payload is ComingSoonPayload {
   return Boolean(payload && typeof payload === 'object');
+}
+
+function isActionSheetPayload(payload?: ModalPayload): payload is ActionSheetPayload {
+  return Boolean(payload && typeof payload === 'object' && Array.isArray((payload as ActionSheetPayload).options));
 }
 
 function isCheckoutSheetPayload(payload?: ModalPayload): payload is CheckoutSheetPayload {
@@ -287,6 +305,121 @@ export default function GlobalModalHost() {
             </AppView>
           </View>
         </AppView>
+      </Modal>
+    );
+  }
+
+  // ── Action sheet (overflow menus, e.g. AI chat "⋮") ──────────────────────
+  // A left-aligned option list in a bottom sheet — replaces Android's native
+  // Alert.alert (whose buttons are right-aligned and text-centered) so options
+  // like "Open previous" / "Clear chat" read naturally from the left edge.
+  if (activeModal.name === 'actionSheet' && isActionSheetPayload(activeModal.payload)) {
+    const {
+      title,
+      message,
+      options = [],
+      cancelLabel = t('common.cancel'),
+      onCancel,
+    } = activeModal.payload;
+
+    const handleClose = () => {
+      onCancel?.();
+      modalService.closeModal();
+    };
+
+    const handlePick = (option: ActionSheetOption) => {
+      modalService.closeModal();
+      option.onPress?.();
+    };
+
+    return (
+      <Modal transparent animationType="fade" visible onRequestClose={handleClose}>
+        <Pressable
+          style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.42)' }}
+          onPress={handleClose}
+        >
+          <Pressable onPress={(e) => e.stopPropagation()}>
+            <AppView
+              roundedTop={28}
+              px={18}
+              pt={18}
+              pb={12}
+              safeArea="bottom"
+              gap={16}
+              style={{
+                width: '100%',
+                borderWidth: 1,
+                borderColor: tokens.border,
+                backgroundColor: scheme === 'dark' ? tokens.card : tokens.white,
+              }}
+            >
+              <AppView center>
+                <AppView
+                  rounded={36}
+                  style={{ width: 36, height: 4, backgroundColor: tokens.divider }}
+                />
+              </AppView>
+
+              {title || message ? (
+                <AppView gap={4}>
+                  {title ? (
+                    <AppText textVariant="title" family="heading" weight="bold">
+                      {title}
+                    </AppText>
+                  ) : null}
+                  {message ? (
+                    <AppText textVariant="bodySm" colorName="gray400">
+                      {message}
+                    </AppText>
+                  ) : null}
+                </AppView>
+              ) : null}
+
+              <AppView
+                rounded={20}
+                style={{
+                  borderWidth: 1,
+                  borderColor: tokens.border,
+                  backgroundColor: scheme === 'dark' ? tokens.backgroundSecondary : tokens.gray50,
+                }}
+              >
+                {options.map((option, i) => (
+                  <AppPressableView
+                    key={option.label}
+                    onPress={() => handlePick(option)}
+                    accessibilityRole="button"
+                    accessibilityLabel={option.label}
+                    androidRipple={false}
+                    pressedOpacity={0.6}
+                    px={16}
+                    py={15}
+                    style={{
+                      borderBottomWidth: i < options.length - 1 ? 1 : 0,
+                      borderBottomColor: tokens.divider,
+                    }}
+                  >
+                    <AppText
+                      textVariant="bodySemibold"
+                      weight="semibold"
+                      style={{ color: option.destructive ? tokens.error : tokens.text }}
+                    >
+                      {option.label}
+                    </AppText>
+                  </AppPressableView>
+                ))}
+              </AppView>
+
+              <AppButton
+                title={cancelLabel}
+                kind="secondary"
+                variant="outline"
+                size="sm"
+                fullWidth
+                onPress={handleClose}
+              />
+            </AppView>
+          </Pressable>
+        </Pressable>
       </Modal>
     );
   }

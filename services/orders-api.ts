@@ -652,6 +652,10 @@ export class HttpOrdersTransport implements OrdersTransport {
     };
     if (input.vehicleId) body.vehicle_id = input.vehicleId;
     if (input.contactPhone) body.contact_phone_e164 = toE164(input.contactPhone);
+    // Chosen payment method (payme = online, terminal = card reader on delivery,
+    // cash = cash on delivery). The backend persists it so it can route the
+    // Payme/Click webhook and report by method.
+    if (input.paymentType) body.payment_type = input.paymentType;
 
     const r = await apiClient.post<RawBackendOrder>('/v1/orders', body, { signal });
     return {

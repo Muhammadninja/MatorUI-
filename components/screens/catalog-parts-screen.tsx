@@ -1,7 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AlertCircle, ArrowLeft, PackageOpen, Search, X } from 'lucide-react-native';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Keyboard, ScrollView, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,7 +16,6 @@ import { useThemeContext } from '@/contexts/theme.context';
 import { useUserContext } from '@/contexts/user.context';
 import { useCatalogList } from '@/hooks/use-catalog-list';
 import { useToast } from '@/hooks/use-toast';
-import { parsePrice } from '@/services/cart-math';
 import type { CatalogItem } from '@/services/catalog-service';
 import type { CatalogSortBy, FilterState } from '@/types/catalog-nav';
 import { triggerHaptic } from '@/utils/haptics';
@@ -66,6 +65,14 @@ export default function CatalogPartsScreen() {
   const vehicleLabel = [make, model].filter(Boolean).join(' ');
 
   const [search, setSearch] = useState(q ?? '');
+  // Debounced copy of the search text. Free-text search now goes to the backend
+  // (so it filters the WHOLE catalog, not just the fetched page); debounce keeps
+  // us from firing a request on every keystroke.
+  const [debouncedSearch, setDebouncedSearch] = useState(q ?? '');
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(id);
+  }, [search]);
   // Seed the filter from a certified preset so the premium catalogue opens
   // already scoped to all-OEM or all-GM parts.
   const [filter, setFilter] = useState<FilterState>(() => ({
@@ -83,17 +90,22 @@ export default function CatalogPartsScreen() {
       brands: f.brands.includes(b) ? f.brands.filter((x) => x !== b) : [...f.brands, b],
     }));
 
-  // Flow context + the coarse catalog facets (region, GM) go to the backend so
-  // the transport does that filtering; the fine refinements (brand, sort, stock,
-  // OEM) + free-text search stay client-side over the fetched page.
-  const { state, items, refresh } = useCatalogList({
+  // All catalog filtering/sorting/search happen SERVER-SIDE so they act on the
+  // whole catalog (not just the fetched page) and the count is accurate: category,
+  // vehicle fit, region, GM, OEM, sort, and free-text search all go to the backend.
+  // Only the brand chips stay a client-side refinement over the fetched page
+  // (the backend `brand` param is single-select; the chips are multi-select).
+  const { state, items, total, refresh } = useCatalogList({
     page: 1,
     pageSize: 50,
     category: categoryId || undefined,
     make: make || undefined,
     model: model || undefined,
+    search: debouncedSearch || undefined,
+    sortBy: filter.sortBy,
     regions: filter.regions.length ? filter.regions : undefined,
     gmOnly: filter.gmOnly || undefined,
+    oemOnly: filter.oemOnly || undefined,
   });
 
   const { addItem } = useCartContext();
@@ -105,21 +117,17 @@ export default function CatalogPartsScreen() {
     [items],
   );
 
-  // Region + GM are filtered server-side (sent in the request above), so the
-  // fetched `items` are already scoped; here we only apply the client-side
-  // refinements over that page.
+  // Category, region, GM, OEM, sort, and search are all applied server-side, so
+  // the fetched `items` are already the correct, correctly-ordered page. The only
+  // client-side refinement left is the multi-select brand chip set.
   const results = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    let list = items.filter((it) => {
-      if (q && !(it.title.toLowerCase().includes(q) || it.oem?.toLowerCase().includes(q))) return false;
-      if (filter.oemOnly && !it.oem) return false;
-      if (filter.brands.length && !filter.brands.includes(brandOf(it))) return false;
-      return true;
-    });
-    if (filter.sortBy === 'price_asc') list = [...list].sort((a, b) => parsePrice(a.price) - parsePrice(b.price));
-    else if (filter.sortBy === 'price_desc') list = [...list].sort((a, b) => parsePrice(b.price) - parsePrice(a.price));
-    return list;
-  }, [items, search, filter]);
+    if (!filter.brands.length) return items;
+    return items.filter((it) => filter.brands.includes(brandOf(it)));
+  }, [items, filter.brands]);
+
+  // Show the TRUE server total for the query; only when the client-side brand
+  // refinement is active does the visible count drop to the filtered page length.
+  const resultCount = filter.brands.length ? results.length : total;
 
   const activeFilterCount =
     filter.brands.length +
@@ -289,7 +297,7 @@ export default function CatalogPartsScreen() {
               <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>
                 {categoryLabel ? `${categoryLabel} · ` : ''}
                 {vehicleLabel ? `${vehicleLabel} · ` : ''}
-                {t('catalog.partCount', { count: results.length })}
+                {t('catalog.partCount', { count: resultCount })}
               </AppText>
             </AppView>
           }

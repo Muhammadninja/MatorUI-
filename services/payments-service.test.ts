@@ -1,11 +1,12 @@
 /**
  * payments-service — HTTP transport contract tests.
  *
- * Pins the Payme start-payment wire contract (POST /v1/orders/:id/payment) and
- * the FAIL-OPEN behavior: a not-live endpoint (404/501) must degrade to
- * `unsupported` so a placed order still completes, while a real transport error
- * (network/5xx) must surface so the caller can tell the buyer payment couldn't
- * start.
+ * Pins the LIVE invoice wire contract (POST /v1/payments/:provider/invoices →
+ * { deep_link, https_fallback, payment_id }) and the FAIL-OPEN behavior: an
+ * endpoint that can't charge online (404/501 not live, or 400 order not
+ * chargeable) must degrade to `unsupported` so a placed order still completes,
+ * while a real transport error (network/5xx) must surface so the caller can
+ * tell the buyer payment couldn't start.
  */
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -36,26 +37,47 @@ beforeEach(() => {
 });
 
 describe('HttpPaymentsTransport — startPayment', () => {
-  test('posts to /v1/orders/:id/payment with provider + return_url', async () => {
-    post.mockResolvedValueOnce({ checkout_url: 'https://checkout.paycom.uz/abc' });
+  test('posts to /v1/payments/:provider/invoices with order_id + return_url', async () => {
+    post.mockResolvedValueOnce({ payment_id: 'pay_1', deep_link: 'https://checkout.paycom.uz/abc' });
     await paymentsTransport.startPayment(input);
-    expect(post.mock.calls[0]![0]).toBe('/v1/orders/ord_123/payment');
-    expect(post.mock.calls[0]![1]).toEqual({ provider: 'payme', return_url: 'mator://payment-return' });
+    expect(post.mock.calls[0]![0]).toBe('/v1/payments/payme/invoices');
+    expect(post.mock.calls[0]![1]).toEqual({ order_id: 'ord_123', return_url: 'mator://payment-return' });
   });
 
-  test('maps checkout_url (snake) → ready', async () => {
-    post.mockResolvedValueOnce({ checkout_url: 'https://checkout.paycom.uz/abc' });
+  test('routes click to /v1/payments/click/invoices', async () => {
+    post.mockResolvedValueOnce({ payment_id: 'pay_2', deep_link: 'click://services/pay?x=1' });
+    await paymentsTransport.startPayment({ ...input, provider: 'click' });
+    expect(post.mock.calls[0]![0]).toBe('/v1/payments/click/invoices');
+  });
+
+  test('prefers deep_link → ready (carries paymentId)', async () => {
+    post.mockResolvedValueOnce({
+      payment_id: 'pay_1',
+      deep_link: 'https://checkout.paycom.uz/abc',
+      https_fallback: 'https://checkout.paycom.uz/abc',
+    });
     expect(await paymentsTransport.startPayment(input)).toEqual({
       status: 'ready',
       checkoutUrl: 'https://checkout.paycom.uz/abc',
+      paymentId: 'pay_1',
     });
   });
 
-  test('maps checkoutUrl (camel) → ready', async () => {
-    post.mockResolvedValueOnce({ checkoutUrl: 'https://checkout.paycom.uz/xyz' });
+  test('falls back to https_fallback when no deep_link', async () => {
+    post.mockResolvedValueOnce({ payment_id: 'pay_1', https_fallback: 'https://checkout.paycom.uz/xyz' });
     expect(await paymentsTransport.startPayment(input)).toEqual({
       status: 'ready',
       checkoutUrl: 'https://checkout.paycom.uz/xyz',
+      paymentId: 'pay_1',
+    });
+  });
+
+  test('tolerates a legacy checkout_url field → ready', async () => {
+    post.mockResolvedValueOnce({ checkout_url: 'https://checkout.paycom.uz/legacy' });
+    expect(await paymentsTransport.startPayment(input)).toEqual({
+      status: 'ready',
+      checkoutUrl: 'https://checkout.paycom.uz/legacy',
+      paymentId: undefined,
     });
   });
 
@@ -71,6 +93,11 @@ describe('HttpPaymentsTransport — startPayment', () => {
 
   test('501 (not implemented) → unsupported (fail open)', async () => {
     post.mockRejectedValueOnce(new ApiError(501, 'NOT_IMPLEMENTED', 'todo'));
+    expect(await paymentsTransport.startPayment(input)).toEqual({ status: 'unsupported' });
+  });
+
+  test('400 (order not chargeable online, e.g. fiscal data) → unsupported (fail open)', async () => {
+    post.mockRejectedValueOnce(new ApiError(400, 'BAD_REQUEST', 'not fiscalizable'));
     expect(await paymentsTransport.startPayment(input)).toEqual({ status: 'unsupported' });
   });
 

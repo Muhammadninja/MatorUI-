@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { Keyboard, Platform, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
     Easing,
     interpolate,
@@ -123,9 +124,21 @@ function AssistantShine({ size }: { size: number }) {
   );
 }
 
+/** Breathing room between the tab row and the bottom safe-area edge (home
+ *  indicator / Android nav bar). Used as a floor when there's no system inset
+ *  (e.g. older Android with an opaque nav bar reporting inset 0). */
+const BAR_BOTTOM_GAP = 12;
+
 export default function AppTabBar({ items = PREVIEW_ITEMS, activeKey = 'home' }: AppTabBarProps) {
   const { scheme, tokens } = useThemeContext();
+  const insets = useSafeAreaInsets();
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
+  // Pad the bar past the real bottom inset so it clears the home indicator on
+  // iOS and the gesture pill / 3-button nav bar on Android (edge-to-edge is the
+  // default on modern Expo/Android, so the system bar draws over our content).
+  // A fixed value here (the old pb={28}) sat *under* the Android nav buttons.
+  const barPaddingBottom = Math.max(insets.bottom, BAR_BOTTOM_GAP);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -154,7 +167,7 @@ export default function AppTabBar({ items = PREVIEW_ITEMS, activeKey = 'home' }:
         borderName="divider"
         px={10}
         pt={2}
-        pb={28}
+        pb={barPaddingBottom}
         gap={4}
       >
         {items.map((item) => {

@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { Bell, Search } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import CategoryGridSkeleton, {
@@ -125,23 +125,37 @@ export default function ExploreScreen() {
         onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
         style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}
       >
-        <BlurView
-          intensity={dark ? 40 : 60}
-          tint={dark ? 'dark' : 'light'}
-          style={StyleSheet.absoluteFill}
-        />
-        <AppView
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            // ~0.82 alpha (0xd1) over the theme background = the frosted wash.
-            backgroundColor: `${tokens.background}d1`,
-          }}
-        />
+        {Platform.OS === 'android' ? (
+          // expo-blur can't do real backdrop blur on Android — it renders a
+          // flat gray fallback which, under the translucent frosted wash,
+          // reads muddy and lets scrolled content bleed through. Use a clean,
+          // fully-opaque theme-bg fill instead; the HeaderFade below still
+          // feathers it softly into the content (matching AppBlurView).
+          <AppView
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, { backgroundColor: tokens.background }]}
+          />
+        ) : (
+          <>
+            <BlurView
+              intensity={dark ? 40 : 60}
+              tint={dark ? 'dark' : 'light'}
+              style={StyleSheet.absoluteFill}
+            />
+            <AppView
+              pointerEvents="none"
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                // ~0.82 alpha (0xd1) over the theme background = the frosted wash.
+                backgroundColor: `${tokens.background}d1`,
+              }}
+            />
+          </>
+        )}
         <AppView style={{ paddingTop: insets.top + 8, paddingHorizontal: 20, paddingBottom: 12, gap: 12 }}>
           <AppView row align="center" justify="space-between">
             <AppLogo size={26} />

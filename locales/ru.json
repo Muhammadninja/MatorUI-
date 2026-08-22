@@ -695,7 +695,12 @@
     "notCompatibleTitle": "Запчасть не подходит",
     "notCompatibleBody": "Эта запчасть несовместима с {{name}}. Вы уверены, что хотите добавить её в заказ?",
     "selectedVehicleFallback": "выбранный автомобиль",
-    "addAnyway": "Всё равно добавить"
+    "addAnyway": "Всё равно добавить",
+    "share": "Поделиться",
+    "shareTitle": "Поделиться запчастью",
+    "shareMessage": "{{title}} — {{price}}",
+    "shareUnavailable": "Отправка недоступна на этом устройстве",
+    "shareFailed": "Не удалось поделиться товаром"
   },
   "sourcing": {
     "offerTitle": "Предложение",

@@ -10,7 +10,6 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActionSheetIOS,
-    Alert,
     Keyboard,
     Platform,
     Pressable,
@@ -99,7 +98,7 @@ export default function AiChatbot() {
   const { tokens } = useThemeContext();
   const { t } = useTranslation();
   const suggestionChips = useMemo(() => buildSuggestionChips(t), [t]);
-  const { openConfirm } = useGlobalModal();
+  const { openConfirm, openActionSheet } = useGlobalModal();
   const { currentActiveVehicle } = useActiveVehicle();
   const [historyItems, setHistoryItems] = useState<AiChatConversationSummary[]>([]);
 
@@ -526,16 +525,17 @@ export default function AiChatbot() {
       );
       return;
     }
-    Alert.alert(t('aiChat.chatOptions'), undefined, [
-      { text: openLabel, onPress: () => handlePick(0) },
-      {
-        text: clearLabel,
-        style: 'destructive',
-        onPress: () => handlePick(1),
-      },
-      { text: cancelLabel, style: 'cancel' },
-    ]);
-  }, [requestClear, requestLoadHistory, t]);
+    // Android: our own left-aligned bottom sheet instead of Alert.alert, whose
+    // Material buttons are right-aligned / center-justified.
+    openActionSheet({
+      title: t('aiChat.chatOptions'),
+      options: [
+        { label: openLabel, onPress: () => handlePick(0) },
+        { label: clearLabel, destructive: true, onPress: () => handlePick(1) },
+      ],
+      cancelLabel,
+    });
+  }, [openActionSheet, requestClear, requestLoadHistory, t]);
 
   // ── Timeline assembly: weave date pills + system notes into messages.
   const timeline = useMemo<TimelineEntry[]>(() => {
