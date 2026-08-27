@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 
 import { fetchCategories, type CategoryTileData } from '@/services/categories-service';
@@ -28,6 +29,8 @@ export type UseCategoriesValue = {
 const FALLBACK_TILES: CategoryTileData[] = MATOR_CAT_TILES.map((t) => ({
   id: t.name,
   name: t.name,
+  // Bundled tiles carry a single name, so it doubles as the display label.
+  label: t.name,
   count: t.count,
   color: t.color,
   iconKey: t.name,
@@ -36,8 +39,12 @@ const FALLBACK_TILES: CategoryTileData[] = MATOR_CAT_TILES.map((t) => ({
 export const CATEGORIES_QUERY_KEY = ['categories', 'list'] as const;
 
 export function useCategories(): UseCategoriesValue {
+  const { i18n } = useTranslation();
+  const lang = i18n.language;
   const query = useQuery({
-    queryKey: CATEGORIES_QUERY_KEY,
+    // Language in the key so switching locale refetches with localized labels
+    // instead of serving the previous language's cached tiles.
+    queryKey: [...CATEGORIES_QUERY_KEY, lang],
     queryFn: ({ signal }) => fetchCategories(signal),
   });
 

@@ -34,7 +34,11 @@ export type SearchResult = {
   priceLabel: string;
   /** Authoritative numeric price in cents. Server-issued. Filterable. */
   priceCents?: number;
+  /** Localized category display name — render only, never an identifier. */
   category: string;
+  /** Stable category id (wire: `category_id`). Use this for filters, deep
+   *  links and analytics. Absent on transports that don't emit it. */
+  categoryId?: string;
   /**
    * Free-text editorial badge from the backend ("Top", "New", "Hot pick").
    * Renders as the standalone single-signal ribbon when no higher
@@ -63,6 +67,19 @@ export type SearchResult = {
 
 export type SearchSortBy = 'relevance' | 'price_asc' | 'price_desc' | 'rating' | 'newest';
 
+/**
+ * One category facet from `/v1/search`. The split is the whole point:
+ * `id` travels in requests (`filters.categories`), `name` is display text
+ * that changes with the request language and must never be used as a key.
+ */
+export type SearchCategoryFacet = {
+  /** Stable identifier — filters, cache keys, persisted state. */
+  id: string;
+  /** Localized display name — render only. */
+  name: string;
+  count?: number;
+};
+
 export type SearchResponse = {
   /** Echo of the query the server actually used (post normalization). */
   query: string;
@@ -77,7 +94,14 @@ export type SearchResponse = {
   didYouMean?: string;
   /** Refinement chips ("Show only AWD", "Under $30k", …). */
   suggestedRefinements?: { label: string; filterPatch: Partial<SearchFilters> }[];
-  /** Per-bucket counts so the filter sheet can show "(3)" next to each. */
+  /** Category facets — the preferred contract. `id` is the stable identifier
+   *  (send this in `filters.categories`); `name` is the localized display
+   *  string (render this). Ordered by count desc. Absent on transports that
+   *  only emit the legacy facet map. */
+  categories?: SearchCategoryFacet[];
+  /** Per-bucket counts so the filter sheet can show "(3)" next to each.
+   *  LEGACY for categories: the keys are localized display strings, so they
+   *  are NOT identifiers. Kept for count lookup and older transports. */
   facetCounts?: {
     categories?: Record<string, number>;
     price?: Partial<Record<PriceBucket, number>>;
@@ -86,7 +110,8 @@ export type SearchResponse = {
   /** Server-canonicalized filters (after parsing/expansion). UI should
    *  trust these over the request `filters`. */
   appliedFilters?: SearchFilters;
-  /** Server-suggested category facets (when no facetCounts available). */
+  /** Server-suggested category facets, localized display strings (when no
+   *  `categories` array is available). Display only — never identifiers. */
   suggestedCategories?: string[];
   /** Milliseconds the server took. Dev-only UI; never expose in prod. */
   durationMs: number;
@@ -122,7 +147,9 @@ export type SearchRequest = {
   sortBy?: SearchSortBy;
   /** Client-issued correlation id, echoed back as `response.requestId`. */
   requestId?: string;
-  /** BCP-47 locale ('en-US'). Server uses for currency, units, language. */
+  /** BCP-47 locale ('en-US') or a bare code ('uz'). Server uses it for
+   *  currency, units and language; it takes precedence over the
+   *  `Accept-Language` header, so send the APP's interface language. */
   locale?: string;
   /** Anonymous or authenticated user id for personalization. */
   userId?: string;

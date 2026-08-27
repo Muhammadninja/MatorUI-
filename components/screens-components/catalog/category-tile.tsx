@@ -7,13 +7,19 @@ import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 
 export type CategoryTileProps = {
-  /** Category name (also the fallback icon key). */
+  /** INTERNAL canonical name — icon fallback key only, never rendered. */
   name: string;
+  /** Localized display text from the server (`label`). Falls back to `name`
+   *  when the caller has no localized string. */
+  label?: string;
   /** Server icon handle from `/v1/categories`; resolved before `name`. */
   iconKey?: string;
-  /** Parts count shown under the name. */
+  /** Parts count shown under the label. */
   count: number;
-  onPress: (name: string) => void;
+  /** Takes no argument on purpose: the tile has both an internal `name` and a
+   *  localized `label`, and handing either one back invites a caller to use
+   *  the wrong string. The parent already knows the category it rendered. */
+  onPress: () => void;
 };
 
 /**
@@ -21,15 +27,18 @@ export type CategoryTileProps = {
  * + name + count on a bordered card. Presentational; the parent supplies the
  * data + tap handler.
  */
-function CategoryTile({ name, iconKey, count, onPress }: CategoryTileProps) {
+function CategoryTile({ name, label, iconKey, count, onPress }: CategoryTileProps) {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
+  // Everything user-facing reads the localized label; `name` is only ever an
+  // icon-resolution fallback.
+  const display = label ?? name;
   return (
     <AppPressableView
-      onPress={() => onPress(name)}
+      onPress={onPress}
       androidRipple={false}
       accessibilityRole="button"
-      accessibilityLabel={`${name}, ${t('category.partsCount', { count })}`}
+      accessibilityLabel={`${display}, ${t('category.partsCount', { count })}`}
       center
       borderBottomWidth={0.6}
       borderName="border"
@@ -45,7 +54,7 @@ function CategoryTile({ name, iconKey, count, onPress }: CategoryTileProps) {
           style={{ fontSize: 12.5, color: tokens.text, textAlign: 'center', lineHeight: 15 }}
           numberOfLines={1}
         >
-          {name}
+          {display}
         </AppText>
         <AppText family="default" style={{ fontSize: 10.5, color: tokens.textMuted, marginTop: 2 }}>
           {t('category.partsCount', { count })}

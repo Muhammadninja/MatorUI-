@@ -3,6 +3,7 @@ import type {
   AccentTagKind,
   PriceBucket,
   RatingBucket,
+  SearchCategoryFacet,
   SearchFilters,
   SearchRequest,
   SearchResponse,
@@ -181,6 +182,7 @@ export class MockSearchTransport implements SearchTransport {
       startIndex + limit < scored.length ? makePageToken(startIndex + limit) : undefined;
 
     const didYouMean = DEMO_DID_YOU_MEAN[query.toLowerCase()];
+    const facets = computeFacets(scored.map((s) => s.item));
 
     return {
       query,
@@ -189,8 +191,14 @@ export class MockSearchTransport implements SearchTransport {
       total: scored.length,
       nextPageToken,
       didYouMean,
-      facetCounts: computeFacets(scored.map((s) => s.item)),
+      facetCounts: facets,
       appliedFilters: request.filters,
+      // The mock catalog has no separate category ids, so the name doubles as
+      // the id — which is consistent with its filter matching (see
+      // `passesFilters`, which compares `filters.categories` to `item.category`).
+      categories: Object.entries(facets.categories)
+        .map(([name, count]) => ({ id: name, name, count }))
+        .sort((a, b) => b.count - a.count),
       suggestedCategories: Array.from(new Set(scored.map((s) => s.item.category))).slice(0, 4),
       durationMs: Date.now() - started,
     };
@@ -319,7 +327,32 @@ type RawSearchResult = Partial<SearchResult> & {
    */
   rating_avg?: number | null;
   review_count?: number | null;
+  /** Live backend key for the stable category id; app uses `categoryId`. */
+  category_id?: string | null;
 };
+
+/**
+ * Keep only well-formed category facets. This array is the one place the
+ * search response carries an *identifier* the client will send back in
+ * `filters.categories`, so a malformed entry is worse than a missing one: it
+ * would render a chip that silently filters to nothing. Entries without a
+ * usable id or name are dropped rather than trusted.
+ */
+function normalizeCategoryFacets(
+  raw: SearchResponse['categories'],
+): SearchCategoryFacet[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  return raw
+    .filter(
+      (c): c is SearchCategoryFacet =>
+        !!c && typeof c.id === 'string' && c.id.length > 0 && typeof c.name === 'string',
+    )
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      count: typeof c.count === 'number' ? c.count : undefined,
+    }));
+}
 
 /** The live `/v1/search` envelope — fields may be null / absent. */
 type RawSearchResponse = Partial<Omit<SearchResponse, 'results'>> & {
@@ -335,7 +368,11 @@ function normalizeSearchResult(r: RawSearchResult): SearchResult {
     price,
     priceLabel: r.priceLabel ?? price,
     priceCents: r.priceCents,
+    // Localized display string from the server — rendered, never keyed on.
     category: r.category ?? '',
+    // Stable id (snake_case on the wire); the camelCase fallback covers a
+    // pre-normalized transport.
+    categoryId: r.category_id ?? r.categoryId ?? undefined,
     badge: r.badge,
     accentTagKind: r.accentTagKind,
     status: r.status,
@@ -373,6 +410,11 @@ export class HttpSearchTransport implements SearchTransport {
       nextPageToken: raw.nextPageToken ?? undefined,
       didYouMean: raw.didYouMean ?? undefined,
       suggestedRefinements: raw.suggestedRefinements,
+      // The preferred category contract: {id, name, count}. `id` is what
+      // filters send, `name` is what the chip renders.
+      categories: normalizeCategoryFacets(raw.categories),
+      // Legacy facet map: keys are localized display strings, kept only so
+      // chips can still look up a count.
       facetCounts: raw.facetCounts,
       appliedFilters: raw.appliedFilters,
       suggestedCategories: raw.suggestedCategories,

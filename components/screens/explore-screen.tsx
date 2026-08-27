@@ -307,9 +307,10 @@ export default function ExploreScreen() {
               <CategoryTile
                 key={c.id}
                 name={c.name}
+                label={c.label}
                 iconKey={c.iconKey}
                 count={c.count}
-                onPress={() => openCategory(c.id, c.name)}
+                onPress={() => openCategory(c.id, c.label)}
               />
             ))}
           </AppView>

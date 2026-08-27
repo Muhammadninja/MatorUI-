@@ -55,7 +55,7 @@ export default function CatalogSystemsScreen() {
         disabled={resolvingId != null}
         androidRipple={false}
         accessibilityRole="button"
-        accessibilityLabel={item.name}
+        accessibilityLabel={item.label}
         row
         align="center"
         gap={14}
@@ -68,7 +68,7 @@ export default function CatalogSystemsScreen() {
         )}
         <AppView flex={1}>
           <AppText family="heading" weight="bold" style={{ fontSize: 16, color: tokens.text }}>
-            {item.name}
+            {item.label}
           </AppText>
         </AppView>
         {resolvingId === item.id ? (

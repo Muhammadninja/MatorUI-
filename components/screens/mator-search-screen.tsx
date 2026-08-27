@@ -1,15 +1,16 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Search, X } from 'lucide-react-native';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Keyboard, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import SearchFiltersSheet from '@/components/screens-components/search/search-filters-sheet';
 import SearchResults from '@/components/screens-components/search/search-results';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
-import { hasActiveFilters, useSearch } from '@/hooks/use-search';
+import { DEFAULT_FILTERS, hasActiveFilters, useSearch } from '@/hooks/use-search';
 
 /**
  * Universal search over the REAL search backend (`POST /v1/search` via
@@ -38,10 +39,20 @@ export default function MatorSearchScreen() {
     durationMs,
     error,
     filters,
+    setFilters,
+    availableCategories,
+    facetCounts,
     didYouMean,
     isLoadingMore,
     loadMore,
   } = useSearch();
+
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+
+  const openFilters = useCallback(() => setIsFilterSheetOpen(true), []);
+  const closeFilters = useCallback(() => setIsFilterSheetOpen(false), []);
+
+  const clearFilters = useCallback(() => setFilters(DEFAULT_FILTERS), [setFilters]);
 
   // Seed from the optional `q` deep-link param exactly once on mount.
   const seededRef = useRef(false);
@@ -139,9 +150,24 @@ export default function MatorSearchScreen() {
             onUseSuggestion={setQuery}
             onEndReached={loadMore}
             isLoadingMore={isLoadingMore}
+            onFilterPress={openFilters}
+            onClearFilters={clearFilters}
           />
         </AppView>
       )}
+
+      {/* Facet sheet. Chips render the localized `categories[].name` but stage
+          `categories[].id` into the draft, so a selection survives a language
+          switch and round-trips back into `filters.categories`. `setFilters`
+          re-runs the current query as soon as the draft is applied. */}
+      <SearchFiltersSheet
+        visible={isFilterSheetOpen}
+        filters={filters}
+        availableCategories={availableCategories}
+        facetCounts={facetCounts}
+        onApply={setFilters}
+        onClose={closeFilters}
+      />
     </AppView>
   );
 }

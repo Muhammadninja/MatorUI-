@@ -26,6 +26,8 @@ import {
   fetchMakes,
   fetchModels,
   fetchTrims,
+  fetchReferenceCategories,
+  localizedCategoryName,
 } from './reference-catalog';
 import { UZ_BRANDS } from './uz-vehicle-catalog';
 
@@ -119,5 +121,107 @@ describe('fetchEngines', () => {
   test('no trimId → [] without a request', async () => {
     expect(await fetchEngines(undefined)).toEqual([]);
     expect(get).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Category display labels. `name` is the backend's internal English value and
+ * is the LAST resort — a partly-translated category should still render a real
+ * title rather than leak the internal one into the UI.
+ */
+describe('localizedCategoryName — language fallback matrix', () => {
+  const full = {
+    name: 'Brake pads',
+    titleRu: 'Тормозные колодки',
+    titleUz: 'Tormoz kolodkalari',
+    titleEn: 'Brake pads',
+  };
+
+  test('picks the requested language when all three are present', () => {
+    expect(localizedCategoryName(full, 'ru')).toBe('Тормозные колодки');
+    expect(localizedCategoryName(full, 'uz')).toBe('Tormoz kolodkalari');
+    expect(localizedCategoryName(full, 'en')).toBe('Brake pads');
+  });
+
+  test('ignores region and script subtags, and is case-insensitive', () => {
+    expect(localizedCategoryName(full, 'uz-UZ')).toBe('Tormoz kolodkalari');
+    expect(localizedCategoryName(full, 'uz-Latn-UZ')).toBe('Tormoz kolodkalari');
+    expect(localizedCategoryName(full, 'EN-US')).toBe('Brake pads');
+  });
+
+  test('an unknown or missing language falls back to Russian', () => {
+    expect(localizedCategoryName(full, 'de-DE')).toBe('Тормозные колодки');
+    expect(localizedCategoryName(full, undefined)).toBe('Тормозные колодки');
+    expect(localizedCategoryName(full, '')).toBe('Тормозные колодки');
+  });
+
+  test('falls through to another translation before the internal name', () => {
+    const onlyUz = { ...full, titleRu: null, titleEn: null };
+    expect(localizedCategoryName(onlyUz, 'ru')).toBe('Tormoz kolodkalari');
+    expect(localizedCategoryName(onlyUz, 'en')).toBe('Tormoz kolodkalari');
+
+    const onlyEn = { ...full, titleRu: null, titleUz: null };
+    expect(localizedCategoryName(onlyEn, 'ru')).toBe('Brake pads');
+    expect(localizedCategoryName(onlyEn, 'uz')).toBe('Brake pads');
+  });
+
+  test('uses the raw name only when every translation is missing', () => {
+    const untranslated = { name: 'Brake pads', titleRu: null, titleUz: null, titleEn: null };
+    for (const lang of ['ru', 'uz', 'en']) {
+      expect(localizedCategoryName(untranslated, lang)).toBe('Brake pads');
+    }
+  });
+});
+
+describe('fetchReferenceCategories — title parsing', () => {
+  beforeEach(() => {
+    httpOn = true;
+    get.mockReset();
+  });
+
+  test('reads all three titles in both camelCase and snake_case', async () => {
+    get.mockResolvedValueOnce({
+      items: [
+        {
+          id: 'brake-pads',
+          name: 'Brake pads',
+          title_ru: 'Тормозные колодки',
+          title_uz: 'Tormoz kolodkalari',
+          title_en: 'Brake pads',
+          slug: 'brake-pads',
+        },
+        {
+          id: 'motor-oil',
+          name: 'Motor oil',
+          titleRu: 'Моторное масло',
+          titleUz: 'Motor moyi',
+          titleEn: 'Motor oil',
+          slug: 'motor-oil',
+        },
+      ],
+    });
+
+    const [pads, oil] = await fetchReferenceCategories();
+
+    expect(pads).toMatchObject({
+      titleRu: 'Тормозные колодки',
+      titleUz: 'Tormoz kolodkalari',
+      titleEn: 'Brake pads',
+    });
+    expect(oil).toMatchObject({
+      titleRu: 'Моторное масло',
+      titleUz: 'Motor moyi',
+      titleEn: 'Motor oil',
+    });
+  });
+
+  test('missing titles null out rather than undefined, so `||` chains work', async () => {
+    get.mockResolvedValueOnce({
+      items: [{ id: 'c1', name: 'Brake pads', slug: 'brake-pads' }],
+    });
+
+    const [c] = await fetchReferenceCategories();
+    expect(c).toMatchObject({ titleRu: null, titleUz: null, titleEn: null });
+    expect(localizedCategoryName(c!, 'uz')).toBe('Brake pads');
   });
 });

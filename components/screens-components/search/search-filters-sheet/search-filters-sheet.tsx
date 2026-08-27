@@ -14,7 +14,7 @@ import {
   type RatingBucket,
   type SearchFilters,
 } from '@/hooks/use-search';
-import type { SearchResponse } from '@/types/search';
+import type { SearchCategoryFacet, SearchResponse } from '@/types/search';
 import { triggerHaptic } from '@/utils/haptics';
 
 import FilterChip from './filter-chip';
@@ -23,7 +23,9 @@ import FilterSection from './filter-section';
 export type SearchFiltersSheetProps = {
   visible: boolean;
   filters: SearchFilters;
-  availableCategories: string[];
+  /** Category facets from the latest search: `name` renders on the chip,
+   *  `id` is what goes into `filters.categories`. */
+  availableCategories: SearchCategoryFacet[];
   /** Per-bucket match counts from the latest search response.
    *  When present, chips render "Label (N)". */
   facetCounts?: SearchResponse['facetCounts'];
@@ -88,13 +90,15 @@ export default function SearchFiltersSheet({
     }
   }, [visible, translateY]);
 
-  const toggleCategory = (cat: string) => {
+  // Draft state holds category IDs, never display names — a stored label
+  // would stop matching the moment the user switches language.
+  const toggleCategory = (id: string) => {
     triggerHaptic('selection');
     setDraft((d) => ({
       ...d,
-      categories: d.categories.includes(cat)
-        ? d.categories.filter((c) => c !== cat)
-        : [...d.categories, cat],
+      categories: d.categories.includes(id)
+        ? d.categories.filter((c) => c !== id)
+        : [...d.categories, id],
     }));
   };
 
@@ -168,13 +172,15 @@ export default function SearchFiltersSheet({
               <FilterSection title={t('search.categorySection')}>
                 <AppView row gap="sm" style={{ flexWrap: 'wrap' }}>
                   {availableCategories.map((cat) => {
-                    const count = facetCounts?.categories?.[cat];
+                    // The facet's own count wins; the legacy facet map is keyed
+                    // by the localized name, so look it up by `name`.
+                    const count = cat.count ?? facetCounts?.categories?.[cat.name];
                     return (
                       <FilterChip
-                        key={cat}
-                        label={withCount(cat, count)}
-                        selected={draft.categories.includes(cat)}
-                        onPress={() => toggleCategory(cat)}
+                        key={cat.id}
+                        label={withCount(cat.name, count)}
+                        selected={draft.categories.includes(cat.id)}
+                        onPress={() => toggleCategory(cat.id)}
                       />
                     );
                   })}

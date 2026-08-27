@@ -406,7 +406,18 @@ type ApiCatalogPart = {
   id: string;
   title: string;
   brand?: { id: string; name: string } | null;
-  category?: { id: string; name: string } | null;
+  /** `name` is the backend's INTERNAL canonical (English) category name —
+   *  never rendered. `label` is already resolved for the request's
+   *  `Accept-Language`; it's what the card shows. `label` is absent until the
+   *  backend's category-i18n migration lands, so display falls back to `name`. */
+  category?: {
+    id: string;
+    name: string;
+    label?: string;
+    name_ru?: string;
+    name_uz?: string;
+    name_en?: string;
+  } | null;
   /** Canonical part system, uppercase enum (e.g. "BRAKES", "ENGINE"). */
   main_category?: string;
   /** Product kind — drives which card to render. Oils carry a `motor_oil` block
@@ -569,11 +580,21 @@ function narrowOilType(v: string | null | undefined): OilType | undefined {
 
 function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
   const partNumber = resolvePartNumber(p);
+  // Placeholder detection runs on the INTERNAL English `name` (the sentinel is
+  // an English backend value, so a localized label would never match), but what
+  // we render is the server-localized `label`. Pre-migration `label` is absent
+  // and this degrades to exactly the old behaviour.
+  const cleanedCategoryName = cleanCategoryName(p.category?.name);
+  const categoryLabel = cleanedCategoryName
+    ? // `||` not `??`: an empty/whitespace label must fall through to the name
+      // rather than blank the card's subtitle.
+      p.category?.label?.trim() || cleanedCategoryName
+    : undefined;
   return {
     id: p.id,
     status: p.in_stock === false ? 'Out of stock' : 'In stock',
     title: p.title,
-    description: [p.brand?.name, cleanCategoryName(p.category?.name)].filter(Boolean).join(' · '),
+    description: [p.brand?.name, categoryLabel].filter(Boolean).join(' · '),
     price:
       p.price_label ??
       (p.price_uzs != null ? `UZS' ${p.price_uzs.toLocaleString('ru-RU')}` : ''),
@@ -584,7 +605,7 @@ function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
     // part's structured fields so the detail screen isn't blank.
     specs: p.specs?.length ? p.specs : deriveSpecs(p),
     features: p.features ?? [],
-    category: cleanCategoryName(p.category?.name) ?? '',
+    category: categoryLabel ?? '',
     brand: p.part_brand_name ?? p.brand?.name ?? undefined,
     // Exactly one of these is ever set — a part is GM xor OEM (see resolvePartNumber).
     oem: partNumber.oem,

@@ -79,6 +79,27 @@ export function setUnauthorizedHandler(handler: UnauthorizedHandler | null) {
   unauthorizedHandler = handler;
 }
 
+// ── Language hook ──────────────────────────────────────────────────────
+
+/** The interface language sent as `Accept-Language` on every request, so the
+ *  backend can resolve localized fields (category `label`, part descriptions)
+ *  server-side.
+ *
+ *  Seeded to the same code as `FALLBACK_LANGUAGE` in `services/i18n.ts` — kept
+ *  as a literal rather than an import so this transport module doesn't pull in
+ *  i18next and every locale bundle. It covers the window before
+ *  `language.context` hydrates the persisted choice (an async storage read, so
+ *  no synchronous value exists to use), during which requests are sent in the
+ *  app's default language rather than with no header at all. */
+let appLanguage = 'en';
+
+/** Register the app's interface language. Called by `language.context.tsx`
+ *  on hydration and on every user switch. Pass the *app's* chosen language,
+ *  not the device locale — they can differ. */
+export function setAppLanguage(code: string) {
+  appLanguage = code;
+}
+
 // ── Request types ──────────────────────────────────────────────────────
 
 export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE' | 'HEAD';
@@ -92,6 +113,11 @@ export type RequestOptions = {
   maxRetries?: number;
   /** Skip auth header injection (e.g. for /auth/sign-in itself). */
   skipAuth?: boolean;
+  /** Skip `Accept-Language` injection. For the handful of endpoints that
+   *  detect the language from the payload themselves and must not be told
+   *  otherwise — currently the sourcing chat (`POST /api/ai-chat/message`),
+   *  which infers language from the message text. */
+  skipLanguage?: boolean;
   /** Extra headers to merge. */
   headers?: Record<string, string>;
 };
@@ -129,6 +155,9 @@ async function request<T>(
     try {
       const headers: Record<string, string> = {
         Accept: 'application/json',
+        // Server-side localization (category labels, etc.) keys off this.
+        // Caller-supplied headers still win, so a transport can override it.
+        ...(opts.skipLanguage ? null : { 'Accept-Language': appLanguage }),
         ...(body !== undefined ? { 'Content-Type': 'application/json' } : null),
         ...opts.headers,
       };
