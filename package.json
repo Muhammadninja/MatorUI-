@@ -61,6 +61,7 @@
     "@types/react": "~19.2.2",
     "@types/react-test-renderer": "^19.1.0",
     "eas-build-cache-provider": "^20.0.0",
+    "eas-cli": "^22.6.0",
     "jsdom": "^27.0.1",
     "lucide-react": "^1.17.0",
     "patch-package": "^8.0.1",
