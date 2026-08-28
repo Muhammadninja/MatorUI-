@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useSearchVehicleContext } from '@/contexts/active-vehicle.context';
 import { searchTransport } from '@/services/search-service';
 import type {
   PriceBucket,
   RatingBucket,
+  SearchCategoryFacet,
   SearchFilters,
   SearchResponse,
   SearchResult,
@@ -17,6 +19,7 @@ import type {
 export type {
   PriceBucket,
   RatingBucket,
+  SearchCategoryFacet,
   SearchFilters,
   SearchResult,
   SearchSortBy,
@@ -43,6 +46,25 @@ export const DEFAULT_FILTERS: SearchFilters = {
   minRating: 'any',
 };
 
+/**
+ * Category chips for the filter sheet, in preference order:
+ *   1. `categories` — {id, name, count}; the only source with real ids.
+ *   2. `facetCounts.categories` — localized keys + counts (legacy).
+ *   3. `suggestedCategories` — localized names only (legacy).
+ * In the legacy cases the display name has to stand in as the id, which is
+ * exactly the round-trip problem the `categories` contract fixes — but it
+ * preserves the pre-existing behaviour for transports that haven't caught up.
+ */
+export function deriveCategoryFacets(response: SearchResponse): SearchCategoryFacet[] {
+  if (response.categories?.length) return response.categories;
+
+  const counts = response.facetCounts?.categories;
+  if (counts) {
+    return Object.entries(counts).map(([name, count]) => ({ id: name, name, count }));
+  }
+  return (response.suggestedCategories ?? []).map((name) => ({ id: name, name }));
+}
+
 export function hasActiveFilters(filters: SearchFilters): boolean {
   return (
     filters.categories.length > 0 ||
@@ -63,8 +85,9 @@ export type UseSearchValue = {
   /** Active filter set. Default is everything-off. */
   filters: SearchFilters;
   setFilters: (next: SearchFilters) => void;
-  /** Server-suggested category facets (full list). */
-  availableCategories: string[];
+  /** Server-suggested category facets (full list): `id` for filtering,
+   *  `name` for display. Never key UI state on `name` — it's localized. */
+  availableCategories: SearchCategoryFacet[];
   /** Per-bucket counts from the server for the filter sheet. */
   facetCounts: SearchResponse['facetCounts'];
   /** Server-issued correlation id — pass through to analytics events. */
@@ -106,7 +129,7 @@ export function useSearch(): UseSearchValue {
   const [requestId, setRequestId] = useState<string | null>(null);
   const [didYouMean, setDidYouMean] = useState<string | null>(null);
   const [appliedFilters, setAppliedFilters] = useState<SearchFilters | null>(null);
-  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  const [availableCategories, setAvailableCategories] = useState<SearchCategoryFacet[]>([]);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
@@ -123,6 +146,14 @@ export function useSearch(): UseSearchValue {
   useEffect(() => {
     vehicleContextRef.current = vehicleContext;
   }, [vehicleContext]);
+
+  // Interface language sent as `SearchRequest.locale`. It takes precedence
+  // over `Accept-Language` server-side, which is exactly what we want: the
+  // app's chosen language, not the device's. Held in a ref so the runner
+  // closures always read the current value (the ref is seeded here; the
+  // effect that keeps it current lives below, next to `run`).
+  const { i18n } = useTranslation();
+  const localeRef = useRef(i18n.language);
 
   // Keep latest derived values in refs so closures (debounced runner,
   // loadMore) never capture stale values.
@@ -183,6 +214,7 @@ export function useSearch(): UseSearchValue {
         filters: filtersRef.current,
         sortBy: sortByRef.current,
         requestId: reqId,
+        locale: localeRef.current,
         vehicleContext: vehicleContextRef.current,
         signal: controller.signal,
       });
@@ -197,12 +229,11 @@ export function useSearch(): UseSearchValue {
       setFacetCounts(response.facetCounts);
       setDidYouMean(response.didYouMean ?? null);
       setAppliedFilters(response.appliedFilters ?? null);
-      setAvailableCategories(
-        response.suggestedCategories ??
-          (response.facetCounts?.categories
-            ? Object.keys(response.facetCounts.categories)
-            : []),
-      );
+      // Prefer the `categories` contract — it carries the stable id alongside
+      // the localized name. The legacy fallbacks only have display strings, so
+      // there the name has to double as the id (which is what the old code
+      // did, and what the mock catalog still expects).
+      setAvailableCategories(deriveCategoryFacets(response));
       setNextPageToken(response.nextPageToken ?? null);
       setState(response.results.length > 0 ? 'success' : 'empty');
     } catch (err) {
@@ -216,6 +247,25 @@ export function useSearch(): UseSearchValue {
       setState('error');
     }
   }, []);
+
+  // A language switch invalidates everything the server localized for us —
+  // result rows' `category`, the facet chips' names, `suggestedCategories`.
+  // Re-run the live query so they come back in the new language instead of
+  // sitting stale until the user next types. Filters are unaffected: they
+  // carry ids, so the same selection re-applies verbatim.
+  const localeSyncedRef = useRef(true);
+  useEffect(() => {
+    localeRef.current = i18n.language;
+    // Skip the mount pass — there is no query to re-run yet, and the initial
+    // search is driven by setQuery.
+    if (localeSyncedRef.current) {
+      localeSyncedRef.current = false;
+      return;
+    }
+    if (liveQueryRef.current.length >= MIN_QUERY_LENGTH) {
+      void run(liveQueryRef.current);
+    }
+  }, [i18n.language, run]);
 
   const loadMore = useCallback(async () => {
     const token = nextPageTokenRef.current;
@@ -238,6 +288,7 @@ export function useSearch(): UseSearchValue {
         filters: filtersRef.current,
         sortBy: sortByRef.current,
         requestId: reqId,
+        locale: localeRef.current,
         vehicleContext: vehicleContextRef.current,
         signal: controller.signal,
       });

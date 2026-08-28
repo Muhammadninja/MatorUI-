@@ -79,7 +79,7 @@ export default function CatalogSubcategoriesScreen() {
       const label = localizedCategoryName(item, i18n.language);
       return (
       <AppPressableView
-        onPress={() => void drill({ id: item.id, name: label })}
+        onPress={() => void drill({ id: item.id, label })}
         disabled={resolvingId != null}
         androidRipple={false}
         accessibilityRole="button"

@@ -8,6 +8,7 @@ import {
   type PropsWithChildren,
 } from 'react';
 
+import { setAppLanguage } from '@/services/api-client';
 import { changeAppLanguage, SUPPORTED_LANGUAGES } from '@/services/i18n';
 import {
   loadLanguage,
@@ -107,6 +108,14 @@ export function LanguageProvider({ children }: PropsWithChildren) {
       cancelled = true;
     };
   }, []);
+
+  // Keep the HTTP client's `Accept-Language` in lockstep with the interface
+  // language, so every request gets server-localized fields back. Driven off
+  // the state (not the individual setters) so hydration, the device-locale
+  // guess and a user switch are all covered by one path.
+  useEffect(() => {
+    setAppLanguage(language);
+  }, [language]);
 
   const setLanguage = useCallback(async (code: LanguageCode) => {
     setLanguageState(code);

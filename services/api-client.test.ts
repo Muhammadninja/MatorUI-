@@ -14,7 +14,7 @@ vi.mock('@/config/api', () => ({
   shouldUseHttpTransport: () => true,
 }));
 
-import { apiClient, ApiError, setUnauthorizedHandler } from './api-client';
+import { apiClient, ApiError, setAppLanguage, setUnauthorizedHandler } from './api-client';
 import * as config from '@/config/api';
 
 const originalFetch = globalThis.fetch;
@@ -24,6 +24,7 @@ beforeEach(() => {
   fetchMock.mockReset();
   globalThis.fetch = fetchMock;
   setUnauthorizedHandler(null);
+  setAppLanguage('en');
 });
 
 afterEach(() => {
@@ -53,6 +54,35 @@ describe('apiClient — happy paths', () => {
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe('https://api.test/items/abc');
     expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer tkn');
+  });
+
+  test('sends the registered app language as Accept-Language', async () => {
+    setAppLanguage('uz');
+    fetchMock.mockResolvedValueOnce(ok({ ok: true }));
+    await apiClient.get('/v1/categories');
+
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect((init?.headers as Record<string, string>)['Accept-Language']).toBe('uz');
+  });
+
+  test('a per-request Accept-Language overrides the registered language', async () => {
+    setAppLanguage('uz');
+    fetchMock.mockResolvedValueOnce(ok({ ok: true }));
+    await apiClient.get('/v1/categories', { headers: { 'Accept-Language': 'ru' } });
+
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect((init?.headers as Record<string, string>)['Accept-Language']).toBe('ru');
+  });
+
+  test('skipLanguage omits Accept-Language entirely', async () => {
+    setAppLanguage('uz');
+    fetchMock.mockResolvedValueOnce(ok({ ok: true }));
+    // The sourcing chat detects language from the message text; telling it
+    // otherwise would override what the buyer actually typed.
+    await apiClient.post('/api/ai-chat/message', { message: 'tormoz' }, { skipLanguage: true });
+
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect((init?.headers as Record<string, string>)['Accept-Language']).toBeUndefined();
   });
 
   test('POST serializes body + sets Content-Type', async () => {

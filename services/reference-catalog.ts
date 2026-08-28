@@ -65,6 +65,7 @@ export type RefCategory = {
    *  the app falls back to `name`. */
   titleRu: string | null;
   titleUz: string | null;
+  titleEn: string | null;
   slug: string;
   parentId: string | null;
   level: number;
@@ -72,18 +73,21 @@ export type RefCategory = {
 };
 
 /**
- * The label to show for a category in the given app language: Uzbek → `title_uz`,
- * everything else → `title_ru`, each falling back to the next and finally to the
- * raw `name` so a tile is never blank. `lang` is the i18next language code
- * (`i18n.language`), only its first two chars matter.
+ * The label to show for a category in the given app language: Uzbek →
+ * `title_uz`, English → `title_en`, everything else → `title_ru`. Each falls
+ * back to the other translations and only then to the raw `name`, so a
+ * partly-translated category still renders a real title rather than the
+ * internal English one. `lang` is the i18next language code
+ * (`i18n.language`); only its first two chars matter.
  */
 export function localizedCategoryName(
-  c: Pick<RefCategory, 'name' | 'titleRu' | 'titleUz'>,
+  c: Pick<RefCategory, 'name' | 'titleRu' | 'titleUz' | 'titleEn'>,
   lang?: string,
 ): string {
   const l = (lang ?? '').slice(0, 2).toLowerCase();
-  if (l === 'uz') return c.titleUz || c.titleRu || c.name;
-  return c.titleRu || c.name;
+  if (l === 'uz') return c.titleUz || c.titleRu || c.titleEn || c.name;
+  if (l === 'en') return c.titleEn || c.titleRu || c.titleUz || c.name;
+  return c.titleRu || c.titleEn || c.titleUz || c.name;
 }
 export type RefEngine = {
   id: string;
@@ -298,6 +302,7 @@ export async function fetchReferenceCategories(
       name: str(c.name),
       titleRu: (c.titleRu as string | null) ?? (c.title_ru as string | null) ?? null,
       titleUz: (c.titleUz as string | null) ?? (c.title_uz as string | null) ?? null,
+      titleEn: (c.titleEn as string | null) ?? (c.title_en as string | null) ?? null,
       slug: str(c.slug),
       parentId: (c.parentId as string | null) ?? (c.parent_id as string | null) ?? null,
       level: numOrUndef(c.level) ?? 0,

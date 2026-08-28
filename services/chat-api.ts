@@ -515,7 +515,11 @@ export class SourcingChatTransport implements ChatTransport {
           SOURCING_CHAT_PATH,
           // Clamp to the backend's `@MaxLength(2000)` so a long paste can't 400.
           { message: message.slice(0, 2000), history },
-          { signal },
+          // No `Accept-Language`: this endpoint detects the language from the
+          // message text itself, and the reply (including category names) comes
+          // back in whatever the buyer wrote. Sending a header here would be
+          // claiming a language the user may not have typed in.
+          { signal, skipLanguage: true },
         );
 
         let text = res.reply_text ?? '';

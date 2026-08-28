@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { FileText, Globe } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 
+import { ThemePreferenceCard } from '@/components/screens-components/profile/theme-preference-card';
 import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
@@ -17,7 +18,7 @@ export default function SettingsSecurityScreen() {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const { languageLabel } = useLanguageContext();
-  const { deleteAccount } = useUserContext();
+  const { deleteAccount, isAuthenticated } = useUserContext();
   const toast = useToast();
 
   const confirmDeleteAccount = () => {
@@ -42,8 +43,6 @@ export default function SettingsSecurityScreen() {
 
   return (
     <AppView flex={1} colorName="background">
-      {/* The app follows the phone's light/dark appearance automatically — there
-          is no in-app theme toggle. */}
       <AppSettingsHeader title={t('settings.title')} fallbackHref="/profile" />
       <AppScrollView
         showsVerticalScrollIndicator={false}
@@ -90,6 +89,11 @@ export default function SettingsSecurityScreen() {
                 <ChevronRight />
               </AppPressableView>
             </AppView>
+
+            {/* Appearance — local-only preference, available to guests and
+                signed-in users alike (this screen is reachable from both
+                profile states). */}
+            <ThemePreferenceCard />
           </AppView>
 
           {/* ── Legal ───────────────────────────────────────────────────── */}
@@ -132,22 +136,27 @@ export default function SettingsSecurityScreen() {
           </AppView>
 
           {/* ── Delete account ──────────────────────────────────────────── */}
-          <AppView px="lg" style={{ marginTop: 4 }}>
-            <AppPressableView
-              androidRipple={false}
-              onPress={confirmDeleteAccount}
-              accessibilityRole="button"
-              accessibilityLabel={t('settings.deleteAccount')}
-            >
-              <AppText
-                family="accent"
-                weight="bold"
-                style={{ fontSize: 14, color: tokens.error, paddingVertical: 8 }}
+          {/* Signed-in only: `deleteAccount` calls DELETE /v1/me, which a guest
+              has no session for — showing the row would only ever produce a
+              failure toast. Everything above stays visible to guests. */}
+          {isAuthenticated ? (
+            <AppView px="lg" style={{ marginTop: 4 }}>
+              <AppPressableView
+                androidRipple={false}
+                onPress={confirmDeleteAccount}
+                accessibilityRole="button"
+                accessibilityLabel={t('settings.deleteAccount')}
               >
-                {t('settings.deleteAccount')}
-              </AppText>
-            </AppPressableView>
-          </AppView>
+                <AppText
+                  family="accent"
+                  weight="bold"
+                  style={{ fontSize: 14, color: tokens.error, paddingVertical: 8 }}
+                >
+                  {t('settings.deleteAccount')}
+                </AppText>
+              </AppPressableView>
+            </AppView>
+          ) : null}
         </AppView>
       </AppScrollView>
     </AppView>

@@ -61,6 +61,8 @@ const HIDDEN_ROOTS = new Set<string>(['cat_uncategorized']);
 const FALLBACK_TILES: CategoryTileData[] = MATOR_CAT_TILES.map((t) => ({
   id: t.name,
   name: t.name,
+  // Bundled tiles carry a single name, so it doubles as the display label.
+  label: t.name,
   count: t.count,
   color: t.color,
   iconKey: t.name,
@@ -74,12 +76,18 @@ async function fetchSystemCategories(lang: string, signal?: AbortSignal): Promis
     .filter((r) => !HIDDEN_ROOTS.has(r.id))
     .map((r) => {
       const meta = ROOT_META[r.id];
-      // Prefer the server's localized title (title_ru/title_uz); fall back to the
-      // built-in Russian label for any root not yet translated, then the raw name.
-      const name = r.titleRu || r.titleUz ? localizedCategoryName(r, lang) : meta?.label ?? r.name;
+      // Prefer the server's localized title (title_ru/title_uz/title_en); fall
+      // back to the built-in Russian label for any root not yet translated,
+      // then the raw name. This is the *display* string — `name` stays the raw
+      // internal one so icon keys and placeholder checks keep matching.
+      const label =
+        r.titleRu || r.titleUz || r.titleEn
+          ? localizedCategoryName(r, lang)
+          : meta?.label ?? r.name;
       return {
         id: r.id,
-        name,
+        name: r.name,
+        label,
         count: 0, // roots carry no count; the systems rows don't render one
         color: meta?.color ?? DEFAULT_TILE_COLOR,
         iconKey: meta?.iconKey ?? r.slug ?? r.name,

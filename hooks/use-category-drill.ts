@@ -24,8 +24,10 @@ export type DrillContext = {
   brandId?: string;
 };
 
-/** A category tappable in the drill flow — only id + display name are needed. */
-export type DrillNode = { id: string; name: string };
+/** A category tappable in the drill flow — only the id and the *localized*
+ *  display label are needed. Never pass the internal English `name`: this
+ *  string is threaded straight into the next screen's header. */
+export type DrillNode = { id: string; label: string };
 
 export function useCategoryDrill(ctx: DrillContext) {
   // The id currently being resolved, so the tapped row can show a spinner and
@@ -52,12 +54,12 @@ export function useCategoryDrill(ctx: DrillContext) {
       if (hasChildren) {
         router.push({
           pathname: '/catalog/subcategories',
-          params: { parentId: node.id, parentLabel: node.name, ...base },
+          params: { parentId: node.id, parentLabel: node.label, ...base },
         });
       } else {
         router.push({
           pathname: '/catalog/parts',
-          params: { categoryId: node.id, categoryLabel: node.name, ...base },
+          params: { categoryId: node.id, categoryLabel: node.label, ...base },
         });
       }
     },
