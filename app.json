@@ -75,7 +75,8 @@
           "url": "https://sentry.io/"
         }
       ],
-      "@sentry/react-native"
+      "@sentry/react-native",
+      "./plugins/with-jitpack-scoping"
     ],
     "experiments": {
       "typedRoutes": true

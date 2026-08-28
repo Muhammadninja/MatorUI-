@@ -1,0 +1,24 @@
+diff --git a/node_modules/@react-native-masked-view/masked-view/android/build.gradle b/node_modules/@react-native-masked-view/masked-view/android/build.gradle
+index ed87f73..f0d978a 100644
+--- a/node_modules/@react-native-masked-view/masked-view/android/build.gradle
++++ b/node_modules/@react-native-masked-view/masked-view/android/build.gradle
+@@ -68,7 +68,18 @@ android {
+ 
+ repositories {
+   google()
+-  maven { url "https://jitpack.io" }
++  maven {
++    url "https://jitpack.io"
++    // JitPack only ever hosts artifacts built from source repos
++    // (com.github.* / com.gitlab.*). Without this filter Gradle also asks it
++    // for things like com.facebook.react and org.bouncycastle while resolving
++    // dynamic versions ("+") and version ranges, which means a JitPack outage
++    // fails the whole build with "Read timed out".
++    content {
++      includeGroupByRegex "com\\.github\\..*"
++      includeGroupByRegex "com\\.gitlab\\..*"
++    }
++  }
+   mavenCentral()
+   maven {
+     // All of React Native (JS, Obj-C sources, Android binaries) is installed from npm
