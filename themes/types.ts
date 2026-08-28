@@ -82,5 +82,13 @@ export type ThemeTokens = {
    *  `\`${tokens.brand}1F\`` pattern. Use for tinted fill backgrounds
    *  on brand-accented icons, badges, and highlights. */
   brandSoft: string;
+  /** Low-alpha tint of `success`, for the fill behind success-state
+   *  chips and badges (fit chips, "certified" pills). Derived from each
+   *  theme's own `success` value, so it tracks the token rather than
+   *  freezing the light-mode green. */
+  successSoft: string;
+  /** Low-alpha tint of `info`, for the fill behind informational badges
+   *  (e.g. the "lowest price" pill). Mirrors `successSoft`. */
+  infoSoft: string;
   [key: string]: string;
 };

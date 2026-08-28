@@ -134,12 +134,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
   // Footer hairline — deliberately fainter than the global divider token.
   const hairline = scheme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
 
-  const fitChipBg =
-    fitState === 'fits'
-      ? scheme === 'dark'
-        ? 'rgba(15,157,88,0.16)'
-        : 'rgba(15,157,88,0.10)'
-      : tokens.background;
+  const fitChipBg = fitState === 'fits' ? tokens.successSoft : tokens.background;
   const fitLabel =
     fitState === 'fits'
       ? vehicleLabel
@@ -210,17 +205,17 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
                       flexDirection: 'row',
                       alignItems: 'center',
                       gap: 3,
-                      backgroundColor: '#16a34a1a',
+                      backgroundColor: tokens.successSoft,
                       borderRadius: 999,
                       paddingHorizontal: 7,
                       paddingVertical: 2,
                     }}
                   >
-                    <MaterialIcons name="verified" size={11} color="#16a34a" />
+                    <MaterialIcons name="verified" size={11} color={tokens.success} />
                     <AppText
                       family="accent"
                       weight="bold"
-                      style={{ fontSize: 10, color: '#16a34a' }}
+                      style={{ fontSize: 10, color: tokens.success }}
                     >
                       {t('catalog.certified')}
                     </AppText>
@@ -232,17 +227,17 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
                       flexDirection: 'row',
                       alignItems: 'center',
                       gap: 3,
-                      backgroundColor: '#2563eb1a',
+                      backgroundColor: tokens.infoSoft,
                       borderRadius: 999,
                       paddingHorizontal: 7,
                       paddingVertical: 2,
                     }}
                   >
-                    <MaterialIcons name="local-offer" size={11} color="#2563eb" />
+                    <MaterialIcons name="local-offer" size={11} color={tokens.info} />
                     <AppText
                       family="accent"
                       weight="bold"
-                      style={{ fontSize: 10, color: '#2563eb' }}
+                      style={{ fontSize: 10, color: tokens.info }}
                     >
                       {t('catalog.lowestPrice')}
                     </AppText>
@@ -252,7 +247,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
             ) : null}
             {/* Meta row — ★ rating · (reviews) · OEM */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 5 }}>
-              <MaterialIcons name="star" size={12} color="#F59E0B" />
+              <MaterialIcons name="star" size={12} color={tokens.rating} />
               <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.text }}>
                 {rating}
               </AppText>
@@ -312,8 +307,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
                 alignSelf: 'flex-start',
                 paddingHorizontal: 12,
                 paddingVertical: 6,
-                backgroundColor:
-                  scheme === 'dark' ? 'rgba(15,157,88,0.16)' : 'rgba(15,157,88,0.10)',
+                backgroundColor: tokens.successSoft,
               }}
             >
               <MaterialIcons name="check-circle" size={14} color={tokens.success} />

@@ -157,6 +157,10 @@ export const lightTokens: ThemeTokens = {
   scrim: 'rgba(0, 0, 0, 0.55)',
   scannerAccent: '#00e676',
   brandSoft: 'rgba(0, 0, 0, 0.12)',
+  // Tints of this theme's own success/info greens & blues (#0f9d58 /
+  // #4285f4) — the fill behind fit chips and status badges.
+  successSoft: 'rgba(15, 157, 88, 0.10)',
+  infoSoft: 'rgba(66, 133, 244, 0.12)',
 };
 
 export const darkTokens: ThemeTokens = {
@@ -218,6 +222,10 @@ export const darkTokens: ThemeTokens = {
   scrim: 'rgba(0, 0, 0, 0.55)',
   scannerAccent: '#00e676',
   brandSoft: 'rgba(255, 255, 255, 0.12)',
+  // Dark-mode success/info are lighter (#22c55e / #8ab4f8); the tints run a
+  // touch stronger so they still read against the near-black card.
+  successSoft: 'rgba(34, 197, 94, 0.16)',
+  infoSoft: 'rgba(138, 180, 248, 0.18)',
 };
 
 export function createNavigationTheme(scheme: 'light' | 'dark') {
