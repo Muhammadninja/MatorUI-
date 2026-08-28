@@ -60,7 +60,12 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
 
   const [fitState, setFitState] = useState<FitState>('idle');
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+  useEffect(
+    () => () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    },
+    [],
+  );
 
   const handleCheckFit = () => {
     if (fitState !== 'idle') return;
@@ -68,7 +73,8 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
     timerRef.current = setTimeout(() => {
       if (vehicleLabel) {
         setFitState('fits');
-        const vehicle = `${activeVehicle!.year} ${activeVehicle!.make} ${activeVehicle!.model ?? ''}`.trim();
+        const vehicle =
+          `${activeVehicle!.year} ${activeVehicle!.make} ${activeVehicle!.model ?? ''}`.trim();
         toast.success(t('catalog.confirmedFit', { vehicle }));
       } else {
         setFitState('idle');
@@ -90,7 +96,12 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
   // omits target ids.
   const sales = useActiveSales();
   const clientSale = resolveItemSale(
-    { id: item.id, categoryId: product.categoryId, sellerId: product.sellerId, priceUzs: product.priceUzs },
+    {
+      id: item.id,
+      categoryId: product.categoryId,
+      sellerId: product.sellerId,
+      priceUzs: product.priceUzs,
+    },
     sales,
   );
   const backendPct = product.salePercent && product.salePercent > 0 ? product.salePercent : 0;
@@ -137,7 +148,8 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
       : fitState === 'checking'
         ? t('catalog.checking')
         : t('catalog.checkFit');
-  const fitTextColor = fitState === 'fits' ? tokens.success : fitState === 'checking' ? tokens.textMuted : tokens.text;
+  const fitTextColor =
+    fitState === 'fits' ? tokens.success : fitState === 'checking' ? tokens.textMuted : tokens.text;
 
   return (
     <AppView colorName="backgroundSecondary" rounded={20} style={{ overflow: 'hidden' }}>
@@ -170,7 +182,12 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
                 family="accent"
                 weight="bold"
                 numberOfLines={1}
-                style={{ fontSize: 10, letterSpacing: 1, color: tokens.textMuted, textTransform: 'uppercase' }}
+                style={{
+                  fontSize: 10,
+                  letterSpacing: 1,
+                  color: tokens.textMuted,
+                  textTransform: 'uppercase',
+                }}
               >
                 {brandEyebrow}
               </AppText>
@@ -200,7 +217,11 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
                     }}
                   >
                     <MaterialIcons name="verified" size={11} color="#16a34a" />
-                    <AppText family="accent" weight="bold" style={{ fontSize: 10, color: '#16a34a' }}>
+                    <AppText
+                      family="accent"
+                      weight="bold"
+                      style={{ fontSize: 10, color: '#16a34a' }}
+                    >
                       {t('catalog.certified')}
                     </AppText>
                   </View>
@@ -218,7 +239,11 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
                     }}
                   >
                     <MaterialIcons name="local-offer" size={11} color="#2563eb" />
-                    <AppText family="accent" weight="bold" style={{ fontSize: 10, color: '#2563eb' }}>
+                    <AppText
+                      family="accent"
+                      weight="bold"
+                      style={{ fontSize: 10, color: '#2563eb' }}
+                    >
                       {t('catalog.lowestPrice')}
                     </AppText>
                   </View>
@@ -236,7 +261,14 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
               </AppText>
               {oem ? (
                 <>
-                  <View style={{ width: 3, height: 3, borderRadius: 3, backgroundColor: tokens.textMuted }} />
+                  <View
+                    style={{
+                      width: 3,
+                      height: 3,
+                      borderRadius: 3,
+                      backgroundColor: tokens.textMuted,
+                    }}
+                  />
                   <AppText
                     family="mono"
                     numberOfLines={1}
@@ -247,7 +279,14 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
                 </>
               ) : oilMeta ? (
                 <>
-                  <View style={{ width: 3, height: 3, borderRadius: 3, backgroundColor: tokens.textMuted }} />
+                  <View
+                    style={{
+                      width: 3,
+                      height: 3,
+                      borderRadius: 3,
+                      backgroundColor: tokens.textMuted,
+                    }}
+                  />
                   <AppText
                     family="accent"
                     weight="semibold"
@@ -278,7 +317,12 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
               }}
             >
               <MaterialIcons name="check-circle" size={14} color={tokens.success} />
-              <AppText family="accent" weight="bold" numberOfLines={1} style={{ fontSize: 11.5, color: tokens.success }}>
+              <AppText
+                family="accent"
+                weight="bold"
+                numberOfLines={1}
+                style={{ fontSize: 11.5, color: tokens.success }}
+              >
                 {t('catalog.universalFit')}
               </AppText>
             </AppView>
@@ -294,8 +338,15 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
               rounded={999}
               hitSlop={{ top: 8, bottom: 8, left: 6, right: 8 }}
               accessibilityRole="button"
-              accessibilityLabel={fitState === 'fits' ? fitLabel : t('catalog.checkFitAccessibility')}
-              style={{ alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, backgroundColor: fitChipBg }}
+              accessibilityLabel={
+                fitState === 'fits' ? fitLabel : t('catalog.checkFitAccessibility')
+              }
+              style={{
+                alignSelf: 'flex-start',
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                backgroundColor: fitChipBg,
+              }}
             >
               {fitState === 'checking' ? (
                 <WheelLoader size={13} color={tokens.textMuted} />
@@ -304,7 +355,12 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
               ) : (
                 <MaterialIcons name="rule" size={14} color={tokens.text} />
               )}
-              <AppText family="accent" weight="bold" numberOfLines={1} style={{ fontSize: 11.5, color: fitTextColor }}>
+              <AppText
+                family="accent"
+                weight="bold"
+                numberOfLines={1}
+                style={{ fontSize: 11.5, color: fitTextColor }}
+              >
                 {fitLabel}
               </AppText>
             </AppPressableView>
@@ -317,14 +373,28 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
         row
         align="center"
         gap={10}
-        style={{ paddingHorizontal: 14, paddingVertical: 11, borderTopWidth: 1, borderTopColor: hairline }}
+        style={{
+          paddingHorizontal: 14,
+          paddingVertical: 11,
+          borderTopWidth: 1,
+          borderTopColor: hairline,
+        }}
       >
         {/* Price (+ struck was) + sale pill. flexWrap so the pill drops to its
          *  own line — instead of overlapping the price — when the price/"was"
          *  string or the device's font scale leaves no room to share the line
          *  (matches PriceBlock's ribbon behavior). rowGap keeps a wrapped pill
          *  clear of the price. */}
-        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: 8, rowGap: 4 }}>
+        <View
+          style={{
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            columnGap: 8,
+            rowGap: 4,
+          }}
+        >
           <View style={{ flexShrink: 1, flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
             <AppText
               family="heading"
@@ -334,14 +404,22 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
             >
               {priceAmount}
             </AppText>
-            <AppText family="accent" weight="semibold" style={{ fontSize: 11, color: tokens.textMuted }}>
+            <AppText
+              family="accent"
+              weight="semibold"
+              style={{ fontSize: 11, color: tokens.textMuted }}
+            >
               {"so'm"}
             </AppText>
             {wasLabel ? (
               <AppText
                 family="default"
                 numberOfLines={1}
-                style={{ fontSize: 12, color: tokens.textMuted, textDecorationLine: 'line-through' }}
+                style={{
+                  fontSize: 12,
+                  color: tokens.textMuted,
+                  textDecorationLine: 'line-through',
+                }}
               >
                 {wasLabel}
               </AppText>
@@ -351,13 +429,13 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
             <View
               style={{
                 flexShrink: 0,
-                backgroundColor: '#DC26261a',
+                backgroundColor: tokens.error ? `${tokens.error}1a` : 'transparent',
                 borderRadius: 999,
                 paddingHorizontal: 7,
                 paddingVertical: 3,
               }}
             >
-              <AppText family="accent" weight="bold" style={{ fontSize: 11, color: '#DC2626' }}>
+              <AppText family="accent" weight="bold" style={{ fontSize: 11, color: tokens.error }}>
                 {`-${savePct}%`}
               </AppText>
             </View>
