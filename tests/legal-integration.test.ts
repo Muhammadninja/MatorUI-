@@ -1,0 +1,265 @@
+/**
+ * Legal feature — repository-level guards.
+ *
+ * Covers the requirements that live across files rather than inside one
+ * module: the Settings entries, the three document routes, and the hard rule
+ * that no legal TEXT or VERSION exists anywhere in the frontend.
+ */
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+import { describe, expect, test } from 'vitest';
+
+import { MockLegalTransport } from '@/services/legal-api';
+import { LEGAL_DOCUMENT_TYPES, MARKDOWN_CONTENT_FORMAT } from '@/types/legal';
+
+const ROOT = join(__dirname, '..');
+
+const read = (rel: string): string => readFileSync(join(ROOT, rel), 'utf8');
+const readJson = (rel: string): Record<string, unknown> => JSON.parse(read(rel));
+
+const LOCALES = ['en', 'ru', 'uz'] as const;
+const TYPES = ['TERMS_OF_USE', 'PRIVACY_POLICY', 'PERSONAL_DATA_CONSENT'] as const;
+
+describe('Settings → Legal', () => {
+  const source = read('components/screens/settings-security-screen.tsx');
+
+  test.each(TYPES)('lists %s', (type) => {
+    expect(source).toContain(type);
+  });
+
+  test.each([
+    ['/terms', 'TERMS_OF_USE'],
+    ['/privacy', 'PRIVACY_POLICY'],
+    ['/personal-data-consent', 'PERSONAL_DATA_CONSENT'],
+  ])('routes %s for %s', (href) => {
+    expect(source).toContain(`'${href}'`);
+  });
+
+  test('labels come from i18n, not literals', () => {
+    expect(source).toContain('settings.privacy');
+    expect(source).toContain('settings.personalDataConsent');
+  });
+});
+
+describe('document routes', () => {
+  test.each([
+    ['app/(tabs)/(profile)/terms.tsx', 'TERMS_OF_USE'],
+    ['app/(tabs)/(profile)/privacy.tsx', 'PRIVACY_POLICY'],
+    ['app/(tabs)/(profile)/personal-data-consent.tsx', 'PERSONAL_DATA_CONSENT'],
+  ])('%s renders the %s document', (file, type) => {
+    expect(existsSync(join(ROOT, file)), `missing route: ${file}`).toBe(true);
+    expect(read(file)).toContain(`type="${type}"`);
+  });
+
+  test('/terms is preserved so existing deep links keep resolving', () => {
+    expect(existsSync(join(ROOT, 'app/(tabs)/(profile)/terms.tsx'))).toBe(true);
+  });
+
+  test('all three routes are registered in the profile stack', () => {
+    const layout = read('app/(tabs)/(profile)/_layout.tsx');
+    for (const name of ['terms', 'privacy', 'personal-data-consent']) {
+      expect(layout).toContain(`name="${name}"`);
+    }
+  });
+
+  test('the old hardcoded terms screen is deleted', () => {
+    expect(existsSync(join(ROOT, 'components/screens/terms-screen.tsx'))).toBe(false);
+  });
+});
+
+describe('no hardcoded legal content', () => {
+  test.each(LOCALES)('%s.json has no `terms` legal-text namespace', (loc) => {
+    const json = readJson(`locales/${loc}.json`);
+    expect(json.terms).toBeUndefined();
+  });
+
+  test.each(LOCALES)('%s.json dropped the passive consent notice', (loc) => {
+    const json = readJson(`locales/${loc}.json`) as { auth?: Record<string, unknown> };
+    expect(json.auth?.termsNotice).toBeUndefined();
+  });
+
+  test.each(LOCALES)('%s.json has no s1..s15 legal section keys', (loc) => {
+    const raw = read(`locales/${loc}.json`);
+    for (const n of [1, 2, 15]) {
+      expect(raw).not.toContain(`"s${n}Heading"`);
+      expect(raw).not.toContain(`"s${n}Body"`);
+    }
+    expect(raw).not.toContain('"effectiveDate"');
+  });
+
+  test.each(LOCALES)('%s.json keeps only UI strings under `legal`', (loc) => {
+    const json = readJson(`locales/${loc}.json`) as { legal?: Record<string, unknown> };
+    expect(json.legal).toBeDefined();
+    // UI chrome is short; a legal paragraph is not. Anything long here would
+    // mean document text crept back into the bundle.
+    for (const [key, value] of Object.entries(json.legal!)) {
+      if (typeof value === 'string') {
+        expect(value.length, `legal.${key} looks like document text`).toBeLessThan(120);
+      }
+    }
+  });
+
+  test.each(LOCALES)('%s.json still provides the three UI type labels', (loc) => {
+    const json = readJson(`locales/${loc}.json`) as {
+      legal?: { types?: Record<string, string> };
+    };
+    for (const type of TYPES) {
+      expect(json.legal?.types?.[type], `${loc}: missing legal.types.${type}`).toBeTruthy();
+    }
+  });
+
+  test('no source file hardcodes a legal version', () => {
+    for (const rel of [
+      'services/legal-api.ts',
+      'hooks/use-legal.ts',
+      'components/screens/legal-document-screen.tsx',
+      'components/shared/legal-update-host/legal-update-host.tsx',
+    ]) {
+      const source = read(rel);
+      expect(source, `${rel} hardcodes a version`).not.toMatch(
+        /(TERMS|PRIVACY|CONSENT)_VERSION\s*=/,
+      );
+    }
+  });
+
+  test('the document screen renders backend content, not local text', () => {
+    const source = read('components/screens/legal-document-screen.tsx');
+    expect(source).toContain('doc!.content');
+    expect(source).toContain('doc!.title');
+    // No i18n-sourced document body.
+    expect(source).not.toMatch(/t\('terms\./);
+  });
+});
+
+describe('gate policy', () => {
+  test('no LegalGuard / LegalInterceptor / middleware module exists', () => {
+    for (const bad of [
+      'guards/legal-guard.ts',
+      'guards/legal.guard.ts',
+      'services/legal-interceptor.ts',
+    ]) {
+      expect(existsSync(join(ROOT, bad)), `unexpected global guard: ${bad}`).toBe(false);
+    }
+  });
+
+  // NOTE: the mandatory gate's actual behavior (non-dismissible, no bypass
+  // control, anonymous users unaffected) is covered by RENDERED tests in
+  // `legal-update-host.test.tsx`. The checks here only guard the two
+  // repo-wide invariants a rendered test cannot see: that the bypass strings
+  // are gone from every locale bundle, and that no route guard exists.
+  test.each(LOCALES)('%s.json has no Later/Skip bypass string left', (loc) => {
+    const legal = (readJson(`locales/${loc}.json`) as { legal?: Record<string, unknown> })
+      .legal!;
+    expect(legal.later).toBeUndefined();
+    expect(legal.reviewAction).toBeUndefined();
+    // The mandatory CTA replaced it.
+    expect(legal.acceptAndContinue).toBeTruthy();
+  });
+
+  test.each(LOCALES)('%s.json provides the blocking status-error copy', (loc) => {
+    const legal = (readJson(`locales/${loc}.json`) as { legal?: Record<string, unknown> })
+      .legal!;
+    expect(legal.statusErrorTitle).toBeTruthy();
+    expect(legal.statusErrorBody).toBeTruthy();
+  });
+
+  test('the api-client has no legal-acceptance interception', () => {
+    expect(read('services/api-client.ts')).not.toContain('LEGAL_ACCEPTANCE_REQUIRED');
+  });
+});
+
+describe('content_format handling', () => {
+  const screen = read('components/screens/legal-document-screen.tsx');
+
+  test('markdown routes to the Markdown renderer', () => {
+    expect(screen).toContain('MARKDOWN_CONTENT_FORMAT');
+    expect(screen).toContain('<AppMarkdown content={doc!.content} />');
+  });
+
+  test('an unknown format falls back to plain text instead of throwing', () => {
+    // The ternary must have a non-Markdown branch that still renders content.
+    const branch = screen.slice(screen.indexOf('MARKDOWN_CONTENT_FORMAT'));
+    expect(branch).toContain(') : (');
+    expect(branch).toContain('{doc!.content}');
+    expect(screen).not.toContain('throw new Error');
+  });
+
+});
+
+describe('legal document type enum', () => {
+  // Runtime assertions against the exported constant — a source grep would
+  // still pass if the type alias were right but the runtime value wrong.
+  test('LEGAL_DOCUMENT_TYPES holds exactly the three backend values', () => {
+    expect([...LEGAL_DOCUMENT_TYPES]).toEqual([
+      'TERMS_OF_USE',
+      'PRIVACY_POLICY',
+      'PERSONAL_DATA_CONSENT',
+    ]);
+  });
+
+  test('no short enum value appears at runtime', () => {
+    for (const value of LEGAL_DOCUMENT_TYPES) {
+      expect(value).not.toBe('TERMS');
+      expect(value).not.toBe('PRIVACY');
+    }
+  });
+
+  test('the mock transport emits exactly those three types', async () => {
+    const { documents } = await new MockLegalTransport().getDocuments();
+    expect(documents.map((d) => d.type)).toEqual([...LEGAL_DOCUMENT_TYPES]);
+  });
+
+  test('MARKDOWN_CONTENT_FORMAT is the literal the backend sends', () => {
+    expect(MARKDOWN_CONTENT_FORMAT).toBe('markdown');
+  });
+});
+
+describe('accept payload contract', () => {
+  test('the transport posts `acceptances`, never `documents`', () => {
+    const source = read('services/legal-api.ts');
+    expect(source).toContain("'/v1/legal/accept', { acceptances }");
+    expect(source).not.toMatch(/legal\/accept',\s*\{\s*documents/);
+  });
+
+  test('no client-side version comparison anywhere in the legal feature', () => {
+    for (const rel of [
+      'services/legal-api.ts',
+      'hooks/use-legal.ts',
+      'components/shared/legal-update-host/legal-update-host.tsx',
+      'components/screens/legal-document-screen.tsx',
+    ]) {
+      const code = read(rel)
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/\/\/.*$/gm, '');
+      // The backend owns `accepted`; the client must never re-derive it.
+      expect(code, `${rel} compares versions locally`).not.toMatch(
+        /accepted_version\s*(>=|>|===|<)\s*\w*required_version/,
+      );
+      expect(code, `${rel} compares versions locally`).not.toMatch(
+        /required_version\s*(>=|>|===|<)\s*\w*accepted_version/,
+      );
+    }
+  });
+
+  test('the status consumer reads the backend `accepted` flag', () => {
+    expect(read('hooks/use-legal.ts')).toContain('.filter((d) => !d.accepted)');
+  });
+});
+
+describe('markdown safety wiring', () => {
+  test('the renderer has no HTML or WebView escape hatch', () => {
+    // Strip comments first: the file DOCUMENTS that it avoids these APIs, and
+    // the guard is about actual code, not prose.
+    const code = read('components/shared/app-markdown/app-markdown.tsx')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '');
+    expect(code).not.toContain('dangerouslySetInnerHTML');
+    expect(code).not.toContain('WebView');
+    expect(code).not.toContain('innerHTML');
+  });
+
+  test('the parser is the only link-target authority', () => {
+    expect(read('utils/markdown.ts')).toContain('isSafeHref');
+  });
+});

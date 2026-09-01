@@ -96,7 +96,9 @@
     "deleteAccountConfirmTitle": "Hisob o'chirilsinmi?",
     "deleteAccountConfirmMessage": "Bu hisobingiz, buyurtmalaringiz, garajingiz va saqlangan ma'lumotlaringizni butunlay o'chiradi. Buni ortga qaytarib bo'lmaydi.",
     "deleteAccountConfirm": "Hisobni o'chirish",
-    "accountDeleteFailedToast": "Hisobni o'chirib bo'lmadi. Qayta urinib ko'ring."
+    "accountDeleteFailedToast": "Hisobni o'chirib bo'lmadi. Qayta urinib ko'ring.",
+    "privacy": "Maxfiylik siyosati",
+    "personalDataConsent": "Shaxsiy maʼlumotlarni qayta ishlashga rozilik"
   },
   "orderStatus": {
     "list": {
@@ -180,41 +182,6 @@
   "paymentMethods": {
     "title": "Toʻlov usullari",
     "intro": "Buyurtma berishda toʻlov usulini tanlang. Karta akkauntingizda saqlanmaydi."
-  },
-  "terms": {
-    "title": "Foydalanish shartlari",
-    "intro": "Iltimos, Mator’dan foydalanishdan oldin ushbu shartlarni diqqat bilan oʻqing. Ular siz bilan Mator oʻrtasidagi majburiy kelishuvni tashkil etadi.",
-    "effectiveDate": "Kuchga kirish sanasi: [ishga tushirishda belgilanadi]. Mator operatori — [yuridik shaxs nomi], Oʻzbekiston.",
-    "s1Heading": "1. Shartlarni qabul qilish",
-    "s1Body": "Akkaunt yaratish, buyurtma berish yoki boshqa tarzda Mator ilovasidan foydalanish orqali siz ushbu Foydalanish shartlari va Maxfiylik siyosatimizni oʻqib chiqqaningizni, tushunganingizni hamda ularga rioya qilishga rozi ekaningizni tasdiqlaysiz. Agar rozi boʻlmasangiz, iltimos, ilovadan foydalanishni toʻxtating.",
-    "s2Heading": "2. Foydalanish huquqi",
-    "s2Body": "Mator’dan foydalanish uchun siz kamida 18 yoshda boʻlishingiz va shartnoma tuzishga qonuniy layoqatli boʻlishingiz kerak. Ilovadan foydalanib, siz ushbu talablarga javob berishingizni va taqdim etayotgan maʼlumotlaringiz haqqoniy ekanini tasdiqlaysiz.",
-    "s3Heading": "3. Sizning akkauntingiz",
-    "s3Body": "Kirish telefon raqamingiz va bir martalik kod orqali amalga oshiriladi. Raqamingiz va qurilmangizga kirishni xavfsiz saqlash hamda akkauntingizdagi barcha harakatlar uchun siz javobgarsiz. Profil maʼlumotlaringizni dolzarb saqlang. Ruxsatsiz foydalanishga shubha qilsangiz, darhol bizga xabar bering.",
-    "s4Heading": "4. Mator qanday ishlaydi",
-    "s4Body": "Mator — bu xaridorlarni avtoehtiyot qismlar, moylar va tegishli mahsulotlar sotuvchilari bilan bogʻlaydigan marketpleys. Agar eʼlonda sotuvchi Mator ekani koʻrsatilmagan boʻlsa, oldi-sotdi shartnomasi siz bilan uchinchi tomon sotuvchi oʻrtasida tuziladi. Mator platforma, qidiruv, moslik vositalari hamda buyurtma va yetkazib berishni muvofiqlashtirishni taqdim etadi.",
-    "s5Heading": "5. Buyurtmalar va narxlar",
-    "s5Body": "Narxlar Oʻzbekiston soʻmida (UZS) koʻrsatiladi va buyurtma tasdiqlangunga qadar oʻzgarishi mumkin. Buyurtma berish — sotib olish taklifidir; buyurtma faqat sotuvchi uni qabul qilganda va mahsulot mavjud boʻlganda tasdiqlanadi. Biz buyurtmani rad etishimiz yoki bekor qilishimiz mumkin (masalan, narx xatolari, mahsulot yoʻqligi yoki firibgarlikka shubha tufayli) va allaqachon toʻlangan summani qaytaramiz.",
-    "s6Heading": "6. Toʻlov",
-    "s6Body": "Toʻlov usulini rasmiylashtirishda tanlaysiz: Payme (onlayn toʻlov), Terminal (kuryer yetkazishda olib keladigan karta oʻqigich) yoki Naqd (yetkazishda naqd pul). Onlayn toʻlovlar uchinchi tomon provayderlari tomonidan oʻz shartlari asosida amalga oshiriladi; Mator kartangizning toʻliq maʼlumotlarini saqlamaydi.",
-    "s7Heading": "7. Yetkazib berish",
-    "s7Body": "Yetkazib berish kuryer orqali tashkil etiladi. Siz saqlangan manzilsiz ham buyurtma berishingiz mumkin — kuryer yetkazish joyini aniqlashtirish uchun telefon orqali bogʻlanadi. Yetkazish muddatlari va toʻlovlari taxminiy boʻlib, tasdiqlashdan oldin koʻrsatiladi va joylashuv hamda mavjudlikka qarab oʻzgarishi mumkin. Iltimos, mahsulotlarni qabul qilishda tekshiring.",
-    "s8Heading": "8. Moslik va tanlash",
-    "s8Body": "Moslik va tanlash koʻrsatkichlari faqat maʼlumot uchun beriladi va siz kiritgan avtomobil maʼlumotlariga asoslanadi. Ular kafolat emas. Iltimos, sotib olishdan oldin qism aynan sizning avtomobilingizga mos kelishini — VIN, OEM raqami boʻyicha yoki mutaxassis bilan — tekshiring. Universal deb belgilangan mahsulotlar muayyan avtomobilga bogʻliq emas.",
-    "s9Heading": "9. Qaytarish, bekor qilish va pul qaytarish",
-    "s9Body": "Qaytarish, bekor qilish va pul qaytarish huquqlari sotuvchining siyosatiga va Oʻzbekistonning isteʼmolchi huquqlari toʻgʻrisidagi amaldagi qonunchiligiga bogʻliq. Bunday huquq amal qilganda, mahsulotlar ishlatilmagan va asl qadoqda boʻlishi kerak. Buyurtmani bekor qilish yoki qaytarish/pul qaytarishni rasmiylashtirish uchun ilova orqali sotuvchiga yoki Mator qoʻllab-quvvatlashiga murojaat qiling.",
-    "s10Heading": "10. Maqbul foydalanish",
-    "s10Body": "Siz ilovani suiisteʼmol qilmaslikka rozisiz: firibgar buyurtmalar, yolgʻon maʼlumot, qalbaki, oʻgʻirlangan yoki noqonuniy tovarlar, platforma ishi yoki xavfsizligiga aralashish va ilovadan har qanday noqonuniy maqsadda foydalanish taqiqlanadi. Ushbu qoidalarni buzgan akkauntlarni toʻxtatib qoʻyishimiz yoki yopishimiz mumkin.",
-    "s11Heading": "11. Intellektual mulk",
-    "s11Body": "Mator nomi, logotipi, ilovasi va uning mazmuni Mator yoki uning litsenziarlariga tegishli boʻlib, qonun bilan himoyalangan. Siz ilovadan faqat uning shaxsiy, notijorat maqsadida foydalanishingiz mumkin. Ilovaning biror qismini bizning ruxsatimizsiz nusxalash, qayta sotish yoki teskari muhandislik qilish taqiqlanadi.",
-    "s12Heading": "12. Kafolatlardan voz kechish va javobgarlikni cheklash",
-    "s12Body": "Ilova hech qanday kafolatsiz «bo'lgani kabi» taqdim etiladi. Mator sotiladigan qismlarning ishlab chiqaruvchisi emas va ularning sifatiga kafolat bermaydi — bu javobgarlik sotuvchi va ishlab chiqaruvchi zimmasida. Qonun ruxsat etgan eng yuqori darajada Mator bilvosita zararlar uchun javobgar emas va ushbu shartlardagi hech narsa Oʻzbekiston qonunchiligiga koʻra cheklab boʻlmaydigan javobgarlikni cheklamaydi.",
-    "s13Heading": "13. Maxfiylik va maʼlumotlar",
-    "s13Body": "Biz shaxsiy maʼlumotlaringizni — telefon raqamingiz, ismingiz, avtomobilingiz va buyurtma tafsilotlari kabi — ilovani ishlatish va buyurtmalaringizni bajarish uchun qayta ishlaymiz. Nimalarni yigʻishimiz, ulardan qanday foydalanish va ularni ulashish hamda huquqlaringiz, jumladan akkaunt va maʼlumotlarni oʻchirishni soʻrash tartibi haqida Maxfiylik siyosatimizda oʻqing.",
-    "s14Heading": "14. Shartlarga oʻzgartirishlar",
-    "s14Body": "Biz ushbu shartlarni vaqti-vaqti bilan yangilashimiz mumkin. Muhim oʻzgartirishlar kiritganimizda kuchga kirish sanasini yangilaymiz va zarur boʻlganda ilovada sizni ogohlantiramiz. Oʻzgartirishlar kuchga kirgach Mator’dan foydalanishda davom etishingiz yangilangan shartlarni qabul qilganingizni bildiradi.",
-    "s15Heading": "15. Amaldagi qonun va aloqa",
-    "s15Body": "Ushbu shartlar Oʻzbekiston Respublikasi qonunlari bilan tartibga solinadi va nizolar uning sudlariga taalluqlidir. Ushbu shartlar boʻyicha savollar bormi? Ilovadagi qoʻllab-quvvatlash imkoniyatlari orqali yoki [qoʻllab-quvvatlash aloqasi / manzil] boʻyicha biz bilan bogʻlaning."
   },
   "account": {
     "editAddress": "Manzilni tahrirlash",
@@ -308,14 +275,18 @@
     "phoneLabel": "Telefon raqami",
     "sendingCode": "Kod yuborilmoqda…",
     "next": "Keyingi",
-    "termsNotice": "Davom etish orqali siz Xizmat shartlari va Maxfiylik siyosatiga rozilik bildirasiz.",
     "enterCode": "Kodni kiriting",
     "codeSentDetail": "Biz {{phone}} raqamiga 6 xonali kod yubordik.",
     "verificationCodeLabel": "Tasdiqlash kodi",
     "verifying": "Tekshirilmoqda…",
     "verifyContinue": "Tasdiqlash va davom etish",
     "resendCode": "Kodni qayta yuborish",
-    "didntGetItResend": "Kod kelmadimi? Qayta yuborish"
+    "didntGetItResend": "Kod kelmadimi? Qayta yuborish",
+    "acceptTerms": "Men qabul qilaman:",
+    "acceptPrivacy": "Men tanishib chiqdim:",
+    "acceptPersonalData": "Shaxsiy maʼlumotlarimni qayta ishlashga rozilik beraman —",
+    "legalRequiredTitle": "Hujjatlarni qabul qilish talab etiladi",
+    "legalRequiredBody": "Davom etish uchun kerakli hujjatlarni koʻrib chiqing va qabul qiling."
   },
   "splash": {
     "skip": "Oʻtkazib yuborish",
@@ -879,5 +850,23 @@
     "bestsellers": "Ko'p sotilganlar",
     "fallbackTitle": "Mos keladigan qismlar",
     "emptyBody": "{{vehicle}} uchun hozircha qismlar yo'q. Keyinroq qarang."
+  },
+  "legal": {
+    "loading": "Hujjat yuklanmoqda…",
+    "loadError": "Hujjatni yuklab boʻlmadi.",
+    "unavailable": "Bu hujjat hozircha mavjud emas.",
+    "versionLine": "Versiya {{version}} · Amal qiladi {{date}}",
+    "updatedTitle": "Hujjatlar yangilandi",
+    "updatedBody": "Baʼzi hujjatlar yangilandi. Iltimos, koʻrib chiqing va qabul qiling.",
+    "acceptAction": "Qabul qilish",
+    "acceptError": "Rozilikni saqlab boʻlmadi. Qayta urinib koʻring.",
+    "types": {
+      "TERMS_OF_USE": "Foydalanish shartlari",
+      "PRIVACY_POLICY": "Maxfiylik siyosati",
+      "PERSONAL_DATA_CONSENT": "Shaxsiy maʼlumotlarga rozilik"
+    },
+    "acceptAndContinue": "Qabul qilish va davom etish",
+    "statusErrorTitle": "Hujjatlar holatini tekshirib boʻlmadi",
+    "statusErrorBody": "Yangilangan hujjatlarni qabul qilish kerakmi — buni tekshira olmadik. Ulanishni tekshirib, qayta urinib koʻring."
   }
 }

@@ -1,0 +1,12 @@
+import { Stack } from 'expo-router';
+
+import LegalDocumentScreen from '@/components/screens/legal-document-screen';
+
+export default function PersonalDataConsentRoute() {
+  return (
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <LegalDocumentScreen type="PERSONAL_DATA_CONSENT" />
+    </>
+  );
+}

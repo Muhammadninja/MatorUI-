@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { FileText, Globe } from 'lucide-react-native';
+import { FileText, Globe, ShieldCheck, UserCheck } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 
 import { ThemePreferenceCard } from '@/components/screens-components/profile/theme-preference-card';
@@ -13,6 +13,32 @@ import { useUserContext } from '@/contexts/user.context';
 import { useToast } from '@/hooks/use-toast';
 import { modalService } from '@/services/global-modal-service/global-modal.service';
 import { triggerHaptic } from '@/utils/haptics';
+
+/**
+ * The Legal section's rows. `type` matches the backend document type so the
+ * row and its screen agree on identity; `labelKey` is a UI string only — the
+ * document's own (localized) title comes from the API on the detail screen.
+ */
+const LEGAL_ROWS = [
+  {
+    type: 'TERMS_OF_USE',
+    labelKey: 'settings.terms',
+    href: '/terms',
+    Icon: FileText,
+  },
+  {
+    type: 'PRIVACY_POLICY',
+    labelKey: 'settings.privacy',
+    href: '/privacy',
+    Icon: ShieldCheck,
+  },
+  {
+    type: 'PERSONAL_DATA_CONSENT',
+    labelKey: 'settings.personalDataConsent',
+    href: '/personal-data-consent',
+    Icon: UserCheck,
+  },
+] as const;
 
 export default function SettingsSecurityScreen() {
   const { t } = useTranslation();
@@ -109,29 +135,35 @@ export default function SettingsSecurityScreen() {
                 overflow: 'hidden',
               }}
             >
-              {/* Terms & Conditions */}
-              <AppPressableView
-                androidRipple={false}
-                onPress={() => {
-                  triggerHaptic('selection');
-                  router.push('/terms');
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={t('settings.terms')}
-                row
-                align="center"
-                gap="md"
-                px="lg"
-                py="md"
-              >
-                <IconBox Icon={FileText} />
-                <AppView style={{ flex: 1 }}>
-                  <AppText family="accent" weight="semibold" style={{ fontSize: 14.5, color: tokens.text }}>
-                    {t('settings.terms')}
-                  </AppText>
-                </AppView>
-                <ChevronRight />
-              </AppPressableView>
+              {/* One row per backend legal document type. Labels are UI
+                  strings; the document text itself is fetched per screen. */}
+              {LEGAL_ROWS.map((row, i) => (
+                <AppPressableView
+                  key={row.type}
+                  testID={`settings-legal-${row.type}`}
+                  androidRipple={false}
+                  onPress={() => {
+                    triggerHaptic('selection');
+                    router.push(row.href);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t(row.labelKey)}
+                  row
+                  align="center"
+                  gap="md"
+                  px="lg"
+                  py="md"
+                  style={i > 0 ? { borderTopWidth: 1, borderTopColor: tokens.border } : undefined}
+                >
+                  <IconBox Icon={row.Icon} />
+                  <AppView style={{ flex: 1 }}>
+                    <AppText family="accent" weight="semibold" style={{ fontSize: 14.5, color: tokens.text }}>
+                      {t(row.labelKey)}
+                    </AppText>
+                  </AppView>
+                  <ChevronRight />
+                </AppPressableView>
+              ))}
             </AppView>
           </AppView>
 

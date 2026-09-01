@@ -28,6 +28,7 @@
 import { apiClient, ApiError } from '@/services/api-client';
 import { debugLog } from '@/services/debug-log';
 import type { AuthSession } from '@/services/auth-storage';
+import type { LegalRegistrationVersions } from '@/types/legal';
 
 export type UserSummary = {
   id: string;
@@ -63,7 +64,21 @@ export type RequestOtpResult = {
   devCode?: string;
 };
 
-export type VerifyOtpInput = { otpToken: string; code: string };
+export type VerifyOtpInput = {
+  otpToken: string;
+  code: string;
+  /**
+   * Accepted legal versions. Always populated once the documents have loaded
+   * and the user has ticked the boxes; versions MUST come from
+   * GET /v1/legal/documents, never a literal.
+   *
+   * Optional only because the documents request can still be in flight or have
+   * failed. The transport forwards whatever it is given — it never decides to
+   * withhold the block based on whether the user looks like an existing one.
+   * The backend requires it for a new account and ignores it otherwise.
+   */
+  legal?: LegalRegistrationVersions;
+};
 
 export type AuthResult = {
   session: AuthSession;
@@ -326,7 +341,17 @@ class HttpAuthTransport implements AuthTransport {
     const phone_e164 = this.phoneByRequest.get(input.otpToken);
     const r = await apiClient.post<RawVerifyResponse>(
       '/v1/auth/phone/verify-otp',
-      { request_id: input.otpToken, phone_e164, otp_code: input.code },
+      {
+        request_id: input.otpToken,
+        phone_e164,
+        otp_code: input.code,
+        // ALWAYS sent when the caller has the versions — the backend requires
+        // it for a new account and ignores it for an existing one, so the
+        // client must never decide to withhold it. There is deliberately no
+        // `is_existing_user` branch here: guessing wrong would strip a
+        // legitimate registration's consent.
+        legal: input.legal,
+      },
       { signal, skipAuth: true },
     );
     this.phoneByRequest.delete(input.otpToken);

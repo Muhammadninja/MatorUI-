@@ -45,6 +45,21 @@ export default function ProfileStackLayout() {
         name="settings-security"
         options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }}
       />
+      {/* Legal documents — one route per backend document type. Content is
+          fetched from /v1/legal/documents; `terms` keeps its original path so
+          existing deep links still resolve. */}
+      <Stack.Screen
+        name="terms"
+        options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }}
+      />
+      <Stack.Screen
+        name="privacy"
+        options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }}
+      />
+      <Stack.Screen
+        name="personal-data-consent"
+        options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }}
+      />
     </Stack>
   );
 }
