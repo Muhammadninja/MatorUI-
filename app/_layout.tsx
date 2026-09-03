@@ -54,6 +54,7 @@ import { AppToastHost } from '@/components/shared/app-toast';
 import { AppView } from '@/components/shared/app-view';
 import GlobalModalHost from '@/components/shared/global-modal-host';
 import LikesListSuggestionHost from '@/components/shared/likes-list-suggestion-host';
+import LegalUpdateHost from '@/components/shared/legal-update-host';
 import SplashOverlay from '@/components/screens/splash-screen';
 import { useColorScheme } from '@/components/useColorScheme';
 import AppGateHost from '@/components/shared/app-gate-host';
@@ -131,6 +132,9 @@ function RootLayoutNav() {
                         <RootNavigation />
                         <GlobalModalHost />
                         <LikesListSuggestionHost />
+                        {/* Non-blocking: prompts a signed-in user to accept a
+                            newly published legal version. Never gates routes. */}
+                        <LegalUpdateHost />
                         <AppToastHost />
                         <AppGateHost />
                       </SearchUIProvider>

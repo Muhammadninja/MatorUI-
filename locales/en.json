@@ -96,7 +96,9 @@
     "deleteAccountConfirmTitle": "Delete account?",
     "deleteAccountConfirmMessage": "This permanently erases your account, orders, garage, and saved data. This can't be undone.",
     "deleteAccountConfirm": "Delete account",
-    "accountDeleteFailedToast": "Couldn't delete your account. Please try again."
+    "accountDeleteFailedToast": "Couldn't delete your account. Please try again.",
+    "privacy": "Privacy Policy",
+    "personalDataConsent": "Personal Data Consent"
   },
   "orderStatus": {
     "list": {
@@ -180,41 +182,6 @@
   "paymentMethods": {
     "title": "Payment methods",
     "intro": "Choose how to pay when you place an order. No card is stored on your account."
-  },
-  "terms": {
-    "title": "Terms & Conditions",
-    "intro": "Please read these terms carefully before using Mator. They form a binding agreement between you and Mator.",
-    "effectiveDate": "Effective date: [set at launch]. Mator is operated by [legal entity name], Uzbekistan.",
-    "s1Heading": "1. Acceptance of Terms",
-    "s1Body": "By creating an account, placing an order, or otherwise using the Mator app you confirm that you have read, understood, and agree to be bound by these Terms & Conditions and our Privacy Policy. If you do not agree, please stop using the app.",
-    "s2Heading": "2. Eligibility",
-    "s2Body": "You must be at least 18 years old and legally able to enter into a contract to use Mator. By using the app you confirm that you meet these requirements and that the information you provide is truthful.",
-    "s3Heading": "3. Your Account",
-    "s3Body": "You sign in with your phone number and a one-time code. You are responsible for keeping access to your number and device secure and for all activity under your account. Keep your profile details accurate and up to date. Notify us immediately if you suspect unauthorized use.",
-    "s4Heading": "4. How Mator Works",
-    "s4Body": "Mator is a marketplace that connects buyers with sellers of automotive parts, oils, and related products. Unless a listing states that Mator is the seller, the contract of sale is between you and the third-party seller. Mator provides the platform, search, fitment tools, and order and delivery coordination.",
-    "s5Heading": "5. Orders & Pricing",
-    "s5Body": "Prices are shown in Uzbek som (UZS) and may change before an order is confirmed. Placing an order is an offer to buy; the order is confirmed only when the seller accepts it and stock is available. We may decline or cancel an order (for example, due to pricing errors, stock issues, or suspected fraud) and will refund any amount already paid.",
-    "s6Heading": "6. Payment",
-    "s6Body": "You choose a payment method at checkout: Payme (paid online), Terminal (card reader brought by the courier on delivery), or Cash (cash on delivery). Online payments are processed by third-party providers subject to their own terms; Mator does not store your full card details.",
-    "s7Heading": "7. Delivery",
-    "s7Body": "Delivery is arranged by courier. You may place an order without a saved address — the courier will contact you by phone to confirm the drop-off. Delivery windows and fees are estimates shown before you confirm and may vary with location and availability. Please check items on receipt.",
-    "s8Heading": "8. Fitment & Compatibility",
-    "s8Body": "Compatibility and fitment indicators are provided for guidance only and are based on the vehicle information you supply. They are not a guarantee. Please confirm that a part fits your specific vehicle — by VIN, OEM number, or with a professional — before purchasing. Items marked universal are not vehicle-specific.",
-    "s9Heading": "9. Returns, Cancellations & Refunds",
-    "s9Body": "Return, cancellation, and refund rights depend on the seller's policy and applicable Uzbek consumer law. Where a right applies, items should be unused and in their original packaging. To cancel an order or request a return or refund, contact the seller or Mator support through the app.",
-    "s10Heading": "10. Acceptable Use",
-    "s10Body": "You agree not to misuse the app: no fraudulent orders, no false information, no infringing, counterfeit, stolen, or unlawful goods, no interference with the platform's operation or security, and no use of the app for any unlawful purpose. We may suspend or close accounts that break these rules.",
-    "s11Heading": "11. Intellectual Property",
-    "s11Body": "The Mator name, logo, app, and its content are owned by Mator or its licensors and are protected by law. You may use the app for its intended personal, non-commercial purpose only. You may not copy, resell, or reverse-engineer any part of the app without our permission.",
-    "s12Heading": "12. Disclaimers & Limitation of Liability",
-    "s12Body": "The app is provided \"as is\" without warranties of any kind. Mator is not the manufacturer of the parts sold and does not warrant their quality; that responsibility lies with the seller and manufacturer. To the fullest extent permitted by law, Mator is not liable for indirect or consequential loss, and nothing in these terms limits liability that cannot be limited under Uzbek law.",
-    "s13Heading": "13. Privacy & Data",
-    "s13Body": "We process your personal data — such as your phone number, name, vehicle, and order details — to operate the app and fulfil your orders. See our Privacy Policy for what we collect, how it is used and shared, and your rights, including how to request deletion of your account and data.",
-    "s14Heading": "14. Changes to These Terms",
-    "s14Body": "We may update these terms from time to time. When we make material changes we will update the effective date and, where appropriate, notify you in the app. Continuing to use Mator after changes take effect means you accept the updated terms.",
-    "s15Heading": "15. Governing Law & Contact",
-    "s15Body": "These terms are governed by the laws of the Republic of Uzbekistan, and disputes are subject to its courts. Questions about these terms? Reach us through the support options in the app or at [support contact / address]."
   },
   "account": {
     "editAddress": "Edit address",
@@ -308,14 +275,18 @@
     "phoneLabel": "Phone number",
     "sendingCode": "Sending code…",
     "next": "Next",
-    "termsNotice": "By continuing you agree to the Terms of Service and Privacy Policy.",
     "enterCode": "Enter the code",
     "codeSentDetail": "We sent a 6-digit code to {{phone}}.",
     "verificationCodeLabel": "Verification code",
     "verifying": "Verifying…",
     "verifyContinue": "Verify & continue",
     "resendCode": "Resend code",
-    "didntGetItResend": "Didn’t get it? Resend code"
+    "didntGetItResend": "Didn’t get it? Resend code",
+    "acceptTerms": "I accept the",
+    "acceptPrivacy": "I acknowledge the",
+    "acceptPersonalData": "I consent to the processing of my personal data —",
+    "legalRequiredTitle": "Legal acceptance required",
+    "legalRequiredBody": "Please review and accept the required documents to continue."
   },
   "splash": {
     "skip": "Skip",
@@ -879,5 +850,23 @@
     "bestsellers": "Bestsellers",
     "fallbackTitle": "Parts that fit",
     "emptyBody": "We don't have parts listed for your {{vehicle}} yet. Check back soon."
+  },
+  "legal": {
+    "loading": "Loading document…",
+    "loadError": "Could not load the document.",
+    "unavailable": "This document is not available right now.",
+    "versionLine": "Version {{version}} · Effective {{date}}",
+    "updatedTitle": "Updated legal documents",
+    "updatedBody": "Some documents have been updated. Please review and accept them.",
+    "acceptAction": "Accept",
+    "acceptError": "Could not record your acceptance. Please try again.",
+    "types": {
+      "TERMS_OF_USE": "Terms & Conditions",
+      "PRIVACY_POLICY": "Privacy Policy",
+      "PERSONAL_DATA_CONSENT": "Personal Data Consent"
+    },
+    "acceptAndContinue": "Accept and continue",
+    "statusErrorTitle": "Could not verify your legal status",
+    "statusErrorBody": "We could not check whether updated documents need your acceptance. Please check your connection and try again."
   }
 }

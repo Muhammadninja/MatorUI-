@@ -1,12 +1,13 @@
 import { Stack } from 'expo-router';
 
-import TermsScreen from '@/components/screens/terms-screen';
+import LegalDocumentScreen from '@/components/screens/legal-document-screen';
 
+/** Kept at `/terms` (rather than renamed) so existing deep links keep working. */
 export default function TermsRoute() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <TermsScreen />
+      <LegalDocumentScreen type="TERMS_OF_USE" />
     </>
   );
 }

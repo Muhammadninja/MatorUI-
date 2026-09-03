@@ -7,15 +7,41 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/shared/app-button';
+import { AppCheckbox } from '@/components/shared/app-checkbox';
 import AppTextField from '@/components/shared/app-text-field';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useUserContext } from '@/contexts/user.context';
 import { useToast } from '@/hooks/use-toast';
+import { useLegalDocuments } from '@/hooks/use-legal';
 import { getApiBaseUrl } from '@/config/api';
 import { ApiError } from '@/services/api-client';
+import {
+  LEGAL_ACCEPTANCE_REQUIRED,
+  type LegalDocumentType,
+  type LegalRegistrationVersions,
+} from '@/types/legal';
 import { triggerHaptic } from '@/utils/haptics';
+
+/** Where each consent link navigates. Keyed by backend document type. */
+const LEGAL_ROUTES = {
+  TERMS_OF_USE: '/terms',
+  PRIVACY_POLICY: '/privacy',
+  PERSONAL_DATA_CONSENT: '/personal-data-consent',
+} as const satisfies Record<LegalDocumentType, string>;
+
+/** The consent rows, in display order. `labelKey`/`linkKey` are UI strings —
+ *  the legal wording itself lives behind the linked document screens. */
+const CONSENT_ROWS: { type: LegalDocumentType; labelKey: string; linkKey: string }[] = [
+  { type: 'TERMS_OF_USE', labelKey: 'auth.acceptTerms', linkKey: 'settings.terms' },
+  { type: 'PRIVACY_POLICY', labelKey: 'auth.acceptPrivacy', linkKey: 'settings.privacy' },
+  {
+    type: 'PERSONAL_DATA_CONSENT',
+    labelKey: 'auth.acceptPersonalData',
+    linkKey: 'settings.personalDataConsent',
+  },
+];
 
 /** Turn a request/verify failure into a user-facing description. A 429
  *  (global rate limit) gets an explicit "too many attempts" message that
@@ -105,6 +131,68 @@ export default function PasswordlessAuthScreen() {
   const [code, setCode] = useState('');
   const [otpToken, setOtpToken] = useState<string | null>(null);
 
+  // ── Legal consent ────────────────────────────────────────────────────
+  // Versions come from the backend; the app never hardcodes one. The docs
+  // query is public, so it resolves before the user has a session.
+  const { state: legalState, documents: legalDocuments, refresh: refreshLegal } =
+    useLegalDocuments();
+  const [accepted, setAccepted] = useState<Record<LegalDocumentType, boolean>>({
+    TERMS_OF_USE: false,
+    PRIVACY_POLICY: false,
+    PERSONAL_DATA_CONSENT: false,
+  });
+
+  /** Only documents the backend marks required must be ticked. */
+  const requiredTypes = legalDocuments
+    .filter((d) => d.is_required)
+    .map((d) => d.type);
+  const allAccepted =
+    legalState === 'success' &&
+    requiredTypes.length > 0 &&
+    requiredTypes.every((type) => accepted[type]);
+
+  /**
+   * Whether Continue is allowed.
+   *
+   * When the documents request FAILED we cannot show checkboxes at all, and
+   * blocking here would lock an existing user out of their own account over an
+   * unrelated network error. So we let the attempt through: the backend is the
+   * real gate — it ignores `legal` for an existing user and answers
+   * LEGAL_ACCEPTANCE_REQUIRED for a new one, which `verify` handles by showing
+   * the consent step. Consent is still never assumed: with no documents loaded
+   * we send no versions, so a registration cannot silently succeed.
+   */
+  const legalGateSatisfied = legalState === 'error' ? true : allAccepted;
+
+  /**
+   * The `legal` block for verify-otp, built from the fetched document versions.
+   *
+   * Always sent when the documents have loaded — never gated on `allAccepted`
+   * and never on whether the user looks like an existing account. The backend
+   * requires it for a new registration and ignores it for a sign-in, so
+   * withholding it client-side could only ever break a legitimate signup.
+   * (The Continue button already blocks submission until consent is explicit.)
+   * Undefined only when the documents request hasn't resolved.
+   */
+  const legalVersions = (): LegalRegistrationVersions | undefined => {
+    const versionOf = (type: LegalDocumentType) =>
+      legalDocuments.find((d) => d.type === type)?.version;
+    const terms = versionOf('TERMS_OF_USE');
+    const privacy = versionOf('PRIVACY_POLICY');
+    const consent = versionOf('PERSONAL_DATA_CONSENT');
+    if (terms === undefined || privacy === undefined || consent === undefined) return undefined;
+    return {
+      terms_version: terms,
+      privacy_version: privacy,
+      personal_data_consent_version: consent,
+    };
+  };
+
+  const openLegalDoc = (type: LegalDocumentType) => {
+    triggerHaptic('selection');
+    router.push(LEGAL_ROUTES[type]);
+  };
+
   // Prefill the last-used number on reload (real backends only — demo already
   // seeds its own). So the simulator "remembers" the account across reloads.
   useEffect(() => {
@@ -156,11 +244,27 @@ export default function PasswordlessAuthScreen() {
   const verify = async () => {
     if (isLoading || !otpToken) return;
     try {
-      await verifyOtp({ otpToken, code: code.trim() });
+      await verifyOtp({ otpToken, code: code.trim(), legal: legalVersions() });
       triggerHaptic('success');
       dismiss();
     } catch (err) {
       triggerHaptic('error');
+      // A missing/stale acceptance is NOT an OTP failure — the code the user
+      // typed may be perfectly valid. Keep them in the OTP phase (their code
+      // stays entered), re-fetch the current documents, and point them at the
+      // consent boxes instead of telling them the code didn't work.
+      if (err instanceof ApiError && err.code === LEGAL_ACCEPTANCE_REQUIRED) {
+        setAccepted({
+          TERMS_OF_USE: false,
+          PRIVACY_POLICY: false,
+          PERSONAL_DATA_CONSENT: false,
+        });
+        refreshLegal();
+        toast.danger(t('auth.legalRequiredTitle'), {
+          description: t('auth.legalRequiredBody'),
+        });
+        return;
+      }
       toast.danger(t('auth.codeDidNotWork'), { description: describeAuthError(err, t) });
     }
   };
@@ -282,9 +386,6 @@ export default function PasswordlessAuthScreen() {
                 disabled={isLoading || !phoneValid}
                 onPress={sendCode}
               />
-              <AppText family="default" style={{ fontSize: 11, color: tokens.textMuted, textAlign: 'center', lineHeight: 16 }}>
-                {t('auth.termsNotice')}
-              </AppText>
             </>
           ) : (
             <>
@@ -315,13 +416,74 @@ export default function PasswordlessAuthScreen() {
                 {...field}
               />
 
+              {/* Explicit legal consent. Never pre-ticked, and never inferred
+                  from the user having opened or scrolled a document. */}
+              {legalState === 'loading' ? (
+                <AppText family="default" style={{ fontSize: 12, color: tokens.textMuted }}>
+                  {t('legal.loading')}
+                </AppText>
+              ) : legalState === 'success' ? (
+                <AppView gap={10}>
+                  {CONSENT_ROWS.filter((row) =>
+                    requiredTypes.includes(row.type),
+                  ).map((row) => (
+                    <AppCheckbox
+                      key={row.type}
+                      testID={`auth-legal-${row.type}`}
+                      checked={accepted[row.type]}
+                      accessibilityLabel={t(row.labelKey)}
+                      onChange={(next) =>
+                        setAccepted((prev) => ({ ...prev, [row.type]: next }))
+                      }
+                    >
+                      <AppText
+                        family="default"
+                        style={{ fontSize: 12, lineHeight: 17, color: tokens.textMuted }}
+                      >
+                        {t(row.labelKey)}{' '}
+                        <AppText
+                          family="default"
+                          weight="semibold"
+                          underline
+                          style={{ fontSize: 12, color: tokens.text }}
+                          onPress={() => openLegalDoc(row.type)}
+                        >
+                          {t(row.linkKey)}
+                        </AppText>
+                      </AppText>
+                    </AppCheckbox>
+                  ))}
+                </AppView>
+              ) : (
+                <AppView gap={6}>
+                  <AppText family="default" style={{ fontSize: 12, color: tokens.error }}>
+                    {t('legal.loadError')}
+                  </AppText>
+                  <AppPressableView
+                    onPress={refreshLegal}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('common.retry')}
+                  >
+                    <AppText
+                      family="accent"
+                      weight="semibold"
+                      style={{ fontSize: 12.5, color: tokens.text }}
+                    >
+                      {t('common.retry')}
+                    </AppText>
+                  </AppPressableView>
+                </AppView>
+              )}
+
               <AppButton
                 testID="auth-verify-btn"
                 title={isLoading ? t('auth.verifying') : t('auth.verifyContinue')}
                 kind="brand"
                 size="lg"
                 fullWidth
-                disabled={isLoading || code.length < 6}
+                // Consent is a hard precondition: the code alone is no longer
+                // enough to complete registration.
+                disabled={isLoading || code.length < 6 || !legalGateSatisfied}
                 onPress={verify}
               />
 
