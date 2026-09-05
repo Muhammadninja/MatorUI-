@@ -22,10 +22,20 @@ export type CategoryTileProps = {
   onPress: () => void;
 };
 
+/** Label block height: two lines at `lineHeight`, so a wrapped label and a
+ *  single-word one keep their counts on the same baseline across a row. */
+const LABEL_LINE_HEIGHT = 15;
+const LABEL_BLOCK_HEIGHT = LABEL_LINE_HEIGHT * 2;
+
 /**
  * `CategoryTile` — a single "Shop by category" grid cell: realistic part icon
  * + name + count on a bordered card. Presentational; the parent supplies the
  * data + tap handler.
+ *
+ * The label wraps to two lines: localized names are far longer than the
+ * internal English ones ("Электрооборудование", "Kuzov va tashqi qism") and a
+ * single line ellipsized them mid-word. The block is a fixed two lines tall so
+ * the counts stay aligned whether the label wraps or not.
  */
 function CategoryTile({ name, label, iconKey, count, onPress }: CategoryTileProps) {
   const { t } = useTranslation();
@@ -47,16 +57,23 @@ function CategoryTile({ name, label, iconKey, count, onPress }: CategoryTileProp
       <AppView center style={{ width: 68, height: 68 }}>
         <AutoPartIcon name={name} iconKey={iconKey} size={60} />
       </AppView>
-      <AppView align="center">
-        <AppText
-          family="accent"
-          weight="bold"
-          style={{ fontSize: 12.5, color: tokens.text, textAlign: 'center', lineHeight: 15 }}
-          numberOfLines={1}
-        >
-          {display}
-        </AppText>
-        <AppText family="default" style={{ fontSize: 10.5, color: tokens.textMuted, marginTop: 2 }}>
+      <AppView align="center" style={{ alignSelf: 'stretch' }}>
+        <AppView justify="center" style={{ height: LABEL_BLOCK_HEIGHT, alignSelf: 'stretch' }}>
+          <AppText
+            family="accent"
+            weight="bold"
+            style={{
+              fontSize: 12.5,
+              color: tokens.text,
+              textAlign: 'center',
+              lineHeight: LABEL_LINE_HEIGHT,
+            }}
+            numberOfLines={2}
+          >
+            {display}
+          </AppText>
+        </AppView>
+        <AppText family="default" style={{ fontSize: 10.5, color: tokens.textMuted, marginTop: 3 }}>
           {t('category.partsCount', { count })}
         </AppText>
       </AppView>

@@ -491,7 +491,9 @@
     "fitBannerAccessibility": "{{label}} uchun moslik ko‘rsatilyapti. Avtomobilni almashtiring.",
     "fittingPartsFor": "Qismlar mos keladi:",
     "fittingPartsAccessibility": "{{label}} uchun qismlar. Avtomobilni almashtiring.",
-    "selectVehiclePrompt": "Aniq moslik uchun avtomobilni tanlang"
+    "selectVehiclePrompt": "Aniq moslik uchun avtomobilni tanlang",
+    "fitmentNotSet": "Moslik tanlanmagan",
+    "selectVehicleTitle": "Avtomobilingizni tanlang"
   },
   "home": {
     "savePercent": "CHEGIRMA {{percent}}%"
@@ -775,8 +777,6 @@
     "filters": "Filtrlar",
     "searchingFor": "«{{query}}» bo‘yicha qidirilmoqda…",
     "addToCart": "Savatga qo‘shish",
-    "showingFitmentFor": "MOSLIK KO‘RSATILMOQDA",
-    "fitmentBannerA11y": "{{vehicle}} uchun moslik. Avtomobilni o‘zgartirish.",
     "promoAccentLabel": "Cheklangan seriya",
     "promoHeadline": "Osma tizim yangilanishiga 28% gacha chegirma",
     "promoBody": "Loyihangiz uchun tayyor KW, Bilstein va Öhlins to‘plamlari, $500 dan yuqorida bepul yetkazib berish.",

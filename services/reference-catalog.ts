@@ -61,8 +61,10 @@ export type RefTrim = { id: string; modelId: string; name: string };
 export type RefCategory = {
   id: string;
   name: string;
-  /** Localized display titles (buyer app). Null until an admin/seed sets them;
-   *  the app falls back to `name`. */
+  /** Localized display titles (buyer app). The admin console writes these as
+   *  `nameRu` / `nameUz` / `nameEn` and that is what the API returns today;
+   *  `title_ru` / `title_uz` is the older spelling, still accepted. Null only
+   *  for a row nobody has translated — the app falls back to `name`. */
   titleRu: string | null;
   titleUz: string | null;
   titleEn: string | null;
@@ -114,6 +116,23 @@ function str(v: unknown): string {
 
 function numOrUndef(v: unknown): number | undefined {
   return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+}
+
+/**
+ * Read a localized name off a reference row in any spelling the backend has
+ * used for it: `nameRu` (current, matches the admin console), `name_ru`,
+ * `titleRu`, `title_ru`. Returns `null` when none carries text.
+ */
+function localizedField(row: Raw, suffix: 'Ru' | 'Uz' | 'En'): string | null {
+  const lower = suffix.toLowerCase();
+  const candidates = [
+    row[`name${suffix}`],
+    row[`name_${lower}`],
+    row[`title${suffix}`],
+    row[`title_${lower}`],
+  ];
+  const hit = candidates.find((v) => typeof v === 'string' && v.trim());
+  return typeof hit === 'string' ? hit : null;
 }
 
 /** True when we should hit the live reference endpoints vs. the local fallback. */
@@ -300,9 +319,12 @@ export async function fetchReferenceCategories(
       .map((c) => ({
       id: str(c.id),
       name: str(c.name),
-      titleRu: (c.titleRu as string | null) ?? (c.title_ru as string | null) ?? null,
-      titleUz: (c.titleUz as string | null) ?? (c.title_uz as string | null) ?? null,
-      titleEn: (c.titleEn as string | null) ?? (c.title_en as string | null) ?? null,
+      // `nameRu` / `nameUz` / `nameEn` is what the endpoint returns now (same
+      // spelling the admin console writes); `title_*` is the older one. Read
+      // both so a rename on either side can't silently blank every label.
+      titleRu: localizedField(c, 'Ru'),
+      titleUz: localizedField(c, 'Uz'),
+      titleEn: localizedField(c, 'En'),
       slug: str(c.slug),
       parentId: (c.parentId as string | null) ?? (c.parent_id as string | null) ?? null,
       level: numOrUndef(c.level) ?? 0,

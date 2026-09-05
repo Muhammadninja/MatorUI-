@@ -491,7 +491,9 @@
     "fitBannerAccessibility": "Showing fitment for {{label}}. Change vehicle.",
     "fittingPartsFor": "Fitting parts for",
     "fittingPartsAccessibility": "Fitting parts for {{label}}. Change vehicle.",
-    "selectVehiclePrompt": "Select a vehicle to guarantee fitment accuracy"
+    "selectVehiclePrompt": "Select a vehicle to guarantee fitment accuracy",
+    "fitmentNotSet": "Fitment not set",
+    "selectVehicleTitle": "Select your vehicle"
   },
   "home": {
     "savePercent": "SAVE {{percent}}%"
@@ -775,8 +777,6 @@
     "filters": "Filters",
     "searchingFor": "Searching for “{{query}}”…",
     "addToCart": "Add to cart",
-    "showingFitmentFor": "SHOWING FITMENT FOR",
-    "fitmentBannerA11y": "Showing fitment for {{vehicle}}. Change vehicle.",
     "promoAccentLabel": "Limited drop",
     "promoHeadline": "Save up to 28% on suspension upgrades",
     "promoBody": "Curated KW, Bilstein, and Öhlins kits ready for your build, free shipping over $500.",

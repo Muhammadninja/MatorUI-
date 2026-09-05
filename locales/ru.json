@@ -342,6 +342,7 @@
     "titleWithCount_one": "Корзина · {{count}} товар",
     "titleWithCount_few": "Корзина · {{count}} товара",
     "titleWithCount_many": "Корзина · {{count}} товаров",
+    "titleWithCount_other": "Корзина · {{count}} товаров",
     "loadErrorTitle": "Не удалось загрузить корзину",
     "emptyTitle": "Ваша корзина пуста",
     "emptySubtitle": "Найдите запчасти для вашего автомобиля и добавьте их сюда.",
@@ -409,7 +410,8 @@
     "orderAccessibility": "Заказ {{id}}, {{status}}",
     "dateItems_one": "{{date}} · {{count}} товар",
     "dateItems_few": "{{date}} · {{count}} товара",
-    "dateItems_many": "{{date}} · {{count}} товаров"
+    "dateItems_many": "{{date}} · {{count}} товаров",
+    "dateItems_other": "{{date}} · {{count}} товаров"
   },
   "trackOrder": {
     "title": "Отслеживание заказа",
@@ -434,7 +436,8 @@
   "category": {
     "partsCount_one": "{{count}} запчасть",
     "partsCount_few": "{{count}} запчасти",
-    "partsCount_many": "{{count}} запчастей"
+    "partsCount_many": "{{count}} запчастей",
+    "partsCount_other": "{{count}} запчастей"
   },
   "make": {
     "vehicleFallback": "Автомобиль",
@@ -450,6 +453,7 @@
     "resultCount_one": "{{count}} результат",
     "resultCount_few": "{{count}} результата",
     "resultCount_many": "{{count}} результатов",
+    "resultCount_other": "{{count}} результатов",
     "noPartsFound": "Запчасти не найдены",
     "findingParts": "Поиск запчастей…",
     "priceAsc": "Цена ↑",
@@ -466,6 +470,7 @@
     "partCount_one": "{{count}} запчасть",
     "partCount_few": "{{count}} запчасти",
     "partCount_many": "{{count}} запчастей",
+    "partCount_other": "{{count}} запчастей",
     "categories": "Категории",
     "categoriesSuffix": "категорий",
     "loadSubcategoriesError": "Не удалось загрузить подкатегории.",
@@ -496,7 +501,9 @@
     "fitBannerAccessibility": "Совместимость показана для {{label}}. Сменить автомобиль.",
     "fittingPartsFor": "Подбор запчастей для",
     "fittingPartsAccessibility": "Подбор запчастей для {{label}}. Сменить автомобиль.",
-    "selectVehiclePrompt": "Выберите автомобиль, чтобы гарантировать точность совместимости"
+    "selectVehiclePrompt": "Выберите автомобиль, чтобы гарантировать точность совместимости",
+    "fitmentNotSet": "Совместимость не задана",
+    "selectVehicleTitle": "Выберите автомобиль"
   },
   "home": {
     "savePercent": "СКИДКА {{percent}}%"
@@ -780,8 +787,6 @@
     "filters": "Фильтры",
     "searchingFor": "Поиск по «{{query}}»…",
     "addToCart": "В корзину",
-    "showingFitmentFor": "ПОДБОР ДЛЯ",
-    "fitmentBannerA11y": "Показан подбор для {{vehicle}}. Сменить автомобиль.",
     "promoAccentLabel": "Ограниченный выпуск",
     "promoHeadline": "Скидки до 28% на апгрейды подвески",
     "promoBody": "Подобранные комплекты KW, Bilstein и Öhlins готовы для вашего проекта, бесплатная доставка при заказе от $500.",

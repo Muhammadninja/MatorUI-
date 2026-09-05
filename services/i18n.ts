@@ -1,3 +1,10 @@
+// Hermes ships Intl without `Intl.PluralRules`, so i18next falls back to a
+// dummy one/other rule: Russian `_few` / `_many` never resolve and every count
+// but 1 silently falls through to English ("3 parts" under a Russian UI). The
+// polyfill installs a CLDR-complete implementation (and no-ops on engines that
+// already have a real one), so it MUST be imported before i18next initializes.
+import 'intl-pluralrules';
+
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
@@ -16,6 +23,11 @@ import type { LanguageCode } from '@/services/language-storage';
  * `changeAppLanguage()` on hydration and on every user switch. We init
  * synchronously (resources are bundled, no network) so the first render
  * already has strings.
+ *
+ * Pluralization is CLDR-driven (`compatibilityJSON: 'v4'`): Russian keys need
+ * `_one` / `_few` / `_many` (+ `_other` for non-integer counts), English and
+ * Uzbek need `_one` / `_other`. A missing form falls back to `FALLBACK_LANGUAGE`,
+ * which surfaces as English text inside an otherwise translated screen.
  */
 
 export const SUPPORTED_LANGUAGES: LanguageCode[] = ['en', 'ru', 'uz'];
