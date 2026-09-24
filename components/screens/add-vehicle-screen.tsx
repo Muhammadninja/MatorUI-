@@ -10,6 +10,7 @@ import AppTextField from '@/components/shared/app-text-field';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { WheelLoader } from '@/components/shared/wheel-loader';
+import { useActiveVehicle } from '@/contexts/active-vehicle.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import useGarage from '@/hooks/use-garage';
 import { resolveCatalogIds } from '@/services/reference-catalog';
@@ -31,6 +32,7 @@ export default function AddVehicleScreen() {
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
   const { addVehicle, isMutating } = useGarage();
+  const { setPrimaryVehicle } = useActiveVehicle();
 
   const [vin, setVin] = useState('');
   const [decoded, setDecoded] = useState<DecodedVehicle | null>(null);
@@ -102,11 +104,12 @@ export default function AddVehicleScreen() {
       const mileageDigits = mileage.replace(/[^\d]/g, '');
       const mileageKm = mileageDigits.length > 0 ? Number.parseInt(mileageDigits, 10) : undefined;
 
-      // Add through the real garage layer. `setAsPrimary` makes it the active
-      // vehicle (turning on fitment UI across the app). Color isn't collected
+      // Add through the real garage layer. `setAsPrimary` makes it the primary
+      // vehicle; the pin move below makes it the active one (turning on
+      // fitment UI across the app). Color isn't collected
       // here — default 'midnight'; it (and everything below) is editable from
       // the vehicle-detail screen afterwards.
-      await addVehicle({
+      const created = await addVehicle({
         make: decoded.make,
         model: decoded.model,
         year: decoded.year,
@@ -121,6 +124,12 @@ export default function AddVehicleScreen() {
         colorHex,
         setAsPrimary: true,
       });
+      // `setAsPrimary` only flips `isPrimary` on the server. The active-vehicle
+      // context prefers its pinned car over `isPrimary`, so without moving the
+      // pin the garage hero showed the new car while every fit check kept the
+      // previous one until a restart. The create already made it primary, so
+      // move the pin with `skipBackend` rather than sending the flip twice.
+      await setPrimaryVehicle(created.id, { skipBackend: true });
       toastService.success(t('addVehicle.addedToast'), {
         description: `${decoded.year} ${decoded.make} ${decoded.model}`,
       });
@@ -134,7 +143,7 @@ export default function AddVehicleScreen() {
     } finally {
       setSaving(false);
     }
-  }, [decoded, canSave, catalogIds, vin, mileage, plate, colorHex, addVehicle, t]);
+  }, [decoded, canSave, catalogIds, vin, mileage, plate, colorHex, addVehicle, setPrimaryVehicle, t]);
 
   // Decode a VIN via the provider-agnostic VinDecoderService. Never throws —
   // domain errors surface as a screen-local toast so a provider outage can't
