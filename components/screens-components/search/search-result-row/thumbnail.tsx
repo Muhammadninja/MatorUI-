@@ -1,5 +1,5 @@
-import AppImage from '@/components/shared/app-image';
 import { AppView } from '@/components/shared/app-view';
+import PartImagePlaceholder from '@/components/shared/part-image-placeholder';
 
 import { RADIUS_MEDIA } from '../radii';
 
@@ -30,19 +30,15 @@ export default function Thumbnail({ alt }: { alt: string }) {
         // visible edge). Letting the card's own bg show through fixes it.
       }}
     >
-      {/* Overscan-crop via transform: image stays in normal flow at
-       *  100%×100%, then `scale(1.08)` zooms the rendered output ~8%
-       *  around its center. The wrapper's `overflow:hidden` clips
-       *  ~4% from every edge — hides any thin border baked into the
-       *  asset (the test PNG has one) without touching layout. */}
-      <AppImage
-        source={require('@/assets/images/test-image.png')}
+      {/* This row has never had a real photo to show — the slot was hard-wired
+       *  to the stand-in PNG. It now draws the neutral part placeholder, which
+       *  also retires the `scale(1.08)` overscan hack that existed only to crop
+       *  the thin border baked into that asset. */}
+      <PartImagePlaceholder
+        label={alt}
         width="100%"
         height="100%"
-        contentFit="cover"
-        placeholderColor="transparent"
-        style={{ transform: [{ scale: 1.08 }] }}
-        alt={alt}
+        backgroundColor="transparent"
       />
     </AppView>
   );

@@ -386,6 +386,44 @@ export default function PasswordlessAuthScreen() {
                 disabled={isLoading || !phoneValid}
                 onPress={sendCode}
               />
+
+              {/* Passive disclosure, NOT consent. `sendCode` already ships the
+                  phone number to the backend and an SMS provider, so the user
+                  must be told what they're agreeing to one step before the
+                  binding checkboxes on the OTP step. Deliberately unticked,
+                  unblocking and not wired into `legalGateSatisfied`: explicit
+                  acceptance still happens at verify-otp and nowhere else. */}
+              <AppText
+                testID="auth-phone-legal-note"
+                family="default"
+                style={{ fontSize: 12, lineHeight: 17, color: tokens.textMuted }}
+              >
+                {t('auth.phoneLegalPrefix')}
+                <AppText
+                  testID="auth-phone-legal-terms"
+                  family="default"
+                  weight="semibold"
+                  underline
+                  accessibilityRole="link"
+                  style={{ fontSize: 12, color: tokens.text }}
+                  onPress={() => openLegalDoc('TERMS_OF_USE')}
+                >
+                  {t('auth.phoneLegalTerms')}
+                </AppText>
+                {t('auth.phoneLegalAnd')}
+                <AppText
+                  testID="auth-phone-legal-privacy"
+                  family="default"
+                  weight="semibold"
+                  underline
+                  accessibilityRole="link"
+                  style={{ fontSize: 12, color: tokens.text }}
+                  onPress={() => openLegalDoc('PRIVACY_POLICY')}
+                >
+                  {t('auth.phoneLegalPrivacy')}
+                </AppText>
+                {t('auth.phoneLegalSuffix')}
+              </AppText>
             </>
           ) : (
             <>

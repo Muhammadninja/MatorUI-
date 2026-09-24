@@ -12,13 +12,9 @@ import { AppCard } from '../../shared/app-card/app-card';
 import { AppOemPill } from '../../shared/app-oem-pill';
 import { AppText } from '../../shared/app-text';
 import { AppView } from '../../shared/app-view';
+import PartImagePlaceholder from '../../shared/part-image-placeholder';
 import { RADIUS_SHEET } from './radii';
 
-/** Card placeholder used when no real product image is available. The
- *  card was historically hard-coded to this require — Step 6 moves it
- *  into a single named constant so the placeholder behavior is honest
- *  and easy to find/replace later. */
-const PLACEHOLDER_IMAGE = require('@/assets/images/test-image.png');
 
 export type SearchPartCardProps = {
   id: string;
@@ -68,13 +64,12 @@ function SearchPartCard({
   const resolvedPriceLabel = priceLabel ?? t('search.startingAt');
   const resolvedActionLabel = actionLabel ?? t('search.addToCart');
   const [wasJustAdded, setWasJustAdded] = useState(false);
-  // Resolve the image source: prefer a URL string, fall back to a static
-  // require result, fall back to the built-in placeholder. Empty string
-  // counts as "no image" so the backend can ship `''` instead of null.
+  // Resolve the image source: prefer a URL string, else a static require
+  // result from a legacy caller. Empty string counts as "no image" so the
+  // backend can ship `''` instead of null. `null` means nothing to render —
+  // the media slot draws the part placeholder instead of an <AppImage>.
   const resolvedImageSource =
-    image && image.length > 0
-      ? { uri: image }
-      : imageSource ?? PLACEHOLDER_IMAGE;
+    image && image.length > 0 ? { uri: image } : (imageSource ?? null);
   const resetAddedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Debounce guard: rapid double-taps within 800ms would otherwise push
   // duplicate line items into the cart.
@@ -133,14 +128,18 @@ function SearchPartCard({
       onPress={onPress}
       media={
         <AppView>
-          <AppImage
-            source={resolvedImageSource}
-            width="100%"
-            height={compact ? 140 : 180}
-            contentFit="cover"
-            priority="normal"
-            alt={title}
-          />
+          {resolvedImageSource ? (
+            <AppImage
+              source={resolvedImageSource}
+              width="100%"
+              height={compact ? 140 : 180}
+              contentFit="cover"
+              priority="normal"
+              alt={title}
+            />
+          ) : (
+            <PartImagePlaceholder label={title} width="100%" height={compact ? 140 : 180} />
+          )}
           {/* Badge + status overlay */}
           <AppView
             row

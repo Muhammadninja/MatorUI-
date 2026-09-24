@@ -3,8 +3,10 @@ import { SlidersHorizontal } from 'lucide-react-native';
 
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
+import { useLanguageContext } from '@/contexts/language.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import type { Vehicle } from '@/services/garage-service';
+import { formatMileage } from '@/utils/mileage';
 
 
 export type GarageActiveHeroProps = {
@@ -17,11 +19,6 @@ export type GarageActiveHeroProps = {
 
 function titleCase(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-function formatMileage(km: number | undefined, unit: string): string {
-  if (km === undefined || km === null) return '';
-  return `${km.toLocaleString('en-US')} ${unit}`;
 }
 
 /** VIN masked to its last 6 chars for the stat row (full VIN lives on detail). */
@@ -67,6 +64,7 @@ function Stat({
 export function GarageActiveHero({ vehicle, onShopParts, onOpenDetail }: GarageActiveHeroProps) {
   const { t } = useTranslation();
   const { tokens, scheme } = useThemeContext();
+  const { language } = useLanguageContext();
   const isDark = scheme === 'dark';
 
   const hairline = isDark ? 'rgba(0,0,0,0.14)' : 'rgba(255,255,255,0.18)';
@@ -84,18 +82,16 @@ export function GarageActiveHero({ vehicle, onShopParts, onOpenDetail }: GarageA
       p={18}
       style={{ position: 'relative', overflow: 'hidden' }}
     >
-      {/* Status line */}
-      <AppView row align="center" gap={8}>
-        <AppView style={{ width: 6, height: 6, borderRadius: 999, backgroundColor: tokens.success }} />
-        <AppText
-          family="accent"
-          weight="bold"
-          transform="uppercase"
-          style={{ fontSize: 10, letterSpacing: 1.6, color: tokens.onBrand, opacity: 0.75 }}
-        >
-          {t('garage.activeVehicle')}
-        </AppText>
-      </AppView>
+      {/* Active marker: the green dot alone. The uppercase "ACTIVE VEHICLE"
+       *  label that sat beside it read as stiff and official, and the card is
+       *  already the only one of its kind on the screen, so the word was doing
+       *  no work the colour wasn't. The text moves to the a11y layer, where a
+       *  screen reader still announces which car is active. */}
+      <AppView
+        accessible
+        accessibilityLabel={t('garage.activeVehicle')}
+        style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: tokens.success }}
+      />
 
       {/* Title — two lines, clipped from the watermark. */}
       <AppView style={{ maxWidth: 210, marginTop: 10 }}>
@@ -115,7 +111,7 @@ export function GarageActiveHero({ vehicle, onShopParts, onOpenDetail }: GarageA
 
       {/* Stat row over a hairline */}
       <AppView row gap={14} style={{ marginTop: 18, paddingTop: 14, borderTopWidth: 1, borderTopColor: hairline }}>
-        <Stat label={t('garage.statMileage')} value={formatMileage(vehicle.mileage, t('garage.mileageUnit'))} labelColor={statLabel} valueColor={tokens.onBrand} />
+        <Stat label={t('garage.statMileage')} value={formatMileage(vehicle.mileage, t('garage.mileageUnit'), language)} labelColor={statLabel} valueColor={tokens.onBrand} />
         <Stat label={t('garage.statVin')} value={maskVin(vehicle.vin)} labelColor={statLabel} valueColor={tokens.onBrand} />
         <Stat label={t('garage.statTrim')} value={vehicle.trim ?? '—'} labelColor={statLabel} valueColor={tokens.onBrand} />
       </AppView>

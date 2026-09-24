@@ -1,17 +1,15 @@
 import { type ImageContentFit } from 'expo-image';
 import { memo } from 'react';
-import { Image, type DimensionValue } from 'react-native';
+import { type DimensionValue } from 'react-native';
 
 import { AppImage } from '@/components/shared/app-image';
-
-// Stand-in product photo used while the catalog ships no real image URLs.
-const TEST_IMAGE = require('@/assets/images/test-image.png');
+import PartImagePlaceholder from '@/components/shared/part-image-placeholder';
 
 export type ImageBoxProps = {
   /** Accessibility label (product/vehicle name). */
   label: string;
   /** Real image URL. When present the box renders the photo (cover) and
-   *  falls back to the test image if it fails to load. */
+   *  falls back to the part placeholder if it fails to load. */
   uri?: string;
   height: DimensionValue;
   width?: DimensionValue;
@@ -31,8 +29,8 @@ export type ImageBoxProps = {
 
 /**
  * Product image box. Renders the real `uri` when present; otherwise shows the
- * bundled test image so every product slot has a photo until the backend
- * ships imagery.
+ * neutral part placeholder, so a listing with no photo reads as "no photo"
+ * rather than as a product that happens to look like the old stand-in PNG.
  */
 function ImageBox({
   label,
@@ -43,11 +41,13 @@ function ImageBox({
   contentFit = 'cover',
   backgroundColor,
 }: ImageBoxProps) {
-  const testImage = (
-    <Image
-      source={TEST_IMAGE}
-      style={{ width, height, borderRadius: radius, backgroundColor }}
-      resizeMode={contentFit === 'contain' ? 'contain' : 'cover'}
+  const placeholder = (
+    <PartImagePlaceholder
+      label={label}
+      width={width}
+      height={height}
+      radius={radius}
+      backgroundColor={backgroundColor}
     />
   );
 
@@ -59,14 +59,14 @@ function ImageBox({
         height={height}
         rounded={radius}
         alt={label}
-        fallback={testImage}
+        fallback={placeholder}
         contentFit={contentFit}
         placeholderColor={backgroundColor}
       />
     );
   }
 
-  return testImage;
+  return placeholder;
 }
 
 export default memo(ImageBox);

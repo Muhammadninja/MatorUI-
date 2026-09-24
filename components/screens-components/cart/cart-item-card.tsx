@@ -8,10 +8,10 @@ import { AppQtyStepper } from '@/components/shared/app-qty-stepper';
 import { AppPrice } from '@/components/shared/app-price';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
+import PartImagePlaceholder from '@/components/shared/part-image-placeholder';
 import type { CartItem } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
 
-const FALLBACK_IMAGE = require('@/assets/images/test-image.png');
 
 export type CartItemCardProps = {
   item: CartItem;
@@ -34,7 +34,7 @@ function CartItemCard({
 }: CartItemCardProps) {
   const { t } = useTranslation();
   const { tokens, scheme } = useThemeContext();
-  const imageSource = item.imageUrl ? { uri: item.imageUrl } : FALLBACK_IMAGE;
+  const imageSource = item.imageUrl ? { uri: item.imageUrl } : null;
   const oem = (item as CartItem & { oem?: string }).oem;
 
   return (
@@ -50,14 +50,18 @@ function CartItemCard({
         backgroundColor: scheme === 'dark' ? tokens.card : tokens.white,
       }}
     >
-      <AppImage
-        source={imageSource}
-        width={80}
-        height={80}
-        rounded={12}
-        contentFit="cover"
-        alt={item.title}
-      />
+      {imageSource ? (
+        <AppImage
+          source={imageSource}
+          width={80}
+          height={80}
+          rounded={12}
+          contentFit="cover"
+          alt={item.title}
+        />
+      ) : (
+        <PartImagePlaceholder label={item.title} width={80} height={80} radius={12} />
+      )}
       <AppView flex={1} gap={8} style={{ justifyContent: 'space-between' }}>
         <AppView row align="flex-start" gap={8}>
           <AppView flex={1} gap={5}>

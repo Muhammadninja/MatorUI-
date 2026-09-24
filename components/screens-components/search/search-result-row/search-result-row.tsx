@@ -2,8 +2,8 @@ import { memo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Pressable, StyleSheet } from 'react-native';
 
-import AppImage from '@/components/shared/app-image';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
+import PartImagePlaceholder from '@/components/shared/part-image-placeholder';
 import { useCartContext } from '@/contexts/cart.context';
 import { useLikesContext } from '@/contexts/likes.context';
 import { useThemeContext } from '@/contexts/theme.context';
@@ -23,7 +23,6 @@ import StatusLine from './status-line';
 import Thumbnail from './thumbnail';
 import { deriveCardVariant } from './variant';
 
-const ROW_IMAGE_SOURCE = require('@/assets/images/test-image.png');
 const PREVIEW_SIZE = 300;
 
 export type SearchResultRowProps = {
@@ -171,13 +170,11 @@ function SearchResultRow({
               backgroundColor: isDark ? tokens.card : tokens.white,
             }}
           >
-            <AppImage
-              source={ROW_IMAGE_SOURCE}
+            <PartImagePlaceholder
+              label={result.title}
               width="100%"
               height="100%"
-              contentFit="cover"
-              placeholderColor="transparent"
-              alt={result.title}
+              backgroundColor="transparent"
             />
           </Pressable>
         </Pressable>

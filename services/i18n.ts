@@ -53,6 +53,27 @@ if (!i18n.isInitialized) {
     // could render the raw key while waiting on an (already-complete) init.
     react: { useSuspense: false },
   });
+} else {
+  // Fast Refresh path.
+  //
+  // Editing a locale file re-evaluates THIS module with the new JSON, but the
+  // i18next instance is a module singleton that survives the refresh — so the
+  // guard above skips `init()` and the fresh resources are never installed.
+  // The app keeps serving the bundle captured at startup, and any key added
+  // since then renders as its raw id (`garage.emptyPickLead`) until the whole
+  // process restarts.
+  //
+  // Push the new bundles in explicitly instead. `deep` merges so untouched
+  // namespaces survive, `overwrite` lets an edited string actually replace the
+  // old one. Production never reaches this branch: the module is evaluated
+  // exactly once there.
+  for (const [lng, translation] of [
+    ['en', en],
+    ['ru', ru],
+    ['uz', uz],
+  ] as const) {
+    i18n.addResourceBundle(lng, 'translation', translation, true, true);
+  }
 }
 
 /** Switch the active language. Safe to call before init completes. */

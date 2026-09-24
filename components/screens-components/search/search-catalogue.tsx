@@ -16,8 +16,6 @@ const CARD_WIDTH = 280;
 const CARD_GAP = 12;
 const SIDE_PEEK = 28;
 
-const FALLBACK_IMAGE = require('@/assets/images/test-image.png');
-
 /**
  * Catalogue strip on the explore landing. Consumes `useCatalogList`,
  * renders one of four UI paths:
@@ -95,7 +93,6 @@ export default function SearchCatalogue() {
                   priceLabel={card.priceLabel}
                   oem={card.oem}
                   image={card.images[0]}
-                  imageSource={FALLBACK_IMAGE}
                   style={{ width: CARD_WIDTH }}
                   onPress={() => openItemDetail(card.id)}
                 />
