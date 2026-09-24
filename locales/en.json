@@ -283,16 +283,16 @@
     "verifyContinue": "Verify & continue",
     "resendCode": "Resend code",
     "didntGetItResend": "Didn’t get it? Resend code",
-    "acceptTerms": "I accept the",
-    "acceptPrivacy": "I acknowledge the",
-    "acceptPersonalData": "I consent to the processing of my personal data —",
     "legalRequiredTitle": "Legal acceptance required",
     "legalRequiredBody": "Please review and accept the required documents to continue.",
     "phoneLegalPrefix": "By continuing, you agree to the ",
     "phoneLegalTerms": "Terms & Conditions",
     "phoneLegalAnd": " and ",
     "phoneLegalPrivacy": "Privacy Policy",
-    "phoneLegalSuffix": "."
+    "phoneLegalSuffix": ".",
+    "agreeAndContinue": "Agree & continue",
+    "agreeNotePrefix": "By continuing you accept the ",
+    "agreeNoteComma": ", "
   },
   "splash": {
     "skip": "Skip",
@@ -883,17 +883,10 @@
     "loadError": "Could not load the document.",
     "unavailable": "This document is not available right now.",
     "versionLine": "Version {{version}} · Effective {{date}}",
-    "updatedTitle": "Updated legal documents",
-    "updatedBody": "Some documents have been updated. Please review and accept them.",
-    "acceptAction": "Accept",
-    "acceptError": "Could not record your acceptance. Please try again.",
     "types": {
       "TERMS_OF_USE": "Terms & Conditions",
       "PRIVACY_POLICY": "Privacy Policy",
       "PERSONAL_DATA_CONSENT": "Personal Data Consent"
-    },
-    "acceptAndContinue": "Accept and continue",
-    "statusErrorTitle": "Could not verify your legal status",
-    "statusErrorBody": "We could not check whether updated documents need your acceptance. Please check your connection and try again."
+    }
   }
 }

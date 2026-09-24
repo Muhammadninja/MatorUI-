@@ -1,16 +1,20 @@
 /**
  * Registration legal consent — gating logic and wiring guards.
  *
+ * Consent lives in ONE place: the "Agree & continue" button on the OTP step.
+ * Tapping it IS the acceptance — there are no checkboxes, and there is no
+ * post-login acceptance sheet (the old `LegalUpdateHost`, which re-prompted a
+ * signed-in user on every reload, is gone).
+ *
  * The screen itself can't be rendered under vitest (see the note in
  * `app-pressable-view-regression.test.tsx`: react-native's Flow-typed entry
  * defeats the parser). So this spec covers the two things that actually carry
  * the requirement:
  *
- *   1. the gating RULE, extracted and exercised directly over every
- *      combination of checkbox state;
- *   2. structural guards proving the screen wires that rule into the Continue
- *      button, sends backend versions, and handles LEGAL_ACCEPTANCE_REQUIRED
- *      separately from an OTP failure.
+ *   1. the version RULE, extracted and exercised directly;
+ *   2. structural guards proving the screen names every document next to the
+ *      button, sends backend versions, records the acceptance, and handles
+ *      LEGAL_ACCEPTANCE_REQUIRED separately from an OTP failure.
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -29,20 +33,12 @@ function read(rel: string): string {
 
 const SCREEN = 'components/screens-components/auth/passwordless-auth-screen.tsx';
 
-// ── The gating rule ──────────────────────────────────────────────────────
+// ── The version rule ─────────────────────────────────────────────────────
 //
-// Mirrors the screen's `allAccepted` + `legalVersions()`. Kept in the test as
-// a pure function so every checkbox permutation is cheap to assert.
+// Mirrors the screen's `legalVersions()`. Kept in the test as a pure function
+// so the "never invent a version" requirement is asserted directly.
 
-type Accepted = Record<LegalDocumentType, boolean>;
-
-function allAccepted(documents: LegalDocument[], accepted: Accepted): boolean {
-  const required = documents.filter((d) => d.is_required).map((d) => d.type);
-  return required.length > 0 && required.every((type) => accepted[type]);
-}
-
-function legalVersions(documents: LegalDocument[], accepted: Accepted) {
-  if (!allAccepted(documents, accepted)) return undefined;
+function legalVersions(documents: LegalDocument[]) {
   const versionOf = (t: LegalDocumentType) => documents.find((d) => d.type === t)?.version;
   const terms = versionOf('TERMS_OF_USE');
   const privacy = versionOf('PRIVACY_POLICY');
@@ -74,72 +70,9 @@ const DOCS = [
   doc('PERSONAL_DATA_CONSENT', 2),
 ];
 
-const NONE: Accepted = {
-  TERMS_OF_USE: false,
-  PRIVACY_POLICY: false,
-  PERSONAL_DATA_CONSENT: false,
-};
-
-describe('continue gating', () => {
-  test('nothing checked → blocked', () => {
-    expect(allAccepted(DOCS, NONE)).toBe(false);
-    expect(legalVersions(DOCS, NONE)).toBeUndefined();
-  });
-
-  test.each([
-    ['TERMS_OF_USE'],
-    ['PRIVACY_POLICY'],
-    ['PERSONAL_DATA_CONSENT'],
-  ] as const)('only %s checked → still blocked', (type) => {
-    expect(allAccepted(DOCS, { ...NONE, [type]: true })).toBe(false);
-  });
-
-  test.each([
-    ['TERMS_OF_USE', 'PRIVACY_POLICY'],
-    ['TERMS_OF_USE', 'PERSONAL_DATA_CONSENT'],
-    ['PRIVACY_POLICY', 'PERSONAL_DATA_CONSENT'],
-  ] as const)('two of three (%s + %s) → still blocked', (a, b) => {
-    expect(allAccepted(DOCS, { ...NONE, [a]: true, [b]: true })).toBe(false);
-  });
-
-  test('all three checked → allowed', () => {
-    const all: Accepted = {
-      TERMS_OF_USE: true,
-      PRIVACY_POLICY: true,
-      PERSONAL_DATA_CONSENT: true,
-    };
-    expect(allAccepted(DOCS, all)).toBe(true);
-  });
-
-  test('documents not loaded yet → blocked (never fails open)', () => {
-    const all: Accepted = {
-      TERMS_OF_USE: true,
-      PRIVACY_POLICY: true,
-      PERSONAL_DATA_CONSENT: true,
-    };
-    expect(allAccepted([], all)).toBe(false);
-  });
-
-  test('an optional document does not gate the button', () => {
-    const docs = [
-      doc('TERMS_OF_USE', 4),
-      doc('PRIVACY_POLICY', 9),
-      { ...doc('PERSONAL_DATA_CONSENT', 2), is_required: false },
-    ];
-    expect(
-      allAccepted(docs, { ...NONE, TERMS_OF_USE: true, PRIVACY_POLICY: true }),
-    ).toBe(true);
-  });
-});
-
 describe('submitted versions', () => {
   test('come from the fetched documents, not a constant', () => {
-    const all: Accepted = {
-      TERMS_OF_USE: true,
-      PRIVACY_POLICY: true,
-      PERSONAL_DATA_CONSENT: true,
-    };
-    expect(legalVersions(DOCS, all)).toEqual({
+    expect(legalVersions(DOCS)).toEqual({
       terms_version: 4,
       privacy_version: 9,
       personal_data_consent_version: 2,
@@ -147,64 +80,77 @@ describe('submitted versions', () => {
   });
 
   test('a different backend payload yields different versions', () => {
-    const all: Accepted = {
-      TERMS_OF_USE: true,
-      PRIVACY_POLICY: true,
-      PERSONAL_DATA_CONSENT: true,
-    };
     const other = [
       doc('TERMS_OF_USE', 11),
       doc('PRIVACY_POLICY', 12),
       doc('PERSONAL_DATA_CONSENT', 13),
     ];
-    expect(legalVersions(other, all)).toEqual({
+    expect(legalVersions(other)).toEqual({
       terms_version: 11,
       privacy_version: 12,
       personal_data_consent_version: 13,
     });
   });
-});
 
-describe('documents-unavailable gate', () => {
-  /** Mirrors the screen's `legalGateSatisfied`. */
-  const gate = (state: string, accepted: boolean) => (state === 'error' ? true : accepted);
-
-  test('a failed documents request does NOT lock an existing user out', () => {
-    // The backend ignores `legal` for an existing account, so blocking here
-    // would turn an unrelated network error into "cannot sign in".
-    expect(gate('error', false)).toBe(true);
+  test('documents never loaded → no versions, so consent is never faked', () => {
+    expect(legalVersions([])).toBeUndefined();
   });
 
-  test('a successful load still requires explicit consent', () => {
-    expect(gate('success', false)).toBe(false);
-    expect(gate('success', true)).toBe(true);
-  });
-
-  test('still loading blocks — never fails open mid-flight', () => {
-    expect(gate('loading', false)).toBe(false);
-  });
-
-  test('no versions are sent when documents never loaded, so consent is never faked', () => {
-    const all: Accepted = {
-      TERMS_OF_USE: true,
-      PRIVACY_POLICY: true,
-      PERSONAL_DATA_CONSENT: true,
-    };
-    // Even with the gate open, an empty document set yields no legal block —
-    // a registration cannot silently succeed without real consent.
-    expect(legalVersions([], all)).toBeUndefined();
+  test('a partial document set is not padded with a default', () => {
+    expect(legalVersions([doc('TERMS_OF_USE', 4), doc('PRIVACY_POLICY', 9)])).toBeUndefined();
   });
 });
 
 describe('screen wiring', () => {
   const source = read(SCREEN);
 
-  test('the Continue button is gated on the legal gate', () => {
-    expect(source).toMatch(/disabled=\{[^}]*!legalGateSatisfied/);
+  test('the CTA is the consent action', () => {
+    expect(source).toContain("t('auth.agreeAndContinue')");
+    expect(source).not.toContain("t('auth.verifyContinue')");
+  });
+
+  test('a failed documents request does not disable the CTA', () => {
+    // The backend is the real gate (LEGAL_ACCEPTANCE_REQUIRED); blocking here
+    // would turn an unrelated network error into "cannot sign in".
+    const idx = source.indexOf('testID="auth-verify-btn"');
+    expect(idx).toBeGreaterThan(-1);
+    const button = source.slice(idx, source.indexOf('/>', idx));
+    expect(button).toContain('disabled={isLoading || code.length < 6}');
+    expect(button).not.toContain('legalGateSatisfied');
+  });
+
+  test('every document is named next to the button, each one tappable', () => {
+    for (const type of [
+      'TERMS_OF_USE',
+      'PRIVACY_POLICY',
+      'PERSONAL_DATA_CONSENT',
+    ] as const) {
+      expect(source).toContain(`testID="auth-legal-${type}"`);
+      expect(source).toContain(`openLegalDoc('${type}')`);
+    }
+  });
+
+  test('the consent line has no checkboxes', () => {
+    expect(source).not.toContain('AppCheckbox');
+    expect(source).not.toContain('CONSENT_ROWS');
   });
 
   test('verify-otp is called with backend-sourced legal versions', () => {
     expect(source).toContain('legal: legalVersions()');
+  });
+
+  test('the tap is recorded as an acceptance for existing accounts too', () => {
+    expect(source).toContain('void recordAcceptance();');
+    // The versions posted come from the documents, never a literal.
+    const idx = source.indexOf('const recordAcceptance');
+    const body = source.slice(idx, source.indexOf('};', idx));
+    expect(body).toContain('legalDocuments.map((d) => ({ type: d.type, version: d.version }))');
+  });
+
+  test('a failed acceptance never breaks a successful sign-in', () => {
+    const idx = source.indexOf('const recordAcceptance');
+    const body = source.slice(idx, source.indexOf('};', idx));
+    expect(body).toMatch(/try\s*\{[\s\S]*await accept\(acceptances\);[\s\S]*\}\s*catch/);
   });
 
   test('LEGAL_ACCEPTANCE_REQUIRED is handled before the generic OTP error', () => {
@@ -218,13 +164,8 @@ describe('screen wiring', () => {
     const branch = source.slice(legalIdx, otpIdx);
     expect(branch).toContain('return;');
     expect(branch).toContain('auth.legalRequiredTitle');
-  });
-
-  test('checkboxes are never pre-ticked', () => {
-    // The initial acceptance state must be all-false.
-    const init = source.slice(source.indexOf('useState<Record<LegalDocumentType, boolean>>'));
-    const block = init.slice(0, init.indexOf('});'));
-    expect(block).not.toMatch(/:\s*true/);
+    // It re-fetches the documents so the next tap carries current versions.
+    expect(branch).toContain('refreshLegal();');
   });
 
   test('the passive "By continuing you agree" notice is gone', () => {

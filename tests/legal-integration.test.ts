@@ -114,7 +114,7 @@ describe('no hardcoded legal content', () => {
       'services/legal-api.ts',
       'hooks/use-legal.ts',
       'components/screens/legal-document-screen.tsx',
-      'components/shared/legal-update-host/legal-update-host.tsx',
+      'components/screens-components/auth/passwordless-auth-screen.tsx',
     ]) {
       const source = read(rel);
       expect(source, `${rel} hardcodes a version`).not.toMatch(
@@ -132,7 +132,7 @@ describe('no hardcoded legal content', () => {
   });
 });
 
-describe('gate policy', () => {
+describe('consent policy', () => {
   test('no LegalGuard / LegalInterceptor / middleware module exists', () => {
     for (const bad of [
       'guards/legal-guard.ts',
@@ -143,25 +143,42 @@ describe('gate policy', () => {
     }
   });
 
-  // NOTE: the mandatory gate's actual behavior (non-dismissible, no bypass
-  // control, anonymous users unaffected) is covered by RENDERED tests in
-  // `legal-update-host.test.tsx`. The checks here only guard the two
-  // repo-wide invariants a rendered test cannot see: that the bypass strings
-  // are gone from every locale bundle, and that no route guard exists.
-  test.each(LOCALES)('%s.json has no Later/Skip bypass string left', (loc) => {
-    const legal = (readJson(`locales/${loc}.json`) as { legal?: Record<string, unknown> })
-      .legal!;
-    expect(legal.later).toBeUndefined();
-    expect(legal.reviewAction).toBeUndefined();
-    // The mandatory CTA replaced it.
-    expect(legal.acceptAndContinue).toBeTruthy();
+  // The post-login acceptance sheet re-prompted a signed-in user on every
+  // reload. Consent is now collected once, at sign-in, by the "Agree &
+  // continue" button — so nothing may re-open an acceptance prompt later.
+  test('the post-login acceptance host is gone', () => {
+    expect(existsSync(join(ROOT, 'components/shared/legal-update-host'))).toBe(false);
   });
 
-  test.each(LOCALES)('%s.json provides the blocking status-error copy', (loc) => {
+  test('the root layout mounts no legal host', () => {
+    expect(read('app/_layout.tsx')).not.toContain('LegalUpdateHost');
+  });
+
+  test.each(LOCALES)('%s.json dropped the acceptance-sheet copy', (loc) => {
     const legal = (readJson(`locales/${loc}.json`) as { legal?: Record<string, unknown> })
       .legal!;
-    expect(legal.statusErrorTitle).toBeTruthy();
-    expect(legal.statusErrorBody).toBeTruthy();
+    for (const key of [
+      'later',
+      'reviewAction',
+      'updatedTitle',
+      'updatedBody',
+      'acceptAndContinue',
+      'statusErrorTitle',
+      'statusErrorBody',
+    ]) {
+      expect(legal[key], `legal.${key} belongs to the removed sheet`).toBeUndefined();
+    }
+  });
+
+  test.each(LOCALES)('%s.json carries the sign-in consent copy', (loc) => {
+    const auth = (readJson(`locales/${loc}.json`) as { auth?: Record<string, unknown> })
+      .auth!;
+    expect(auth.agreeAndContinue).toBeTruthy();
+    expect(auth.agreeNotePrefix).toBeTruthy();
+    // The checkbox row labels went with the checkboxes.
+    expect(auth.acceptTerms).toBeUndefined();
+    expect(auth.acceptPrivacy).toBeUndefined();
+    expect(auth.acceptPersonalData).toBeUndefined();
   });
 
   test('the api-client has no legal-acceptance interception', () => {
@@ -226,7 +243,7 @@ describe('accept payload contract', () => {
     for (const rel of [
       'services/legal-api.ts',
       'hooks/use-legal.ts',
-      'components/shared/legal-update-host/legal-update-host.tsx',
+      'components/screens-components/auth/passwordless-auth-screen.tsx',
       'components/screens/legal-document-screen.tsx',
     ]) {
       const code = read(rel)

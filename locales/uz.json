@@ -283,16 +283,16 @@
     "verifyContinue": "Tasdiqlash va davom etish",
     "resendCode": "Kodni qayta yuborish",
     "didntGetItResend": "Kod kelmadimi? Qayta yuborish",
-    "acceptTerms": "Men qabul qilaman:",
-    "acceptPrivacy": "Men tanishib chiqdim:",
-    "acceptPersonalData": "Shaxsiy maʼlumotlarimni qayta ishlashga rozilik beraman —",
     "legalRequiredTitle": "Hujjatlarni qabul qilish talab etiladi",
     "legalRequiredBody": "Davom etish uchun kerakli hujjatlarni koʻrib chiqing va qabul qiling.",
     "phoneLegalPrefix": "Davom etish orqali siz ",
     "phoneLegalTerms": "Foydalanish shartlari",
     "phoneLegalAnd": " va ",
     "phoneLegalPrivacy": "Maxfiylik siyosatini",
-    "phoneLegalSuffix": " qabul qilasiz."
+    "phoneLegalSuffix": " qabul qilasiz.",
+    "agreeAndContinue": "Qabul qilaman va davom etaman",
+    "agreeNotePrefix": "Davom etish orqali siz ",
+    "agreeNoteComma": ", "
   },
   "splash": {
     "skip": "Oʻtkazib yuborish",
@@ -883,17 +883,10 @@
     "loadError": "Hujjatni yuklab boʻlmadi.",
     "unavailable": "Bu hujjat hozircha mavjud emas.",
     "versionLine": "Versiya {{version}} · Amal qiladi {{date}}",
-    "updatedTitle": "Hujjatlar yangilandi",
-    "updatedBody": "Baʼzi hujjatlar yangilandi. Iltimos, koʻrib chiqing va qabul qiling.",
-    "acceptAction": "Qabul qilish",
-    "acceptError": "Rozilikni saqlab boʻlmadi. Qayta urinib koʻring.",
     "types": {
       "TERMS_OF_USE": "Foydalanish shartlari",
       "PRIVACY_POLICY": "Maxfiylik siyosati",
       "PERSONAL_DATA_CONSENT": "Shaxsiy maʼlumotlarga rozilik"
-    },
-    "acceptAndContinue": "Qabul qilish va davom etish",
-    "statusErrorTitle": "Hujjatlar holatini tekshirib boʻlmadi",
-    "statusErrorBody": "Yangilangan hujjatlarni qabul qilish kerakmi — buni tekshira olmadik. Ulanishni tekshirib, qayta urinib koʻring."
+    }
   }
 }
