@@ -25,7 +25,7 @@
  */
 
 import { isVinChecksumValid, isVinShapeValid, normalizeVin } from '@/utils/vin';
-import { decodeUzVin } from '@/services/uz-vin-catalog';
+import { classifyUzVin } from '@/services/uz-vin-catalog';
 
 // ── Public return contract ───────────────────────────────────────────────────
 
@@ -44,9 +44,9 @@ export interface DecodedVehicle {
   isVerified: boolean;
   /** The normalized 17-char VIN this record was decoded from (traceability). */
   vin: string;
-  /** Backend catalog id (e.g. `make_chevrolet`) when the provider resolved
-   *  one — set by the UZ-market decoder, absent for NHTSA. Threading these
-   *  through lets `POST /v1/garage/vehicles` validate make_id/model_id. */
+  /** Catalog id (e.g. `make_chevrolet`) when the provider resolved one — set
+   *  only by the UZ demo scheme, absent for real UzAuto patterns and NHTSA.
+   *  The add-vehicle screen resolves live ids by name instead. */
   makeId?: string;
   modelId?: string;
   /** Body silhouette key when known (UZ decoder only). */
@@ -59,7 +59,8 @@ export type VinDecodeErrorCode =
   | 'INVALID_LENGTH' //     not exactly 17 chars after sanitization
   | 'INVALID_CHARACTERS' // contains I / O / Q or other illegal symbols
   | 'CHECKSUM_FAILED' //    ISO 3779 check digit mismatch (strict mode only)
-  | 'NOT_FOUND' //          provider returned zero records for the VIN
+  | 'NOT_FOUND' //          provider returned no record, or one that identifies nothing
+  | 'UNSUPPORTED_VIN' //    a UzAuto VIN outside the evidence-backed pattern table
   | 'PROVIDER_ERROR' //     provider returned a non-2xx / malformed payload
   | 'NETWORK_ERROR' //      DNS / connect / transport failure
   | 'TIMEOUT'; //           request exceeded the configured budget
@@ -185,28 +186,43 @@ export class NhtsaVinDecodeTransport implements VinDecodeTransport {
 
 /**
  * UZ-market decoder with NHTSA fallback. UzAuto / GM-Uzbekistan VINs aren't
- * in NHTSA's database, so we resolve them locally against the mator catalog
- * (returning `MakeId`/`ModelId` so the garage create validates); anything
- * that isn't a recognised UZ pattern falls through to the wrapped provider.
- * This is the app-wide default so the existing VIN screen "just works" for
- * both UZ and foreign vehicles.
+ * in NHTSA's database, so they're decoded locally against the evidence-backed
+ * pattern table in `uz-vin-catalog.ts`. A UzAuto VIN the table can't decode
+ * fails as `UNSUPPORTED_VIN` without asking NHTSA, which can't decode it
+ * either. Anything that isn't a UZ VIN falls through to the wrapped provider.
+ * This is the app-wide default, so the VIN screen handles both UZ and foreign
+ * vehicles.
  */
 export class UzMarketVinDecodeTransport implements VinDecodeTransport {
-  constructor(private readonly fallback: VinDecodeTransport = new NhtsaVinDecodeTransport()) {}
+  constructor(
+    private readonly fallback: VinDecodeTransport = new NhtsaVinDecodeTransport(),
+    /** Clock for the model-year upper bound; tests pass a fixed date. */
+    private readonly now: () => Date = () => new Date(),
+  ) {}
 
   async fetchRaw(vin: string, signal: AbortSignal): Promise<RawVinRecord> {
-    const uz = decodeUzVin(vin);
-    if (uz) {
+    const uz = classifyUzVin(vin, this.now());
+    if (uz.kind === 'decoded') {
+      const d = uz.decode;
       return {
-        Make: uz.make,
-        Model: uz.model,
-        ModelYear: String(uz.year),
-        FuelTypePrimary: uz.fuelType,
+        Make: d.make,
+        Model: d.model,
+        ModelYear: String(d.year),
+        FuelTypePrimary: d.fuelType,
         ErrorCode: '0',
-        MakeId: uz.makeId,
-        ModelId: uz.modelId,
-        BodyStyle: uz.bodyStyle,
+        MakeId: d.makeId,
+        ModelId: d.modelId,
+        BodyStyle: d.bodyStyle,
       };
+    }
+    if (uz.kind === 'unsupported') {
+      throw new VinDecodeError(
+        'UNSUPPORTED_VIN',
+        uz.reason === 'model'
+          ? 'UzAuto VIN, but its model code is not in the verified pattern table.'
+          : 'UzAuto VIN, but its model year cannot be determined for this model.',
+        vin,
+      );
     }
     return this.fallback.fetchRaw(vin, signal);
   }
@@ -384,6 +400,18 @@ function mapRecord(vin: string, record: RawVinRecord): DecodedVehicle {
   const make = cleanString(record.Make);
   const model = cleanString(record.Model);
   const year = parseYear(record.ModelYear);
+
+  // A record that names neither make nor model identifies nothing. NHTSA
+  // answers that way for manufacturers it doesn't carry (error 7). It used
+  // to come back as a successful, empty "unidentified" decode; it's a
+  // failure.
+  if (make === null && model === null) {
+    throw new VinDecodeError(
+      'NOT_FOUND',
+      `VIN provider could not identify this vehicle${errorCode ? ` (error ${errorCode})` : ''}.`,
+      vin,
+    );
+  }
 
   return {
     vin,

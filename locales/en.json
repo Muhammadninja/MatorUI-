@@ -669,7 +669,9 @@
     "detailsOptional": "Details (optional)",
     "mileagePlaceholder": "e.g. 67000",
     "platePlaceholder": "01 A 123 BC",
-    "plateInvalid": "Enter a valid plate, e.g. 01 A 123 BC"
+    "plateInvalid": "Enter a valid plate, e.g. 01 A 123 BC",
+    "vinUnsupported": "This is a UzAuto VIN, but we can't identify its model from the VIN yet.",
+    "vinNotFound": "We couldn't identify a vehicle from this VIN. Check the number and try again."
   },
   "itemDetail": {
     "notFoundTitle": "Product not found",

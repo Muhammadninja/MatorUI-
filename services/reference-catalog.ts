@@ -213,6 +213,10 @@ export async function fetchModels(
  * (VIN-only) rather than falling back to bundled ids the live backend would
  * reject. On mock/offline builds it resolves against the bundled catalog —
  * harmless, since the mock transport doesn't validate ids.
+ *
+ * The model is matched by name first, then by id. Two live Chevrolet models
+ * share the name "Tracker" (`tracker-2` and `tracker`), so a decoder that knows
+ * the exact model passes its id (`Tracker-2`) instead of an ambiguous name.
  */
 export async function resolveCatalogIds(
   make: string,
@@ -226,7 +230,10 @@ export async function resolveCatalogIds(
   if (!useHttp()) {
     const lm = localMakes().find((x) => x.name.trim().toLowerCase() === wantMake);
     if (!lm) return {};
-    const lmd = localModels(lm.id).find((x) => x.name.trim().toLowerCase() === wantModel);
+    const local = localModels(lm.id);
+    const lmd =
+      local.find((x) => x.name.trim().toLowerCase() === wantModel) ??
+      local.find((x) => x.id.trim().toLowerCase() === wantModel);
     return lmd ? { makeId: lm.id, modelId: lmd.id } : {};
   }
 
@@ -244,7 +251,9 @@ export async function resolveCatalogIds(
         { signal },
       ),
     );
-    const md = models.find((x) => str(x.name).trim().toLowerCase() === wantModel);
+    const md =
+      models.find((x) => str(x.name).trim().toLowerCase() === wantModel) ??
+      models.find((x) => str(x.id).trim().toLowerCase() === wantModel);
     if (!md) return {};
     return { makeId, modelId: str(md.id) };
   } catch {
