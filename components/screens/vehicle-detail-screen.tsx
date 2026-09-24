@@ -10,18 +10,15 @@ import { AppButton } from '@/components/shared/app-button';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useActiveVehicle } from '@/contexts/active-vehicle.context';
+import { useLanguageContext } from '@/contexts/language.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import VehicleColorPicker from '@/components/screens-components/garage/vehicle-color-picker';
 import useGarage from '@/hooks/use-garage';
 import type { VehiclePatch } from '@/services/garage-service';
 import { toastService } from '@/services/toast-service';
+import { formatMileage } from '@/utils/mileage';
 import { colorEnumToHex, colorHexToEnum, nearestSwatch, normalizeHex } from '@/utils/vehicle-color';
 import { formatUzPlate, isValidUzPlate, normalizeUzPlate, UZ_PLATE_DISPLAY_MAXLENGTH } from '@/utils/uz-plate';
-
-function formatMileage(km: number | undefined, unit: string): string {
-  if (km === undefined) return '';
-  return `${km.toLocaleString('en-US')} ${unit}`;
-}
 
 function titleCase(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
@@ -60,6 +57,7 @@ export default function VehicleDetailScreen() {
   const { id, edit } = useLocalSearchParams<{ id?: string; edit?: string }>();
   const { vehicles, primaryVehicle, updateVehicle, removeVehicle, isMutating } = useGarage();
   const { currentActiveVehicle, setPrimaryVehicle } = useActiveVehicle();
+  const { language } = useLanguageContext();
 
   const vehicle = vehicles.find((v) => v.id === id) ?? primaryVehicle;
 
@@ -142,8 +140,8 @@ export default function VehicleDetailScreen() {
 
   const notSet = t('vehicleDetail.notSet');
   const mileageValue = useMemo(
-    () => formatMileage(vehicle?.mileage, t('vehicleDetail.mileageUnit')),
-    [vehicle?.mileage, t],
+    () => formatMileage(vehicle?.mileage, t('vehicleDetail.mileageUnit'), language),
+    [vehicle?.mileage, t, language],
   );
 
   // No vehicles in the garage (or none matched) — nothing to show.
