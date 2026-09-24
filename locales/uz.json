@@ -615,6 +615,8 @@
     "identifyFromVin": "VIN boʻyicha avtoni aniqlash",
     "decodingVin": "VIN oʻqilmoqda…",
     "decodedVehicle": "Aniqlangan avtomobil",
+    "unlistedTitle": "{{make}} hali katalogimizda yoʻq",
+    "unlistedBody": "Marka va modelni topa olmasak, avtomobilni saqlay olmaymiz. Uni garajdan model va yil orqali qoʻshib koʻring yoki katalog yangilangach qayta urinib koʻring.",
     "verified": "Tasdiqlangan",
     "partial": "Qisman",
     "unidentified": "Avtomobil aniqlanmadi",

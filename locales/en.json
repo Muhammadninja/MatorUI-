@@ -615,6 +615,8 @@
     "identifyFromVin": "Identify vehicle from VIN",
     "decodingVin": "Decoding VIN…",
     "decodedVehicle": "Decoded vehicle",
+    "unlistedTitle": "{{make}} is not in our catalogue yet",
+    "unlistedBody": "We can't save a car we can't match to a make and model. Try adding it by model and year from the garage, or check back once the catalogue is updated.",
     "verified": "Verified",
     "partial": "Partial",
     "unidentified": "Unidentified vehicle",

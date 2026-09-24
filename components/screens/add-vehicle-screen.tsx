@@ -37,6 +37,20 @@ export default function AddVehicleScreen() {
   const [saving, setSaving] = useState(false);
   const [decoding, setDecoding] = useState(false);
 
+  /**
+   * The backend's canonical ids for the decoded car, resolved at DECODE time.
+   *
+   * `POST /v1/garage/vehicles` requires `make_id` and `model_id` — both are
+   * plain `@IsString()` on `CreateVehicleDto`, neither is optional — so a
+   * create that omits them is a validation failure, not a server-side VIN
+   * decode. Resolving here rather than inside save means a car the reference
+   * catalogue doesn't carry is caught BEFORE the user is invited to save,
+   * instead of failing after they typed 17 characters.
+   *
+   * `null` = not resolved yet, `{}` = resolved to nothing (unseeded make).
+   */
+  const [catalogIds, setCatalogIds] = useState<{ makeId?: string; modelId?: string } | null>(null);
+
   // Optional details captured alongside the VIN. All backend-supported
   // (mileage_km / license_plate / color_hex); blank ones are simply omitted.
   const [mileage, setMileage] = useState('');
@@ -44,14 +58,28 @@ export default function AddVehicleScreen() {
   const [colorHex, setColorHex] = useState(DEFAULT_VEHICLE_COLOR_HEX);
 
   // This screen is VIN-only: Make / Model / Year come from the decoder, so Save
-  // is gated entirely on a successful decode that resolved all three.
-  const canSave =
+  // is gated on a successful decode that resolved all three.
+  const decodeComplete =
     !!decoded && decoded.make.length > 0 && decoded.model.length > 0 && decoded.year > 0;
+
+  /** Decoded fine, but the make/model isn't in the backend's catalogue. */
+  const unlistedInCatalog =
+    decodeComplete && catalogIds !== null && !(catalogIds.makeId && catalogIds.modelId);
+
+  // Save also needs the catalogue ids, because the create endpoint rejects a
+  // vehicle without them.
+  const canSave = decodeComplete && !!catalogIds?.makeId && !!catalogIds?.modelId;
 
   // Editing the VIN after a decode invalidates the preview.
   const handleVinChange = useCallback((next: string) => {
     setVin(next);
-    setDecoded((prev) => (prev && prev.vin !== next.trim().toUpperCase() ? null : prev));
+    setDecoded((prev) => {
+      const stale = prev && prev.vin !== next.trim().toUpperCase();
+      // Drop the resolved ids alongside the preview they belong to, or the
+      // next car would be saved under the previous car's make and model.
+      if (stale) setCatalogIds(null);
+      return stale ? null : prev;
+    });
   }, []);
 
   const handleSave = useCallback(async () => {
@@ -65,13 +93,10 @@ export default function AddVehicleScreen() {
     triggerHaptic('success');
     setSaving(true);
     try {
-      // Resolve the backend's canonical make_id/model_id from the live
-      // reference catalog by name. The VIN decoder only *guesses* ids and its
-      // guesses don't match the live seed (the "Unknown or mismatched
-      // make_id/model_id" 400). When they don't resolve — foreign VIN, or a
-      // model the catalog doesn't carry — we omit them and let the backend
-      // decode from the VIN instead.
-      const { makeId, modelId } = await resolveCatalogIds(decoded.make, decoded.model);
+      // Ids were resolved at decode time (see `catalogIds`). `canSave` already
+      // guarantees both are present, so nothing is omitted here — the create
+      // endpoint rejects a vehicle without them.
+      const { makeId, modelId } = catalogIds ?? {};
 
       // Parse mileage to a whole number of km; blank / non-numeric → omitted.
       const mileageDigits = mileage.replace(/[^\d]/g, '');
@@ -109,7 +134,7 @@ export default function AddVehicleScreen() {
     } finally {
       setSaving(false);
     }
-  }, [decoded, canSave, vin, mileage, plate, colorHex, addVehicle, t]);
+  }, [decoded, canSave, catalogIds, vin, mileage, plate, colorHex, addVehicle, t]);
 
   // Decode a VIN via the provider-agnostic VinDecoderService. Never throws —
   // domain errors surface as a screen-local toast so a provider outage can't
@@ -128,6 +153,18 @@ export default function AddVehicleScreen() {
     }
 
     setDecoded(result.data);
+
+    // Resolve the catalogue ids now, so the preview can tell the user whether
+    // this car is savable before offering them a Save button.
+    setCatalogIds(null);
+    try {
+      setCatalogIds(await resolveCatalogIds(result.data.make, result.data.model));
+    } catch {
+      // A reference-API failure is not "unlisted" — treat it as unresolved so
+      // the banner offers the other route rather than blaming the car.
+      setCatalogIds({});
+    }
+
     if (result.data.isVerified) {
       triggerHaptic('success');
       toastService.success(t('addVehicle.identifiedToast'), {
@@ -296,6 +333,35 @@ export default function AddVehicleScreen() {
               <AppText family="mono" colorName="textMuted" style={{ fontSize: 12 }}>
                 {decoded.vin}
               </AppText>
+
+              {/* The VIN read fine, but this make/model isn't in the backend's
+               *  reference catalogue, and the create endpoint requires its ids.
+               *  Saying so here — inside the preview, next to the car it is
+               *  about — beats a toast the user has already dismissed by the
+               *  time they press Save. */}
+              {unlistedInCatalog ? (
+                <AppView
+                  rounded={10}
+                  px={12}
+                  py={10}
+                  gap={4}
+                  style={{ backgroundColor: `${tokens.warning}1F` }}
+                >
+                  <AppText
+                    family="default"
+                    weight="semibold"
+                    style={{ fontSize: 12.5, color: tokens.text }}
+                  >
+                    {t('addVehicle.unlistedTitle', { make: decoded.make })}
+                  </AppText>
+                  <AppText
+                    family="default"
+                    style={{ fontSize: 12, lineHeight: 17, color: tokens.textMuted }}
+                  >
+                    {t('addVehicle.unlistedBody')}
+                  </AppText>
+                </AppView>
+              ) : null}
             </AppView>
           ) : null}
 
