@@ -473,10 +473,19 @@ type ChatStreamEvent =
 turn a 17-char VIN into a clean vehicle record. Used by the garage Add-Vehicle screen (§13)
 to auto-fill make / model / year. Provider is swappable via `VinDecodeTransport`.
 
-- **Provider (default):**
+- **UZ-market first (default engine, `UzMarketVinDecodeTransport`):** VINs are checked
+  against `services/uz-vin-catalog.ts` before any network call.
+  - **UzAuto (WMI `XWB`):** decoded from an evidence-backed pattern table (exact VDS,
+    positions 4–8; each row cites its source). The model year is position 10, with the
+    ISO 3779 cycle chosen by the model's year window.
+  - **A UzAuto VIN outside the table**, or with an ambiguous year, fails as
+    `UNSUPPORTED_VIN`. NHTSA does not carry `XWB`, so there is no fallback for it.
+  - **The synthetic `XUF` demo scheme** is kept for QA.
+- **Fallback provider (everything else):**
   `GET https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/{vin}?format=json`
   (public, keyless, global). `Results[0]` fields consumed: `Make, Model, ModelYear,
-  DisplacementL, FuelTypePrimary, ErrorCode`.
+  DisplacementL, FuelTypePrimary, ErrorCode`. A record with neither make nor model
+  (vPIC's answer for an unregistered manufacturer) is `NOT_FOUND`, not a decode.
 - **Validation before any network call** (reuses `utils/vin`): trim/uppercase, exactly 17
   chars, ISO 3779 alphabet (no I/O/Q). The position-9 check digit is validated but only
   **enforced** when `requireChecksum` is on (default **off** — UZ-market Chevrolets ship
@@ -491,7 +500,7 @@ to auto-fill make / model / year. Provider is swappable via `VinDecodeTransport`
   }
   ```
 - **Typed errors** `VinDecodeError { code }`: `INVALID_LENGTH | INVALID_CHARACTERS |
-  CHECKSUM_FAILED | NOT_FOUND | PROVIDER_ERROR | NETWORK_ERROR | TIMEOUT`. 10s timeout
+  CHECKSUM_FAILED | NOT_FOUND | UNSUPPORTED_VIN | PROVIDER_ERROR | NETWORK_ERROR | TIMEOUT`. 10s timeout
   (AbortController). `decodeSafe()` returns `{ ok, data|error }` (never throws);
   `decodeMany(vins, concurrency=5)` for bulk catalog seeding.
 - **Entry points:** `VinDecoderService.decode(vin)` (static facade over a shared singleton),

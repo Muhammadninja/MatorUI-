@@ -669,7 +669,9 @@
     "detailsOptional": "Tafsilotlar (ixtiyoriy)",
     "mileagePlaceholder": "masalan 67000",
     "platePlaceholder": "01 A 123 BC",
-    "plateInvalid": "To'g'ri raqam kiriting, masalan 01 A 123 BC"
+    "plateInvalid": "To'g'ri raqam kiriting, masalan 01 A 123 BC",
+    "vinUnsupported": "Bu UzAuto VIN raqami, lekin uning modelini hozircha aniqlay olmaymiz.",
+    "vinNotFound": "Bu VIN boʻyicha avtomobilni aniqlab boʻlmadi. Raqamni tekshirib, qayta urinib koʻring."
   },
   "itemDetail": {
     "notFoundTitle": "Mahsulot topilmadi",

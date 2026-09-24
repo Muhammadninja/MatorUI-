@@ -157,7 +157,15 @@ export default function AddVehicleScreen() {
     if (!result.ok) {
       setDecoded(null);
       triggerHaptic('warning');
-      toastService.danger(t('addVehicle.decodeErrorToast'), { description: result.error.message });
+      // The two "we read it but can't identify it" outcomes get a localized
+      // reason; the rest keep the decoder's message.
+      const description =
+        result.error.code === 'UNSUPPORTED_VIN'
+          ? t('addVehicle.vinUnsupported')
+          : result.error.code === 'NOT_FOUND'
+            ? t('addVehicle.vinNotFound')
+            : result.error.message;
+      toastService.danger(t('addVehicle.decodeErrorToast'), { description });
       return;
     }
 

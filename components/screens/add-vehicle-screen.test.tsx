@@ -10,7 +10,8 @@
  * itself once the create succeeds.
  *
  * These tests render the real screen inside the real `ActiveVehicleProvider`,
- * with the garage cache and the VIN decoder stubbed.
+ * with the garage cache stubbed. The VIN decoder is stubbed too, except in the
+ * G-5 test, which runs the real one.
  */
 import React from 'react';
 import { act, create, type ReactTestRenderer, type ReactTestInstance } from 'react-test-renderer';
@@ -92,16 +93,17 @@ vi.mock('@/hooks/use-garage', () => ({
   default: () => ({ addVehicle: (i: Record<string, unknown>) => addVehicle(i), isMutating: false }),
 }));
 
-vi.mock('@/services/vin-decoder-service', () => ({
-  VinDecoderService: {
-    decodeSafe: async (vin: string) => ({
-      ok: true,
-      data: {
-        vin, make: 'Chevrolet', model: 'Malibu', year: 2022,
-        engineDisplacement: null, fuelType: null, isVerified: true,
-      },
-    }),
+const decodeMalibu = async (vin: string): Promise<unknown> => ({
+  ok: true,
+  data: {
+    vin, make: 'Chevrolet', model: 'Malibu', year: 2022,
+    engineDisplacement: null, fuelType: null, isVerified: true,
   },
+});
+/** Swappable so one test can run the real decoder instead. */
+let decodeSafe = decodeMalibu;
+vi.mock('@/services/vin-decoder-service', () => ({
+  VinDecoderService: { decodeSafe: (vin: string) => decodeSafe(vin) },
 }));
 vi.mock('@/services/reference-catalog', () => ({
   resolveCatalogIds: async () => ({ makeId: 'chevrolet', modelId: 'malibu' }),
@@ -190,17 +192,18 @@ async function addByVin(r: ReactTestRenderer) {
   });
 }
 
-describe('VIN route → active vehicle', () => {
-  beforeEach(() => {
-    vehicles = [{ ...COBALT }];
-    listeners = [];
-    snapshot = null;
-    setPrimaryOnServer.mockClear();
-    addVehicle.mockClear();
-    back.mockClear();
-    dangerToast.mockClear();
-  });
+beforeEach(() => {
+  vehicles = [{ ...COBALT }];
+  listeners = [];
+  snapshot = null;
+  setPrimaryOnServer.mockClear();
+  addVehicle.mockClear();
+  back.mockClear();
+  dangerToast.mockClear();
+  decodeSafe = decodeMalibu;
+});
 
+describe('VIN route → active vehicle', () => {
   test('the new car becomes the active vehicle in the same session', async () => {
     const r = await mount();
     expect(api.currentActiveVehicle?.vehicleId).toBe('v-cobalt');
@@ -240,5 +243,31 @@ describe('VIN route → active vehicle', () => {
     expect(snapshot).toBeNull();
     expect(dangerToast).toHaveBeenCalled();
     expect(back).not.toHaveBeenCalled();
+  });
+});
+
+describe('VIN route → undecodable UzAuto VIN (G-5)', () => {
+  test('the real decoder reports it as unsupported, with a localized reason and no Save', async () => {
+    const real = await vi.importActual<typeof import('@/services/vin-decoder-service')>(
+      '@/services/vin-decoder-service',
+    );
+    decodeSafe = (vin) => new real.VinDecoderService().decodeSafe(vin);
+
+    const r = await mount();
+    await act(async () => {
+      // UzAuto WMI, but a VDS outside the evidence table.
+      find(r, (n) => n.props.label === 'addVehicle.vinLabel').props.onChangeText('XWBZZ0000EA000000');
+    });
+    await act(async () => {
+      await find(r, (n) => n.props.accessibilityLabel === 'addVehicle.identifyFromVin').props.onPress();
+    });
+
+    // Before G-5 this came back ok:true as an empty "unidentified" card.
+    expect(dangerToast).toHaveBeenCalledWith('addVehicle.decodeErrorToast', {
+      description: 'addVehicle.vinUnsupported',
+    });
+    expect(r.root.findAll((n) => n.props.children === 'addVehicle.decodedVehicle')).toHaveLength(0);
+    expect(find(r, (n) => n.props.title === 'addVehicle.saveVehicle').props.disabled).toBe(true);
+    expect(addVehicle).not.toHaveBeenCalled();
   });
 });

@@ -679,7 +679,9 @@
     "detailsOptional": "Детали (необязательно)",
     "mileagePlaceholder": "напр. 67000",
     "platePlaceholder": "01 A 123 BC",
-    "plateInvalid": "Введите номер, напр. 01 A 123 BC"
+    "plateInvalid": "Введите номер, напр. 01 A 123 BC",
+    "vinUnsupported": "Это VIN UzAuto, но модель по нему мы пока определить не можем.",
+    "vinNotFound": "По этому VIN не удалось определить автомобиль. Проверьте номер и попробуйте снова."
   },
   "itemDetail": {
     "notFoundTitle": "Товар не найден",
