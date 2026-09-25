@@ -56,3 +56,6 @@ mock.log
 .claude-flow/daemon.pid
 .claude-flow/daemon-state.json
 .claude-flow/metrics/
+
+
+.npm-global/
