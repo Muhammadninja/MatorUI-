@@ -10,7 +10,7 @@
  * (§AuthPhoneEntryScreen / AuthOtpVerifyScreen). It maps between the app's
  * channel-agnostic internal types and the backend's phone-native wire shape:
  *
- *   POST /v1/auth/phone/request-otp  { phone_e164, country_iso2, channel:'sms' }
+ *   POST /v1/auth/phone/request-otp  { phone_e164, country_iso2, channel:'sms', lang }
  *                                      → { request_id, phone_e164, expires_at,
  *                                          resend_after_seconds, otp_length,
  *                                          is_existing_user, next_screen }
@@ -28,6 +28,7 @@
 import { apiClient, ApiError } from '@/services/api-client';
 import { debugLog } from '@/services/debug-log';
 import type { AuthSession } from '@/services/auth-storage';
+import type { LanguageCode } from '@/services/language-storage';
 import type { LegalRegistrationVersions } from '@/types/legal';
 
 export type UserSummary = {
@@ -50,6 +51,14 @@ export type RequestOtpInput = {
   /** E.164 phone (e.g. +998901234567) or an email address. */
   identifier: string;
   purpose: OtpPurpose;
+  /**
+   * Language of the SMS the code arrives in — the app's chosen interface
+   * language. Sent as `lang` on request-otp. That endpoint does NOT read
+   * `Accept-Language`, and the backend falls back to `uz` whenever `lang` is
+   * omitted, so it is required here: a caller that forgets it would silently
+   * text a Russian or English user in Uzbek.
+   */
+  lang: LanguageCode;
   /** Sign-up only — captured up front so verify can create the profile. */
   firstName?: string;
   lastName?: string;
@@ -323,7 +332,7 @@ class HttpAuthTransport implements AuthTransport {
     const phone_e164 = toE164(input.identifier);
     const r = await apiClient.post<RawRequestOtpResponse>(
       '/v1/auth/phone/request-otp',
-      { phone_e164, country_iso2: 'UZ', channel: 'sms' },
+      { phone_e164, country_iso2: 'UZ', channel: 'sms', lang: input.lang },
       { signal, skipAuth: true },
     );
     this.phoneByRequest.set(r.request_id, r.phone_e164 ?? phone_e164);

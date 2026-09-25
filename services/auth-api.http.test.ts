@@ -72,14 +72,35 @@ describe('HttpAuthTransport — request-otp', () => {
       channel: 'phone',
       identifier: '+998 90 123 45 67', // spaces stripped
       purpose: 'sign-in',
+      lang: 'ru',
     });
 
     const [url, body, opts] = post.mock.calls[0]!;
     expect(url).toBe('/v1/auth/phone/request-otp');
-    expect(body).toEqual({ phone_e164: '+998901234567', country_iso2: 'UZ', channel: 'sms' });
+    expect(body).toEqual({
+      phone_e164: '+998901234567',
+      country_iso2: 'UZ',
+      channel: 'sms',
+      lang: 'ru',
+    });
     expect(opts).toMatchObject({ skipAuth: true }); // no token yet → must not 401
     expect(res.otpToken).toBe('otp_ABC');
     expect(res.expiresIn).toBeGreaterThan(0);
+  });
+
+  // Regression: a Russian user got the SMS in Uzbek. RequestOtpDto.lang is the
+  // ONLY input the backend reads for the SMS language (request-otp ignores
+  // Accept-Language) and it falls back to `uz` when the field is absent — so
+  // the chosen language must be on the wire for every supported language.
+  test.each(['ru', 'uz', 'en'] as const)('sends lang=%s as the SMS language', async (lang) => {
+    post.mockResolvedValueOnce({ request_id: 'otp_L' });
+    await authTransport.requestOtp({
+      channel: 'phone',
+      identifier: '+998901234567',
+      purpose: 'sign-in',
+      lang,
+    });
+    expect(post.mock.calls[0]![1]).toMatchObject({ lang });
   });
 
   test.each([
@@ -89,7 +110,7 @@ describe('HttpAuthTransport — request-otp', () => {
     ['0901234567', '+998901234567'], // trunk-prefixed local number
   ])('normalizes %s → %s', async (input, expected) => {
     post.mockResolvedValueOnce({ request_id: 'otp_N' });
-    await authTransport.requestOtp({ channel: 'phone', identifier: input, purpose: 'sign-in' });
+    await authTransport.requestOtp({ channel: 'phone', identifier: input, purpose: 'sign-in', lang: 'en' });
     expect(post.mock.calls[0]![1]).toMatchObject({ phone_e164: expected });
   });
 
@@ -99,6 +120,7 @@ describe('HttpAuthTransport — request-otp', () => {
       channel: 'phone',
       identifier: '+998901112233',
       purpose: 'sign-in',
+      lang: 'en',
     });
     expect(res.expiresIn).toBe(45);
   });
@@ -109,6 +131,7 @@ describe('HttpAuthTransport — request-otp', () => {
       channel: 'phone',
       identifier: '+998901112233',
       purpose: 'sign-in',
+      lang: 'en',
     });
     expect(res.devCode).toBe('424242');
   });
@@ -121,6 +144,7 @@ describe('HttpAuthTransport — verify-otp', () => {
       channel: 'phone',
       identifier: '+998 90 123 45 67',
       purpose: 'sign-in',
+      lang: 'en',
     });
 
     post.mockResolvedValueOnce(verifyResponse());

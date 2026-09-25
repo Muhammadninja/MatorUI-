@@ -278,11 +278,32 @@ export default function VehicleDetailScreen() {
               </AppView>
             </AppView>
 
+            {/* Secondary actions on a detail screen, so they use the app's
+                secondary-button pattern (outline; see order-confirmation and
+                the global modal) rather than the solid CTA fill. Both solid
+                kinds are `#fff` in dark mode, which stacked two full-width
+                white slabs under the dark spec card. */}
             <AppView px={20} gap={10}>
               {!isActive ? (
-                <AppButton title={t('vehicleDetail.setActive')} kind="brand" size="lg" fullWidth onPress={handleSetActive} />
+                <AppButton
+                  testID="vehicle-set-active-btn"
+                  title={t('vehicleDetail.setActive')}
+                  kind="secondary"
+                  variant="outline"
+                  size="lg"
+                  fullWidth
+                  onPress={handleSetActive}
+                />
               ) : null}
-              <AppButton title={t('vehicleDetail.editDetails')} kind="secondary" size="lg" fullWidth onPress={openEdit} />
+              <AppButton
+                testID="vehicle-edit-details-btn"
+                title={t('vehicleDetail.editDetails')}
+                kind="secondary"
+                variant="outline"
+                size="lg"
+                fullWidth
+                onPress={openEdit}
+              />
             </AppView>
           </>
         )}

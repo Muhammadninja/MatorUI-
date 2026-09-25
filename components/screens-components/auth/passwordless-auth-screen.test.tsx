@@ -1,0 +1,289 @@
+/**
+ * Sign-in sheet — regression tests for the registration QA pass.
+ *
+ *   1. Keyboard: avoidance runs on BOTH platforms (it was iOS-only, so on
+ *      Android the keyboard covered the phone field), and the sheet scrolls.
+ *   2. SMS language: request-otp carries the language chosen on
+ *      /select-language (the backend texted Uzbek to everyone without it).
+ *   3. Consent: every document the Legal API returns is listed on BOTH steps —
+ *      the phone step used to hardcode Terms + Privacy only.
+ *   4. Legal links push the (auth)-stack document route, so Back returns to
+ *      this sheet (see tests/legal-integration.test.ts for the router side).
+ *
+ * Renders the real screen with its collaborators stubbed, the same way
+ * `vehicle-detail-screen.test.tsx` does.
+ */
+import React from 'react';
+import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+const { host } = vi.hoisted(() => ({
+  host:
+    (type: string) =>
+    ({ children, ...p }: Record<string, unknown> & { children?: React.ReactNode }) =>
+      React.createElement(type, p, children),
+}));
+
+const mocks = vi.hoisted(() => ({
+  language: 'ru' as 'en' | 'ru' | 'uz',
+  push: vi.fn(),
+  back: vi.fn(),
+  requestOtp: vi.fn(),
+  verifyOtp: vi.fn(),
+  documents: [] as unknown[],
+}));
+
+vi.mock('expo-router', () => ({
+  router: {
+    push: mocks.push,
+    back: mocks.back,
+    replace: vi.fn(),
+    canGoBack: () => true,
+  },
+}));
+vi.mock('react-native', () => ({
+  Animated: {
+    Value: class {
+      constructor(public v: number) {}
+    },
+    spring: () => ({ start: () => {} }),
+    View: host('animated-view'),
+  },
+  Dimensions: { get: () => ({ width: 392, height: 762 }) },
+  Pressable: host('backdrop'),
+  ScrollView: host('scroll'),
+  // Android — the platform of the QA report. RN's own KeyboardAvoidingView is
+  // stubbed so a regression back to it renders (and fails the keyboard test)
+  // instead of crashing the whole file.
+  Platform: { OS: 'android', select: (o: Record<string, unknown>) => o.android ?? o.default },
+  KeyboardAvoidingView: host('rn-keyboard-avoiding-view'),
+}));
+vi.mock('react-native-keyboard-controller', () => ({
+  KeyboardAvoidingView: host('keyboard-avoiding-view'),
+}));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 24, bottom: 34, left: 0, right: 0 }),
+}));
+vi.mock('@react-native-async-storage/async-storage', () => ({
+  default: { getItem: async () => null, setItem: async () => undefined },
+}));
+vi.mock('lucide-react-native', () => ({ ArrowLeft: () => null, X: () => null }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (k: string) => k }),
+}));
+
+vi.mock('@/components/shared/app-button', () => ({ AppButton: host('button') }));
+vi.mock('@/components/shared/app-text-field', () => ({ default: host('field') }));
+vi.mock('@/components/shared/app-text', () => ({ AppText: host('text') }));
+vi.mock('@/components/shared/app-view', () => ({
+  AppView: host('view'),
+  AppPressableView: host('pressable'),
+}));
+
+vi.mock('@/config/api', () => ({ getApiBaseUrl: () => 'https://api.test' }));
+vi.mock('@/services/api-client', () => ({ ApiError: class ApiError extends Error {} }));
+vi.mock('@/utils/haptics', () => ({ triggerHaptic: () => {} }));
+vi.mock('@/hooks/use-toast', () => ({
+  useToast: () => ({ info: () => {}, danger: () => {}, success: () => {} }),
+}));
+vi.mock('@/contexts/theme.context', () => ({
+  useThemeContext: () => ({ tokens: {}, scheme: 'dark' }),
+}));
+vi.mock('@/contexts/language.context', () => ({
+  useLanguageContext: () => ({ language: mocks.language }),
+}));
+vi.mock('@/contexts/user.context', () => ({
+  useUserContext: () => ({
+    requestOtp: mocks.requestOtp,
+    verifyOtp: mocks.verifyOtp,
+    isLoading: false,
+  }),
+}));
+vi.mock('@/hooks/use-legal', () => ({
+  useLegalDocuments: () => ({
+    state: mocks.documents.length ? 'success' : 'loading',
+    documents: mocks.documents,
+    byType: () => null,
+    error: null,
+    refresh: () => {},
+  }),
+  useAcceptLegal: () => ({ accept: async () => ({}), isPending: false, error: null }),
+}));
+
+import PasswordlessAuthScreen from './passwordless-auth-screen';
+import { legalDocumentSlug, type LegalDocument, type LegalDocumentType } from '@/types/legal';
+
+const doc = (type: LegalDocumentType, title: string): LegalDocument => ({
+  type,
+  version: 1,
+  locale: 'ru',
+  title,
+  content: 'body',
+  content_format: 'markdown',
+  effective_at: '2026-08-31T00:00:00.000Z',
+  is_required: true,
+});
+
+const TYPES: LegalDocumentType[] = ['TERMS_OF_USE', 'PRIVACY_POLICY', 'PERSONAL_DATA_CONSENT'];
+
+beforeEach(() => {
+  mocks.language = 'ru';
+  mocks.push.mockReset();
+  mocks.back.mockReset();
+  mocks.requestOtp.mockReset().mockResolvedValue({ otpToken: 'otp_1', expiresIn: 300 });
+  mocks.verifyOtp.mockReset();
+  mocks.documents = [
+    doc('TERMS_OF_USE', 'Пользовательское соглашение'),
+    doc('PRIVACY_POLICY', 'Политика конфиденциальности'),
+    doc('PERSONAL_DATA_CONSENT', 'Согласие на обработку персональных данных'),
+  ];
+});
+
+async function renderSheet() {
+  let r!: ReactTestRenderer;
+  await act(async () => {
+    r = create(<PasswordlessAuthScreen />);
+  });
+  const byTestID = (id: string): ReactTestInstance =>
+    r.root.find((n) => typeof n.type === 'string' && n.props.testID === id);
+  const linksWithPrefix = (prefix: string) =>
+    r.root
+      .findAll(
+        (n) =>
+          n.type === 'text' &&
+          typeof n.props.testID === 'string' &&
+          n.props.testID.startsWith(prefix) &&
+          n.props.accessibilityRole === 'link',
+      )
+      .map((n) => n.props.testID as string);
+
+  const typePhone = async (value: string) => {
+    await act(async () => byTestID('auth-phone-field').props.onChangeText(value));
+  };
+  const sendCode = async () => {
+    await act(async () => {
+      await byTestID('auth-send-code-btn').props.onPress();
+    });
+  };
+  return { r, byTestID, linksWithPrefix, typePhone, sendCode };
+}
+
+describe('keyboard', () => {
+  test('avoids the keyboard on every platform, not just iOS', async () => {
+    const { r } = await renderSheet();
+    const kav = r.root.find((n) => (n.type as string) === 'keyboard-avoiding-view');
+    // Not platform-gated: `undefined` here is what left Android uncovered.
+    expect(kav.props.behavior).toBe('padding');
+    // The sheet already pads for the bottom inset the keyboard covers.
+    expect(kav.props.keyboardVerticalOffset).toBe(-34);
+  });
+
+  test('the sheet scrolls when it is squeezed, and taps go through', async () => {
+    const { r } = await renderSheet();
+    const scroll = r.root.find((n) => (n.type as string) === 'scroll');
+    expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
+    // The phone field lives inside the scrollable content.
+    expect(scroll.findAll((n) => n.props.testID === 'auth-phone-field').length).toBeGreaterThan(0);
+  });
+});
+
+describe('language → phone → OTP', () => {
+  test.each(['ru', 'uz', 'en'] as const)(
+    'language %s is sent as lang on request-otp',
+    async (lang) => {
+      mocks.language = lang;
+      const { typePhone, sendCode } = await renderSheet();
+      await typePhone('+998 90 123 45 67');
+      await sendCode();
+
+      expect(mocks.requestOtp).toHaveBeenCalledTimes(1);
+      expect(mocks.requestOtp.mock.calls[0]![0]).toMatchObject({
+        channel: 'phone',
+        identifier: '+998 90 123 45 67',
+        lang,
+      });
+    },
+  );
+
+  test.each(['ru', 'uz', 'en'] as const)('language %s is sent again on resend', async (lang) => {
+    mocks.language = lang;
+    const { r, typePhone, sendCode } = await renderSheet();
+    await typePhone('+998 90 123 45 67');
+    await sendCode();
+
+    const resend = r.root.find(
+      (n) => (n.type as string) === 'pressable' && n.props.accessibilityLabel === 'auth.resendCode',
+    );
+    await act(async () => {
+      await resend.props.onPress();
+    });
+    expect(mocks.requestOtp).toHaveBeenCalledTimes(2);
+    // Same language on both requests — it is read from the app-wide
+    // LanguageProvider at each call, not captured once or defaulted.
+    expect(mocks.requestOtp.mock.calls.map((c) => c[0].lang)).toEqual([lang, lang]);
+  });
+});
+
+describe('legal documents on the registration sheet', () => {
+  test('phone step lists all three documents from the Legal API', async () => {
+    const { linksWithPrefix } = await renderSheet();
+    expect(linksWithPrefix('auth-phone-legal-')).toEqual(TYPES.map((t) => `auth-phone-legal-${t}`));
+  });
+
+  test('OTP step lists all three documents too', async () => {
+    const { linksWithPrefix, typePhone, sendCode } = await renderSheet();
+    await typePhone('+998 90 123 45 67');
+    await sendCode();
+    expect(linksWithPrefix('auth-legal-')).toEqual(TYPES.map((t) => `auth-legal-${t}`));
+  });
+
+  test('shows only what the backend returned — nothing is padded in', async () => {
+    mocks.documents = [doc('TERMS_OF_USE', 'Terms')];
+    const { linksWithPrefix } = await renderSheet();
+    expect(linksWithPrefix('auth-phone-legal-')).toEqual(['auth-phone-legal-TERMS_OF_USE']);
+  });
+
+  test.each(TYPES)(
+    'opening %s pushes the (auth)-stack document route, not the Profile tab route',
+    async (type) => {
+      const { byTestID } = await renderSheet();
+      await act(async () => byTestID(`auth-phone-legal-${type}`).props.onPress());
+
+      expect(mocks.push).toHaveBeenCalledTimes(1);
+      expect(mocks.push).toHaveBeenCalledWith({
+        pathname: '/legal/[type]',
+        params: { type: legalDocumentSlug(type) },
+      });
+      // The sheet itself is never dismissed on the way.
+      expect(mocks.back).not.toHaveBeenCalled();
+    },
+  );
+
+  // The router side (the sheet stays mounted under the document, same route
+  // key) is pinned in tests/registration-legal-navigation.test.ts; this pins
+  // that opening a document does nothing to the sheet's own state.
+  test('the OTP step keeps phone, code and step across a legal detour', async () => {
+    const { r, byTestID, typePhone, sendCode } = await renderSheet();
+    await typePhone('+998 90 123 45 67');
+    await sendCode();
+    await act(async () => byTestID('auth-otp-field').props.onChangeText('483917'));
+    await act(async () => byTestID('auth-legal-PERSONAL_DATA_CONSENT').props.onPress());
+
+    expect(mocks.push).toHaveBeenCalledWith({
+      pathname: '/legal/[type]',
+      params: { type: 'personal_data_consent' },
+    });
+    // Still on the OTP step, with the typed code…
+    expect(byTestID('auth-otp-field').props.value).toBe('483917');
+    // …and the CTA still armed for it.
+    expect(byTestID('auth-verify-btn').props.disabled).toBe(false);
+    // Back to the phone step: the number is still there.
+    const backToPhone = r.root.find(
+      (n) => (n.type as string) === 'pressable' && n.props.accessibilityLabel === 'auth.back',
+    );
+    await act(async () => backToPhone.props.onPress());
+    expect(byTestID('auth-phone-field').props.value).toBe('+998 90 123 45 67');
+  });
+});

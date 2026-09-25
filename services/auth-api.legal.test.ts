@@ -59,6 +59,7 @@ async function seedRequest(): Promise<string> {
     channel: 'phone',
     identifier: '+998901234567',
     purpose: 'sign-in',
+    lang: 'en',
   });
   post.mockReset();
   return otpToken;

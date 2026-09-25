@@ -285,14 +285,13 @@
     "didntGetItResend": "Не получили код? Отправить повторно",
     "legalRequiredTitle": "Требуется принятие документов",
     "legalRequiredBody": "Пожалуйста, ознакомьтесь с документами и примите их, чтобы продолжить.",
-    "phoneLegalPrefix": "Продолжая, вы принимаете ",
-    "phoneLegalTerms": "Условия использования",
+    "phoneLegalPrefix": "Продолжая, вы принимаете условия документов: ",
     "phoneLegalAnd": " и ",
-    "phoneLegalPrivacy": "Политику конфиденциальности",
     "phoneLegalSuffix": ".",
     "agreeAndContinue": "Принять и продолжить",
-    "agreeNotePrefix": "Продолжая, вы принимаете ",
-    "agreeNoteComma": ", "
+    "agreeNotePrefix": "Продолжая, вы принимаете условия документов: ",
+    "agreeNoteComma": ", ",
+    "legalDocsLoadError": "Не удалось загрузить документы."
   },
   "splash": {
     "skip": "Пропустить",

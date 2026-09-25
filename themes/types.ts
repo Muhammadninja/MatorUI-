@@ -90,5 +90,18 @@ export type ThemeTokens = {
   /** Low-alpha tint of `info`, for the fill behind informational badges
    *  (e.g. the "lowest price" pill). Mirrors `successSoft`. */
   infoSoft: string;
+  /** Surface of the Garage "active vehicle" hero card. Light mode keeps the
+   *  inverted black hero; dark mode uses the elevated `card` surface. It used
+   *  to be `brand`, the CTA fill — which is `#fff` in dark mode, so the hero
+   *  rendered as a full-width white block on the black Garage screen. */
+  hero: string;
+  /** Title / value text and icons on `hero`. */
+  onHero: string;
+  /** Secondary text on `hero` (stat labels). */
+  heroMuted: string;
+  /** Hairline divider on `hero`. */
+  heroDivider: string;
+  /** Low-alpha fill for the square icon button on `hero`. */
+  heroWash: string;
   [key: string]: string;
 };

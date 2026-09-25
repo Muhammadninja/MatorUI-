@@ -1,15 +1,18 @@
 import { router } from 'expo-router';
 import { ArrowLeft, X } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
+import { Animated, Dimensions, Pressable, ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { LegalConsentNote } from '@/components/screens-components/auth/legal-consent-note';
 import { AppButton } from '@/components/shared/app-button';
 import AppTextField from '@/components/shared/app-text-field';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
+import { useLanguageContext } from '@/contexts/language.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useUserContext } from '@/contexts/user.context';
 import { useToast } from '@/hooks/use-toast';
@@ -18,17 +21,11 @@ import { getApiBaseUrl } from '@/config/api';
 import { ApiError } from '@/services/api-client';
 import {
   LEGAL_ACCEPTANCE_REQUIRED,
+  legalDocumentSlug,
   type LegalDocumentType,
   type LegalRegistrationVersions,
 } from '@/types/legal';
 import { triggerHaptic } from '@/utils/haptics';
-
-/** Where each consent link navigates. Keyed by backend document type. */
-const LEGAL_ROUTES = {
-  TERMS_OF_USE: '/terms',
-  PRIVACY_POLICY: '/privacy',
-  PERSONAL_DATA_CONSENT: '/personal-data-consent',
-} as const satisfies Record<LegalDocumentType, string>;
 
 /** Turn a request/verify failure into a user-facing description. A 429
  *  (global rate limit) gets an explicit "too many attempts" message that
@@ -97,6 +94,9 @@ export default function PasswordlessAuthScreen() {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const { t } = useTranslation();
+  // The language picked on /select-language (persisted, app-wide). The OTP
+  // SMS is sent in it — see `RequestOtpInput.lang`.
+  const { language } = useLanguageContext();
   const { requestOtp, verifyOtp, isLoading } = useUserContext();
 
   // Slide the panel up over the (fading) scrim on mount so the screen underneath
@@ -125,13 +125,12 @@ export default function PasswordlessAuthScreen() {
   //
   // Versions come from the backend; the app never hardcodes one. The docs
   // query is public, so it resolves before the user has a session.
-  const { documents: legalDocuments, refresh: refreshLegal } = useLegalDocuments();
+  const {
+    documents: legalDocuments,
+    state: legalState,
+    refresh: refreshLegal,
+  } = useLegalDocuments();
   const { accept } = useAcceptLegal();
-
-  /** The document's own backend title, falling back to the UI label while the
-   *  (public) documents request is still in flight. */
-  const titleOf = (type: LegalDocumentType) =>
-    legalDocuments.find((d) => d.type === type)?.title ?? t(`legal.types.${type}`);
 
   /**
    * The `legal` block for verify-otp, built from the fetched document versions.
@@ -157,9 +156,13 @@ export default function PasswordlessAuthScreen() {
     };
   };
 
+  /** Push the document onto the (auth) stack, over this sheet — NOT the
+   *  Profile-tab /terms · /privacy · /personal-data-consent routes, which would
+   *  mount a second (tabs) navigator whose Back lands on Explore and strands
+   *  this sheet underneath. See app/(auth)/legal/[type].tsx. */
   const openLegalDoc = (type: LegalDocumentType) => {
     triggerHaptic('selection');
-    router.push(LEGAL_ROUTES[type]);
+    router.push({ pathname: '/legal/[type]', params: { type: legalDocumentSlug(type) } });
   };
 
   // Prefill the last-used number on reload (real backends only — demo already
@@ -195,6 +198,7 @@ export default function PasswordlessAuthScreen() {
         identifier,
         // Unified flow: the backend upserts by phone. See file header.
         purpose: 'sign-in',
+        lang: language,
       });
       triggerHaptic('success');
       setOtpToken(token);
@@ -264,6 +268,7 @@ export default function PasswordlessAuthScreen() {
         channel: 'phone',
         identifier: phone.trim(),
         purpose: 'sign-in',
+        lang: language,
       });
       setOtpToken(token);
       setCode(devCode ?? '');
@@ -280,7 +285,13 @@ export default function PasswordlessAuthScreen() {
   };
 
   return (
-    <AppView flex={1} justify="flex-end" testID="sign-in-screen" style={{ backgroundColor: 'rgba(0, 0, 0, 0.45)' }}>
+    <AppView
+      flex={1}
+      justify="flex-end"
+      testID="sign-in-screen"
+      // The top inset keeps a keyboard-squeezed sheet out of the status bar.
+      style={{ backgroundColor: 'rgba(0, 0, 0, 0.45)', paddingTop: insets.top }}
+    >
       {/* Backdrop — tap to dismiss. */}
       <Pressable
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
@@ -288,19 +299,46 @@ export default function PasswordlessAuthScreen() {
         accessibilityLabel={t('auth.dismiss')}
       />
 
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Animated.View style={{ transform: [{ translateY }] }}>
+      {/* Keyboard avoidance on BOTH platforms. RN's own KeyboardAvoidingView
+          was iOS-only here (`behavior` undefined on Android), and with Android
+          edge-to-edge the window no longer resizes for the IME — so the
+          keyboard simply covered the phone field. keyboard-controller's
+          version (its KeyboardProvider is mounted in the root layout) reads the
+          real IME frame on both platforms.
+          The negative offset hands back the bottom safe-area inset: the sheet
+          already pads for it, and the keyboard covers that strip anyway.
+          If the lifted sheet is taller than the space above the keyboard, it
+          shrinks (flexShrink down the chain) and its content scrolls, so the
+          field and the button stay reachable on small screens. */}
+      <KeyboardAvoidingView
+        behavior="padding"
+        automaticOffset
+        keyboardVerticalOffset={-insets.bottom}
+        style={{ flexShrink: 1 }}
+      >
+        <Animated.View style={{ flexShrink: 1, transform: [{ translateY }] }}>
         <AppView
           roundedTop={28}
-          px={20}
-          pt={10}
-          gap={16}
           style={{
             width: '100%',
+            flexShrink: 1,
+            overflow: 'hidden',
             borderWidth: 1,
             borderBottomWidth: 0,
             borderColor: tokens.border,
             backgroundColor: scheme === 'dark' ? tokens.card : tokens.white,
+          }}
+        >
+        <ScrollView
+          style={{ flexGrow: 0 }}
+          bounces={false}
+          showsVerticalScrollIndicator={false}
+          // First tap on "Next" / a legal link must act, not just close the keyboard.
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{
+            gap: 16,
+            paddingHorizontal: 20,
+            paddingTop: 10,
             paddingBottom: insets.bottom + 20,
           }}
         >
@@ -380,38 +418,17 @@ export default function PasswordlessAuthScreen() {
                   must be told what they're agreeing to one step before the
                   binding tap on the OTP step. Unblocking by design: the act of
                   acceptance is the "Agree & continue" button, and nowhere
-                  else. */}
-              <AppText
+                  else. Lists every document the Legal API returned — it used
+                  to hardcode Terms + Privacy and drop PERSONAL_DATA_CONSENT. */}
+              <LegalConsentNote
                 testID="auth-phone-legal-note"
-                family="default"
-                style={{ fontSize: 12, lineHeight: 17, color: tokens.textMuted }}
-              >
-                {t('auth.phoneLegalPrefix')}
-                <AppText
-                  testID="auth-phone-legal-terms"
-                  family="default"
-                  weight="semibold"
-                  underline
-                  accessibilityRole="link"
-                  style={{ fontSize: 12, color: tokens.text }}
-                  onPress={() => openLegalDoc('TERMS_OF_USE')}
-                >
-                  {t('auth.phoneLegalTerms')}
-                </AppText>
-                {t('auth.phoneLegalAnd')}
-                <AppText
-                  testID="auth-phone-legal-privacy"
-                  family="default"
-                  weight="semibold"
-                  underline
-                  accessibilityRole="link"
-                  style={{ fontSize: 12, color: tokens.text }}
-                  onPress={() => openLegalDoc('PRIVACY_POLICY')}
-                >
-                  {t('auth.phoneLegalPrivacy')}
-                </AppText>
-                {t('auth.phoneLegalSuffix')}
-              </AppText>
+                linkTestIDPrefix="auth-phone-legal-"
+                prefix={t('auth.phoneLegalPrefix')}
+                documents={legalDocuments}
+                state={legalState}
+                onOpen={openLegalDoc}
+                onRetry={refreshLegal}
+              />
             </>
           ) : (
             <>
@@ -446,50 +463,17 @@ export default function PasswordlessAuthScreen() {
                   acceptance, and this line names every document that tap
                   accepts. Each title is tappable and opens the full text.
                   No checkboxes, and no separate acceptance sheet after
-                  sign-in — see `recordAcceptance`. */}
-              <AppText
+                  sign-in — see `recordAcceptance`, which accepts exactly the
+                  documents this line names. */}
+              <LegalConsentNote
                 testID="auth-legal-note"
-                family="default"
-                style={{ fontSize: 12.5, lineHeight: 18, color: tokens.textMuted }}
-              >
-                {t('auth.agreeNotePrefix')}
-                <AppText
-                  testID="auth-legal-TERMS_OF_USE"
-                  family="default"
-                  weight="bold"
-                  underline
-                  accessibilityRole="link"
-                  style={{ fontSize: 12.5, color: tokens.text }}
-                  onPress={() => openLegalDoc('TERMS_OF_USE')}
-                >
-                  {titleOf('TERMS_OF_USE')}
-                </AppText>
-                {t('auth.agreeNoteComma')}
-                <AppText
-                  testID="auth-legal-PRIVACY_POLICY"
-                  family="default"
-                  weight="bold"
-                  underline
-                  accessibilityRole="link"
-                  style={{ fontSize: 12.5, color: tokens.text }}
-                  onPress={() => openLegalDoc('PRIVACY_POLICY')}
-                >
-                  {titleOf('PRIVACY_POLICY')}
-                </AppText>
-                {t('auth.phoneLegalAnd')}
-                <AppText
-                  testID="auth-legal-PERSONAL_DATA_CONSENT"
-                  family="default"
-                  weight="bold"
-                  underline
-                  accessibilityRole="link"
-                  style={{ fontSize: 12.5, color: tokens.text }}
-                  onPress={() => openLegalDoc('PERSONAL_DATA_CONSENT')}
-                >
-                  {titleOf('PERSONAL_DATA_CONSENT')}
-                </AppText>
-                {t('auth.phoneLegalSuffix')}
-              </AppText>
+                linkTestIDPrefix="auth-legal-"
+                prefix={t('auth.agreeNotePrefix')}
+                documents={legalDocuments}
+                state={legalState}
+                onOpen={openLegalDoc}
+                onRetry={refreshLegal}
+              />
 
               {/* Sole control, and the consent itself: pressing it accepts the
                   documents named above. A failed documents request does not
@@ -518,6 +502,7 @@ export default function PasswordlessAuthScreen() {
               </AppPressableView>
             </>
           )}
+        </ScrollView>
         </AppView>
         </Animated.View>
       </KeyboardAvoidingView>

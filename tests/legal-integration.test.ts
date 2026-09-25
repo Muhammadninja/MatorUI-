@@ -11,7 +11,14 @@ import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 
 import { MockLegalTransport } from '@/services/legal-api';
-import { LEGAL_DOCUMENT_TYPES, MARKDOWN_CONTENT_FORMAT } from '@/types/legal';
+import {
+  LEGAL_DOCUMENT_TYPES,
+  legalDocumentSlug,
+  legalDocumentTypeFromSlug,
+  MARKDOWN_CONTENT_FORMAT,
+  orderLegalDocuments,
+  type LegalDocument,
+} from '@/types/legal';
 
 const ROOT = join(__dirname, '..');
 
@@ -278,5 +285,66 @@ describe('markdown safety wiring', () => {
 
   test('the parser is the only link-target authority', () => {
     expect(read('utils/markdown.ts')).toContain('isSafeHref');
+  });
+});
+
+describe('legal document helpers', () => {
+  const doc = (type: string, title = type) =>
+    ({
+      type,
+      version: 1,
+      locale: 'ru',
+      title,
+      content: '',
+      content_format: 'markdown',
+      effective_at: '2026-08-31T00:00:00.000Z',
+      is_required: true,
+    }) as LegalDocument;
+
+  test('orderLegalDocuments keeps every document, in UI order', () => {
+    const ordered = orderLegalDocuments([
+      doc('PERSONAL_DATA_CONSENT'),
+      doc('TERMS_OF_USE'),
+      doc('PRIVACY_POLICY'),
+    ]);
+    expect(ordered.map((d) => d.type)).toEqual([...LEGAL_DOCUMENT_TYPES]);
+  });
+
+  test('an unknown future type is kept (last), not dropped', () => {
+    const ordered = orderLegalDocuments([doc('COOKIE_POLICY'), doc('TERMS_OF_USE')]);
+    expect(ordered.map((d) => d.type)).toEqual(['TERMS_OF_USE', 'COOKIE_POLICY']);
+  });
+
+  test('nothing is invented for an empty response', () => {
+    expect(orderLegalDocuments([])).toEqual([]);
+  });
+
+  test('slugs round-trip for all three documents', () => {
+    expect(LEGAL_DOCUMENT_TYPES.map(legalDocumentSlug)).toEqual([
+      'terms_of_use',
+      'privacy_policy',
+      'personal_data_consent',
+    ]);
+    for (const type of LEGAL_DOCUMENT_TYPES) {
+      expect(legalDocumentTypeFromSlug(legalDocumentSlug(type))).toBe(type);
+    }
+  });
+
+  // No false fallback: anything that is not exactly one of the three slugs is
+  // null — the route then shows "unavailable", never a different document.
+  test.each([
+    'TERMS_OF_USE', // the enum itself is not a slug
+    'Terms_Of_Use',
+    'terms',
+    'terms_of_use ',
+    'privacy',
+    'cookie_policy', // a type this build does not know
+    '',
+    undefined,
+    null,
+    1,
+    ['terms_of_use'], // expo-router hands repeated params over as arrays
+  ])('legalDocumentTypeFromSlug(%j) is null', (bad) => {
+    expect(legalDocumentTypeFromSlug(bad)).toBeNull();
   });
 });

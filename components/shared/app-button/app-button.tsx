@@ -256,6 +256,7 @@ const AppButtonImpl = forwardRef<View, AppButtonProps>(function AppButton(
     spinnerSize,
     rippleConfig,
     getPressedStyle,
+    defaultTextVariant,
   } = buttonStyles;
 
   // Dev-only a11y guard: if no textual content and no accessibilityLabel, warn
@@ -362,6 +363,7 @@ const AppButtonImpl = forwardRef<View, AppButtonProps>(function AppButton(
           labelBaseStyle={labelStyle}
           textStyle={textStyle}
           textVariant={textVariant}
+          defaultTextVariant={defaultTextVariant}
           weight={weight}
           numberOfLines={numberOfLines}
           ellipsizeMode={ellipsizeMode}
