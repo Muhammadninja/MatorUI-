@@ -24,15 +24,13 @@ export type GarageFitRowProps = {
  */
 export function GarageFitRow({ vehicle }: GarageFitRowProps) {
   const { t } = useTranslation();
-  const { tokens, scheme } = useThemeContext();
-  const isDark = scheme === 'dark';
-  // Success glyph medallion — a low-alpha wash of the theme's success token
-  // (≈16% dark / ≈10% light) rather than a hardcoded green literal.
-  const successWash = `${tokens.success}${isDark ? '29' : '1a'}`;
+  const { tokens } = useThemeContext();
 
   return (
     <AppView row align="center" gap={11} rounded={16} colorName="card" style={{ paddingVertical: 13, paddingHorizontal: 14 }}>
-      <AppView center style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: successWash, flexShrink: 0 }}>
+      {/* Success glyph medallion — the theme's `successSoft` wash (16% dark /
+       *  10% light, the same values this row used to hand-build per scheme). */}
+      <AppView center style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: tokens.successSoft, flexShrink: 0 }}>
         <BadgeCheck size={18} strokeWidth={2.2} color={tokens.success} />
       </AppView>
       <AppView flex={1} style={{ minWidth: 0 }}>

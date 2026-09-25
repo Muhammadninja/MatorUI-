@@ -64,6 +64,9 @@ function ButtonBaseImpl({
             <AppText
               allowFontScaling={allowFontScaling}
               textVariant={textVariant}
+              // A label that wraps (long translations) stays centred in a
+              // centred button instead of hugging the left edge.
+              align={contentJustify === 'center' ? 'center' : undefined}
               weight={weight}
               numberOfLines={numberOfLines}
               ellipsizeMode={ellipsizeMode}

@@ -285,14 +285,13 @@
     "didntGetItResend": "Kod kelmadimi? Qayta yuborish",
     "legalRequiredTitle": "Hujjatlarni qabul qilish talab etiladi",
     "legalRequiredBody": "Davom etish uchun kerakli hujjatlarni koʻrib chiqing va qabul qiling.",
-    "phoneLegalPrefix": "Davom etish orqali siz ",
-    "phoneLegalTerms": "Foydalanish shartlari",
+    "phoneLegalPrefix": "Davom etish orqali siz quyidagi hujjatlarni qabul qilasiz: ",
     "phoneLegalAnd": " va ",
-    "phoneLegalPrivacy": "Maxfiylik siyosatini",
-    "phoneLegalSuffix": " qabul qilasiz.",
+    "phoneLegalSuffix": ".",
     "agreeAndContinue": "Qabul qilaman va davom etaman",
-    "agreeNotePrefix": "Davom etish orqali siz ",
-    "agreeNoteComma": ", "
+    "agreeNotePrefix": "Davom etish orqali siz quyidagi hujjatlarni qabul qilasiz: ",
+    "agreeNoteComma": ", ",
+    "legalDocsLoadError": "Hujjatlarni yuklab boʻlmadi."
   },
   "splash": {
     "skip": "Oʻtkazib yuborish",

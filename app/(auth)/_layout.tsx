@@ -33,6 +33,18 @@ export default function AuthStackLayout() {
         name="select-language"
         options={{ headerShown: false, animation: 'fade', gestureEnabled: false }}
       />
+      {/* A legal document opened from the sign-in sheet. Pushed onto THIS
+          stack, over the sheet, so Back pops back to the sheet with its state
+          intact — see app/(auth)/legal/[type].tsx for why it can't reuse the
+          Profile-tab routes. Opaque (inherits `tokens.background`). */}
+      <Stack.Screen
+        name="legal/[type]"
+        options={{
+          headerShown: false,
+          animation: 'slide_from_right',
+          gestureEnabled: true,
+        }}
+      />
     </Stack>
   );
 }

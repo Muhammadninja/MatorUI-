@@ -119,14 +119,32 @@ describe('screen wiring', () => {
     expect(button).not.toContain('legalGateSatisfied');
   });
 
+  // Rendered behaviour (all three documents, links, order) is pinned by
+  // legal-consent-note.test.tsx and passwordless-auth-screen.test.tsx; these
+  // guard the wiring that makes the list come from the Legal API.
   test('every document is named next to the button, each one tappable', () => {
-    for (const type of [
-      'TERMS_OF_USE',
-      'PRIVACY_POLICY',
-      'PERSONAL_DATA_CONSENT',
-    ] as const) {
-      expect(source).toContain(`testID="auth-legal-${type}"`);
-      expect(source).toContain(`openLegalDoc('${type}')`);
+    const idx = source.indexOf('testID="auth-legal-note"');
+    expect(idx).toBeGreaterThan(-1);
+    const note = source.slice(source.lastIndexOf('<LegalConsentNote', idx), source.indexOf('/>', idx));
+    expect(note).toContain('documents={legalDocuments}');
+    expect(note).toContain('onOpen={openLegalDoc}');
+    expect(note).toContain('linkTestIDPrefix="auth-legal-"');
+  });
+
+  // Regression: the phone step hardcoded Terms + Privacy and never showed
+  // PERSONAL_DATA_CONSENT, although the backend serves three documents.
+  test('the phone step lists the Legal API documents too, not a hardcoded pair', () => {
+    const idx = source.indexOf('testID="auth-phone-legal-note"');
+    expect(idx).toBeGreaterThan(-1);
+    const note = source.slice(source.lastIndexOf('<LegalConsentNote', idx), source.indexOf('/>', idx));
+    expect(note).toContain('documents={legalDocuments}');
+    expect(source).not.toContain('auth.phoneLegalTerms');
+    expect(source).not.toContain('auth.phoneLegalPrivacy');
+  });
+
+  test('no document type is hardcoded into a consent link', () => {
+    for (const type of ['TERMS_OF_USE', 'PRIVACY_POLICY', 'PERSONAL_DATA_CONSENT']) {
+      expect(source).not.toContain(`openLegalDoc('${type}')`);
     }
   });
 

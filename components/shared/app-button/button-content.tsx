@@ -5,6 +5,7 @@ import type { AppIconProps } from '@/components/shared/app-icon';
 import { AppView } from '@/components/shared/app-view';
 import type { TextVariant, WeightName } from '@/themes';
 import { ButtonBase } from './button-base';
+import { DEFAULT_LABEL_WEIGHT } from './tokens';
 
 export type ButtonContentProps = {
   title?: string;
@@ -20,6 +21,9 @@ export type ButtonContentProps = {
   labelBaseStyle: StyleProp<TextStyle>;
   textStyle?: StyleProp<TextStyle>;
   textVariant?: TextVariant;
+  /** The size's design-system typography (`SIZE_MAP[size].textVariant`),
+   *  used whenever the caller passes no `textVariant`. */
+  defaultTextVariant: TextVariant;
   weight?: WeightName;
   numberOfLines?: number;
   ellipsizeMode?: 'head' | 'middle' | 'tail' | 'clip';
@@ -44,8 +48,9 @@ export function ButtonContent({
   contentJustify,
   labelBaseStyle,
   textStyle,
-  textVariant,
-  weight,
+  textVariant: textVariantProp,
+  defaultTextVariant,
+  weight: weightProp,
   numberOfLines,
   ellipsizeMode,
   resolvedIconColor,
@@ -55,6 +60,13 @@ export function ButtonContent({
   disabled,
   gap,
 }: ButtonContentProps) {
+  // Without a variant the label fell through to AppText's `body` default —
+  // Inter Regular with a 24px line height — so every button rendered in a
+  // thin weight and grew a two-line label to an oversized block. The size's
+  // own `button` / `buttonSm` variant supplies the tight line height, the
+  // default weight its SemiBold, and the size's `fontSize` below the size.
+  const textVariant = textVariantProp ?? defaultTextVariant;
+  const weight = weightProp ?? DEFAULT_LABEL_WEIGHT;
   // Memoize resolved icons to prevent recreation
   const resolvedStartIcon = useMemo(
     () =>
@@ -81,7 +93,7 @@ export function ButtonContent({
   );
 
   const labelStyle: StyleProp<TextStyle> = [
-    !textVariant ? ({ fontSize } as TextStyle) : undefined,
+    !textVariantProp ? ({ fontSize } as TextStyle) : undefined,
     labelBaseStyle,
     textStyle,
     disabled ? ({ opacity: 0.85 } as TextStyle) : undefined,

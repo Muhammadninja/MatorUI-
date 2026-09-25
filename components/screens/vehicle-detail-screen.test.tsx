@@ -12,6 +12,7 @@ import { describe, expect, test, vi } from 'vitest';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 let language: 'en' | 'ru' | 'uz' = 'en';
+let activeVehicleId = 'v-malibu';
 const UNIT = { en: 'km', ru: 'км', uz: 'km' } as const;
 
 const MALIBU = {
@@ -30,7 +31,7 @@ vi.mock('@/hooks/use-garage', () => ({
 }));
 vi.mock('@/contexts/active-vehicle.context', () => ({
   useActiveVehicle: () => ({
-    currentActiveVehicle: { vehicleId: 'v-malibu' },
+    currentActiveVehicle: { vehicleId: activeVehicleId },
     setPrimaryVehicle: async () => {},
   }),
 }));
@@ -110,5 +111,45 @@ describe('vehicle detail — mileage', () => {
 
   test('keeps the comma in English', async () => {
     expect(await mileageCell('en')).toBe('68,500 km');
+  });
+});
+
+// Dark-theme QA: "Set active" rendered as a full-width white slab with a thin
+// two-line label, stacked on a second white slab ("Edit details") — both used
+// solid kinds whose dark-mode fill is #fff. They are secondary actions, so
+// they take the app's secondary-button pattern (outline), like
+// order-confirmation and the global modal do.
+describe('vehicle detail — actions', () => {
+  async function actions() {
+    let r!: ReactTestRenderer;
+    await act(async () => {
+      r = create(<VehicleDetailScreen />);
+    });
+    return r.root.findAll((n) => n.type === 'button');
+  }
+
+  test('a non-active vehicle offers "Set active" as an outline button', async () => {
+    activeVehicleId = 'another-car';
+    const setActive = (await actions()).find((b) => b.props.title === 'vehicleDetail.setActive');
+    expect(setActive).toBeDefined();
+    expect(setActive!.props.variant).toBe('outline');
+    expect(setActive!.props.kind).toBe('secondary');
+    // Stays inside the button scale; typography comes from AppButton itself.
+    expect(setActive!.props.size).toBe('lg');
+    expect(setActive!.props.textStyle).toBeUndefined();
+  });
+
+  test('"Edit details" is an outline button too — no solid fill on this screen', async () => {
+    activeVehicleId = 'another-car';
+    for (const b of await actions()) {
+      expect(b.props.variant, String(b.props.title)).toBe('outline');
+      expect(b.props.kind, String(b.props.title)).not.toBe('brand');
+    }
+  });
+
+  test('the active vehicle hides "Set active"', async () => {
+    activeVehicleId = 'v-malibu';
+    const titles = (await actions()).map((b) => b.props.title);
+    expect(titles).toEqual(['vehicleDetail.editDetails']);
   });
 });

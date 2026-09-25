@@ -63,22 +63,20 @@ function Stat({
 
 export function GarageActiveHero({ vehicle, onShopParts, onOpenDetail }: GarageActiveHeroProps) {
   const { t } = useTranslation();
-  const { tokens, scheme } = useThemeContext();
+  const { tokens } = useThemeContext();
   const { language } = useLanguageContext();
-  const isDark = scheme === 'dark';
-
-  const hairline = isDark ? 'rgba(0,0,0,0.14)' : 'rgba(255,255,255,0.18)';
-  const statLabel = isDark ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.5)';
-  const tuneWash = isDark ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.16)';
 
   const subline = [vehicle.trim, vehicle.color ? titleCase(vehicle.color) : undefined]
     .filter(Boolean)
     .join(' · ');
 
+  // Every colour comes from the `hero*` theme tokens: an inverted black card
+  // in light mode, the elevated card surface in dark mode. (It used the
+  // `brand` CTA fill — white in dark mode — plus per-scheme rgba literals.)
   return (
     <AppView
       rounded={22}
-      colorName="brand"
+      colorName="hero"
       p={18}
       style={{ position: 'relative', overflow: 'hidden' }}
     >
@@ -95,41 +93,44 @@ export function GarageActiveHero({ vehicle, onShopParts, onOpenDetail }: GarageA
 
       {/* Title — two lines, clipped from the watermark. */}
       <AppView style={{ maxWidth: 210, marginTop: 10 }}>
-        <AppText family="heading" weight="bold" numberOfLines={1} style={{ fontSize: 26, lineHeight: 30, color: tokens.onBrand }}>
+        <AppText family="heading" weight="bold" numberOfLines={1} style={{ fontSize: 26, lineHeight: 30, color: tokens.onHero }}>
           {`${vehicle.year} ${vehicle.make}`}
         </AppText>
-        <AppText family="heading" weight="bold" numberOfLines={1} style={{ fontSize: 26, lineHeight: 30, color: tokens.onBrand }}>
+        <AppText family="heading" weight="bold" numberOfLines={1} style={{ fontSize: 26, lineHeight: 30, color: tokens.onHero }}>
           {vehicle.model}
         </AppText>
       </AppView>
 
       {subline ? (
-        <AppText family="default" numberOfLines={1} style={{ fontSize: 13, color: tokens.onBrand, opacity: 0.7, marginTop: 6 }}>
+        <AppText family="default" numberOfLines={1} style={{ fontSize: 13, color: tokens.onHero, opacity: 0.7, marginTop: 6 }}>
           {subline}
         </AppText>
       ) : null}
 
       {/* Stat row over a hairline */}
-      <AppView row gap={14} style={{ marginTop: 18, paddingTop: 14, borderTopWidth: 1, borderTopColor: hairline }}>
-        <Stat label={t('garage.statMileage')} value={formatMileage(vehicle.mileage, t('garage.mileageUnit'), language)} labelColor={statLabel} valueColor={tokens.onBrand} />
-        <Stat label={t('garage.statVin')} value={maskVin(vehicle.vin)} labelColor={statLabel} valueColor={tokens.onBrand} />
-        <Stat label={t('garage.statTrim')} value={vehicle.trim ?? '—'} labelColor={statLabel} valueColor={tokens.onBrand} />
+      <AppView row gap={14} style={{ marginTop: 18, paddingTop: 14, borderTopWidth: 1, borderTopColor: tokens.heroDivider }}>
+        <Stat label={t('garage.statMileage')} value={formatMileage(vehicle.mileage, t('garage.mileageUnit'), language)} labelColor={tokens.heroMuted} valueColor={tokens.onHero} />
+        <Stat label={t('garage.statVin')} value={maskVin(vehicle.vin)} labelColor={tokens.heroMuted} valueColor={tokens.onHero} />
+        <Stat label={t('garage.statTrim')} value={vehicle.trim ?? '—'} labelColor={tokens.heroMuted} valueColor={tokens.onHero} />
       </AppView>
 
-      {/* Actions — inverted-back-out primary + square tune button */}
+      {/* Actions — primary + square tune button. The CTA is the design
+       *  system's `primary` pair (white fill, black label in both themes), so
+       *  it reads on the black light-mode hero AND on the dark card surface;
+       *  `background` would vanish into the dark hero. */}
       <AppView row gap={10} style={{ marginTop: 16 }}>
         <AppPressableView
           flex={1}
           center
           rounded={13}
-          colorName="background"
+          colorName="primaryBg"
           androidRipple
           onPress={() => onShopParts(vehicle.id)}
           accessibilityRole="button"
           accessibilityLabel={t('garage.shopPartsThatFit')}
           style={{ paddingVertical: 13, paddingHorizontal: 16 }}
         >
-          <AppText family="accent" weight="bold" colorName="text" style={{ fontSize: 14 }}>
+          <AppText family="accent" weight="bold" colorName="onPrimary" style={{ fontSize: 14 }}>
             {t('garage.shopPartsThatFit')}
           </AppText>
         </AppPressableView>
@@ -140,9 +141,9 @@ export function GarageActiveHero({ vehicle, onShopParts, onOpenDetail }: GarageA
           onPress={() => onOpenDetail(vehicle.id)}
           accessibilityRole="button"
           accessibilityLabel={t('garage.vehicleDetails')}
-          style={{ width: 46, backgroundColor: tuneWash }}
+          style={{ width: 46, backgroundColor: tokens.heroWash }}
         >
-          <SlidersHorizontal size={20} strokeWidth={2.2} color={tokens.onBrand} />
+          <SlidersHorizontal size={20} strokeWidth={2.2} color={tokens.onHero} />
         </AppPressableView>
       </AppView>
     </AppView>

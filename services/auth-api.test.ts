@@ -24,6 +24,7 @@ describe('auth-api mock (OTP)', () => {
       channel: 'phone',
       identifier: '+998901234567',
       purpose: 'sign-in',
+      lang: 'en',
     });
     expect(result.otpToken).toMatch(/^otp_/);
     expect(result.expiresIn).toBeGreaterThan(0);
@@ -35,6 +36,7 @@ describe('auth-api mock (OTP)', () => {
       channel: 'email',
       identifier: 'a@b.com',
       purpose: 'sign-in',
+      lang: 'en',
     });
     const result = await authTransport.verifyOtp({ otpToken, code: devCode! });
     expect(result).toMatchObject({
@@ -60,6 +62,7 @@ describe('auth-api mock (OTP)', () => {
       channel: 'email',
       identifier: 'c@d.com',
       purpose: 'sign-up',
+      lang: 'en',
       firstName: 'Casey',
       lastName: 'Doe',
     });
@@ -73,6 +76,7 @@ describe('auth-api mock (OTP)', () => {
       channel: 'phone',
       identifier: '+998901234567',
       purpose: 'sign-in',
+      lang: 'en',
     });
     await expect(authTransport.verifyOtp({ otpToken, code: '12' })).rejects.toThrow();
   });
@@ -92,6 +96,7 @@ describe('auth-api mock (OTP)', () => {
       channel: 'phone',
       identifier: '+998901234567',
       purpose: 'sign-in',
+      lang: 'en',
     });
     const result = await authTransport.verifyOtp({ otpToken, code: devCode! });
     expect(result.session.expiresAt).toBeGreaterThan(Math.floor(Date.now() / 1000));

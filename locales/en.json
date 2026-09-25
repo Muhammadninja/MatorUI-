@@ -286,13 +286,12 @@
     "legalRequiredTitle": "Legal acceptance required",
     "legalRequiredBody": "Please review and accept the required documents to continue.",
     "phoneLegalPrefix": "By continuing, you agree to the ",
-    "phoneLegalTerms": "Terms & Conditions",
     "phoneLegalAnd": " and ",
-    "phoneLegalPrivacy": "Privacy Policy",
     "phoneLegalSuffix": ".",
     "agreeAndContinue": "Agree & continue",
     "agreeNotePrefix": "By continuing you accept the ",
-    "agreeNoteComma": ", "
+    "agreeNoteComma": ", ",
+    "legalDocsLoadError": "Couldn’t load the legal documents."
   },
   "splash": {
     "skip": "Skip",

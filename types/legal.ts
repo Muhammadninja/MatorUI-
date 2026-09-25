@@ -24,6 +24,38 @@ export const LEGAL_DOCUMENT_TYPES: readonly LegalDocumentType[] = [
   'PERSONAL_DATA_CONSENT',
 ] as const;
 
+/** URL segment for a document: `TERMS_OF_USE` → `terms_of_use`
+ *  (`/legal/terms_of_use`). */
+export function legalDocumentSlug(type: LegalDocumentType): string {
+  return type.toLowerCase();
+}
+
+/**
+ * Inverse of `legalDocumentSlug`, for values that arrive untyped (route
+ * params, deep links). Exact match only: anything that is not one of the
+ * three slugs — a typo, another case, an array param, a type this build does
+ * not know — is `null`, never a guess at the nearest document.
+ */
+export function legalDocumentTypeFromSlug(slug: unknown): LegalDocumentType | null {
+  if (typeof slug !== 'string') return null;
+  return LEGAL_DOCUMENT_TYPES.find((type) => legalDocumentSlug(type) === slug) ?? null;
+}
+
+/**
+ * The documents exactly as the backend returned them, put into the UI order
+ * of `LEGAL_DOCUMENT_TYPES`. Nothing is dropped — a type this build does not
+ * know yet goes last, in backend order — and nothing is added: an empty
+ * response stays empty rather than being padded with placeholders.
+ */
+export function orderLegalDocuments(documents: readonly LegalDocument[]): LegalDocument[] {
+  const rank = (d: LegalDocument) => {
+    const i = LEGAL_DOCUMENT_TYPES.indexOf(d.type);
+    return i === -1 ? LEGAL_DOCUMENT_TYPES.length : i;
+  };
+  // Array#sort is stable, so unknown types keep their relative backend order.
+  return [...documents].sort((a, b) => rank(a) - rank(b));
+}
+
 /** The one format the app renders as Markdown. Any OTHER value — including
  *  formats the backend adds later — falls back to plain text rather than
  *  failing, so a new server-side format can never break the screen. */

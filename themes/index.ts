@@ -161,6 +161,13 @@ export const lightTokens: ThemeTokens = {
   // #4285f4) — the fill behind fit chips and status badges.
   successSoft: 'rgba(15, 157, 88, 0.10)',
   infoSoft: 'rgba(66, 133, 244, 0.12)',
+  // Garage hero — the inverted black card, exactly as it rendered before
+  // (`brand` surface + the alpha whites the component used to hardcode).
+  hero: '#000000',
+  onHero: '#ffffff',
+  heroMuted: 'rgba(255, 255, 255, 0.5)',
+  heroDivider: 'rgba(255, 255, 255, 0.18)',
+  heroWash: 'rgba(255, 255, 255, 0.16)',
 };
 
 export const darkTokens: ThemeTokens = {
@@ -226,6 +233,14 @@ export const darkTokens: ThemeTokens = {
   // touch stronger so they still read against the near-black card.
   successSoft: 'rgba(34, 197, 94, 0.16)',
   infoSoft: 'rgba(138, 180, 248, 0.18)',
+  // Garage hero — the elevated `card` surface like every other Garage card,
+  // not the white CTA fill. Values reuse this theme's card / text /
+  // textMuted / border / brandSoft.
+  hero: '#111111',
+  onHero: '#ffffff',
+  heroMuted: '#8f8f8f',
+  heroDivider: '#2a2a2a',
+  heroWash: 'rgba(255, 255, 255, 0.12)',
 };
 
 export function createNavigationTheme(scheme: 'light' | 'dark') {
