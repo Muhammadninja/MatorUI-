@@ -4,17 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { fetchCategories, type CategoryTileData } from '@/services/categories-service';
 import { MATOR_CAT_TILES } from '@/mocks/mator-catalog';
-
-/**
- * "Shop by category" grid hook for the Explore (home) screen, backed by
- * React Query. Same state machine as `useCatalogList`
- * so the landing blocks behave consistently.
- *
- * Resilience: the home grid is the first thing the user sees, so it must never
- * render blank. If the request errors, we fall back to the bundled
- * `MATOR_CAT_TILES` and report `state: 'error'` (callers can still surface a
- * quiet "couldn't refresh" toast) while keeping tiles on screen.
- */
+import { localizedCategoryLabel } from '@/utils/category-label';
 
 export type CategoriesState = 'loading' | 'success' | 'error';
 
@@ -55,8 +45,10 @@ export function useCategories(): UseCategoriesValue {
     else state = 'success';
 
     // On error keep tiles visible using the bundled fallback; otherwise use
-    // whatever the transport returned (mock or live).
-    const categories = query.isError ? FALLBACK_TILES : query.data ?? [];
+    // whatever the transport returned (mock or live). Either way the label is
+    // re-resolved for the active language (see the note above).
+    const rows = query.isError ? FALLBACK_TILES : (query.data ?? []);
+    const categories = rows.map((c) => ({ ...c, label: localizedCategoryLabel(c, lang) }));
 
     return {
       state,
@@ -64,7 +56,7 @@ export function useCategories(): UseCategoriesValue {
       error: query.error instanceof Error ? query.error.message : null,
       refresh: () => query.refetch(),
     };
-  }, [query]);
+  }, [query, lang]);
 }
 
 export default useCategories;

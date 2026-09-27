@@ -112,12 +112,20 @@ export function LanguageProvider({ children }: PropsWithChildren) {
   // Keep the HTTP client's `Accept-Language` in lockstep with the interface
   // language, so every request gets server-localized fields back. Driven off
   // the state (not the individual setters) so hydration, the device-locale
-  // guess and a user switch are all covered by one path.
+  // guess and a user switch are all covered by one path. `setLanguage` also
+  // sets it eagerly; this stays as the path for hydration and any future
+  // state change that does not go through that callback.
   useEffect(() => {
     setAppLanguage(language);
   }, [language]);
 
   const setLanguage = useCallback(async (code: LanguageCode) => {
+    // Synchronously, BEFORE the re-render: any request a child fires in
+    // response to the switch (the category grid refetches on a language-keyed
+    // query key) must carry the new `Accept-Language`. The effect below also
+    // sets this, but effects run child-first — a child's refetch would beat
+    // this provider's effect and fetch the OLD language under the NEW key.
+    setAppLanguage(code);
     setLanguageState(code);
     setHasChosen(true);
     await changeAppLanguage(code);

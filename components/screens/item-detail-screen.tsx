@@ -390,23 +390,33 @@ function FitBadge({
   );
 }
 
-// Static "fits everything" plaque for universal listings. No status, no CTA —
-// mirrors the green FitBadge chrome so the two read as one family. Kept inline
-// to avoid a new shared file.
+// Static "fits everything" chip for universal listings. No status, no CTA — a
+// compact pill that hugs its label (the RU string is long; a full-width plaque
+// ate the space between the price and the specs). Kept inline to avoid a new
+// shared file.
 function UniversalFitBadge({ tokens }: { tokens: ThemeTokens }) {
   const { t } = useTranslation();
   return (
-    <AppView row align="center" gap={10} rounded={14} p={14} colorName="backgroundSecondary" borderWidth={1} borderName="border">
-      <AppView center rounded={999} style={{ width: 22, height: 22, backgroundColor: tokens.success }}>
-        <AppText weight="bold" style={{ fontSize: 13, color: tokens.white }}>
+    <AppView
+      row
+      align="center"
+      gap={6}
+      rounded={999}
+      px={10}
+      py={6}
+      colorName="backgroundSecondary"
+      borderWidth={1}
+      borderName="border"
+      style={{ alignSelf: 'flex-start' }}
+    >
+      <AppView center rounded={999} style={{ width: 16, height: 16, backgroundColor: tokens.success }}>
+        <AppText weight="bold" style={{ fontSize: 10, color: tokens.white }}>
           ✓
         </AppText>
       </AppView>
-      <AppView flex={1}>
-        <AppText family="accent" weight="bold" style={{ fontSize: 14, color: tokens.text }}>
-          {t('itemDetail.universalFitTitle')}
-        </AppText>
-      </AppView>
+      <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.text }}>
+        {t('itemDetail.universalFitTitle')}
+      </AppText>
     </AppView>
   );
 }
