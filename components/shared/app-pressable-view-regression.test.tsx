@@ -83,3 +83,32 @@ describe('AppTabBar relocation', () => {
     expect(container).not.toMatch(/height:\s*(50|80)\b/);
   });
 });
+
+describe('AppPressableView — collapse detector', () => {
+  /**
+   * The guard that reports a row which has actually shrunk to its content and
+   * lost its flex column. It has to MEASURE: an earlier static version
+   * ("row + flex child + no fillContainer") fired 27 times across healthy
+   * screens, because a column parent stretches those rows anyway. A warning
+   * that cries wolf gets ignored, so the width check is the whole point.
+   */
+  test('warns from onLayout on a measured width, not from a static guess', () => {
+    const source = read('components/shared/app-view/app-pressable-view.tsx');
+    expect(source).toMatch(/COLLAPSE_WIDTH_PX/);
+    // The decision must read the laid-out width...
+    expect(source).toMatch(/event\.nativeEvent\.layout/);
+    expect(source).toMatch(/width >= COLLAPSE_WIDTH_PX/);
+    // ...and it must actually be wired to the inner Pressable.
+    expect(source).toMatch(/onLayout=\{onCollapseLayout\}/);
+  });
+
+  test('the detector is dev-only and fires at most once per instance', () => {
+    const source = read('components/shared/app-view/app-pressable-view.tsx');
+    const hook = source.slice(
+      source.indexOf('function useCollapseWarning'),
+      source.indexOf('export type AppPressableViewProps'),
+    );
+    expect(hook).toMatch(/__DEV__/);
+    expect(hook).toMatch(/warned\.current/);
+  });
+});

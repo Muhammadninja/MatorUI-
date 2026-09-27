@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { BadgeCheck, Check, Tag } from 'lucide-react-native';
+import { Check, Tag } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { Image, Linking, ScrollView, View } from 'react-native';
 
@@ -22,8 +22,7 @@ import { triggerHaptic } from '@/utils/haptics';
  */
 export default function CertifiedSection() {
   const { t } = useTranslation();
-  const { tokens, scheme } = useThemeContext();
-  const dark = scheme === 'dark';
+  const { tokens } = useThemeContext();
   const { placements } = usePlacements();
 
   const open = (p: MatorCertifiedPlacement) => {
@@ -61,17 +60,10 @@ export default function CertifiedSection() {
 
   return (
     <AppView gap={12}>
-      {/* Section header */}
-      <AppView row align="center" gap={10}>
-        <AppView center rounded={999} style={{ width: 22, height: 22, backgroundColor: tokens.info }}>
-          <BadgeCheck size={14} strokeWidth={2.6} color={tokens.white} />
-        </AppView>
-        <AppText family="heading" weight="bold" style={{ flex: 1, fontSize: 18, color: tokens.text }}>
-          {t('catalog.matorCertified')}
-        </AppText>
-      </AppView>
-      <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted, marginTop: -8 }}>
-        {t('catalog.certifiedSubtitle')}
+      {/* Section header. The filled check-disc that sat beside the words said
+       *  "certified" a second time, in a picture. */}
+      <AppText family="heading" weight="bold" style={{ fontSize: 18, color: tokens.text }}>
+        {t('catalog.matorCertified')}
       </AppText>
 
       {/* Placement carousel */}
@@ -96,66 +88,105 @@ export default function CertifiedSection() {
               borderName="border"
               style={{ width: 224, overflow: 'hidden' }}
             >
-              {/* Colored brand banner */}
-              <View style={{ height: 74, overflow: 'hidden', backgroundColor: p.visual.color }}>
-                <View style={{ position: 'absolute', right: -18, top: -18, width: 72, height: 72, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.12)' }} />
-                <View style={{ position: 'absolute', right: 14, bottom: -22, width: 52, height: 52, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.1)' }} />
-                {/* Sponsored tag for sold slots */}
-                {p.sponsor?.sponsored ? (
-                  <AppView rounded={5} px={6} py={2} style={{ position: 'absolute', top: 8, right: 10, backgroundColor: 'rgba(0,0,0,0.28)' }}>
-                    <AppText family="accent" weight="bold" style={{ fontSize: 9, letterSpacing: 0.3, color: tokens.white }}>
-                      {t('catalog.sponsored')}
+              {/* The dealer's colour is a keyline and a monogram tile, not a
+               *  filled banner with translucent discs floating in it. Those
+               *  discs were decoration on a card whose job is to look
+               *  trustworthy. */}
+              <AppView row align="center" gap={11} px={14} pt={14} pb={12}>
+                <AppView
+                  center
+                  rounded={12}
+                  style={{
+                    width: 42,
+                    height: 42,
+                    overflow: 'hidden',
+                    backgroundColor: tokens.white,
+                    borderWidth: 1,
+                    borderColor: tokens.border,
+                  }}
+                >
+                  {p.visual.imageUrl ? (
+                    <Image
+                      source={{ uri: p.visual.imageUrl }}
+                      style={{ width: 42, height: 42 }}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <AppText
+                      family="heading"
+                      weight="bold"
+                      style={{ fontSize: 19, color: p.visual.color }}
+                    >
+                      {p.visual.monogram ?? p.title.charAt(0)}
                     </AppText>
-                  </AppView>
-                ) : null}
-                <AppView row align="center" gap={11} px={14} style={{ height: 74 }}>
-                  <AppView center rounded={12} style={{ width: 42, height: 42, backgroundColor: tokens.white, overflow: 'hidden' }}>
-                    {p.visual.imageUrl ? (
-                      <Image source={{ uri: p.visual.imageUrl }} style={{ width: 42, height: 42 }} resizeMode="contain" />
-                    ) : (
-                      <AppText family="heading" weight="bold" style={{ fontSize: 20, color: p.visual.color }}>
-                        {p.visual.monogram ?? p.title.charAt(0)}
-                      </AppText>
-                    )}
-                  </AppView>
-                  <AppView flex={1}>
-                    <AppText family="heading" weight="bold" numberOfLines={1} style={{ fontSize: 15, color: tokens.white }}>
-                      {p.title}
-                    </AppText>
-                    {p.subtitle ? (
-                      <AppText family="accent" weight="semibold" numberOfLines={1} style={{ fontSize: 10.5, color: `${tokens.white}d9`, marginTop: 1 }}>
-                        {p.subtitle}
-                      </AppText>
-                    ) : null}
-                  </AppView>
+                  )}
                 </AppView>
-              </View>
+                <AppView flex={1} gap={1}>
+                  <AppText
+                    family="heading"
+                    weight="bold"
+                    style={{ fontSize: 15, color: tokens.text }}
+                  >
+                    {p.title}
+                  </AppText>
+                  {p.subtitle ? (
+                    <AppText
+                      family="accent"
+                      weight="semibold"
+                      style={{ fontSize: 11, color: tokens.textMuted }}
+                    >
+                      {p.subtitle}
+                    </AppText>
+                  ) : null}
+                </AppView>
+                {p.sponsor?.sponsored ? (
+                  <AppText
+                    family="accent"
+                    weight="bold"
+                    transform="uppercase"
+                    style={{ fontSize: 8.5, letterSpacing: 0.6, color: tokens.textMuted }}
+                  >
+                    {t('catalog.sponsored')}
+                  </AppText>
+                ) : null}
+              </AppView>
 
-              {/* Badge rows */}
-              <AppView p={12} gap={7}>
+              <AppView style={{ height: 1, backgroundColor: tokens.divider }} />
+
+              {/* Claims as claims: a small tick and the words, in the colour
+               *  that means them. Each line used to carry a filled disc with a
+               *  glyph inside, which is a lot of furniture for two facts. */}
+              <AppView px={14} py={12} gap={6}>
                 {badges[0] ? (
-                  <AppView row align="center" gap={6}>
-                    <AppView center rounded={999} style={{ width: 18, height: 18, backgroundColor: tokens.info }}>
-                      <Check size={11} strokeWidth={3} color={tokens.white} />
-                    </AppView>
-                    <AppText family="accent" weight="bold" style={{ fontSize: 11.5, letterSpacing: 0.2, color: tokens.text }}>
+                  <AppView row align="center" gap={7}>
+                    <Check size={13} strokeWidth={3} color={tokens.info} />
+                    <AppText
+                      family="accent"
+                      weight="bold"
+                      style={{ flex: 1, fontSize: 11.5, letterSpacing: 0.2, color: tokens.text }}
+                    >
                       {badges[0]}
                     </AppText>
                   </AppView>
                 ) : null}
                 {badges[1] ? (
-                  <AppView row align="center" gap={6}>
-                    <AppView center rounded={999} style={{ width: 18, height: 18, backgroundColor: tokens.success }}>
-                      <Tag size={10} strokeWidth={2.6} color={tokens.white} />
-                    </AppView>
-                    <AppText family="accent" weight="bold" style={{ fontSize: 11.5, letterSpacing: 0.2, color: tokens.text }}>
+                  <AppView row align="center" gap={7}>
+                    <Tag size={12} strokeWidth={2.6} color={tokens.success} />
+                    <AppText
+                      family="accent"
+                      weight="bold"
+                      style={{ flex: 1, fontSize: 11.5, letterSpacing: 0.2, color: tokens.text }}
+                    >
                       {badges[1]}
                     </AppText>
-                    <AppView rounded={5} px={6} py={2} style={{ marginLeft: 'auto', backgroundColor: `${tokens.success}${dark ? '29' : '1a'}` }}>
-                      <AppText family="accent" weight="bold" style={{ fontSize: 10, color: tokens.success }}>
-                        {t('catalog.guaranteed')}
-                      </AppText>
-                    </AppView>
+                    <AppText
+                      family="accent"
+                      weight="bold"
+                      transform="uppercase"
+                      style={{ fontSize: 9.5, letterSpacing: 0.5, color: tokens.success }}
+                    >
+                      {t('catalog.guaranteed')}
+                    </AppText>
                   </AppView>
                 ) : null}
               </AppView>

@@ -23,12 +23,11 @@ export function AddVehicleStepIndicator({
           family="accent"
           colorName="gray400"
           transform="uppercase"
-          numberOfLines={1}
         >
           {t('addVehicle.stepProgress', { current, total })}
         </AppText>
         {label ? (
-          <AppText textVariant="bodySemibold" colorName="text" numberOfLines={1}>
+          <AppText textVariant="bodySemibold" colorName="text">
             {label}
           </AppText>
         ) : null}

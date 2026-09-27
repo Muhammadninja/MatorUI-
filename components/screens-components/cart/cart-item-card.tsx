@@ -65,7 +65,7 @@ function CartItemCard({
       <AppView flex={1} gap={8} style={{ justifyContent: 'space-between' }}>
         <AppView row align="flex-start" gap={8}>
           <AppView flex={1} gap={5}>
-            <AppText textVariant="bodySemibold" weight="semibold" numberOfLines={2}>
+            <AppText textVariant="bodySemibold" weight="semibold">
               {item.title}
             </AppText>
             {oem ? <AppOemPill oem={oem} /> : null}

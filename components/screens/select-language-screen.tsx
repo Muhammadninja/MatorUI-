@@ -196,14 +196,12 @@ export default function SelectLanguageScreen() {
                 <AppText
                   textVariant="bodySemibold"
                   weight="semibold"
-                  numberOfLines={1}
                 >
                   {opt.nativeName}
                 </AppText>
                 <AppText
                   textVariant="bodyXs"
                   colorName="gray400"
-                  numberOfLines={1}
                 >
                   {opt.englishName}
                 </AppText>

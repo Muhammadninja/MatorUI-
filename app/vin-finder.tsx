@@ -146,7 +146,7 @@ export default function VinFinderScreen() {
             rounded={999}
             style={{ width: 9, height: 9, backgroundColor: tokens.success }}
           />
-          <AppText family="accent" weight="bold" numberOfLines={1} style={{ flex: 1, fontSize: 14, color: tokens.text }}>
+          <AppText family="accent" weight="bold" style={{ flex: 1, fontSize: 14, color: tokens.text }}>
             {t('vinFinder.fittingFor', { vehicle: `${car.year} ${car.make} ${car.model}` })}
           </AppText>
         </AppView>

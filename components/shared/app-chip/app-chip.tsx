@@ -50,6 +50,7 @@ export type AppChipProps = {
   pressedScale?: number;
   /** Typography accessibility */
   allowFontScaling?: boolean;
+  /** Optional hard line cap. Unset by default so labels wrap, never clip. */
   numberOfLines?: number;
   ellipsizeMode?: 'head' | 'middle' | 'tail' | 'clip';
 };
@@ -125,7 +126,9 @@ const AppChipComponent: React.FC<AppChipProps> = ({
   enableAnimatedPress,
   pressedScale = 0.98,
   allowFontScaling,
-  numberOfLines = 1,
+  // Unset by default: a chip grows/wraps to fit its label instead of
+  // ellipsizing it. Callers that truly need one line can still pass a cap.
+  numberOfLines,
   ellipsizeMode,
 }) => {
   const { scheme, tokens } = useThemeContext();

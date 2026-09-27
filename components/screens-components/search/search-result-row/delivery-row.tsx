@@ -24,7 +24,6 @@ export default function DeliveryRow({
         textVariant="bodyXs"
         weight="semibold"
         style={{ color, fontSize: 10 }}
-        numberOfLines={1}
       >
         {delivery.label}
       </AppText>

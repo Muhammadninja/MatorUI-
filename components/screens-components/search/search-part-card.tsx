@@ -169,10 +169,10 @@ function SearchPartCard({
     >
       <AppView gap={bodyGap} px={compact ? 4 : 8}>
         <AppView gap={compact ? 3 : 4}>
-          <AppText textVariant={titleVariant} family="heading" numberOfLines={compact ? 2 : 1}>
+          <AppText textVariant={titleVariant} family="heading">
             {title}
           </AppText>
-          <AppText textVariant="bodySm" colorName="textMuted" numberOfLines={compact ? 3 : 2}>
+          <AppText textVariant="bodySm" colorName="textMuted">
             {description}
           </AppText>
         </AppView>

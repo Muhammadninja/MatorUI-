@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Search, X } from 'lucide-react-native';
 import { useEffect, useRef } from 'react';
 import { Dimensions, Keyboard, TextInput } from 'react-native';
@@ -27,6 +28,7 @@ export function AppExpandableSearch({
   shadowColorName = 'black',
 }: AppExpandableSearchProps) {
   const { scheme, tokens } = useThemeContext();
+  const { t } = useTranslation();
   const inputRef = useRef<TextInput>(null);
 
   const searchWidth = useSharedValue(0);
@@ -108,6 +110,8 @@ export function AppExpandableSearch({
           </Animated.View>
           <AppPressableView
             onPress={handleCollapse}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.close')}
             hitSlop={8}
             androidRipple={false}
             pressedScale={0.96}
@@ -136,6 +140,8 @@ export function AppExpandableSearch({
       ) : (
         <AppPressableView
           onPress={handleExpand}
+          accessibilityRole="button"
+          accessibilityLabel={t('explore.searchAccessibility')}
           hitSlop={8}
           androidRipple={false}
           pressedScale={0.96}

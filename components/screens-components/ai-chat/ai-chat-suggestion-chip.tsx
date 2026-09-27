@@ -53,7 +53,6 @@ export default function AiChatSuggestionChip({ label, Icon, onPress }: AiChatSug
         <Icon size={14} strokeWidth={2.1} color={tokens.brand} />
       </View>
       <AppText
-        numberOfLines={1}
         textVariant="bodySm"
         weight="semibold"
         style={{ color: tokens.brand, marginLeft: 10, marginRight: 12 }}

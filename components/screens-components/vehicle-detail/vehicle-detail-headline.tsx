@@ -23,7 +23,6 @@ export function VehicleDetailHeadline({
         family="accent"
         colorName="gray400"
         transform="uppercase"
-        numberOfLines={1}
       >
         {resolvedEyebrow}
       </AppText>

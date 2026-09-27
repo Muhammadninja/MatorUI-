@@ -37,7 +37,6 @@ export function VehicleDetailHeader({ onBack, isPrimary }: VehicleDetailHeaderPr
               textVariant="caption"
               family="accent"
               colorName="onSecondary"
-              numberOfLines={1}
             >
               {t('vehicleDetail.primaryPill')}
             </AppText>

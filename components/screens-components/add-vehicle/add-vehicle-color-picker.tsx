@@ -53,7 +53,6 @@ export function AddVehicleColorPicker({ value, onChange }: AddVehicleColorPicker
                   textVariant="buttonSm"
                   family="accent"
                   colorName={selected ? 'onSecondary' : 'text'}
-                  numberOfLines={1}
                 >
                   {opt.label}
                 </AppText>

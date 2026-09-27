@@ -70,11 +70,10 @@ function Cell({ label, value }: CellProps) {
         family="accent"
         colorName="gray400"
         transform="uppercase"
-        numberOfLines={1}
       >
         {label}
       </AppText>
-      <AppText textVariant="bodySemibold" colorName="text" numberOfLines={1}>
+      <AppText textVariant="bodySemibold" colorName="text">
         {value}
       </AppText>
     </AppView>
@@ -121,14 +120,12 @@ function LiveStatusCell({ status }: LiveStatusCellProps) {
             family="accent"
             colorName="gray400"
             transform="uppercase"
-            numberOfLines={1}
           >
             {t('vehicleDetail.liveLabel')} · {stageLabel(status.stage, t)}
             {status.mechanic ? ` · ${status.mechanic}` : ''}
           </AppText>
           <AppText
             textVariant="bodySemibold"
-            numberOfLines={1}
             style={{ color: tone.fg }}
           >
             {status.label}
@@ -137,7 +134,6 @@ function LiveStatusCell({ status }: LiveStatusCellProps) {
             <AppText
               textVariant="bodyXs"
               colorName="gray400"
-              numberOfLines={2}
               style={{ marginTop: 2 }}
             >
               {status.note}

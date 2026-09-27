@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Car, ChevronRight, Plus } from 'lucide-react-native';
+import { ChevronRight } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 
 import { AppText } from '@/components/shared/app-text';
@@ -45,32 +45,42 @@ export default function MatorFitBanner() {
       pressedOpacity={0.9}
       row
       align="center"
-      gap={10}
-      rounded={14}
-      px={14}
-      py={12}
-      style={{ backgroundColor: tokens.brandBg }}
+      gap={12}
+      rounded={16}
+      px={16}
+      py={14}
+      // `hero`, not `brandBg`. brandBg is the CTA fill — #000 in light but
+      // #fff in DARK, so this bar rendered as a bright white slab on a dark
+      // screen. The hero pair is an inverted black card in light and the
+      // elevated surface in dark, with `onHero` white in both. The garage hero
+      // was moved off brandBg for exactly this reason.
+      style={{ backgroundColor: tokens.hero }}
     >
-      <AppView center rounded={9} style={{ width: 34, height: 34, backgroundColor: `${tokens.onBrand}22` }}>
-        {label ? (
-          <Car size={20} strokeWidth={2.2} color={tokens.onBrand} />
-        ) : (
-          <Plus size={20} strokeWidth={2.4} color={tokens.onBrand} />
-        )}
-      </AppView>
-      <AppView flex={1}>
+      {/* A status dot, not a glyph in a tinted tile: green once parts are
+       *  being filtered, amber while nothing is scoping them. */}
+      <AppView
+        rounded={999}
+        style={{
+          width: 9,
+          height: 9,
+          flexShrink: 0,
+          backgroundColor: label ? tokens.success : tokens.warning,
+        }}
+      />
+      <AppView flex={1} gap={2}>
         <AppText
           family="accent"
-          weight="medium"
-          style={{ fontSize: 10, letterSpacing: 0.8, textTransform: 'uppercase', color: tokens.onBrand, opacity: 0.7 }}
+          weight="bold"
+          transform="uppercase"
+          style={{ fontSize: 9.5, letterSpacing: 1.1, color: tokens.heroMuted }}
         >
           {label ? t('catalog.showingFitmentFor') : t('catalog.fitmentNotSet')}
         </AppText>
-        <AppText family="accent" weight="bold" numberOfLines={1} style={{ fontSize: 14, color: tokens.onBrand }}>
+        <AppText family="heading" weight="bold" style={{ fontSize: 15.5, color: tokens.onHero }}>
           {label ?? t('catalog.selectVehicleTitle')}
         </AppText>
       </AppView>
-      <ChevronRight size={20} strokeWidth={2.2} color={tokens.onBrand} style={{ opacity: 0.6 }} />
+      <ChevronRight size={18} strokeWidth={2.4} color={tokens.heroMuted} />
     </AppPressableView>
   );
 }

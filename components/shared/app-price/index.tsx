@@ -24,6 +24,8 @@ export type AppPriceProps = {
   size?: number;
   /** Amount color. Defaults to the theme text color. */
   color?: string;
+  /** Line cap for the amount. Stays at 1 by default: the amount shrinks to fit
+   *  (`adjustsFontSizeToFit`) rather than wrapping or ellipsizing. */
   numberOfLines?: number;
 };
 
@@ -44,7 +46,6 @@ export function AppPrice({ value, size = 26, color, numberOfLines = 1 }: AppPric
       <AppText
         family="heading"
         weight="bold"
-        numberOfLines={numberOfLines}
         style={{ fontSize: Math.round(size * 0.8), color: c }}
       >
         {value || '—'}

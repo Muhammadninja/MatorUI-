@@ -164,6 +164,7 @@ const AppImageCarouselComponent: React.FC<AppImageCarouselProps> = ({
         typeof item === 'object' && item && 'uri' in item && item.uri
           ? String(item.uri)
           : String(idx);
+      const label = `Image ${toVisualIndex(idx) + 1} of ${sources.length}`;
       const Img = (
         <AppImage
           source={item}
@@ -175,7 +176,7 @@ const AppImageCarouselComponent: React.FC<AppImageCarouselProps> = ({
           cachePolicy="memory-disk"
           recyclingKey={recyclingKey}
           priority={idx === toFlatIndex(index) ? 'high' : 'normal'}
-          alt={`Image ${toVisualIndex(idx) + 1} of ${sources.length}`}
+          alt={label}
           style={imageStyle as any}
         />
       );
@@ -183,6 +184,8 @@ const AppImageCarouselComponent: React.FC<AppImageCarouselProps> = ({
       return (
         <AppPressableView
           onPress={() => onPressImage?.(idx)}
+          accessibilityRole="button"
+          accessibilityLabel={label}
           style={{ width: itemWidth, height, borderRadius: rounded, overflow: 'hidden' }}
         >
           {Img}

@@ -29,7 +29,7 @@ function Chip({ label, value }: { label: string; value: string }) {
       <AppText family="mono" style={{ fontSize: 10.5, letterSpacing: 0.3 }} weight="bold" colorName="text">
         {label}
       </AppText>
-      <AppText family="mono" style={{ fontSize: 10.5 }} colorName="textMuted" numberOfLines={1}>
+      <AppText family="mono" style={{ fontSize: 10.5 }} colorName="textMuted">
         {value}
       </AppText>
     </AppView>

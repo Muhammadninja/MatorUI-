@@ -1,5 +1,4 @@
 import { router } from 'expo-router';
-import { FileText, Globe, ShieldCheck, UserCheck } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 
 import { ThemePreferenceCard } from '@/components/screens-components/profile/theme-preference-card';
@@ -24,19 +23,16 @@ const LEGAL_ROWS = [
     type: 'TERMS_OF_USE',
     labelKey: 'settings.terms',
     href: '/terms',
-    Icon: FileText,
   },
   {
     type: 'PRIVACY_POLICY',
     labelKey: 'settings.privacy',
     href: '/privacy',
-    Icon: ShieldCheck,
   },
   {
     type: 'PERSONAL_DATA_CONSENT',
     labelKey: 'settings.personalDataConsent',
     href: '/personal-data-consent',
-    Icon: UserCheck,
   },
 ] as const;
 
@@ -80,13 +76,8 @@ export default function SettingsSecurityScreen() {
             <SectionLabel>{t('settings.preferences')}</SectionLabel>
 
             <AppView
-              rounded={14}
-              style={{
-                borderWidth: 1,
-                borderColor: tokens.border,
-                backgroundColor: tokens.card,
-                overflow: 'hidden',
-              }}
+              rounded={16}
+              style={{ backgroundColor: tokens.card, overflow: 'hidden' }}
             >
               {/* Language */}
               <AppPressableView
@@ -102,14 +93,20 @@ export default function SettingsSecurityScreen() {
                 gap="md"
                 px="lg"
                 py="md"
+                // The icon tile used to hold this row open; without a
+                // fixed-width child the Pressable shrinks to its content and
+                // the flex:1 label column collapses to nothing.
+                fillContainer
               >
-                <IconBox Icon={Globe} />
                 <AppView style={{ flex: 1 }}>
                   <AppText family="accent" weight="semibold" style={{ fontSize: 14.5, color: tokens.text }}>
                     {t('settings.language')}
                   </AppText>
                 </AppView>
-                <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>
+                <AppText
+                  family="default"
+                  style={{ fontSize: 13.5, color: tokens.textMuted, marginRight: 4 }}
+                >
                   {languageLabel}
                 </AppText>
                 <ChevronRight />
@@ -127,13 +124,8 @@ export default function SettingsSecurityScreen() {
             <SectionLabel>{t('settings.legal')}</SectionLabel>
 
             <AppView
-              rounded={14}
-              style={{
-                borderWidth: 1,
-                borderColor: tokens.border,
-                backgroundColor: tokens.card,
-                overflow: 'hidden',
-              }}
+              rounded={16}
+              style={{ backgroundColor: tokens.card, overflow: 'hidden' }}
             >
               {/* One row per backend legal document type. Labels are UI
                   strings; the document text itself is fetched per screen. */}
@@ -153,9 +145,9 @@ export default function SettingsSecurityScreen() {
                   gap="md"
                   px="lg"
                   py="md"
-                  style={i > 0 ? { borderTopWidth: 1, borderTopColor: tokens.border } : undefined}
+                  fillContainer
+                  style={i > 0 ? { borderTopWidth: 1, borderTopColor: tokens.divider } : undefined}
                 >
-                  <IconBox Icon={row.Icon} />
                   <AppView style={{ flex: 1 }}>
                     <AppText family="accent" weight="semibold" style={{ fontSize: 14.5, color: tokens.text }}>
                       {t(row.labelKey)}
@@ -215,23 +207,6 @@ function SectionLabel({ children }: { children: string }) {
   );
 }
 
-function IconBox({ Icon }: { Icon: React.ComponentType<{ size: number; strokeWidth: number; color: string }> }) {
-  const { tokens } = useThemeContext();
-  return (
-    <AppView
-      center
-      rounded={11}
-      style={{
-        width: 38,
-        height: 38,
-        backgroundColor: tokens.backgroundSecondary,
-        flexShrink: 0,
-      }}
-    >
-      <Icon size={17} strokeWidth={2.1} color={tokens.icon} />
-    </AppView>
-  );
-}
 
 function ChevronRight() {
   const { tokens } = useThemeContext();

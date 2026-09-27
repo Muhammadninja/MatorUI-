@@ -21,52 +21,21 @@ function titleCase(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-/** VIN masked to its last 6 chars for the stat row (full VIN lives on detail). */
-function maskVin(vin: string | undefined): string {
-  if (!vin) return '—';
-  return vin.length > 6 ? `…${vin.slice(-6)}` : vin;
-}
-
-function Stat({
-  label,
-  value,
-  labelColor,
-  valueColor,
-}: {
-  label: string;
-  value: string;
-  labelColor: string;
-  valueColor: string;
-}) {
-  return (
-    <AppView flex={1} style={{ minWidth: 0 }}>
-      <AppText
-        family="accent"
-        weight="bold"
-        transform="uppercase"
-        numberOfLines={1}
-        style={{ fontSize: 9.5, letterSpacing: 1.2, color: labelColor }}
-      >
-        {label}
-      </AppText>
-      <AppText
-        family="default"
-        weight="semibold"
-        numberOfLines={1}
-        style={{ fontSize: 13.5, color: valueColor, marginTop: 3 }}
-      >
-        {value || '—'}
-      </AppText>
-    </AppView>
-  );
-}
-
 export function GarageActiveHero({ vehicle, onShopParts, onOpenDetail }: GarageActiveHeroProps) {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const { language } = useLanguageContext();
 
-  const subline = [vehicle.trim, vehicle.color ? titleCase(vehicle.color) : undefined]
+  // One muted line instead of the old labelled MILEAGE · VIN · TRIM stat grid.
+  // That grid was six pieces of text for three facts, and two of them (VIN,
+  // trim) are reference data nobody reads while choosing what to shop for —
+  // they live on the vehicle-detail screen, one tap away. Mileage stays because
+  // it is the one value that changes and that fitment leans on.
+  const meta = [
+    vehicle.trim,
+    vehicle.color ? titleCase(vehicle.color) : undefined,
+    formatMileage(vehicle.mileage, t('garage.mileageUnit'), language) || undefined,
+  ]
     .filter(Boolean)
     .join(' · ');
 
@@ -91,34 +60,28 @@ export function GarageActiveHero({ vehicle, onShopParts, onOpenDetail }: GarageA
         style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: tokens.success }}
       />
 
-      {/* Title — two lines, clipped from the watermark. */}
+      {/* Title — year + make on one line, model on the next; both wrap
+       *  rather than clip, so long makes ("Mercedes-Benz") stay readable. */}
       <AppView style={{ maxWidth: 210, marginTop: 10 }}>
-        <AppText family="heading" weight="bold" numberOfLines={1} style={{ fontSize: 26, lineHeight: 30, color: tokens.onHero }}>
+        <AppText family="heading" weight="bold" style={{ fontSize: 26, lineHeight: 30, color: tokens.onHero }}>
           {`${vehicle.year} ${vehicle.make}`}
         </AppText>
-        <AppText family="heading" weight="bold" numberOfLines={1} style={{ fontSize: 26, lineHeight: 30, color: tokens.onHero }}>
+        <AppText family="heading" weight="bold" style={{ fontSize: 26, lineHeight: 30, color: tokens.onHero }}>
           {vehicle.model}
         </AppText>
       </AppView>
 
-      {subline ? (
-        <AppText family="default" numberOfLines={1} style={{ fontSize: 13, color: tokens.onHero, opacity: 0.7, marginTop: 6 }}>
-          {subline}
+      {meta ? (
+        <AppText family="default" style={{ fontSize: 13, color: tokens.heroMuted, marginTop: 6 }}>
+          {meta}
         </AppText>
       ) : null}
-
-      {/* Stat row over a hairline */}
-      <AppView row gap={14} style={{ marginTop: 18, paddingTop: 14, borderTopWidth: 1, borderTopColor: tokens.heroDivider }}>
-        <Stat label={t('garage.statMileage')} value={formatMileage(vehicle.mileage, t('garage.mileageUnit'), language)} labelColor={tokens.heroMuted} valueColor={tokens.onHero} />
-        <Stat label={t('garage.statVin')} value={maskVin(vehicle.vin)} labelColor={tokens.heroMuted} valueColor={tokens.onHero} />
-        <Stat label={t('garage.statTrim')} value={vehicle.trim ?? '—'} labelColor={tokens.heroMuted} valueColor={tokens.onHero} />
-      </AppView>
 
       {/* Actions — primary + square tune button. The CTA is the design
        *  system's `primary` pair (white fill, black label in both themes), so
        *  it reads on the black light-mode hero AND on the dark card surface;
        *  `background` would vanish into the dark hero. */}
-      <AppView row gap={10} style={{ marginTop: 16 }}>
+      <AppView row gap={10} style={{ marginTop: 18 }}>
         <AppPressableView
           flex={1}
           center

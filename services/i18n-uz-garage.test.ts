@@ -32,9 +32,9 @@ const get = (bundle: unknown, ns: string, key: string) =>
 const placeholders = (s: string) => [...s.matchAll(/{{\s*(\w+)\s*}}/g)].map((m) => m[1]).sort();
 
 describe('Uzbek garage copy (G-4)', () => {
-  test('the scope is the 59 garage keys plus the two G-5 VIN errors', () => {
-    expect(Object.keys(en.garage)).toHaveLength(59);
-    expect(SCOPE).toHaveLength(61);
+  test('the scope is the 41 garage keys plus the two G-5 VIN errors', () => {
+    expect(Object.keys(en.garage)).toHaveLength(41);
+    expect(SCOPE).toHaveLength(43);
   });
 
   test.each(SCOPE)('%s.%s keeps the same placeholders as English and Russian', (ns, key) => {
@@ -46,5 +46,27 @@ describe('Uzbek garage copy (G-4)', () => {
   test.each(SCOPE)('%s.%s uses Uzbek apostrophes, not ASCII quotes', (ns, key) => {
     // Between two letters, only ʻ (U+02BB) or ʼ (U+02BC) belongs in Uzbek Latin.
     expect(get(uz, ns, key)).not.toMatch(/\p{L}['`‘’]\p{L}/u);
+  });
+
+  /**
+   * The same rule, over the WHOLE bundle. The per-key checks above only ever
+   * covered `garage.*`, so 64 strings elsewhere kept their typewriter quotes
+   * ("Hisobni o'chirish", "ma'lumot") until someone read them on a screen.
+   * A straight quote is a different character to search, sorting and screen
+   * readers — and it simply looks wrong to a reader of Uzbek.
+   */
+  test('no string in uz.json uses an ASCII quote as a letter', () => {
+    const offenders: string[] = [];
+    const walk = (node: unknown, path: string) => {
+      if (typeof node === 'string') {
+        if (/\p{L}['`‘’]\p{L}/u.test(node)) offenders.push(`${path}: ${node}`);
+        return;
+      }
+      if (node && typeof node === 'object') {
+        for (const [k, v] of Object.entries(node)) walk(v, path ? `${path}.${k}` : k);
+      }
+    };
+    walk(uz, '');
+    expect(offenders).toEqual([]);
   });
 });

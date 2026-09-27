@@ -117,7 +117,6 @@ const OrderCard = React.memo(function OrderCard({ order }: { order: OrderListRow
       <AppView row align="center" justify="space-between" style={{ gap: 10 }}>
         <AppText
           weight="bold"
-          numberOfLines={1}
           style={{
             fontFamily: 'SpaceMono',
             fontSize: 14,
@@ -154,7 +153,6 @@ const OrderCard = React.memo(function OrderCard({ order }: { order: OrderListRow
       <AppText
         family="default"
         weight="semibold"
-        numberOfLines={1}
         style={{ fontSize: 13.5, color: tokens.text, marginTop: 8 }}
       >
         {order.summary}

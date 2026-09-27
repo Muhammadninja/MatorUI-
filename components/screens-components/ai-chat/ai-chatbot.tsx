@@ -769,7 +769,6 @@ export default function AiChatbot() {
                         textVariant="bodySm"
                         weight="semibold"
                         colorName="text"
-                        numberOfLines={1}
                       >
                         {item.label}
                       </AppText>

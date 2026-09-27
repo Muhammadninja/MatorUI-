@@ -1,9 +1,8 @@
 import { router } from 'expo-router';
-import { CarFront, ChevronRight } from 'lucide-react-native';
+import { ChevronRight } from 'lucide-react-native';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { AppIconBox } from '@/components/shared/app-icon-box';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useActiveVehicle } from '@/contexts/active-vehicle.context';
@@ -13,17 +12,16 @@ import { triggerHaptic } from '@/utils/haptics';
 /**
  * Persistent vehicle-context bar shown atop every catalog view.
  *
- * One card, two states — same anatomy in both (car icon box with a status dot,
- * uppercase eyebrow over a bold line, trailing chevron), so switching states
- * reads as the same control changing its status rather than as two different
- * widgets:
+ * One card, two states — same anatomy in both (status dot, uppercase eyebrow
+ * over a bold line, trailing chevron), so switching states reads as the same
+ * control changing its status rather than as two different widgets:
  *
  *   set   — green dot, "Fitting parts for" / `2019 Chevrolet Cobalt LT`.
  *   unset — amber dot, "Fitment not set" / "Select your vehicle".
  *
- * The card matches the app's standard `card` + 1px border surface used by list
- * rows and section cards, so it sits in the catalog scroll without announcing
- * itself as an alert. Both states route to the Garage.
+ * The card matches the app's standard `card` fill used by list rows and
+ * section cards, so it sits in the catalog scroll without announcing itself as
+ * an alert. Both states route to the Garage.
  */
 function VehicleContextBar() {
   const { t } = useTranslation();
@@ -55,49 +53,37 @@ function VehicleContextBar() {
       gap={12}
       px={14}
       py={12}
-      rounded={14}
+      rounded={16}
       colorName="card"
-      borderWidth={1}
-      borderName="border"
+      // The icon tile used to give this row its width. A 9px dot does not, so
+      // without this the Pressable shrinks to its content and the bar renders
+      // as a stub.
+      fillContainer
     >
-      <AppView>
-        <AppIconBox
-          Icon={CarFront}
-          size={36}
-          iconSize={19}
-          strokeWidth={1.9}
-          rounded={11}
-          colorName={label ? 'text' : 'textMuted'}
-        />
-        {/* Status dot, ringed in the card colour so it reads as attached to
-            the icon: green when parts are being filtered, amber when nothing
-            is scoping them yet. */}
-        <AppView
-          testID="fitment-status-indicator"
-          rounded={999}
-          style={{
-            position: 'absolute',
-            right: -2,
-            bottom: -2,
-            width: 12,
-            height: 12,
-            backgroundColor: label ? tokens.success : tokens.warning,
-            borderWidth: 2.5,
-            borderColor: tokens.card,
-          }}
-        />
-      </AppView>
+      {/* A dot, nothing more. This was a 36px tinted tile with a car glyph in
+       *  it AND a ringed status dot pinned to its corner — a badge on a tile
+       *  on a bar, to say one binary thing. The colour says it. */}
+      <AppView
+        testID="fitment-status-indicator"
+        rounded={999}
+        style={{
+          width: 9,
+          height: 9,
+          flexShrink: 0,
+          backgroundColor: label ? tokens.success : tokens.warning,
+        }}
+      />
 
-      <AppView flex={1} gap={1}>
+      <AppView flex={1} gap={2}>
         <AppText
           family="accent"
-          weight="medium"
-          numberOfLines={1}
-          style={{ fontSize: 10, letterSpacing: 0.7, textTransform: 'uppercase', color: tokens.textMuted }}
+          weight="bold"
+          transform="uppercase"
+          style={{ fontSize: 9.5, letterSpacing: 1.1, color: tokens.textMuted }}
         >
           {label ? t('catalog.fittingPartsFor') : t('catalog.fitmentNotSet')}
         </AppText>
-        <AppText family="accent" weight="bold" numberOfLines={1} style={{ fontSize: 13.5, color: tokens.text }}>
+        <AppText family="heading" weight="bold" style={{ fontSize: 14.5, color: tokens.text }}>
           {label ?? t('catalog.selectVehicleTitle')}
         </AppText>
       </AppView>

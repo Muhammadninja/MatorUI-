@@ -51,14 +51,12 @@ export function VehicleDetailActionRow({
         <AppView flex={1} gap={2} style={{ opacity: muted ? 0.5 : 1 }}>
           <AppText
             textVariant="bodySemibold"
-            numberOfLines={1}
-            ellipsizeMode="tail"
             style={{ color: destructive ? tokens.error : tokens.text }}
           >
             {label}
           </AppText>
           {hint ? (
-            <AppText textVariant="bodyXs" colorName="gray400" numberOfLines={1}>
+            <AppText textVariant="bodyXs" colorName="gray400">
               {hint}
             </AppText>
           ) : null}

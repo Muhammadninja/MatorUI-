@@ -145,7 +145,6 @@ export default function OrderConfirmationScreen() {
               <AppText
                 family="mono"
                 weight="bold"
-                numberOfLines={1}
                 style={{ fontSize: 16, color: tokens.text }}
               >
                 {formatOrderNo(order.id)}
@@ -184,7 +183,6 @@ export default function OrderConfirmationScreen() {
               <AppText
                 family="default"
                 style={{ fontSize: 13, color: tokens.textMuted, flex: 1 }}
-                numberOfLines={1}
               >
                 {line.title} × {line.quantity}
               </AppText>

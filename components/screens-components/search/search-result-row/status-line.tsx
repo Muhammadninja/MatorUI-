@@ -18,7 +18,6 @@ export default function StatusLine({ status }: { status: string }) {
   return (
     <AppText
       textVariant="bodyXs"
-      numberOfLines={1}
       style={{
         color: statusColor(status, tokens),
         fontSize: 12,

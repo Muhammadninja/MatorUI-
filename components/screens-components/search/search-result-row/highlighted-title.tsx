@@ -6,7 +6,6 @@ export default function HighlightedTitle({ text }: { text: string; query?: strin
     <AppText
       textVariant="bodySemibold"
       weight="medium"
-      numberOfLines={3}
       style={{ flexShrink: 1, fontSize: 14, lineHeight: 19 }}
     >
       {text}

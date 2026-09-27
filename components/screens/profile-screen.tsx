@@ -42,13 +42,17 @@ type AccountItem = {
 };
 
 /** Build the account rows with translated copy. `t` comes from the caller so
- *  the labels re-resolve when the language changes. */
+ *  the labels re-resolve when the language changes.
+ *
+ *  Titles only, no sub-lines: "Order history / View your orders" and
+ *  "Shipping addresses / Manage delivery addresses" spent a second line
+ *  restating the first, which doubled the reading on the screen without
+ *  telling anyone anything. The icon + title + chevron carry it. */
 function buildAccountItems(t: (key: string) => string): AccountItem[] {
   return [
     {
       key: 'edit-profile',
       title: t('profile.editProfileTitle'),
-      subtitle: t('profile.editProfileSub'),
       leading: <AppIconBox Icon={User} rounded={11} />,
       rightChevron: true,
       onPress: () => router.push('/edit-profile'),
@@ -56,7 +60,6 @@ function buildAccountItems(t: (key: string) => string): AccountItem[] {
     {
       key: 'orders',
       title: t('profile.orderHistoryTitle'),
-      subtitle: t('profile.orderHistorySub'),
       leading: <AppIconBox Icon={ReceiptText} rounded={11} />,
       rightChevron: true,
       onPress: () => router.push('/order-history'),
@@ -64,7 +67,6 @@ function buildAccountItems(t: (key: string) => string): AccountItem[] {
     {
       key: 'addresses',
       title: t('profile.addressesTitle'),
-      subtitle: t('profile.addressesSub'),
       leading: <AppIconBox Icon={MapPin} rounded={11} />,
       rightChevron: true,
       onPress: () => router.push('/shipping-addresses'),
@@ -72,7 +74,6 @@ function buildAccountItems(t: (key: string) => string): AccountItem[] {
     {
       key: 'liked',
       title: t('profile.likedTitle'),
-      subtitle: t('profile.likedSub'),
       leading: <AppIconBox Icon={Heart} rounded={11} />,
       rightChevron: true,
       onPress: () => router.push('/liked'),
@@ -80,7 +81,6 @@ function buildAccountItems(t: (key: string) => string): AccountItem[] {
     {
       key: 'settings',
       title: t('profile.settingsTitle'),
-      subtitle: t('profile.settingsSub'),
       leading: <AppIconBox Icon={Shield} rounded={11} />,
       rightChevron: true,
       onPress: () => router.push('/settings-security'),
@@ -153,20 +153,32 @@ export default function ProfileScreen() {
           {/* Handoff §17: 64px avatar, name 21/700, email, Pro pill */}
           <ProfileHeader profile={profile} />
 
-          {/* 3-equal stats cards — real counts (0 = the honest empty state). */}
-          <AppView row gap="sm" px="lg">
-            <StatCard label={t('profile.statOrders')} value={String(orderCount)} />
-            <StatCard label={t('profile.statVehicles')} value={String(vehicles.length)} />
-            <StatCard label={t('profile.statSaved')} value={String(likedIds.size)} />
+          {/* One card, three columns, hairlines between — real counts (0 = the
+           *  honest empty state). Three separate bordered boxes framed each
+           *  number individually and made a summary read as three widgets. */}
+          <AppView px="lg">
+            <AppView
+              row
+              rounded={16}
+              colorName="card"
+              style={{ overflow: 'hidden', paddingVertical: 14 }}
+            >
+              <StatCell label={t('profile.statOrders')} value={String(orderCount)} />
+              <StatDivider />
+              <StatCell label={t('profile.statVehicles')} value={String(vehicles.length)} />
+              <StatDivider />
+              <StatCell label={t('profile.statSaved')} value={String(likedIds.size)} />
+            </AppView>
           </AppView>
 
-          {/* Handoff §17: list rows with icon tile 11-radius + title + sub + chevron */}
+          {/* Handoff §17 rows, minus the sub-lines (see buildAccountItems). */}
           <AppView gap={10} px="lg">
-            <AppView rounded={SECTION_RADIUS} colorName="card" borderWidth={1} borderName="border">
+            <AppView rounded={SECTION_RADIUS} colorName="card" style={{ overflow: 'hidden' }}>
               {accountItems.map(({ key, ...item }, index) => (
                 <AppListItem
                   key={key}
                   {...item}
+                  titleWeight="bold"
                   _isFirst={index === 0}
                   _isLast={index === accountItems.length - 1}
                   _parentRounded={SECTION_RADIUS}
@@ -274,35 +286,32 @@ function ProfileHeader({ profile }: { profile: UserProfile }) {
 
 // ── Stats Card ────────────────────────────────────────────────────────────────
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function StatCell({ label, value }: { label: string; value: string }) {
   const { tokens } = useThemeContext();
   return (
-    <AppView
-      flex={1}
-      align="center"
-      gap={3}
-      py={14}
-      rounded={14}
-      style={{
-        paddingHorizontal: 10,
-        borderWidth: 1,
-        borderColor: tokens.border,
-        backgroundColor: tokens.card,
-      }}
-    >
+    <AppView flex={1} align="center" gap={2} style={{ paddingHorizontal: 8 }}>
       <AppText
         family="heading"
         weight="bold"
-        style={{ fontSize: 20, lineHeight: 24, color: tokens.text }}
+        style={{ fontSize: 21, lineHeight: 25, color: tokens.text }}
       >
         {value}
       </AppText>
       <AppText
         family="default"
-        style={{ fontSize: 11.5, color: tokens.textMuted, marginTop: 2 }}
+        weight="bold"
+        style={{ fontSize: 11.5, color: tokens.textMuted }}
       >
         {label}
       </AppText>
     </AppView>
+  );
+}
+
+/** Hairline between two stat columns, inset from the card's edges. */
+function StatDivider() {
+  const { tokens } = useThemeContext();
+  return (
+    <AppView style={{ width: 1, marginVertical: 2, backgroundColor: tokens.divider }} />
   );
 }

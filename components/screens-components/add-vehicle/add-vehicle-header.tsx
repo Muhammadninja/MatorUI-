@@ -37,7 +37,6 @@ export function AddVehicleHeader({ title, canSubmit, onBack, onSubmit }: AddVehi
           family="heading"
           weight="bold"
           align="center"
-          numberOfLines={1}
         >
           {title}
         </AppText>

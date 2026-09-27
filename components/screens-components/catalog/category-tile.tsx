@@ -22,7 +22,7 @@ export type CategoryTileProps = {
   onPress: () => void;
 };
 
-/** Label block height: two lines at `lineHeight`, so a wrapped label and a
+/** Label block floor: two lines at `lineHeight`, so a wrapped label and a
  *  single-word one keep their counts on the same baseline across a row. */
 const LABEL_LINE_HEIGHT = 15;
 const LABEL_BLOCK_HEIGHT = LABEL_LINE_HEIGHT * 2;
@@ -32,10 +32,11 @@ const LABEL_BLOCK_HEIGHT = LABEL_LINE_HEIGHT * 2;
  * + name + count on a bordered card. Presentational; the parent supplies the
  * data + tap handler.
  *
- * The label wraps to two lines: localized names are far longer than the
- * internal English ones ("Электрооборудование", "Kuzov va tashqi qism") and a
- * single line ellipsized them mid-word. The block is a fixed two lines tall so
- * the counts stay aligned whether the label wraps or not.
+ * The label wraps freely and is never ellipsized: localized names are far
+ * longer than the internal English ones ("Электрооборудование", "Kuzov va
+ * tashqi qism") and a clamped label cut them mid-word. The block reserves two
+ * lines so the counts stay aligned for the common case, and grows for the rare
+ * label that needs a third line.
  */
 function CategoryTile({ name, label, iconKey, count, onPress }: CategoryTileProps) {
   const { t } = useTranslation();
@@ -50,15 +51,13 @@ function CategoryTile({ name, label, iconKey, count, onPress }: CategoryTileProp
       accessibilityRole="button"
       accessibilityLabel={`${display}, ${t('category.partsCount', { count })}`}
       center
-      borderBottomWidth={0.6}
-      borderName="border"
       style={{ width: '31.5%', paddingBottom: 5, gap: 10 }}
     >
       <AppView center style={{ width: 68, height: 68 }}>
         <AutoPartIcon name={name} iconKey={iconKey} size={60} />
       </AppView>
       <AppView align="center" style={{ alignSelf: 'stretch' }}>
-        <AppView justify="center" style={{ height: LABEL_BLOCK_HEIGHT, alignSelf: 'stretch' }}>
+        <AppView justify="center" style={{ minHeight: LABEL_BLOCK_HEIGHT, alignSelf: 'stretch' }}>
           <AppText
             family="accent"
             weight="bold"
@@ -68,7 +67,6 @@ function CategoryTile({ name, label, iconKey, count, onPress }: CategoryTileProp
               textAlign: 'center',
               lineHeight: LABEL_LINE_HEIGHT,
             }}
-            numberOfLines={2}
           >
             {display}
           </AppText>

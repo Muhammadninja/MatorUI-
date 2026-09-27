@@ -99,7 +99,6 @@ export default function Ribbon({
 
         <AppText
           weight="bold"
-          numberOfLines={1}
           style={{
             color: fg,
             fontSize: composite ? 10 : 9,

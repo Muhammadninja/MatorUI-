@@ -17,8 +17,8 @@ export type GarageQuickActionsProps = {
   onAddByVin: () => void;
   onSavedParts: () => void;
   /** Current mileage of the active vehicle, already formatted and localised
-   *  (e.g. "67 420 km"). Shown as the mileage tile's sub-line; an empty
-   *  string falls back to a generic prompt. */
+   *  (e.g. "67 420 km"). Shown as the mileage tile's sub-line; when empty the
+   *  tile is just its label — no filler copy stands in for it. */
   mileageLabel?: string;
 };
 
@@ -26,7 +26,11 @@ type Action = {
   key: string;
   Icon: ComponentType<LucideProps>;
   label: string;
-  sub: string;
+  /** Optional second line. Only ever LIVE data (the current mileage) — the
+   *  static one-liners these tiles used to carry ("Parts you've bought",
+   *  "Your shortlist") restated their own labels and turned a 4-tap grid
+   *  into eight lines of reading. */
+  sub?: string;
   onPress: () => void;
 };
 
@@ -45,12 +49,14 @@ function Tile({ Icon, label, sub, onPress }: Omit<Action, 'key'>) {
       gap={8}
     >
       <Icon size={20} strokeWidth={2} color={tokens.text} />
-      <AppText family="default" weight="semibold" colorName="text" numberOfLines={1} style={{ fontSize: 13.5 }}>
+      <AppText family="default" weight="semibold" colorName="text" style={{ fontSize: 13.5 }}>
         {label}
       </AppText>
-      <AppText family="default" colorName="textMuted" numberOfLines={2} style={{ fontSize: 11.5, lineHeight: 15 }}>
-        {sub}
-      </AppText>
+      {sub ? (
+        <AppText family="default" colorName="textMuted" style={{ fontSize: 11.5, lineHeight: 15 }}>
+          {sub}
+        </AppText>
+      ) : null}
     </AppPressableView>
   );
 }
@@ -75,12 +81,13 @@ export function GarageQuickActions({
       key: 'mileage',
       Icon: Gauge,
       label: t('garage.qaUpdateMileage'),
-      sub: mileageLabel || t('garage.qaUpdateMileageSub'),
+      // The only sub-line left, and only when there is a reading to show.
+      sub: mileageLabel || undefined,
       onPress: onUpdateMileage,
     },
-    { key: 'orders', Icon: ReceiptText, label: t('garage.qaPastOrders'), sub: t('garage.qaPastOrdersSub'), onPress: onPastOrders },
-    { key: 'vin', Icon: Hash, label: t('garage.qaAddByVin'), sub: t('garage.qaAddByVinSub'), onPress: onAddByVin },
-    { key: 'saved', Icon: Bookmark, label: t('garage.qaSavedParts'), sub: t('garage.qaSavedPartsSub'), onPress: onSavedParts },
+    { key: 'orders', Icon: ReceiptText, label: t('garage.qaPastOrders'), onPress: onPastOrders },
+    { key: 'vin', Icon: Hash, label: t('garage.qaAddByVin'), onPress: onAddByVin },
+    { key: 'saved', Icon: Bookmark, label: t('garage.qaSavedParts'), onPress: onSavedParts },
   ];
 
   return (

@@ -5,17 +5,18 @@ import { RADIUS_MEDIA, RADIUS_PLACEHOLDER } from '@/components/screens-component
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 
-const HERO_HEIGHT = 232;
-const FIT_ROW_HEIGHT = 60;
-const QUICK_TILE_HEIGHT = 92;
+const HERO_HEIGHT = 202;
+const QUICK_TILE_HEIGHT = 86;
 
 /**
  * Loading shimmer for the garage screen. Mirrors the redesigned loaded
  * layout so the skeleton → success transition doesn't shift content:
  *
- *   - Active-vehicle hero placeholder (~232 tall)
- *   - Fit-filter row placeholder (~60 tall)
- *   - 2×2 quick-action grid placeholders (~92 tall each)
+ *   - Active-vehicle hero placeholder (~202 tall)
+ *   - 2×2 quick-action grid placeholders (~86 tall each)
+ *
+ * It tracks the trimmed layout: no fit-filter row, no three-column stat grid
+ * in the hero, and a sub-line only on the mileage tile.
  *
  * Native driver throughout so the screen stays at 60fps while a slow
  * fetch resolves.
@@ -68,25 +69,10 @@ export default function GarageSkeleton() {
         <AppView style={{ height: 12, width: 96, borderRadius: RADIUS_PLACEHOLDER, backgroundColor: baseColor }} />
         <AppView style={{ height: 26, width: '55%', borderRadius: RADIUS_PLACEHOLDER, backgroundColor: highlightColor, marginTop: 14 }} />
         <AppView style={{ height: 26, width: '38%', borderRadius: RADIUS_PLACEHOLDER, backgroundColor: highlightColor, marginTop: 6 }} />
-        <AppView row gap={14} style={{ marginTop: 26 }}>
-          {[0, 1, 2].map((i) => (
-            <AppView key={i} style={{ flex: 1, height: 30, borderRadius: RADIUS_PLACEHOLDER, backgroundColor: baseColor }} />
-          ))}
-        </AppView>
+        <AppView style={{ height: 13, width: '62%', borderRadius: RADIUS_PLACEHOLDER, backgroundColor: baseColor, marginTop: 10 }} />
         <AppView row gap={10} style={{ marginTop: 20 }}>
           <AppView style={{ flex: 1, height: 46, borderRadius: 13, backgroundColor: highlightColor }} />
           <AppView style={{ width: 46, height: 46, borderRadius: 13, backgroundColor: highlightColor }} />
-        </AppView>
-      </Animated.View>
-
-      {/* Fit-filter row placeholder */}
-      <Animated.View style={{ opacity }}>
-        <AppView row align="center" gap={11} style={{ height: FIT_ROW_HEIGHT, paddingHorizontal: 14, borderRadius: 16, ...shell }}>
-          <AppView style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: highlightColor }} />
-          <AppView style={{ flex: 1, gap: 6 }}>
-            <AppView style={{ height: 13, width: '40%', borderRadius: RADIUS_PLACEHOLDER, backgroundColor: highlightColor }} />
-            <AppView style={{ height: 10, width: '75%', borderRadius: RADIUS_PLACEHOLDER, backgroundColor: baseColor }} />
-          </AppView>
         </AppView>
       </Animated.View>
 
@@ -97,7 +83,10 @@ export default function GarageSkeleton() {
             <AppView key={i} style={{ flexBasis: '48%', flexGrow: 1, height: QUICK_TILE_HEIGHT, padding: 14, borderRadius: 16, ...shell }}>
               <AppView style={{ width: 22, height: 22, borderRadius: RADIUS_MEDIA, backgroundColor: highlightColor }} />
               <AppView style={{ height: 12, width: '60%', borderRadius: RADIUS_PLACEHOLDER, backgroundColor: highlightColor, marginTop: 10 }} />
-              <AppView style={{ height: 9, width: '45%', borderRadius: RADIUS_PLACEHOLDER, backgroundColor: baseColor, marginTop: 6 }} />
+              {/* Only the mileage tile (first) carries a second line now. */}
+              {i === 0 ? (
+                <AppView style={{ height: 9, width: '45%', borderRadius: RADIUS_PLACEHOLDER, backgroundColor: baseColor, marginTop: 6 }} />
+              ) : null}
             </AppView>
           ))}
         </AppView>

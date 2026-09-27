@@ -95,7 +95,7 @@ function planToolCalls(message: string): AiChatToolCall[] {
       name: 'search_parts',
       args: { query: message },
       status: 'pending',
-      label: `Searching catalogue for "${message.slice(0, 40)}${message.length > 40 ? '…' : ''}"`,
+      label: `Searching catalogue for "${message}"`,
     });
   }
   if (lower.includes('fit') || lower.includes('compatib')) {

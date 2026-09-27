@@ -71,7 +71,7 @@ export default function SearchPromoBanner() {
           }),
         })}
       >
-        <View style={{ flexDirection: 'row', height: 148 }}>
+        <View style={{ flexDirection: 'row', minHeight: 148 }}>
           {/* Imagery — uses the picsum seed for variety until real
            *  campaign artwork lands. Absolute fill so it follows the
            *  row height instead of pushing it to the source's intrinsic
@@ -130,7 +130,6 @@ export default function SearchPromoBanner() {
               textVariant="bodySemibold"
               family="heading"
               weight="bold"
-              numberOfLines={2}
               style={{ lineHeight: 20 }}
             >
               {MOCK_CAMPAIGN.headline}
@@ -138,7 +137,6 @@ export default function SearchPromoBanner() {
             <AppText
               textVariant="bodyXs"
               colorName="gray400"
-              numberOfLines={1}
               style={{ lineHeight: 16 }}
             >
               {MOCK_CAMPAIGN.body}

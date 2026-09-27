@@ -2,7 +2,7 @@ import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 
 export type AppInlineErrorProps = {
-  /** Error message to display. Truncates at 2 lines. */
+  /** Error message to display. Wraps to as many lines as it needs. */
   message: string;
   /** Optional dismiss action. Renders a tappable "Dismiss" label when
    *  provided. */
@@ -42,7 +42,6 @@ export function AppInlineError({
       <AppText
         textVariant="bodyXs"
         colorName="error"
-        numberOfLines={2}
         style={{ flexShrink: 1 }}
       >
         {message}

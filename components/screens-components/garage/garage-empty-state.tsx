@@ -6,9 +6,9 @@ import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 
 export type GarageEmptyStateProps = {
-  /** Route 1: the VIN decoder screen. */
+  /** Route 2: the VIN decoder screen. */
   onAddByVin: () => void;
-  /** Route 2: pick the model, then the year. */
+  /** Route 1, the default: the make/model/year sheet. */
   onAddByDetails: () => void;
   /** A create is in flight — freeze both routes. */
   busy?: boolean;
@@ -29,7 +29,7 @@ function Route({
   body?: string;
   onPress: () => void;
   disabled?: boolean;
-  /** The precise route gets the filled treatment; the other is an outline. */
+  /** The default route gets the filled treatment; the other is an outline. */
   emphasis?: boolean;
 }) {
   const { tokens } = useThemeContext();
@@ -88,12 +88,12 @@ function Route({
 /**
  * Garage empty state: a statement, then the two ways in.
  *
- * Two routes exist because they answer different situations. A VIN is the
+ * Two routes exist because they answer different situations. Make/model/year
+ * leads: three taps from the sofa, and enough for most fitment. A VIN is the
  * precise one (it resolves trim and engine, which is what makes fitment exact)
  * but it means finding the plate under the windscreen and typing 17
- * characters. Make/model/year is three taps from the sofa and is enough for
- * most fitment. Neither is a fallback for the other, so they are presented as
- * a genuine choice rather than one CTA plus a link.
+ * characters. Neither is a fallback for the other, so they are presented as a
+ * genuine choice rather than one CTA plus a link.
  *
  * Left-aligned throughout, no centered hero, no benefit list. Grouping is done
  * with space; the only bordered objects are the two routes, where the border
@@ -121,19 +121,23 @@ export function GarageEmptyState({ onAddByVin, onAddByDetails, busy }: GarageEmp
         </AppText>
       </AppView>
 
+      {/* Model-and-year leads, and takes the filled treatment: it is three
+       *  taps in the platform's own pickers, against walking to the car and
+       *  typing 17 characters. VIN keeps its sub-line, which is the honest
+       *  reason to choose the slower route. */}
       <AppView gap={10}>
         <Route
           index="1"
           emphasis
-          title={t('garage.emptyOptionVin')}
-          body={t('garage.emptyOptionVinSub')}
-          onPress={onAddByVin}
+          title={t('garage.emptyOptionDetails')}
+          onPress={onAddByDetails}
           disabled={busy}
         />
         <Route
           index="2"
-          title={t('garage.emptyOptionDetails')}
-          onPress={onAddByDetails}
+          title={t('garage.emptyOptionVin')}
+          body={t('garage.emptyOptionVinSub')}
+          onPress={onAddByVin}
           disabled={busy}
         />
       </AppView>

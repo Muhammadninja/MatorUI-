@@ -17,7 +17,7 @@ import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useColorToken } from '@/components/shared/app-view/colors';
 import { useThemeContext } from '@/contexts/theme.context';
-import { type ColorName } from '@/themes';
+import { type ColorName, type WeightName } from '@/themes';
 import { triggerHaptic, type HapticKind } from '@/utils/haptics';
 
 export type ListItemSize = 'sm' | 'md' | 'lg';
@@ -90,7 +90,11 @@ export type AppListItemProps = {
   /** Title/subtitle configuration and overrides */
   titleVariant?: 'bodySm' | 'h4' | 'h3' | 'body' | 'bodySemibold' | 'subtitle' | 'title';
   subtitleVariant?: 'bodyXs' | 'bodySm' | 'caption' | 'body' | 'subtitle';
+  /** Title font weight. Unset = the variant's own weight (semibold at `md`). */
+  titleWeight?: WeightName;
+  /** Optional hard line cap. Omitted by default so text wraps, never clips. */
   titleLines?: number;
+  /** Optional hard line cap. Omitted by default so text wraps, never clips. */
   subtitleLines?: number;
   titleStyle?: any;
   subtitleStyle?: any;
@@ -169,8 +173,12 @@ const AppListItemComponent: React.FC<AppListItemProps> = ({
   borderColor,
   titleVariant,
   subtitleVariant,
-  titleLines = 1,
-  subtitleLines = 2,
+  titleWeight,
+  // No default clamp: rows grow to fit their text instead of ellipsizing it.
+  // Callers can still pass an explicit line cap where a fixed row height
+  // genuinely matters.
+  titleLines,
+  subtitleLines,
   titleStyle,
   subtitleStyle,
   rightTextColorName,
@@ -420,6 +428,7 @@ const AppListItemComponent: React.FC<AppListItemProps> = ({
           {typeof title === 'string' ? (
             <AppText
               textVariant={titleVariant ?? sz.title}
+              weight={titleWeight}
               numberOfLines={titleLines}
               allowFontScaling={allowFontScaling}
               colorName={titleColorName}

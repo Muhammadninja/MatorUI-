@@ -158,26 +158,6 @@ export const MATOR_CAT_TILES: MatorCatTile[] = [
   { name: 'Exterior', count: 49, color: '#3949ab' },
 ];
 
-/** A "Shop by vehicle" make tile. `body` picks the car silhouette glyph. */
-export type MatorMake = {
-  name: string;
-  color: string;
-  body: 'sedan' | 'suv' | 'truck' | 'hatchback';
-  models: string[];
-};
-
-/** The makes for the "Shop by vehicle" row. Uses the brand logos shipped in
- *  `assets/brands/` (see `brand-logo.tsx`) — the popular makes on mator.uz.
- *  `color` is each brand's accent (tile border/tint); `body` picks the car
- *  silhouette used for the per-model rows on the Make screen. */
-export const MATOR_MAKES: MatorMake[] = [
-  { name: 'Chevrolet', color: '#CD9834', body: 'sedan', models: ['Cobalt', 'Nexia', 'Malibu', 'Tracker', 'Onix', 'Spark'] },
-  { name: 'Hyundai', color: '#002C5E', body: 'suv', models: ['Sonata', 'Elantra', 'Tucson', 'Santa Fe', 'Accent'] },
-  { name: 'Kia', color: '#BB162B', body: 'suv', models: ['K5', 'Sportage', 'Sorento', 'Cerato', 'Seltos'] },
-  { name: 'Skoda', color: '#4BA82E', body: 'hatchback', models: ['Octavia', 'Rapid', 'Superb', 'Kodiaq', 'Fabia'] },
-  { name: 'Volkswagen', color: '#151F5D', body: 'sedan', models: ['Polo', 'Passat', 'Tiguan', 'Jetta', 'Golf'] },
-];
-
 /**
  * Map a category-tile name to the Category screen's route params, mirroring
  * the prototype's `catRoute`: tiles that don't have their own product bucket
@@ -193,11 +173,6 @@ export function categoryRouteFor(name: string): { cat: MatorCategory | 'All'; la
     Wipers: 'Exterior',
   };
   return { cat: fallback[name] ?? 'All', label: name };
-}
-
-/** Look up a make tile by name (falls back to the first make). */
-export function makeByName(name: string | undefined): MatorMake {
-  return MATOR_MAKES.find((m) => m.name === name) ?? MATOR_MAKES[0];
 }
 
 // ---- MATOR Certified (sponsored / sellable placements) ----

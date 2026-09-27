@@ -406,9 +406,6 @@ function UniversalFitBadge({ tokens }: { tokens: ThemeTokens }) {
         <AppText family="accent" weight="bold" style={{ fontSize: 14, color: tokens.text }}>
           {t('itemDetail.universalFitTitle')}
         </AppText>
-        <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted }}>
-          {t('itemDetail.universalFitSubtitle')}
-        </AppText>
       </AppView>
     </AppView>
   );

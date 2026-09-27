@@ -64,7 +64,6 @@ function ProductCard({ product: p }: ProductCardProps) {
       <AppText
         family="default"
         weight="semibold"
-        numberOfLines={2}
         style={{ fontSize: 13, lineHeight: 17, color: tokens.text, minHeight: 34 }}
       >
         {p.title}

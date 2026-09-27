@@ -32,7 +32,7 @@ export function AddVehiclePrimaryToggle({
     >
       <AppView row align="center" justify="space-between" gap="md" p="lg">
         <AppView flex={1} gap={2}>
-          <AppText textVariant="bodySemibold" colorName="text" numberOfLines={1}>
+          <AppText textVariant="bodySemibold" colorName="text">
             {resolvedTitle}
           </AppText>
           <AppText textVariant="bodyXs" colorName="gray400">

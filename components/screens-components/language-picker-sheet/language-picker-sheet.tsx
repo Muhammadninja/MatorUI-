@@ -152,10 +152,10 @@ export default function LanguagePickerSheet({ visible, onClose }: LanguagePicker
                     <AppText style={{ fontSize: 24, lineHeight: 28 }}>{opt.flag}</AppText>
                   </View>
                   <View style={{ flex: 1, gap: 2 }}>
-                    <AppText textVariant="bodySemibold" weight="semibold" numberOfLines={1}>
+                    <AppText textVariant="bodySemibold" weight="semibold">
                       {opt.nativeName}
                     </AppText>
-                    <AppText textVariant="bodyXs" colorName="gray400" numberOfLines={1}>
+                    <AppText textVariant="bodyXs" colorName="gray400">
                       {opt.englishName}
                     </AppText>
                   </View>

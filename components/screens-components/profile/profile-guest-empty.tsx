@@ -77,7 +77,7 @@ export default function ProfileGuestEmpty() {
           <AppText
             textVariant="caption"
             family="accent"
-            weight="semibold"
+            weight="bold"
             transform="uppercase"
             style={{ color: tokens.textMuted, letterSpacing: 1.4 }}
           >
@@ -112,7 +112,7 @@ export default function ProfileGuestEmpty() {
         >
           <AppView row align="center" gap="sm">
             <LogIn size={16} strokeWidth={2.2} color={tokens.onBrand} />
-            <AppText weight="semibold" colorName="onBrand">
+            <AppText weight="bold" colorName="onBrand">
               {t('profileCards.logIn')}
             </AppText>
           </AppView>
@@ -141,12 +141,9 @@ export default function ProfileGuestEmpty() {
           >
             <Settings size={18} strokeWidth={2.1} color={tokens.icon} />
           </AppView>
-          <AppView gap={2} style={{ flex: 1 }}>
-            <AppText textVariant="body" family="heading" weight="semibold" colorName="text">
+          <AppView style={{ flex: 1 }}>
+            <AppText textVariant="body" family="heading" weight="bold" colorName="text">
               {t('profileCards.settings')}
-            </AppText>
-            <AppText textVariant="bodyXs" colorName="textMuted">
-              {t('profileCards.settingsSub')}
             </AppText>
           </AppView>
           <ChevronRight size={18} strokeWidth={2.2} color={tokens.textMuted} />

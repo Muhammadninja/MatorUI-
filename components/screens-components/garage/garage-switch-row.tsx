@@ -61,16 +61,16 @@ export function GarageSwitchRow({
         <CarIcon body={body} size={38} color={tokens.textMuted} />
       </AppView>
       <AppView flex={1} style={{ minWidth: 0 }}>
-        <AppText family="default" weight="semibold" colorName="text" numberOfLines={1} style={{ fontSize: 14.5 }}>
+        <AppText family="default" weight="semibold" colorName="text" style={{ fontSize: 14.5 }}>
           {name}
         </AppText>
         {sub ? (
-          <AppText family="default" colorName="textMuted" numberOfLines={1} style={{ fontSize: 12, marginTop: 2 }}>
+          <AppText family="default" colorName="textMuted" style={{ fontSize: 12, marginTop: 2 }}>
             {sub}
           </AppText>
         ) : null}
       </AppView>
-      <AppText family="accent" weight="bold" colorName="textMuted" numberOfLines={1} style={{ fontSize: 11.5, flexShrink: 0 }}>
+      <AppText family="accent" weight="bold" colorName="textMuted" style={{ fontSize: 11.5, flexShrink: 1, maxWidth: 96, textAlign: 'right' }}>
         {t('garage.setActive')}
       </AppText>
       <AppPressableView

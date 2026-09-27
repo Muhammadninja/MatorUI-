@@ -451,12 +451,9 @@ export default function GlobalModalHost() {
                 style={{ width: 36, height: 4, backgroundColor: tokens.divider }}
               />
             </AppView>
-            <AppView gap={4}>
+            <AppView>
               <AppText textVariant="title" family="heading" weight="bold">
                 {t('modalHost.privacySecurity')}
-              </AppText>
-              <AppText textVariant="bodySm" colorName="gray400">
-                {t('modalHost.privacySecuritySubtitle')}
               </AppText>
             </AppView>
             <AppView
@@ -1105,11 +1102,11 @@ function CarSelectionModal({ payload }: { payload: CarSelectionPayload }) {
                       <Car size={14} strokeWidth={2.2} color={tokens.text} />
                     </View>
                     <View style={{ flex: 1, gap: 2 }}>
-                      <AppText textVariant="bodySm" weight="semibold" numberOfLines={1}>
+                      <AppText textVariant="bodySm" weight="semibold">
                         {vehicleLabel(v)}
                       </AppText>
                       {v.nickname || v.isPrimary ? (
-                        <AppText textVariant="bodyXs" colorName="gray400" numberOfLines={1}>
+                        <AppText textVariant="bodyXs" colorName="gray400">
                           {v.isPrimary ? t('modalHost.primary') : v.nickname}
                           {v.isPrimary && v.nickname ? ` · ${v.nickname}` : ''}
                         </AppText>

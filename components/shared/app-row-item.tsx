@@ -51,11 +51,11 @@ export function AppRowItem({
     <AppView row align="center" gap="md" px={px} py="md" style={{ minHeight: 56 }}>
       {leading ? <AppView>{leading}</AppView> : null}
       <AppView flex={1} gap="xs">
-        <AppText textVariant="bodySemibold" weight="semibold" numberOfLines={1}>
+        <AppText textVariant="bodySemibold" weight="semibold">
           {title}
         </AppText>
         {subtitle ? (
-          <AppText textVariant="bodyXs" colorName="gray400" numberOfLines={2}>
+          <AppText textVariant="bodyXs" colorName="gray400">
             {subtitle}
           </AppText>
         ) : null}

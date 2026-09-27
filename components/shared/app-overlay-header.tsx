@@ -94,7 +94,7 @@ export function AppOverlayHeader({
 
         <AppView style={{ flex: 1, alignItems: 'center' }}>
           {title ? (
-            <AppText textVariant="bodySm" weight="semibold" numberOfLines={1}>
+            <AppText textVariant="bodySm" weight="semibold" align="center">
               {title}
             </AppText>
           ) : null}

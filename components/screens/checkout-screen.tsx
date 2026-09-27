@@ -227,7 +227,7 @@ export default function CheckoutScreen() {
           <AppView gap={10}>
             {items.map((item) => (
               <AppView key={item.id} row justify="space-between">
-                <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted, flex: 1 }} numberOfLines={1}>
+                <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted, flex: 1 }}>
                   {item.title} × {item.quantity}
                 </AppText>
                 <AppText family="accent" weight="semibold" style={{ fontSize: 13.5, color: tokens.text }}>
@@ -322,7 +322,7 @@ function DeliverySection({
             <MapPin size={18} strokeWidth={2} color={tokens.text} />
             <AppView flex={1}>
               <AppText family="default" weight="semibold" style={{ fontSize: 15, color: tokens.text }}>{addr.label}</AppText>
-              <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted, marginTop: 2 }} numberOfLines={2}>
+              <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted, marginTop: 2 }}>
                 {`${addr.line1}, ${addr.city}`}
               </AppText>
             </AppView>

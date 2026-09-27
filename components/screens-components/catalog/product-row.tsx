@@ -176,7 +176,6 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
               <AppText
                 family="accent"
                 weight="bold"
-                numberOfLines={1}
                 style={{
                   fontSize: 10,
                   letterSpacing: 1,
@@ -190,7 +189,6 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
             <AppText
               family="default"
               weight="semibold"
-              numberOfLines={2}
               style={{ fontSize: 14.5, lineHeight: 19, color: tokens.text, marginTop: 3 }}
             >
               {title}
@@ -266,7 +264,6 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
                   />
                   <AppText
                     family="mono"
-                    numberOfLines={1}
                     style={{ flex: 1, fontSize: 10.5, color: tokens.textMuted }}
                   >
                     {oem}
@@ -285,7 +282,6 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
                   <AppText
                     family="accent"
                     weight="semibold"
-                    numberOfLines={1}
                     style={{ flex: 1, fontSize: 11, color: tokens.textMuted }}
                   >
                     {oilMeta}
@@ -314,7 +310,6 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
               <AppText
                 family="accent"
                 weight="bold"
-                numberOfLines={1}
                 style={{ fontSize: 11.5, color: tokens.success }}
               >
                 {t('catalog.universalFit')}
@@ -352,7 +347,6 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
               <AppText
                 family="accent"
                 weight="bold"
-                numberOfLines={1}
                 style={{ fontSize: 11.5, color: fitTextColor }}
               >
                 {fitLabel}
@@ -393,7 +387,6 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
             <AppText
               family="heading"
               weight="bold"
-              numberOfLines={1}
               style={{ fontSize: 19, lineHeight: 23, letterSpacing: -0.4, color: tokens.text }}
             >
               {priceAmount}
@@ -403,12 +396,11 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
               weight="semibold"
               style={{ fontSize: 11, color: tokens.textMuted }}
             >
-              {"so'm"}
+              {t('common.currency')}
             </AppText>
             {wasLabel ? (
               <AppText
                 family="default"
-                numberOfLines={1}
                 style={{
                   fontSize: 12,
                   color: tokens.textMuted,

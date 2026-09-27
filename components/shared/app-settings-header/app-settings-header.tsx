@@ -103,7 +103,7 @@ export function AppSettingsHeader({
         </AppPressableView>
 
         <AppView style={{ flex: 1, alignItems: 'center', paddingHorizontal: 8 }}>
-          <AppText textVariant="bodySm" weight="semibold" numberOfLines={1}>
+          <AppText textVariant="bodySm" weight="semibold" align="center">
             {title}
           </AppText>
         </AppView>

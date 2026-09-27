@@ -345,8 +345,8 @@ export default function VehicleDetailScreen() {
           family="heading"
           weight="bold"
           colorName="text"
-          numberOfLines={1}
-          style={{ fontSize: 16, lineHeight: 22 }}
+          align="center"
+          style={{ flexShrink: 1, marginHorizontal: 12, fontSize: 16, lineHeight: 22 }}
         >
           {editing ? t('vehicleDetail.editTitle') : makeModel}
         </AppText>
@@ -446,7 +446,6 @@ function SpecCell({ label, value, muted, tokens, swatchHex }: SpecCellProps) {
           family="default"
           weight="semibold"
           style={{ fontSize: 14, color: muted ? tokens.textMuted : tokens.text, flexShrink: 1 }}
-          numberOfLines={2}
         >
           {value}
         </AppText>

@@ -17,6 +17,10 @@ export default function FilterChip({
     <AppPressableView
       onPress={onPress}
       androidRipple={false}
+      // The label comes from the child Text; what a screen reader could not
+      // tell before is whether the filter is ON.
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
       style={{
         borderRadius: 36,
         paddingHorizontal: 14,

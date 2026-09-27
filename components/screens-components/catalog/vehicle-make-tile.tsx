@@ -20,8 +20,9 @@ export type VehicleMakeTileProps = {
 
 /**
  * `VehicleMakeTile` — a single "Shop by vehicle" tile: the brand logo on a
- * white rounded chip. A `comingSoon` brand renders dimmed/disabled; the parent
- * decides tap behavior (it opens a "coming soon" modal instead of navigating).
+ * white rounded chip. A `comingSoon` brand renders with a faded MARK on the
+ * same chip (see below); the parent decides tap behavior (it opens a "coming
+ * soon" modal instead of navigating).
  */
 const VehicleMakeTile = ({ brandId, label, logoUrl, comingSoon, onPress }: VehicleMakeTileProps) => {
   const { t } = useTranslation();
@@ -37,17 +38,19 @@ const VehicleMakeTile = ({ brandId, label, logoUrl, comingSoon, onPress }: Vehic
       gap={8}
       style={{ width: 84 }}
     >
+      {/* The chip stays the same white in every state. Dimming the CHIP for
+       *  a coming-soon brand was invisible in light mode (45% white on white)
+       *  and turned it into a muddy grey square in dark, so the row read as
+       *  mismatched tiles rather than as two brands not being live yet. The
+       *  MARK is what fades now — same treatment in both themes. */}
       <AppView
         center
         rounded={20}
-        style={{
-          width: 65,
-          height: 65,
-          backgroundColor: tokens.white,
-          opacity: comingSoon ? 0.45 : 1,
-        }}
+        style={{ width: 65, height: 65, backgroundColor: tokens.white }}
       >
-        <BrandLogo logoUrl={logoUrl} name={label} size={50} color={brandColor(brandId)} />
+        <AppView style={{ opacity: comingSoon ? 0.32 : 1 }}>
+          <BrandLogo logoUrl={logoUrl} name={label} size={50} color={brandColor(brandId)} />
+        </AppView>
       </AppView>
     </AppPressableView>
   );

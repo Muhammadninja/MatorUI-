@@ -29,14 +29,13 @@ export function GarageHeader({ title, subtitle, onAddPress }: GarageHeaderProps)
             family="heading"
             weight="bold"
             colorName="text"
-            numberOfLines={1}
             accessibilityRole="header"
             style={{ fontSize: 26, lineHeight: 32 }}
           >
             {resolvedTitle}
           </AppText>
           {subtitle ? (
-            <AppText family="default" colorName="textMuted" numberOfLines={1} style={{ fontSize: 13 }}>
+            <AppText family="default" colorName="textMuted" style={{ fontSize: 13 }}>
               {subtitle}
             </AppText>
           ) : null}

@@ -122,12 +122,11 @@ function AppToastImpl({ toast, onDismiss }: AppToastProps) {
               family="heading"
               weight="semibold"
               colorName="text"
-              numberOfLines={1}
             >
               {toast.title}
             </AppText>
             {toast.description ? (
-              <AppText textVariant="bodyXs" colorName="gray400" numberOfLines={2}>
+              <AppText textVariant="bodyXs" colorName="gray400">
                 {toast.description}
               </AppText>
             ) : null}

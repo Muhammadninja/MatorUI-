@@ -7,14 +7,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import GarageActiveHero from '@/components/screens-components/garage/garage-active-hero';
 import GarageAddButton from '@/components/screens-components/garage/garage-add-button';
-import GarageFitRow from '@/components/screens-components/garage/garage-fit-row';
 import GarageHeader from '@/components/screens-components/garage/garage-header';
 import GarageEmptyState from '@/components/screens-components/garage/garage-empty-state';
 import GarageQuickActions from '@/components/screens-components/garage/garage-quick-actions';
-import GarageModelPickerSheet, {
-  type PickedModel,
-} from '@/components/screens-components/garage/garage-model-picker-sheet';
-import GarageQuickAddSheet from '@/components/screens-components/garage/garage-quick-add-sheet';
+import GarageVehiclePickerSheet, {
+  type PickedVehicle,
+} from '@/components/screens-components/garage/garage-vehicle-picker-sheet';
 import GarageSkeleton from '@/components/screens-components/garage/garage-skeleton';
 import GarageSwitchRow from '@/components/screens-components/garage/garage-switch-row';
 import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
@@ -34,18 +32,25 @@ import { DEFAULT_VEHICLE_COLOR_HEX, colorHexToEnum } from '@/utils/vehicle-color
 /**
  * Garage screen — "which car am I shopping for" answered on sight.
  *
- * Success layout (per design_handoff_mator_garage):
- *   header → active-vehicle hero → fit-filter row → 2×2 quick actions →
- *   other-vehicles switcher → dashed add-another button.
+ * Success layout (per design_handoff_mator_garage, trimmed):
+ *   header → active-vehicle hero → 2×2 quick actions → other-vehicles
+ *   switcher → dashed add-another button.
+ *
+ * The handoff's fit-filter row, the header's "{n} vehicles · fit checked
+ * automatically" sub-line and the tiles' static sub-copy are GONE on purpose
+ * (user: the screen carried too much text to read). Between them they said the
+ * same thing the hero's "Shop parts that fit" CTA already says. Do not
+ * reinstate them from the handoff — the deletion is the newer decision.
  *
  * The other four states of `useGarage()` are unchanged in spirit:
  * skeleton while loading, a retry surface on error, and the empty state for
  * guests / zero vehicles. The header stays pinned.
  *
- * The empty state carries a two-tap QUICK ADD (popular model → year) that
- * creates the vehicle here rather than handing off to the VIN screen. The
- * backend only requires make_id + model_id + year, so the VIN flow is the
- * precise path, not the only one.
+ * The empty state and the add buttons both offer a QUICK ADD sheet — make,
+ * model and year in the platform's own pickers — that creates the vehicle here
+ * rather than handing off to the VIN screen. The backend only requires
+ * make_id + model_id + year, so the VIN flow is the precise path, not the only
+ * one.
  */
 export default function GarageScreen() {
   const { t } = useTranslation();
@@ -68,16 +73,16 @@ export default function GarageScreen() {
    *  swap a populated garage for the skeleton on every pull. */
   const [refreshing, setRefreshing] = useState(false);
 
-  /** Route 2, step 1: the model picker is open. */
-  const [pickingModel, setPickingModel] = useState(false);
-  /** Route 2, step 2: the make/model awaiting a year. */
-  const [quickPick, setQuickPick] = useState<PickedModel | null>(null);
+  /** Route 2: the make/model/year sheet is open. */
+  const [pickingVehicle, setPickingVehicle] = useState(false);
   const [quickAdding, setQuickAdding] = useState(false);
 
   const openDetail = (id: string) => router.push({ pathname: '/vehicle-detail', params: { id } });
   const openEdit = (id: string) =>
     router.push({ pathname: '/vehicle-detail', params: { id, edit: '1' } });
-  const openAdd = () => {
+  /** The VIN route. Only ever reached from an affordance that SAYS "VIN" —
+   *  see `startAdd` for why. */
+  const openAddByVin = () => {
     // Guests can browse but adding needs an account — route to the auth sheet
     // (gate=1) so they land back here afterwards.
     if (!isAuthenticated) {
@@ -87,33 +92,39 @@ export default function GarageScreen() {
     router.push('/add-vehicle');
   };
 
-  // Route 2, step 1: open the model picker. Guests hit the auth gate first —
-  // same rule as the VIN route, applied before the sheet opens so they never
-  // pick a car only to be bounced.
-  const startAddByDetails = () => {
+  /**
+   * The default add route: the make/model/year sheet.
+   *
+   * Every unlabelled "add" affordance (the header +, the dashed button) lands
+   * here, and nothing but an explicit "Add by VIN" goes to the VIN screen. The
+   * + used to open the VIN screen, which made the slowest path the default:
+   * walk to the car, find the plate, type 17 characters — for a create the
+   * backend answers with make_id + model_id + year alone. It could also dead
+   * end, on a UzAuto VIN whose model does not decode or a make the catalogue
+   * has never been seeded with, and the quick sheet was unreachable once the
+   * garage had a car in it.
+   *
+   * Guests hit the auth gate first, before the sheet opens, so they never pick
+   * a car only to be bounced.
+   */
+  const startAdd = () => {
     if (!isAuthenticated) {
       router.push('/sign-in?gate=1');
       return;
     }
-    setPickingModel(true);
+    setPickingVehicle(true);
   };
 
-  // Route 2, step 2: model chosen → hand off to the year sheet.
-  const onModelPicked = (model: PickedModel) => {
-    setPickingModel(false);
-    setQuickPick(model);
-  };
-
-  // Route 2, step 3: year chosen -> create.
+  // Route 2, submit: make + model + year in hand -> create.
   //
   // `make_id` / `model_id` come straight from the reference catalog the picker
   // read, which is the same table `POST /v1/garage/vehicles` validates against.
   // The old path matched display NAMES back to ids through
   // `resolveCatalogIds`, which silently failed for every make the backend has
   // not seeded and for ids the two catalogs spell differently.
-  const completeQuickAdd = async (year: number) => {
-    const picked = quickPick;
-    if (!picked || quickAdding) return;
+  const completeQuickAdd = async (picked: PickedVehicle) => {
+    if (quickAdding) return;
+    const { year } = picked;
     const label = `${year} ${picked.makeName} ${picked.modelName}`.replace(/\s+/g, ' ').trim();
 
     setQuickAdding(true);
@@ -129,7 +140,7 @@ export default function GarageScreen() {
         // First car in an empty garage is the one being shopped for.
         setAsPrimary: vehicles.length === 0,
       });
-      setQuickPick(null);
+      setPickingVehicle(false);
       toast.success(t('garage.quickAddSuccess', { vehicle: label }));
     } catch {
       toast.danger(t('garage.quickAddFailed'));
@@ -186,9 +197,6 @@ export default function GarageScreen() {
   };
 
   const isSuccess = isAuthenticated && state === 'success';
-  const headerSubtitle = isSuccess
-    ? `${vehicles.length} ${vehicles.length === 1 ? t('garage.vehicleSingular') : t('garage.vehiclePlural')} · ${t('garage.fitCheckedAuto')}`
-    : undefined;
 
   return (
     <AppView flex={1} colorName="background">
@@ -196,7 +204,7 @@ export default function GarageScreen() {
        *  shows once there's a garage to add to (success); empty/guest states
        *  cue "add" through the placeholder tile, so the header + is omitted. */}
       <AppView colorName="background" style={{ paddingTop: insets.top + 8 }}>
-        <GarageHeader subtitle={headerSubtitle} onAddPress={isSuccess ? openAdd : undefined} />
+        <GarageHeader onAddPress={isSuccess ? startAdd : undefined} />
       </AppView>
 
       {!isAuthenticated ? (
@@ -205,7 +213,7 @@ export default function GarageScreen() {
         <AppScrollView showsVerticalScrollIndicator={false} padding={0}
           contentContainerStyle={{ paddingTop: 12, paddingHorizontal: 20, paddingBottom: 40 }}
         >
-          <GarageEmptyState onAddByVin={openAdd} onAddByDetails={startAddByDetails} />
+          <GarageEmptyState onAddByVin={openAddByVin} onAddByDetails={startAdd} />
         </AppScrollView>
       ) : (state === 'loading' || state === 'idle') && vehicles.length === 0 ? (
         // Skeleton only when there is nothing to show yet. A refresh over a
@@ -269,8 +277,8 @@ export default function GarageScreen() {
           }
         >
           <GarageEmptyState
-            onAddByVin={openAdd}
-            onAddByDetails={startAddByDetails}
+            onAddByVin={openAddByVin}
+            onAddByDetails={startAdd}
             busy={quickAdding}
           />
         </AppScrollView>
@@ -301,12 +309,10 @@ export default function GarageScreen() {
             />
           ) : null}
 
-          <GarageFitRow vehicle={primaryVehicle} />
-
           <GarageQuickActions
-            onUpdateMileage={() => (primaryVehicle ? openEdit(primaryVehicle.id) : openAdd())}
+            onUpdateMileage={() => (primaryVehicle ? openEdit(primaryVehicle.id) : startAdd())}
             onPastOrders={() => router.push('/order-history')}
-            onAddByVin={openAdd}
+            onAddByVin={openAddByVin}
             onSavedParts={() => router.push('/liked')}
             mileageLabel={formatMileage(
               primaryVehicle?.mileage,
@@ -317,14 +323,14 @@ export default function GarageScreen() {
 
           {secondaryVehicles.length > 0 ? (
             <>
-              <AppView row align="flex-end" justify="space-between" style={{ marginTop: 2 }}>
-                <AppText family="heading" weight="bold" colorName="text" style={{ fontSize: 17 }}>
-                  {t('garage.otherVehicles')}
-                </AppText>
-                <AppText family="accent" weight="semibold" colorName="textMuted" style={{ fontSize: 12 }}>
-                  {t('garage.tapToSwitch')}
-                </AppText>
-              </AppView>
+              <AppText
+                family="heading"
+                weight="bold"
+                colorName="text"
+                style={{ fontSize: 17, marginTop: 2 }}
+              >
+                {t('garage.otherVehicles')}
+              </AppText>
               <AppView gap={10}>
                 {secondaryVehicles.map((v) => (
                   <GarageSwitchRow
@@ -338,28 +344,24 @@ export default function GarageScreen() {
             </>
           ) : null}
 
-          <GarageAddButton onPress={openAdd} />
+          <GarageAddButton onPress={startAdd} />
         </AppScrollView>
       )}
 
-      {/* Both sheets are mounted outside the state branches on purpose: a
-       *  successful create flips `state` from 'empty' to 'success', which
-       *  would unmount a sheet owned by the empty branch mid-dismiss. */}
-      <GarageModelPickerSheet
-        visible={pickingModel}
-        onClose={() => setPickingModel(false)}
-        onPick={onModelPicked}
-      />
-      <GarageQuickAddSheet
-        model={quickPick}
-        onClose={() => setQuickPick(null)}
-        // Back reopens the model picker rather than dropping the user out of
-        // the flow, so changing your mind about the model costs one tap.
-        onBack={() => {
-          setQuickPick(null);
-          setPickingModel(true);
+      {/* Mounted outside the state branches on purpose: a successful create
+       *  flips `state` from 'empty' to 'success', which would unmount a sheet
+       *  owned by the empty branch mid-dismiss. */}
+      <GarageVehiclePickerSheet
+        visible={pickingVehicle}
+        onClose={() => setPickingVehicle(false)}
+        onSubmit={completeQuickAdd}
+        // The way OUT to the precise route, so making the sheet the default
+        // does not hide the VIN flow from someone who wants exact trim and
+        // engine. It is the only door to it that is not labelled "VIN".
+        onUseVin={() => {
+          setPickingVehicle(false);
+          openAddByVin();
         }}
-        onPickYear={completeQuickAdd}
         busy={quickAdding}
       />
     </AppView>

@@ -3,8 +3,10 @@ import {
   Animated,
   Platform,
   Pressable,
+  StyleSheet,
   type AccessibilityRole,
   type Insets,
+  type LayoutChangeEvent,
   type PressableAndroidRippleConfig,
   type PressableProps,
   type ViewStyle,
@@ -18,6 +20,61 @@ import { useColorToken, useResolvedBackgroundColor } from './colors';
 import { composeSafeAreaPadding } from './safe-area';
 import { composeBorder, composeFlexbox, composeRounding, composeSpacing } from './style-compose';
 import { APP_PRESSABLE_DEFAULTS, DEFAULT_RIPPLE_COLOR_NAME, SHADOW_DEFAULT_LEVEL } from './tokens';
+
+/**
+ * Dev-only guard for a failure this component makes easy and silent.
+ *
+ * Width is deliberately NOT forced (see `innerLayout` below) — forcing it
+ * would stretch chips inside horizontal ScrollViews. The cost is that in some
+ * parents a ROW pressable shrinks to its content width, the `flex: 1` column
+ * collapses to ~0, and the row renders at the right HEIGHT with no visible
+ * text. It reads as a data or theming bug, and it has been hit repeatedly in
+ * this codebase (cart rows, notification rows, settings rows, the catalog
+ * fitment bar), each time right after a fixed-width child such as an icon tile
+ * was removed.
+ *
+ * This MEASURES rather than guesses: a static "row + flex child" check fires
+ * on plenty of healthy rows (a column parent stretches them anyway), and a
+ * warning that cries wolf gets ignored. Only a row that actually laid out
+ * narrower than `COLLAPSE_WIDTH_PX` while carrying a flexible child is
+ * reported — that is the broken state, not a guess at it.
+ */
+const COLLAPSE_WIDTH_PX = 64;
+
+function hasFlexChild(children: React.ReactNode): boolean {
+  return React.Children.toArray(children).some((child) => {
+    if (!React.isValidElement(child)) return false;
+    const props = child.props as { flex?: number; style?: unknown };
+    if (props.flex === 1) return true;
+    const flat = StyleSheet.flatten(props.style as never) as { flex?: number } | undefined;
+    return flat?.flex === 1;
+  });
+}
+
+function useCollapseWarning(
+  isRow: boolean,
+  fillContainer: boolean,
+  children: React.ReactNode,
+  testID?: string,
+): ((event: LayoutChangeEvent) => void) | undefined {
+  const warned = useRef(false);
+  const enabled = typeof __DEV__ !== 'undefined' && __DEV__ && isRow && !fillContainer;
+
+  return useMemo(() => {
+    if (!enabled) return undefined;
+    return (event: LayoutChangeEvent) => {
+      if (warned.current) return;
+      const { width } = event.nativeEvent.layout;
+      if (width >= COLLAPSE_WIDTH_PX || !hasFlexChild(children)) return;
+      warned.current = true;
+      console.warn(
+        `[AppPressableView] A \`row\` pressable${testID ? ` (testID "${testID}")` : ''} laid out ` +
+          `${Math.round(width)}px wide with a flex child — it has shrunk to its content and the ` +
+          'flex column has collapsed, so the row is rendering blank. Add `fillContainer`.',
+      );
+    };
+  }, [enabled, children, testID]);
+}
 
 export type AppPressableViewProps = AppViewProps & {
   onPress?: PressableProps['onPress'];
@@ -122,6 +179,7 @@ const AppPressableViewBase = forwardRef<React.ElementRef<typeof Pressable>, AppP
   ) {
     const { tokens } = useThemeContext();
     const insets = useSafeAreaInsets();
+    const onCollapseLayout = useCollapseWarning(row === true, fillContainer, children, testID);
     const backgroundColor = useResolvedBackgroundColor({ lightColor, darkColor, colorName });
     const borderResolvedColor = useColorToken(borderName);
 
@@ -308,6 +366,7 @@ const AppPressableViewBase = forwardRef<React.ElementRef<typeof Pressable>, AppP
           accessibilityRole={role}
           accessibilityLabel={accessibilityLabel}
           testID={testID}
+          onLayout={onCollapseLayout}
           hitSlop={hitSlop ?? defaultHitSlop}
           android_ripple={Platform.OS === 'android' ? ripple : undefined}
           style={({ pressed }) => [

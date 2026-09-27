@@ -87,7 +87,6 @@ export default function AiChatToolCallCard({ toolCall }: AiChatToolCallCardProps
           <AppText
             textVariant="bodyXs"
             weight="semibold"
-            numberOfLines={2}
             style={{ color: tokens.text }}
           >
             {toolCall.label}

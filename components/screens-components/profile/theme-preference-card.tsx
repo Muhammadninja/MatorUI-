@@ -34,11 +34,9 @@ export function ThemePreferenceCard({ showLabel = true }: { showLabel?: boolean 
       rounded={16}
       gap={10}
       p="lg"
-      style={{
-        borderWidth: 1,
-        borderColor: tokens.border,
-        backgroundColor: tokens.card,
-      }}
+      // Fill, no outline — the cards it sits between dropped theirs, and an
+      // outlined card among flat ones reads as a different kind of thing.
+      style={{ backgroundColor: tokens.card }}
     >
       {showLabel ? (
         <AppText family="accent" weight="semibold" style={{ fontSize: 14.5, color: tokens.text }}>
@@ -87,7 +85,6 @@ export function ThemePreferenceCard({ showLabel = true }: { showLabel?: boolean 
                 <AppText
                   family="accent"
                   weight="semibold"
-                  numberOfLines={1}
                   style={{ fontSize: 13, color: selected ? tokens.text : tokens.textMuted }}
                 >
                   {t(labelKey)}
