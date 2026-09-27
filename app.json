@@ -20,18 +20,9 @@
       "infoPlist": {
         "UIViewControllerBasedStatusBarAppearance": true,
         "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "Mator uses the camera to scan your vehicle's VIN and take photos for your profile.",
         "NSPhotoLibraryUsageDescription": "Mator needs access to your photos so you can set a profile picture and attach images.",
         "NSLocationWhenInUseUsageDescription": "Mator uses your location to find nearby parts providers and mechanics.",
-        "NSFaceIDUsageDescription": "Mator uses Face ID to securely sign you in to your account.",
-        "NSAppTransportSecurity": {
-          "NSExceptionDomains": {
-            "138.68.70.45": {
-              "NSExceptionAllowsInsecureHTTPLoads": true,
-              "NSIncludesSubdomains": true
-            }
-          }
-        }
+        "NSFaceIDUsageDescription": "Mator uses Face ID to securely sign you in to your account."
       },
       "appleTeamId": "DXP9AG6TPN"
     },
@@ -76,7 +67,8 @@
         }
       ],
       "@sentry/react-native",
-      "./plugins/with-jitpack-scoping"
+      "./plugins/with-jitpack-scoping",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

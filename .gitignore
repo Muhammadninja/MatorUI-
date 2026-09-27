@@ -48,6 +48,10 @@ mock.log
 /ios
 /android
 
+# ruflo vector store — a local tool artifact, ~1.5 MB of binary that churns
+# on every run. Kept on disk, out of the repo.
+ruvector.db
+
 # Claude tooling — runtime state, locally-installed skills, agent memory db.
 # The agent/command/helper definitions under .claude/ stay tracked; only the
 # noise that auto-updates as the daemon runs is excluded here.

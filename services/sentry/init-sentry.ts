@@ -30,7 +30,12 @@ export function initSentry(): void {
 
   Sentry.init({
     dsn,
-    environment: extra.sentry?.environment ?? 'production',
+    // Per BUILD, not per app.json: `extra.sentry.environment` is a single
+    // baked-in string, so every dev / preview / staging build reported itself
+    // as "production" and polluted the production error metrics. Each EAS
+    // profile sets EXPO_PUBLIC_SENTRY_ENV; the baked value stays as the
+    // fallback for a local run with no env.
+    environment: process.env.EXPO_PUBLIC_SENTRY_ENV ?? extra.sentry?.environment ?? 'production',
     release: extra.sentry?.release,
     tracesSampleRate: 0.2,
     enableAutoSessionTracking: true,
