@@ -1,5 +1,4 @@
-import { MaterialIcons } from '@expo/vector-icons';
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -13,9 +12,8 @@ import { useThemeContext } from '@/contexts/theme.context';
 import { useActiveSales } from '@/hooks/use-sales';
 import { useToast } from '@/hooks/use-toast';
 import type { CatalogItem } from '@/services/catalog-service';
-import { resolveItemSale } from '@/services/sales-service';
-
-type ProductRowItem = CatalogItem & { brand?: string };
+import { checkCompatibility, type CompatibilityResult } from '@/services/compatibility-service';
+import { resolveItemPricing } from '@/services/sales-service';
 
 export type ProductRowProps = {
   item: CatalogItem;
@@ -25,428 +23,396 @@ export type ProductRowProps = {
   onAdd: (item: CatalogItem) => void;
 };
 
-type FitState = 'idle' | 'checking' | 'fits';
-const FIT_CHECK_MS = 900;
+type FitState = 'idle' | 'checking' | 'answered';
 
-/** Deterministic per-product hash → stable, varied placeholder rating / reviews
- *  (the backend carries neither yet; see the design handoff). The discount, by
- *  contrast, is now real — resolved from `GET /v1/sales`. */
-function hashId(id: string): number {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return h;
-}
+/** Image column. Big on purpose — it is the first thing a shopper reads, and
+ *  the fitment line moving into the copy column paid for the extra height. */
+const THUMB = 118;
 
 /**
- * `ProductRow` — the Mator listing card, matched to `design_handoff_mator_app`
- * (radius-20 surface card, 108² image, brand eyebrow, meta row, inline fit chip,
- * and a footer bar with price + Add pill). Rating / reviews are still
- * placeholders (backend has none); the discount is real, resolved from the
- * active `GET /v1/sales` campaigns. Fitment is checked INLINE across three
- * states — it never routes.
+ * `ProductRow` — the listing card behind every result screen (category,
+ * vehicle parts, catalog directory).
+ *
+ * Laid out like an Amazon search result: a tall image column on the left, and
+ * ONE copy column on the right that runs the whole height — tag, brand, title,
+ * stars, fitment, price, delivery, and the add button. Nothing is stacked
+ * across the full card width, so the image can be large without pushing the
+ * buy affordance off-screen.
+ *
+ * Fitment is a single line of coloured text under the rating (Amazon's "This
+ * fits your 2022 Chevrolet Cobalt"), not a padded chip on its own row — that
+ * row is what used to cap the image size.
+ *
+ * Everything shown is a backend field. Stars render only when the part really
+ * has a rating (`rating_avg` / `review_count`); unreviewed parts show none
+ * rather than an invented score. The fitment line runs the REAL compatibility
+ * check against the active garage vehicle.
  */
 function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
   const { t } = useTranslation();
-  const product = item as ProductRowItem;
-  const { tokens, scheme } = useThemeContext();
+  const { tokens } = useThemeContext();
   const { currentActiveVehicle } = useActiveVehicle();
   const toast = useToast();
-  const image = product.images?.[0];
 
+  const image = item.images?.[0];
   const activeVehicle = currentActiveVehicle?.vehicle ?? null;
   const vehicleLabel = activeVehicle
     ? `${activeVehicle.year} ${activeVehicle.model ?? activeVehicle.make}`.trim()
     : null;
 
+  // ── Fit check — real, on demand ────────────────────────────────────────────
   const [fitState, setFitState] = useState<FitState>('idle');
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [fit, setFit] = useState<CompatibilityResult | null>(null);
+  const alive = useRef(true);
   useEffect(
     () => () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
+      alive.current = false;
     },
     [],
   );
 
-  const handleCheckFit = () => {
-    if (fitState !== 'idle') return;
-    setFitState('checking');
-    timerRef.current = setTimeout(() => {
-      if (vehicleLabel) {
-        setFitState('fits');
-        const vehicle =
-          `${activeVehicle!.year} ${activeVehicle!.make} ${activeVehicle!.model ?? ''}`.trim();
-        toast.success(t('catalog.confirmedFit', { vehicle }));
-      } else {
-        setFitState('idle');
-        toast.info(t('catalog.addVehicleToConfirmFit'));
-      }
-    }, FIT_CHECK_MS);
-  };
+  // FlashList RECYCLES row components: the same instance is handed a different
+  // part as you scroll, without unmounting. Without this reset the previous
+  // part's fit verdict would still be on screen, attached to the wrong product.
+  useEffect(() => {
+    setFitState('idle');
+    setFit(null);
+  }, [item.id]);
 
-  // ── Placeholder signals (rating / reviews only — the backend carries none) ─
-  const h = hashId(item.id);
-  const rating = (4.2 + (h % 8) / 10).toFixed(1); // 4.2–4.9
-  const reviews = 50 + (h % 900); // 50–949
+  const handleCheckFit = useCallback(async () => {
+    if (fitState !== 'idle') return;
+    const vehicleId = currentActiveVehicle?.vehicleId;
+    const vin = currentActiveVehicle?.vehicle?.vin;
+    if (!vehicleId && !vin) {
+      toast.info(t('catalog.addVehicleToConfirmFit'));
+      return;
+    }
+    setFitState('checking');
+    const result = await checkCompatibility(item.id, { vehicleId, vin });
+    if (!alive.current) return;
+    if (!result) {
+      // The check couldn't run (offline, mock transport, server error). Say so
+      // and reset — never fall back to a fabricated "fits".
+      setFitState('idle');
+      toast.info(t('catalog.fitCheckUnavailable'));
+      return;
+    }
+    setFit(result);
+    setFitState('answered');
+  }, [currentActiveVehicle, fitState, item.id, t, toast]);
 
   // ── Sale — real ────────────────────────────────────────────────────────────
-  // Prefer the backend-resolved sale on the part (authoritative: the server
-  // resolves scope/priority and `price_uzs` is already the sale price). Fall back
-  // to the client `/v1/sales` matcher when the backend hasn't applied it yet — but
-  // note that path can only match ALL_PRODUCTS sales, since the public /v1/sales
-  // omits target ids.
   const sales = useActiveSales();
-  const clientSale = resolveItemSale(
-    {
-      id: item.id,
-      categoryId: product.categoryId,
-      sellerId: product.sellerId,
-      priceUzs: product.priceUzs,
-    },
-    sales,
-  );
-  const backendPct = product.salePercent && product.salePercent > 0 ? product.salePercent : 0;
-  const savePct = backendPct > 0 ? Math.round(backendPct) : (clientSale?.percent ?? 0);
-  const amountNum = product.priceUzs ?? (parseInt(item.price.replace(/\D/g, ''), 10) || 0);
-  // Backend gives the exact pre-discount price; otherwise reconstruct the struck
-  // "was" from the percent (shown price stays the charged price).
-  const wasNum =
-    backendPct > 0 && product.originalPriceUzs
-      ? Math.round(product.originalPriceUzs)
-      : savePct > 0 && amountNum > 0
-        ? Math.round(amountNum / (1 - savePct / 100))
-        : 0;
+  const { savePct, wasUzs: wasNum } = resolveItemPricing(item, sales);
   const priceAmount = splitPrice(item.price).amount || item.price;
   const wasLabel = wasNum > 0 ? wasNum.toLocaleString('ru-RU') : null;
 
-  const brandEyebrow = (product.brand ?? product.description?.split('·')[0])?.trim();
-  const title = product.title;
-  const oem = product.oem;
+  const brandEyebrow = (item.brand ?? item.description?.split('·')[0])?.trim();
+  const outOfStock = /out of stock/i.test(item.status ?? '');
 
-  // ── Motor oil ────────────────────────────────────────────────────────────
-  // Oils carry no OEM/GM number; surface their key attributes (viscosity ·
-  // volume) in the meta row instead. Universal listings (oils under "Другое")
-  // replace the Check-fit chip with a static "Подходит для всех" — a
-  // compatibility check is meaningless for a part that fits everything.
-  const oil = product.kind === 'MOTOR_OIL' ? product.motorOil : null;
+  // Oils carry no OEM/GM number; their viscosity · volume goes in that slot.
+  const oil = item.kind === 'MOTOR_OIL' ? item.motorOil : null;
   const oilMeta = oil ? [oil.viscosity, oil.volumeLabel].filter(Boolean).join(' · ') : '';
-  const isUniversal = product.isUniversal === true;
+  const secondary = [item.titleDetail || oilMeta, item.oem ? `OEM ${item.oem}` : '']
+    .filter(Boolean)
+    .join(' · ');
 
-  // Footer hairline — deliberately fainter than the global divider token.
-  const hairline = scheme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
+  const eta =
+    item.deliveryEtaMinDays != null && item.deliveryEtaMaxDays != null
+      ? t('catalog.deliveryDaysRange', {
+          min: item.deliveryEtaMinDays,
+          max: item.deliveryEtaMaxDays,
+        })
+      : null;
 
-  const fitChipBg = fitState === 'fits' ? tokens.successSoft : tokens.background;
-  const fitLabel =
-    fitState === 'fits'
-      ? vehicleLabel
-        ? t('catalog.fitsYourVehicleLabel', { vehicle: vehicleLabel })
-        : t('catalog.fitsYourVehicle')
-      : fitState === 'checking'
-        ? t('catalog.checking')
-        : t('catalog.checkFit');
-  const fitTextColor =
-    fitState === 'fits' ? tokens.success : fitState === 'checking' ? tokens.textMuted : tokens.text;
+  const fitColor =
+    fit?.badge.color === 'green'
+      ? tokens.success
+      : fit?.badge.color === 'red'
+        ? tokens.error
+        : tokens.warning;
 
   return (
-    <AppView colorName="backgroundSecondary" rounded={20} style={{ overflow: 'hidden' }}>
-      {/* ── Top block ── */}
-      <AppView row gap={14} style={{ padding: 14 }}>
-        {/* Image — the discount now lives in the footer next to the price. */}
-        <AppPressableView
-          testID={`part-card-${item.id}`}
-          onPress={() => onOpen(item)}
-          androidRipple={false}
-          accessibilityRole="button"
-          accessibilityLabel={item.title}
-          style={{ width: 108 }}
-        >
-          <ImageBox
-            label={item.title}
-            uri={image}
-            height={108}
-            radius={14}
-            contentFit="contain"
-            backgroundColor={tokens.white}
-          />
-        </AppPressableView>
-
-        {/* Info column */}
-        <AppView flex={1} gap={6}>
-          <AppPressableView onPress={() => onOpen(item)} androidRipple={false} style={{ gap: 6 }}>
-            {brandEyebrow ? (
-              <AppText
-                family="accent"
-                weight="bold"
-                style={{
-                  fontSize: 10,
-                  letterSpacing: 1,
-                  color: tokens.textMuted,
-                  textTransform: 'uppercase',
-                }}
-              >
-                {brandEyebrow}
-              </AppText>
-            ) : null}
-            <AppText
-              family="default"
-              weight="semibold"
-              style={{ fontSize: 14.5, lineHeight: 19, color: tokens.text, marginTop: 3 }}
-            >
-              {title}
-            </AppText>
-            {/* Seller trust badges — driven by the dealer's admin-toggled
-             *  certified / lowest-price flags (part.seller.{certified,lowest_price}). */}
-            {product.certified || product.lowestPrice ? (
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 5 }}>
-                {product.certified ? (
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 3,
-                      backgroundColor: tokens.successSoft,
-                      borderRadius: 999,
-                      paddingHorizontal: 7,
-                      paddingVertical: 2,
-                    }}
-                  >
-                    <MaterialIcons name="verified" size={11} color={tokens.success} />
-                    <AppText
-                      family="accent"
-                      weight="bold"
-                      style={{ fontSize: 10, color: tokens.success }}
-                    >
-                      {t('catalog.certified')}
-                    </AppText>
-                  </View>
-                ) : null}
-                {product.lowestPrice ? (
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 3,
-                      backgroundColor: tokens.infoSoft,
-                      borderRadius: 999,
-                      paddingHorizontal: 7,
-                      paddingVertical: 2,
-                    }}
-                  >
-                    <MaterialIcons name="local-offer" size={11} color={tokens.info} />
-                    <AppText
-                      family="accent"
-                      weight="bold"
-                      style={{ fontSize: 10, color: tokens.info }}
-                    >
-                      {t('catalog.lowestPrice')}
-                    </AppText>
-                  </View>
-                ) : null}
-              </View>
-            ) : null}
-            {/* Meta row — ★ rating · (reviews) · OEM */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 5 }}>
-              <MaterialIcons name="star" size={12} color={tokens.rating} />
-              <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.text }}>
-                {rating}
-              </AppText>
-              <AppText family="default" style={{ fontSize: 11.5, color: tokens.textMuted }}>
-                {`(${reviews.toLocaleString('en-US')})`}
-              </AppText>
-              {oem ? (
-                <>
-                  <View
-                    style={{
-                      width: 3,
-                      height: 3,
-                      borderRadius: 3,
-                      backgroundColor: tokens.textMuted,
-                    }}
-                  />
-                  <AppText
-                    family="mono"
-                    style={{ flex: 1, fontSize: 10.5, color: tokens.textMuted }}
-                  >
-                    {oem}
-                  </AppText>
-                </>
-              ) : oilMeta ? (
-                <>
-                  <View
-                    style={{
-                      width: 3,
-                      height: 3,
-                      borderRadius: 3,
-                      backgroundColor: tokens.textMuted,
-                    }}
-                  />
-                  <AppText
-                    family="accent"
-                    weight="semibold"
-                    style={{ flex: 1, fontSize: 11, color: tokens.textMuted }}
-                  >
-                    {oilMeta}
-                  </AppText>
-                </>
-              ) : null}
-            </View>
-          </AppPressableView>
-
-          {/* Universal listings fit every car — a static badge, never a check.
-              Vehicle-specific parts keep the inline three-state Check-fit chip. */}
-          {isUniversal ? (
-            <AppView
-              row
-              align="center"
-              gap={6}
-              rounded={999}
-              style={{
-                alignSelf: 'flex-start',
-                paddingHorizontal: 12,
-                paddingVertical: 6,
-                backgroundColor: tokens.successSoft,
-              }}
-            >
-              <MaterialIcons name="check-circle" size={14} color={tokens.success} />
-              <AppText
-                family="accent"
-                weight="bold"
-                style={{ fontSize: 11.5, color: tokens.success }}
-              >
-                {t('catalog.universalFit')}
-              </AppText>
-            </AppView>
-          ) : (
-            <AppPressableView
-              onPress={handleCheckFit}
-              disabled={fitState !== 'idle'}
-              androidRipple={false}
-              pressedOpacity={0.7}
-              row
-              align="center"
-              gap={6}
-              rounded={999}
-              hitSlop={{ top: 8, bottom: 8, left: 6, right: 8 }}
-              accessibilityRole="button"
-              accessibilityLabel={
-                fitState === 'fits' ? fitLabel : t('catalog.checkFitAccessibility')
-              }
-              style={{
-                alignSelf: 'flex-start',
-                paddingHorizontal: 12,
-                paddingVertical: 6,
-                backgroundColor: fitChipBg,
-              }}
-            >
-              {fitState === 'checking' ? (
-                <WheelLoader size={13} color={tokens.textMuted} />
-              ) : fitState === 'fits' ? (
-                <MaterialIcons name="check-circle" size={14} color={tokens.success} />
-              ) : (
-                <MaterialIcons name="rule" size={14} color={tokens.text} />
-              )}
-              <AppText
-                family="accent"
-                weight="bold"
-                style={{ fontSize: 11.5, color: fitTextColor }}
-              >
-                {fitLabel}
-              </AppText>
-            </AppPressableView>
-          )}
-        </AppView>
-      </AppView>
-
-      {/* ── Footer bar ── */}
-      <AppView
-        row
-        align="center"
-        gap={10}
-        style={{
-          paddingHorizontal: 14,
-          paddingVertical: 11,
-          borderTopWidth: 1,
-          borderTopColor: hairline,
-        }}
+    // Flat, full-bleed row — no card surface, no corner radius, no outer
+    // margin. The list draws a hairline between rows; the only inset is the
+    // text's own breathing room from the screen edge.
+    <AppView row gap={13} style={{ paddingHorizontal: 16, paddingVertical: 14 }}>
+      {/* ── Image column ── */}
+      {/* The testID lives HERE, not on the card root: E2E taps an element's
+       *  centre, and the card's centre now falls on the copy column (the fit
+       *  link, or the add button) rather than on something that opens detail. */}
+      <AppPressableView
+        testID={`part-card-${item.id}`}
+        onPress={() => onOpen(item)}
+        androidRipple={false}
+        accessibilityRole="button"
+        accessibilityLabel={item.title}
+        style={{ width: THUMB }}
       >
-        {/* Price (+ struck was) + sale pill. flexWrap so the pill drops to its
-         *  own line — instead of overlapping the price — when the price/"was"
-         *  string or the device's font scale leaves no room to share the line
-         *  (matches PriceBlock's ribbon behavior). rowGap keeps a wrapped pill
-         *  clear of the price. */}
-        <View
-          style={{
-            flex: 1,
-            flexDirection: 'row',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            columnGap: 8,
-            rowGap: 4,
-          }}
-        >
-          <View style={{ flexShrink: 1, flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+        <ImageBox
+          label={item.title}
+          uri={image}
+          height={THUMB}
+          radius={8}
+          contentFit="contain"
+          backgroundColor={tokens.white}
+        />
+        {/* GM cross-reference, cornered on the photo. A part carries OEM xor GM
+         *  (see `resolvePartNumber`), and the GM number is THE identifier in
+         *  this market — Chevrolet / Ravon / Daewoo are the UZ fleet — so a GM
+         *  part gets a corner tag instead of hiding the number in the meta
+         *  line. Small, but dark-on-photo so it reads at a glance. */}
+        {item.gm ? (
+          <AppView
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              maxWidth: THUMB,
+              paddingHorizontal: 5,
+              paddingVertical: 2,
+              borderTopLeftRadius: 8,
+              borderBottomRightRadius: 7,
+              backgroundColor: tokens.scrim,
+            }}
+          >
             <AppText
-              family="heading"
+              family="mono"
               weight="bold"
-              style={{ fontSize: 19, lineHeight: 23, letterSpacing: -0.4, color: tokens.text }}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+              style={{ fontSize: 9, letterSpacing: 0.2, color: tokens.white }}
             >
-              {priceAmount}
+              {`GM ${item.gm}`}
             </AppText>
-            <AppText
-              family="accent"
-              weight="semibold"
-              style={{ fontSize: 11, color: tokens.textMuted }}
-            >
-              {t('common.currency')}
-            </AppText>
-            {wasLabel ? (
-              <AppText
-                family="default"
-                style={{
-                  fontSize: 12,
-                  color: tokens.textMuted,
-                  textDecorationLine: 'line-through',
-                }}
-              >
-                {wasLabel}
-              </AppText>
+          </AppView>
+        ) : null}
+      </AppPressableView>
+
+      {/* ── Copy column — runs the full card height ── */}
+      <AppView flex={1} gap={4}>
+        {/* Tags above the title, the way a storefront flags a listing. */}
+        {item.bestseller || item.certified || item.lowestPrice ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5 }}>
+            {item.bestseller ? (
+              <Tag label={t('catalog.bestseller')} color={tokens.onValue} bg={tokens.rating} />
+            ) : null}
+            {item.certified ? (
+              <Tag
+                label={t('catalog.matorCertified')}
+                color={tokens.success}
+                bg={tokens.successSoft}
+              />
+            ) : null}
+            {item.lowestPrice ? (
+              <Tag label={t('catalog.lowestPrice')} color={tokens.info} bg={tokens.infoSoft} />
             ) : null}
           </View>
-          {savePct > 0 ? (
-            <View
+        ) : null}
+
+        <AppPressableView gap={3} onPress={() => onOpen(item)} androidRipple={false}>
+          {brandEyebrow ? (
+            <AppText
+              family="accent"
+              weight="bold"
               style={{
-                flexShrink: 0,
-                backgroundColor: tokens.error ? `${tokens.error}1a` : 'transparent',
-                borderRadius: 999,
-                paddingHorizontal: 7,
-                paddingVertical: 3,
+                fontSize: 10,
+                letterSpacing: 1,
+                color: tokens.textMuted,
+                textTransform: 'uppercase',
               }}
             >
-              <AppText family="accent" weight="bold" style={{ fontSize: 11, color: tokens.error }}>
-                {`-${savePct}%`}
+              {brandEyebrow}
+            </AppText>
+          ) : null}
+
+          <AppText
+            family="default"
+            weight="semibold"
+            style={{ fontSize: 14.5, lineHeight: 19, color: tokens.text }}
+          >
+            {item.title}
+          </AppText>
+
+          {/* Qualifiers `normalizePartTitle` lifted out of the raw title (plus
+           *  an oil's viscosity · volume and the OEM number) — the detail that
+           *  was glued to the name. */}
+          {secondary ? (
+            <AppText
+              family="default"
+              style={{ fontSize: 11.5, lineHeight: 15, color: tokens.textMuted }}
+            >
+              {secondary}
+            </AppText>
+          ) : null}
+        </AppPressableView>
+
+        {/* Real review aggregate. No reviews → no row; never a stand-in. */}
+        {item.rating != null ? (
+          <AppView row align="center" gap={5}>
+            <Stars value={item.rating} />
+            <AppText family="accent" weight="bold" style={{ fontSize: 11.5, color: tokens.text }}>
+              {item.rating.toFixed(1)}
+            </AppText>
+            {item.reviewCount ? (
+              <AppText family="default" style={{ fontSize: 11, color: tokens.textMuted }}>
+                {t('catalog.reviewCount', { count: item.reviewCount })}
               </AppText>
-            </View>
+            ) : null}
+          </AppView>
+        ) : null}
+
+        {/* ── Fitment: ONE line of coloured text, no chrome ── */}
+        {item.isUniversal ? (
+          <AppText family="accent" weight="bold" style={{ fontSize: 11.5, color: tokens.success }}>
+            {`✓ ${t('catalog.universalFit')}`}
+          </AppText>
+        ) : fitState === 'answered' && fit ? (
+          <AppText family="accent" weight="bold" style={{ fontSize: 11.5, color: fitColor }}>
+            {`${fit.badge.color === 'green' ? '✓' : fit.badge.color === 'red' ? '✕' : '!'} ${fit.badge.text}`}
+          </AppText>
+        ) : (
+          <AppPressableView
+            onPress={handleCheckFit}
+            disabled={fitState === 'checking'}
+            androidRipple={false}
+            pressedOpacity={0.6}
+            row
+            align="center"
+            gap={6}
+            hitSlop={{ top: 8, bottom: 8, left: 6, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel={t('catalog.checkFitAccessibility')}
+            style={{ alignSelf: 'flex-start' }}
+          >
+            {fitState === 'checking' ? <WheelLoader size={11} color={tokens.textMuted} /> : null}
+            <AppText
+              family="accent"
+              weight="bold"
+              style={{
+                fontSize: 11.5,
+                color: fitState === 'checking' ? tokens.textMuted : tokens.info,
+              }}
+            >
+              {fitState === 'checking'
+                ? t('catalog.checking')
+                : vehicleLabel
+                  ? t('catalog.checkFitFor', { vehicle: vehicleLabel })
+                  : t('catalog.checkFit')}
+            </AppText>
+          </AppPressableView>
+        )}
+
+        {/* ── Price ── */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'baseline',
+            flexWrap: 'wrap',
+            columnGap: 7,
+            rowGap: 2,
+            marginTop: 2,
+          }}
+        >
+          <AppText
+            family="heading"
+            weight="bold"
+            style={{ fontSize: 19, lineHeight: 23, letterSpacing: -0.4, color: tokens.text }}
+          >
+            {priceAmount}
+          </AppText>
+          <AppText
+            family="accent"
+            weight="semibold"
+            style={{ fontSize: 11, color: tokens.textMuted }}
+          >
+            {t('common.currency')}
+          </AppText>
+          {wasLabel ? (
+            <AppText
+              family="default"
+              style={{ fontSize: 12, color: tokens.textMuted, textDecorationLine: 'line-through' }}
+            >
+              {wasLabel}
+            </AppText>
+          ) : null}
+          {savePct > 0 ? (
+            <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.error }}>
+              {`−${savePct}%`}
+            </AppText>
           ) : null}
         </View>
 
-        {/* Add pill */}
-        <AppPressableView
-          onPress={() => onAdd(item)}
-          accessibilityRole="button"
-          accessibilityLabel={t('catalog.addToCartAccessibility', { title: item.title })}
-          androidRipple={false}
-          pressedOpacity={0.9}
-          row
-          align="center"
-          gap={6}
-          rounded={999}
-          style={{ paddingHorizontal: 18, paddingVertical: 10, backgroundColor: tokens.text }}
-        >
-          <MaterialIcons name="add-shopping-cart" size={16} color={tokens.background} />
-          <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.background }}>
-            {t('catalog.add')}
+        {/* Delivery promise, when the part carries an ETA. */}
+        {eta ? (
+          <AppText family="default" style={{ fontSize: 11.5, color: tokens.textMuted }}>
+            {eta}
           </AppText>
-        </AppPressableView>
+        ) : null}
+
+        {/* ── Add ── */}
+        {outOfStock ? (
+          <AppView
+            center
+            rounded={999}
+            py={9}
+            style={{ marginTop: 4, backgroundColor: tokens.disabledBg }}
+          >
+            <AppText
+              family="accent"
+              weight="bold"
+              style={{ fontSize: 12.5, color: tokens.disabledFg }}
+            >
+              {t('catalog.outOfStock')}
+            </AppText>
+          </AppView>
+        ) : (
+          <AppPressableView
+            onPress={() => onAdd(item)}
+            accessibilityRole="button"
+            accessibilityLabel={t('catalog.addToCartAccessibility', { title: item.title })}
+            androidRipple={false}
+            pressedOpacity={0.9}
+            center
+            rounded={999}
+            py={9}
+            style={{ marginTop: 4, backgroundColor: tokens.text }}
+          >
+            <AppText
+              family="accent"
+              weight="bold"
+              style={{ fontSize: 12.5, color: tokens.background }}
+            >
+              {t('catalog.add')}
+            </AppText>
+          </AppPressableView>
+        )}
       </AppView>
+    </AppView>
+  );
+}
+
+/** Five glyphs, filled to the nearest half — the storefront rating convention,
+ *  set in type so it carries no icon dependency. */
+function Stars({ value }: { value: number }) {
+  const { tokens } = useThemeContext();
+  const filled = Math.round(value);
+  return (
+    <AppText family="accent" weight="bold" style={{ fontSize: 11, letterSpacing: 0.5 }}>
+      <AppText style={{ color: tokens.rating }}>{'★'.repeat(Math.min(5, filled))}</AppText>
+      <AppText style={{ color: tokens.gray300 }}>{'★'.repeat(Math.max(0, 5 - filled))}</AppText>
+    </AppText>
+  );
+}
+
+/** Small filled tag above the title (bestseller, certified, lowest price). */
+function Tag({ label, color, bg }: { label: string; color: string; bg: string }) {
+  return (
+    <AppView rounded={4} px={6} py={2} style={{ backgroundColor: bg }}>
+      <AppText family="accent" weight="bold" style={{ fontSize: 9.5, letterSpacing: 0.4, color }}>
+        {label.toUpperCase()}
+      </AppText>
     </AppView>
   );
 }

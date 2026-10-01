@@ -1,4 +1,5 @@
 import { getCatalogMockItems, type CatalogItem } from '@/services/catalog-service';
+import { normalizePartTitle } from '@/utils/part-title';
 import type {
   AccentTagKind,
   PriceBucket,
@@ -55,20 +56,14 @@ const DEFAULT_PAGE_SIZE = 2;
  *  used to live in `variant.ts` so the mock transport "looks like" the
  *  future HTTP transport. Once the backend ships `accentTagKind`, this
  *  whole table goes away. */
-const MOCK_ACCENT_KINDS: (AccentTagKind | null)[] = [
-  'lowest_price',
-  'bestseller',
-  null,
-  null,
-];
+const MOCK_ACCENT_KINDS: (AccentTagKind | null)[] = ['lowest_price', 'bestseller', null, null];
 
 function catalogToResult(item: CatalogItem, score: number): SearchResult {
   // No rating in the mock: the catalog has no review data, so `rating`
   // stays undefined and the row hides its rating line — mirroring how the
   // live backend returns `rating_avg: null` for products with no reviews.
   const h = hashCode(item.id);
-  const accentTagKind =
-    MOCK_ACCENT_KINDS[(h * 7) % MOCK_ACCENT_KINDS.length] ?? undefined;
+  const accentTagKind = MOCK_ACCENT_KINDS[(h * 7) % MOCK_ACCENT_KINDS.length] ?? undefined;
   return {
     id: item.id,
     title: item.title,
@@ -361,9 +356,11 @@ type RawSearchResponse = Partial<Omit<SearchResponse, 'results'>> & {
 
 function normalizeSearchResult(r: RawSearchResult): SearchResult {
   const price = r.price ?? '';
+  // Same title hygiene the catalog mapper applies, so a part reads identically
+  // whether it was reached through search or through the catalog.
   return {
     id: r.id,
-    title: r.title,
+    title: normalizePartTitle(r.title).title || r.title,
     description: r.description ?? '',
     price,
     priceLabel: r.priceLabel ?? price,

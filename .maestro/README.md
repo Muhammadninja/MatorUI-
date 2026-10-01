@@ -139,7 +139,7 @@ suite depends on. Each was a ~1-line addition; none changed rendered UI.
 | `testID` (flow) | Component | Note |
 |-----------------|-----------|------|
 | `vin-finder-screen`, `vin-input-field`, `vin-submit-button`, `browse-systems-btn` | **`app/vin-finder.tsx`** (new screen) | minimal real VIN Finder; POSTs `/v1/auth/decode-vin`, then hands off to the catalog |
-| `vehicle-fitment-bar`, `fitment-status-indicator` | `app/vin-finder.tsx` (decode banner) **and** `components/screens-components/catalog/vehicle-context-bar.tsx` | both the VIN-result banner and the persistent catalog bar expose these ids |
+| `vehicle-fitment-bar`, `fitment-status-indicator` | `app/vin-finder.tsx` (decode banner) | the VIN-result banner. The catalog screens used to expose the same ids from a persistent fitment bar; that bar was replaced by an inline text span (`components/screens-components/catalog/fitment-note.tsx`) and carries no testID |
 | `systems-grid` | `components/screens/catalog-systems-screen.tsx` (`FlashList`) | |
 | `system-item-<id>` (×8) | `components/screens-components/catalog/master-system-row.tsx` | ids: brakes/maintenance/suspension/electrical/engine/transmission/climate/tuning |
 | `parts-directory-screen` | `components/screens/catalog-parts-screen.tsx` (root) | |

@@ -57,7 +57,8 @@
     "dismissSheet": "Dismiss sheet",
     "noImageSelected": "No image selected",
     "noImagesSelected": "No images selected",
-    "allowedRange": "Allowed range: {{min}} - {{max}}"
+    "allowedRange": "Allowed range: {{min}} - {{max}}",
+    "imageViewer": "Photo {{index}}"
   },
   "language": {
     "title": "Choose your language",
@@ -483,7 +484,18 @@
     "fittingPartsAccessibility": "Fitting parts for {{label}}. Change vehicle.",
     "selectVehiclePrompt": "Select a vehicle to guarantee fitment accuracy",
     "fitmentNotSet": "Fitment not set",
-    "selectVehicleTitle": "Select your vehicle"
+    "selectVehicleTitle": "Select your vehicle",
+    "reviewCount_one": "{{count}} review",
+    "reviewCount_other": "{{count}} reviews",
+    "bestseller": "Bestseller",
+    "outOfStock": "Out of stock",
+    "checkFitFor": "Does it fit my {{vehicle}}?",
+    "fitCheckUnavailable": "Couldn't check fit right now",
+    "sortBy": "Sort",
+    "sortRelevance": "Default",
+    "deliveryDaysRange": "Delivery in {{min}}–{{max}} days",
+    "forVehicle": "for {{vehicle}}",
+    "chooseVehicle": "choose a car"
   },
   "home": {
     "savePercent": "SAVE {{percent}}%"
@@ -637,7 +649,15 @@
     "platePlaceholder": "01 A 123 BC",
     "plateInvalid": "Enter a valid plate, e.g. 01 A 123 BC",
     "vinUnsupported": "This is a UzAuto VIN, but we can't identify its model from the VIN yet.",
-    "vinNotFound": "We couldn't identify a vehicle from this VIN. Check the number and try again."
+    "vinNotFound": "We couldn't identify a vehicle from this VIN. Check the number and try again.",
+    "colorWhite": "White",
+    "colorSilver": "Silver",
+    "colorGray": "Gray",
+    "colorBlack": "Black",
+    "colorRed": "Red",
+    "colorBlue": "Blue",
+    "colorGreen": "Green",
+    "colorBeige": "Beige"
   },
   "itemDetail": {
     "notFoundTitle": "Product not found",
@@ -650,7 +670,6 @@
     "savedToFavorites": "Saved to favorites",
     "removedFromFavorites": "Removed from favorites",
     "viewFullScreen": "View {{title}} full screen",
-    "quantity": "Quantity",
     "total": "Total",
     "addToCart": "Add to cart",
     "imageCounter": "{{current}} of {{total}}",
@@ -664,7 +683,30 @@
     "shareTitle": "Share this part",
     "shareMessage": "{{title}} — {{price}}",
     "shareUnavailable": "Sharing isn't available on this device",
-    "shareFailed": "Couldn't share this item"
+    "shareFailed": "Couldn't share this item",
+    "outOfStock": "Out of stock",
+    "deliveryRange": "{{min}}–{{max}} days",
+    "deliveryDays": "{{days}} days",
+    "discountPercent": "−{{percent}}%",
+    "specsTitle": "Specifications",
+    "featuresTitle": "Highlights",
+    "fitsTitle": "Fits these vehicles",
+    "oilViscosity": "Viscosity",
+    "oilType": "Oil type",
+    "oilVolume": "Volume",
+    "arrivesRange": "{{from}} – {{to}}",
+    "youSave": "You save {{amount}}",
+    "confirmFitTitle": "Will it fit your car?",
+    "confirmFitBody": "Add your vehicle and we'll check this part against it.",
+    "checkingFit": "Checking fit for {{vehicle}}…",
+    "similarTitle": "Similar parts",
+    "buyNow": "Buy now",
+    "arrivesLead": "Arrives",
+    "freeShippingLine": "Free shipping",
+    "freeShippingNeed": "Free shipping when you add {{amount}} more",
+    "paymentLine": "Pay with Payme, a card terminal, or cash on delivery",
+    "addYourCar": "Add your car",
+    "fullScreen": "Tap to enlarge"
   },
   "sourcing": {
     "offerTitle": "Offer",

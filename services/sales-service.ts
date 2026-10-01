@@ -177,3 +177,39 @@ export function resolveItemSale(item: SaleTarget, sales: Sale[]): ItemSale | nul
   if (percent <= 0 || percent >= 100) return null;
   return { sale: winner, percent };
 }
+
+/** Display pricing for one catalog item: the discount badge + the struck "was". */
+export type ItemPricing = {
+  /** Whole-number percent off. 0 when nothing is discounted. */
+  savePct: number;
+  /** Pre-discount price in UZS to strike through. 0 when there is none. */
+  wasUzs: number;
+};
+
+/**
+ * Resolve what a product surface should SHOW for price: the discount percent
+ * and the struck-through "was".
+ *
+ * Prefers the backend-resolved sale carried on the part (authoritative — the
+ * server already resolved scope/priority, `priceUzs` is the sale price and
+ * `originalPriceUzs` the pre-discount one). Falls back to the client
+ * `/v1/sales` matcher, which can only match ALL_PRODUCTS campaigns since the
+ * public endpoint omits target ids, and reconstructs the "was" from the
+ * percent. Shared by the listing card and Item Detail so both agree.
+ */
+export function resolveItemPricing(
+  item: SaleTarget & { price?: string; salePercent?: number; originalPriceUzs?: number },
+  sales: Sale[],
+): ItemPricing {
+  const backendPct = item.salePercent && item.salePercent > 0 ? item.salePercent : 0;
+  const clientSale = resolveItemSale(item, sales);
+  const savePct = backendPct > 0 ? Math.round(backendPct) : (clientSale?.percent ?? 0);
+  const amountNum = item.priceUzs ?? (parseInt((item.price ?? '').replace(/\D/g, ''), 10) || 0);
+  const wasUzs =
+    backendPct > 0 && item.originalPriceUzs
+      ? Math.round(item.originalPriceUzs)
+      : savePct > 0 && amountNum > 0
+        ? Math.round(amountNum / (1 - savePct / 100))
+        : 0;
+  return { savePct, wasUzs };
+}

@@ -1,5 +1,4 @@
 import { useTranslation } from 'react-i18next';
-import { Check } from 'lucide-react-native';
 
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
@@ -14,52 +13,86 @@ export type VehicleColorPickerProps = {
   label?: string;
 };
 
+/** Ring (tap target) and the colour disc inside it. Eight rings + gaps fit one
+ *  row on a 360dp screen, which is what makes this read as a selector rather
+ *  than a palette. */
+const RING = 38;
+const DISC = 28;
+
 /**
- * Automotive colour picker — a wrapped grid of real car-colour swatches that
- * yields a hex value (the backend's `color_hex`). Replaces the old 4-value
- * enum chips; the selected swatch gets a brand ring and a contrast-checked
- * tick. All colours come from `VEHICLE_COLOR_SWATCHES` so this component
- * holds no colour literals (keeps `lint:tokens` clean).
+ * Vehicle colour selector — one row of eight real car colours, yielding the
+ * hex the backend stores as `color_hex`.
+ *
+ * Selection is a ring AROUND the swatch, not a tick on top of it: the colour is
+ * the thing being chosen, so covering it to say "chosen" is backwards (and the
+ * tick needed a contrast-matched icon per swatch to stay legible).
+ *
+ * The selected colour is named beside the label, so the control explains
+ * itself without a tooltip.
  */
 export function VehicleColorPicker({ value, onChange, label }: VehicleColorPickerProps) {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const selected = normalizeHex(value);
+  const current = VEHICLE_COLOR_SWATCHES.find((s) => normalizeHex(s.hex) === selected);
 
   return (
     <AppView gap={10}>
-      <AppText
-        family="accent"
-        weight="semibold"
-        colorName="textMuted"
-        style={{ fontSize: 11, letterSpacing: 0.7 }}
-        transform="uppercase"
-      >
-        {label ?? t('vehicleDetail.color')}
-      </AppText>
-      <AppView row style={{ flexWrap: 'wrap', gap: 12 }}>
+      <AppView row align="center" justify="space-between" gap={12}>
+        <AppText
+          family="accent"
+          weight="semibold"
+          colorName="textMuted"
+          style={{ fontSize: 11, letterSpacing: 0.7 }}
+          transform="uppercase"
+        >
+          {label ?? t('vehicleDetail.color')}
+        </AppText>
+        {current ? (
+          <AppText family="accent" weight="semibold" style={{ fontSize: 13, color: tokens.text }}>
+            {t(current.labelKey)}
+          </AppText>
+        ) : null}
+      </AppView>
+
+      <AppView row align="center" justify="space-between">
         {VEHICLE_COLOR_SWATCHES.map((s) => {
           const isSelected = normalizeHex(s.hex) === selected;
           return (
             <AppPressableView
               key={s.hex}
               center
+              // REQUIRED, not decorative: AppPressableView puts `style` on its
+              // outer wrapper and only stretches the inner Pressable when this
+              // is set. Without it the Pressable sizes to its children — and an
+              // unselected swatch has none — so the touch target collapsed to
+              // 0×0 and the swatches simply did not respond to taps.
+              fillContainer
               androidRipple={false}
+              pressedOpacity={0.7}
               onPress={() => onChange(s.hex)}
               accessibilityRole="button"
-              accessibilityLabel={s.name}
+              accessibilityLabel={t(s.labelKey)}
               accessibilityState={{ selected: isSelected }}
-              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               style={{
-                width: 42,
-                height: 42,
+                width: RING,
+                height: RING,
                 borderRadius: 999,
-                backgroundColor: s.hex,
-                borderWidth: isSelected ? 2.5 : 1,
-                borderColor: isSelected ? tokens.brand : tokens.border,
+                borderWidth: isSelected ? 2 : 0,
+                borderColor: tokens.text,
               }}
             >
-              {isSelected ? <Check size={18} strokeWidth={3} color={s.onHex} /> : null}
+              <AppView
+                style={{
+                  width: DISC,
+                  height: DISC,
+                  borderRadius: 999,
+                  backgroundColor: s.hex,
+                  // Hairline so white-on-white still reads as a disc.
+                  borderWidth: 1,
+                  borderColor: tokens.border,
+                }}
+              />
             </AppPressableView>
           );
         })}

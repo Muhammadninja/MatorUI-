@@ -7,7 +7,7 @@ import { useLanguageContext } from '@/contexts/language.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import type { Vehicle } from '@/services/garage-service';
 import { formatMileage } from '@/utils/mileage';
-
+import { colorEnumToHex, nearestSwatch } from '@/utils/vehicle-color';
 
 export type GarageActiveHeroProps = {
   vehicle: Vehicle;
@@ -16,10 +16,6 @@ export type GarageActiveHeroProps = {
   /** Square tune button — opens the vehicle detail screen. */
   onOpenDetail: (id: string) => void;
 };
-
-function titleCase(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
 
 export function GarageActiveHero({ vehicle, onShopParts, onOpenDetail }: GarageActiveHeroProps) {
   const { t } = useTranslation();
@@ -31,9 +27,12 @@ export function GarageActiveHero({ vehicle, onShopParts, onOpenDetail }: GarageA
   // trim) are reference data nobody reads while choosing what to shop for —
   // they live on the vehicle-detail screen, one tap away. Mileage stays because
   // it is the one value that changes and that fitment leans on.
+  // Same fix as the vehicle-detail screen: the colour to show is `color_hex`,
+  // not the lossy 4-value `color` enum — reading the enum reported a colour the
+  // owner never picked — and the swatch name is translated, not English.
   const meta = [
     vehicle.trim,
-    vehicle.color ? titleCase(vehicle.color) : undefined,
+    t(nearestSwatch(vehicle.colorHex ?? colorEnumToHex(vehicle.color)).labelKey),
     formatMileage(vehicle.mileage, t('garage.mileageUnit'), language) || undefined,
   ]
     .filter(Boolean)
@@ -63,10 +62,18 @@ export function GarageActiveHero({ vehicle, onShopParts, onOpenDetail }: GarageA
       {/* Title — year + make on one line, model on the next; both wrap
        *  rather than clip, so long makes ("Mercedes-Benz") stay readable. */}
       <AppView style={{ maxWidth: 210, marginTop: 10 }}>
-        <AppText family="heading" weight="bold" style={{ fontSize: 26, lineHeight: 30, color: tokens.onHero }}>
+        <AppText
+          family="heading"
+          weight="bold"
+          style={{ fontSize: 26, lineHeight: 30, color: tokens.onHero }}
+        >
           {`${vehicle.year} ${vehicle.make}`}
         </AppText>
-        <AppText family="heading" weight="bold" style={{ fontSize: 26, lineHeight: 30, color: tokens.onHero }}>
+        <AppText
+          family="heading"
+          weight="bold"
+          style={{ fontSize: 26, lineHeight: 30, color: tokens.onHero }}
+        >
           {vehicle.model}
         </AppText>
       </AppView>

@@ -42,7 +42,11 @@ export interface Part {
   categoryId: string;
 }
 
-export type CatalogSortBy = 'relevance' | 'price_asc' | 'price_desc' | 'newest';
+/** Sort orders the catalog list accepts. Every value is a server-side `sort`
+ *  param on `GET /v1/catalog/parts`, so changing it re-orders the WHOLE
+ *  catalog, not the page already fetched. `bestseller` is the backend's
+ *  sales-ranked order (isBestseller → salesCount → reviewCount → rating). */
+export type CatalogSortBy = 'relevance' | 'price_asc' | 'price_desc' | 'newest' | 'bestseller';
 
 /** Local filter state for the parts screen (client-side until the backend
  *  exposes filter params). */

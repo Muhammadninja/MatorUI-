@@ -57,7 +57,8 @@
     "dismissSheet": "Yopish",
     "noImageSelected": "Rasm tanlanmagan",
     "noImagesSelected": "Rasmlar tanlanmagan",
-    "allowedRange": "Ruxsat etilgan oraliq: {{min}} - {{max}}"
+    "allowedRange": "Ruxsat etilgan oraliq: {{min}} - {{max}}",
+    "imageViewer": "{{index}}-rasm"
   },
   "language": {
     "title": "Tilni tanlang",
@@ -483,7 +484,18 @@
     "fittingPartsAccessibility": "{{label}} uchun qismlar. Avtomobilni almashtiring.",
     "selectVehiclePrompt": "Aniq moslik uchun avtomobilni tanlang",
     "fitmentNotSet": "Moslik tanlanmagan",
-    "selectVehicleTitle": "Avtomobilingizni tanlang"
+    "selectVehicleTitle": "Avtomobilingizni tanlang",
+    "reviewCount_one": "{{count}} sharh",
+    "reviewCount_other": "{{count}} ta sharh",
+    "bestseller": "Koʻp sotilgan",
+    "outOfStock": "Mavjud emas",
+    "checkFitFor": "{{vehicle}} uchun mos keladimi?",
+    "fitCheckUnavailable": "Moslikni tekshirib boʻlmadi",
+    "sortBy": "Saralash",
+    "sortRelevance": "Standart",
+    "deliveryDaysRange": "{{min}}–{{max}} kunda yetkazamiz",
+    "forVehicle": "{{vehicle}} uchun",
+    "chooseVehicle": "avtomobil tanlash"
   },
   "home": {
     "savePercent": "CHEGIRMA {{percent}}%"
@@ -637,7 +649,15 @@
     "platePlaceholder": "01 A 123 BC",
     "plateInvalid": "Togʻri raqam kiriting, masalan 01 A 123 BC",
     "vinUnsupported": "Bu UzAuto VIN raqami, lekin uning modelini hozircha aniqlay olmaymiz.",
-    "vinNotFound": "Bu VIN boʻyicha avtomobilni aniqlab boʻlmadi. Raqamni tekshirib, qayta urinib koʻring."
+    "vinNotFound": "Bu VIN boʻyicha avtomobilni aniqlab boʻlmadi. Raqamni tekshirib, qayta urinib koʻring.",
+    "colorWhite": "Oq",
+    "colorSilver": "Kumush",
+    "colorGray": "Kulrang",
+    "colorBlack": "Qora",
+    "colorRed": "Qizil",
+    "colorBlue": "Koʻk",
+    "colorGreen": "Yashil",
+    "colorBeige": "Bej"
   },
   "itemDetail": {
     "notFoundTitle": "Mahsulot topilmadi",
@@ -650,7 +670,6 @@
     "savedToFavorites": "Sevimlilarga qoʻshildi",
     "removedFromFavorites": "Sevimlilardan olib tashlandi",
     "viewFullScreen": "{{title}}ni toʻliq ekranda ochish",
-    "quantity": "Miqdori",
     "total": "Jami",
     "addToCart": "Savatga qoʻshish",
     "imageCounter": "{{total}} dan {{current}}",
@@ -664,7 +683,30 @@
     "shareTitle": "Ehtiyot qismni ulashish",
     "shareMessage": "{{title}} — {{price}}",
     "shareUnavailable": "Bu qurilmada ulashish mavjud emas",
-    "shareFailed": "Mahsulotni ulashib boʻlmadi"
+    "shareFailed": "Mahsulotni ulashib boʻlmadi",
+    "outOfStock": "Mavjud emas",
+    "deliveryRange": "{{min}}–{{max}} kun",
+    "deliveryDays": "{{days}} kun",
+    "discountPercent": "−{{percent}}%",
+    "specsTitle": "Texnik xususiyatlar",
+    "featuresTitle": "Afzalliklari",
+    "fitsTitle": "Quyidagi avtomobillarga mos",
+    "oilViscosity": "Qovushqoqlik",
+    "oilType": "Moy turi",
+    "oilVolume": "Hajmi",
+    "arrivesRange": "{{from}} – {{to}}",
+    "youSave": "{{amount}} tejaysiz",
+    "confirmFitTitle": "Mashinangizga mos keladimi?",
+    "confirmFitBody": "Avtomobilingizni qoʻshing — biz bu detalni tekshiramiz.",
+    "checkingFit": "{{vehicle}} uchun moslik tekshirilmoqda…",
+    "similarTitle": "Oʻxshash detallar",
+    "buyNow": "Hozir sotib olish",
+    "arrivesLead": "Yetkazamiz",
+    "freeShippingLine": "Yetkazib berish bepul",
+    "freeShippingNeed": "Yana {{amount}} qoʻshsangiz, yetkazish bepul",
+    "paymentLine": "Payme, terminal yoki yetkazishda naqd pul bilan toʻlash",
+    "addYourCar": "Avtomobil qoʻshish",
+    "fullScreen": "Toʻliq ekranda ochish"
   },
   "sourcing": {
     "offerTitle": "Taklif",

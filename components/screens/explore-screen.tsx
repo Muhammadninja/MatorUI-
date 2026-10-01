@@ -11,7 +11,7 @@ import CategoryGridSkeleton, {
 } from '@/components/screens-components/catalog/category-grid-skeleton';
 import CategoryTile from '@/components/screens-components/catalog/category-tile';
 import CertifiedSection from '@/components/screens-components/catalog/certified-section';
-import MatorFitBanner from '@/components/screens-components/catalog/mator-fit-banner';
+import FitmentNote from '@/components/screens-components/catalog/fitment-note';
 import VehicleMakeTile from '@/components/screens-components/catalog/vehicle-make-tile';
 import { AppLogo } from '@/components/shared/app-logo';
 import { AppText } from '@/components/shared/app-text';
@@ -156,7 +156,9 @@ export default function ExploreScreen() {
             />
           </>
         )}
-        <AppView style={{ paddingTop: insets.top + 8, paddingHorizontal: 20, paddingBottom: 12, gap: 12 }}>
+        <AppView
+          style={{ paddingTop: insets.top + 8, paddingHorizontal: 20, paddingBottom: 12, gap: 12 }}
+        >
           <AppView row align="center" justify="space-between">
             <AppLogo size={26} />
             <AppPressableView
@@ -233,7 +235,11 @@ export default function ExploreScreen() {
           }}
         >
           <WheelLoader size={22} color={tokens.text} />
-          <AppText family="accent" weight="semibold" style={{ fontSize: 13, color: tokens.textMuted }}>
+          <AppText
+            family="accent"
+            weight="semibold"
+            style={{ fontSize: 13, color: tokens.textMuted }}
+          >
             {t('explore.refreshing')}
           </AppText>
         </AppView>
@@ -257,18 +263,29 @@ export default function ExploreScreen() {
           gap: 16,
         }}
       >
-        <MatorFitBanner />
-
         {/* ── Shop by vehicle ── */}
-        <AppView row align="center" justify="space-between" style={{ marginTop: 2 }}>
-          <AppText family="heading" weight="bold" style={{ fontSize: 18}}>
-            {t('explore.shopByVehicle')}
-          </AppText>
-          <AppPressableView onPress={() => router.navigate('/garage')} androidRipple={false} accessibilityRole="button">
-            <AppText family="accent" weight="semibold" style={{ fontSize: 13, color: tokens.textMuted }}>
-              {t('explore.myGarage')}
+        <AppView gap={4} style={{ marginTop: 2 }}>
+          <AppView row align="center" justify="space-between">
+            <AppText family="heading" weight="bold" style={{ fontSize: 18 }}>
+              {t('explore.shopByVehicle')}
             </AppText>
-          </AppPressableView>
+            <AppPressableView
+              onPress={() => router.navigate('/garage')}
+              androidRipple={false}
+              accessibilityRole="button"
+            >
+              <AppText
+                family="accent"
+                weight="semibold"
+                style={{ fontSize: 13, color: tokens.textMuted }}
+              >
+                {t('explore.myGarage')}
+              </AppText>
+            </AppPressableView>
+          </AppView>
+          {/* Replaces the fitment banner that used to sit above this section —
+              same job, one line, no box. */}
+          <FitmentNote />
         </AppView>
         {makesState === 'loading' ? (
           <BrandRowSkeleton />
@@ -296,7 +313,11 @@ export default function ExploreScreen() {
         <CertifiedSection />
 
         {/* ── Shop by category ── */}
-        <AppText family="heading" weight="bold" style={{ fontSize: 18, color: tokens.text, marginTop: 6 }}>
+        <AppText
+          family="heading"
+          weight="bold"
+          style={{ fontSize: 18, color: tokens.text, marginTop: 6 }}
+        >
           {t('explore.shopByCategory')}
         </AppText>
         {categoriesState === 'loading' ? (

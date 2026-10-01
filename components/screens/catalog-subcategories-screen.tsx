@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CategoryRowsSkeleton } from '@/components/screens-components/catalog/category-grid-skeleton';
-import VehicleContextBar from '@/components/screens-components/catalog/vehicle-context-bar';
+import FitmentNote from '@/components/screens-components/catalog/fitment-note';
 import { AppButton } from '@/components/shared/app-button';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
@@ -14,7 +14,11 @@ import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useCategoryDrill } from '@/hooks/use-category-drill';
-import { fetchReferenceCategories, localizedCategoryName, type RefCategory } from '@/services/reference-catalog';
+import {
+  fetchReferenceCategories,
+  localizedCategoryName,
+  type RefCategory,
+} from '@/services/reference-catalog';
 
 type LoadState = 'loading' | 'error' | 'loaded';
 
@@ -78,28 +82,28 @@ export default function CatalogSubcategoriesScreen() {
     ({ item }: { item: RefCategory }) => {
       const label = localizedCategoryName(item, i18n.language);
       return (
-      <AppPressableView
-        onPress={() => void drill({ id: item.id, label })}
-        disabled={resolvingId != null}
-        androidRipple={false}
-        accessibilityRole="button"
-        accessibilityLabel={label}
-        row
-        align="center"
-        gap={14}
-        style={{ paddingVertical: 16, opacity: resolvingId && resolvingId !== item.id ? 0.5 : 1 }}
-      >
-        <AppView flex={1}>
-          <AppText family="heading" weight="bold" style={{ fontSize: 16, color: tokens.text }}>
-            {label}
-          </AppText>
-        </AppView>
-        {resolvingId === item.id ? (
-          <WheelLoader size={18} color={tokens.textMuted} />
-        ) : (
-          <ChevronRight size={22} strokeWidth={1.5} color={tokens.text} />
-        )}
-      </AppPressableView>
+        <AppPressableView
+          onPress={() => void drill({ id: item.id, label })}
+          disabled={resolvingId != null}
+          androidRipple={false}
+          accessibilityRole="button"
+          accessibilityLabel={label}
+          row
+          align="center"
+          gap={14}
+          style={{ paddingVertical: 16, opacity: resolvingId && resolvingId !== item.id ? 0.5 : 1 }}
+        >
+          <AppView flex={1}>
+            <AppText family="heading" weight="bold" style={{ fontSize: 16, color: tokens.text }}>
+              {label}
+            </AppText>
+          </AppView>
+          {resolvingId === item.id ? (
+            <WheelLoader size={18} color={tokens.textMuted} />
+          ) : (
+            <ChevronRight size={22} strokeWidth={1.5} color={tokens.text} />
+          )}
+        </AppPressableView>
       );
     },
     [drill, resolvingId, tokens, i18n.language],
@@ -112,18 +116,40 @@ export default function CatalogSubcategoriesScreen() {
       {state === 'error' ? (
         <AppView flex={1} center px="xl" gap={12}>
           <AlertCircle size={30} strokeWidth={2} color={tokens.error} />
-          <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted, textAlign: 'center' }}>
+          <AppText
+            family="default"
+            style={{ fontSize: 13, color: tokens.textMuted, textAlign: 'center' }}
+          >
             {t('catalog.loadSubcategoriesError')}
           </AppText>
           <AppButton title={t('common.retry')} kind="brand" size="sm" onPress={() => load()} />
-          <AppButton title={parentLabel ? t('catalog.viewAllLabelParts', { label: parentLabel }) : t('catalog.viewAllParts')} kind="secondary" variant="outline" size="sm" onPress={viewAllParts} />
+          <AppButton
+            title={
+              parentLabel
+                ? t('catalog.viewAllLabelParts', { label: parentLabel })
+                : t('catalog.viewAllParts')
+            }
+            kind="secondary"
+            variant="outline"
+            size="sm"
+            onPress={viewAllParts}
+          />
         </AppView>
       ) : state === 'loaded' && items.length === 0 ? (
         <AppView flex={1} center px="xl" gap={12}>
           <AppText family="heading" weight="bold" style={{ fontSize: 17, color: tokens.text }}>
             {t('catalog.noSubcategories')}
           </AppText>
-          <AppButton title={parentLabel ? t('catalog.viewAllLabelParts', { label: parentLabel }) : t('catalog.viewAllParts')} kind="brand" size="md" onPress={viewAllParts} />
+          <AppButton
+            title={
+              parentLabel
+                ? t('catalog.viewAllLabelParts', { label: parentLabel })
+                : t('catalog.viewAllParts')
+            }
+            kind="brand"
+            size="md"
+            onPress={viewAllParts}
+          />
         </AppView>
       ) : (
         <FlashList
@@ -132,16 +158,33 @@ export default function CatalogSubcategoriesScreen() {
           keyExtractor={(c) => c.id}
           renderItem={renderItem}
           ListHeaderComponent={
-            <AppView gap={12} style={{ paddingBottom: 12 }}>
-              <VehicleContextBar />
-              <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.7 }}>
-                {parentLabel ? `${parentLabel} · ${t('catalog.categoriesSuffix')}` : t('catalog.categories')}
+            <AppView gap={6} style={{ paddingBottom: 12 }}>
+              <AppText
+                family="accent"
+                weight="bold"
+                style={{
+                  fontSize: 12,
+                  color: tokens.textMuted,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.7,
+                }}
+              >
+                {parentLabel
+                  ? `${parentLabel} · ${t('catalog.categoriesSuffix')}`
+                  : t('catalog.categories')}
               </AppText>
+              <FitmentNote />
             </AppView>
           }
-          ItemSeparatorComponent={() => <AppView style={{ height: 1, backgroundColor: tokens.divider }} />}
+          ItemSeparatorComponent={() => (
+            <AppView style={{ height: 1, backgroundColor: tokens.divider }} />
+          )}
           ListEmptyComponent={state === 'loading' ? <CategoryRowsSkeleton /> : null}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: Math.max(insets.bottom + 24, 40) }}
+          contentContainerStyle={{
+            paddingHorizontal: 20,
+            paddingTop: 4,
+            paddingBottom: Math.max(insets.bottom + 24, 40),
+          }}
           showsVerticalScrollIndicator={false}
         />
       )}

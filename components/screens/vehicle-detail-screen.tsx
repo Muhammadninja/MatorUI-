@@ -18,11 +18,12 @@ import type { VehiclePatch } from '@/services/garage-service';
 import { toastService } from '@/services/toast-service';
 import { formatMileage } from '@/utils/mileage';
 import { colorEnumToHex, colorHexToEnum, nearestSwatch, normalizeHex } from '@/utils/vehicle-color';
-import { formatUzPlate, isValidUzPlate, normalizeUzPlate, UZ_PLATE_DISPLAY_MAXLENGTH } from '@/utils/uz-plate';
-
-function titleCase(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
+import {
+  formatUzPlate,
+  isValidUzPlate,
+  normalizeUzPlate,
+  UZ_PLATE_DISPLAY_MAXLENGTH,
+} from '@/utils/uz-plate';
 
 /** Parse a free-typed mileage string ("67,000 km") to a whole number, or
  *  undefined when the user cleared it. */
@@ -152,15 +153,24 @@ export default function VehicleDetailScreen() {
         <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted }}>
           {t('vehicleDetail.notFound')}
         </AppText>
-        <AppButton title={t('vehicleDetail.backToGarage')} kind="secondary" size="sm" onPress={() => router.back()} />
+        <AppButton
+          title={t('vehicleDetail.backToGarage')}
+          kind="secondary"
+          size="sm"
+          onPress={() => router.back()}
+        />
       </AppView>
     );
   }
 
   const makeModel = `${vehicle.make} ${vehicle.model}`.toUpperCase();
-  const subline = [vehicle.trim, vehicle.color ? titleCase(vehicle.color) : undefined]
-    .filter(Boolean)
-    .join(' · ');
+  // The car's colour is `color_hex`; `color` is the lossy 4-value enum kept in
+  // sync for legacy callers. Reading the enum here meant a red car reported
+  // whichever of midnight/graphite/pearl/matte it bucketed into — so the screen
+  // showed a colour the owner never picked. Resolve the hex, then translate.
+  const colorHex = vehicle.colorHex ?? colorEnumToHex(vehicle.color);
+  const colorLabel = t(nearestSwatch(colorHex).labelKey);
+  const subline = [vehicle.trim, colorLabel].filter(Boolean).join(' · ');
 
   return (
     <AppView flex={1} colorName="background">
@@ -173,7 +183,12 @@ export default function VehicleDetailScreen() {
         {/* Info block */}
         <AppView px={20} mb={20} gap={8}>
           <AppView row align="center" gap={10} style={{ flexWrap: 'wrap' }}>
-            <AppText family="heading" weight="bold" colorName="text" style={{ fontSize: 22, lineHeight: 28 }}>
+            <AppText
+              family="heading"
+              weight="bold"
+              colorName="text"
+              style={{ fontSize: 22, lineHeight: 28 }}
+            >
               {headline}
             </AppText>
             {isActive ? (
@@ -191,7 +206,11 @@ export default function VehicleDetailScreen() {
             ) : null}
           </AppView>
           {subline ? (
-            <AppText family="default" colorName="textMuted" style={{ fontSize: 13.5, marginTop: 3 }}>
+            <AppText
+              family="default"
+              colorName="textMuted"
+              style={{ fontSize: 13.5, marginTop: 3 }}
+            >
               {subline}
             </AppText>
           ) : null}
@@ -220,7 +239,11 @@ export default function VehicleDetailScreen() {
               autoCorrect={false}
               keyboardType="default"
               maxLength={UZ_PLATE_DISPLAY_MAXLENGTH}
-              errorText={form.plate.length > 0 && !isValidUzPlate(form.plate) ? t('vehicleDetail.plateInvalid') : undefined}
+              errorText={
+                form.plate.length > 0 && !isValidUzPlate(form.plate)
+                  ? t('vehicleDetail.plateInvalid')
+                  : undefined
+              }
               containerRounded={12}
               containerColorName="backgroundSecondary"
               containerBorderName="border"
@@ -232,7 +255,13 @@ export default function VehicleDetailScreen() {
 
             <AppView row gap={10} style={{ marginTop: 6 }}>
               <AppView flex={1}>
-                <AppButton title={t('common.cancel')} kind="secondary" size="lg" fullWidth onPress={cancelEdit} />
+                <AppButton
+                  title={t('common.cancel')}
+                  kind="secondary"
+                  size="lg"
+                  fullWidth
+                  onPress={cancelEdit}
+                />
               </AppView>
               <AppView flex={1}>
                 <AppButton
@@ -256,24 +285,44 @@ export default function VehicleDetailScreen() {
                 style={{ borderWidth: 1, borderColor: tokens.border, overflow: 'hidden' }}
               >
                 <SpecRow>
-                  <SpecCell label={t('vehicleDetail.vin')} value={vehicle.vin ?? notSet} muted={!vehicle.vin} tokens={tokens} />
-                  <SpecDivider vertical tokens={tokens} />
-                  <SpecCell label={t('vehicleDetail.mileage')} value={mileageValue || notSet} muted={!mileageValue} tokens={tokens} />
-                </SpecRow>
-                <SpecDivider tokens={tokens} />
-                <SpecRow>
-                  <SpecCell label={t('vehicleDetail.trim')} value={vehicle.trim ?? notSet} muted={!vehicle.trim} tokens={tokens} />
+                  <SpecCell
+                    label={t('vehicleDetail.vin')}
+                    value={vehicle.vin ?? notSet}
+                    muted={!vehicle.vin}
+                    tokens={tokens}
+                  />
                   <SpecDivider vertical tokens={tokens} />
                   <SpecCell
-                    label={t('vehicleDetail.color')}
-                    value={nearestSwatch(vehicle.colorHex ?? colorEnumToHex(vehicle.color)).name}
+                    label={t('vehicleDetail.mileage')}
+                    value={mileageValue || notSet}
+                    muted={!mileageValue}
                     tokens={tokens}
-                    swatchHex={vehicle.colorHex ?? colorEnumToHex(vehicle.color)}
                   />
                 </SpecRow>
                 <SpecDivider tokens={tokens} />
                 <SpecRow>
-                  <SpecCell label={t('vehicleDetail.plate')} value={vehicle.plate ? formatUzPlate(vehicle.plate) : notSet} muted={!vehicle.plate} tokens={tokens} />
+                  <SpecCell
+                    label={t('vehicleDetail.trim')}
+                    value={vehicle.trim ?? notSet}
+                    muted={!vehicle.trim}
+                    tokens={tokens}
+                  />
+                  <SpecDivider vertical tokens={tokens} />
+                  <SpecCell
+                    label={t('vehicleDetail.color')}
+                    value={colorLabel}
+                    tokens={tokens}
+                    swatchHex={colorHex}
+                  />
+                </SpecRow>
+                <SpecDivider tokens={tokens} />
+                <SpecRow>
+                  <SpecCell
+                    label={t('vehicleDetail.plate')}
+                    value={vehicle.plate ? formatUzPlate(vehicle.plate) : notSet}
+                    muted={!vehicle.plate}
+                    tokens={tokens}
+                  />
                 </SpecRow>
               </AppView>
             </AppView>
@@ -404,7 +453,12 @@ function SpecRow({ children }: { children: ReactNode }) {
 
 function SpecDivider({ vertical, tokens }: { vertical?: boolean; tokens: { border: string } }) {
   return (
-    <AppView style={[vertical ? styles.specDividerV : styles.specDividerH, { backgroundColor: tokens.border }]} />
+    <AppView
+      style={[
+        vertical ? styles.specDividerV : styles.specDividerH,
+        { backgroundColor: tokens.border },
+      ]}
+    />
   );
 }
 

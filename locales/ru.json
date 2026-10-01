@@ -57,7 +57,8 @@
     "dismissSheet": "Закрыть панель",
     "noImageSelected": "Изображение не выбрано",
     "noImagesSelected": "Изображения не выбраны",
-    "allowedRange": "Допустимый диапазон: {{min}} - {{max}}"
+    "allowedRange": "Допустимый диапазон: {{min}} - {{max}}",
+    "imageViewer": "Фото {{index}}"
   },
   "language": {
     "title": "Выберите язык",
@@ -493,7 +494,20 @@
     "fittingPartsAccessibility": "Подбор запчастей для {{label}}. Сменить автомобиль.",
     "selectVehiclePrompt": "Выберите автомобиль, чтобы гарантировать точность совместимости",
     "fitmentNotSet": "Совместимость не задана",
-    "selectVehicleTitle": "Выберите автомобиль"
+    "selectVehicleTitle": "Выберите автомобиль",
+    "reviewCount_one": "{{count}} отзыв",
+    "reviewCount_few": "{{count}} отзыва",
+    "reviewCount_many": "{{count}} отзывов",
+    "reviewCount_other": "{{count}} отзывов",
+    "bestseller": "Хит продаж",
+    "outOfStock": "Нет в наличии",
+    "checkFitFor": "Подойдёт на {{vehicle}}?",
+    "fitCheckUnavailable": "Не удалось проверить совместимость",
+    "sortBy": "Сортировка",
+    "sortRelevance": "По умолчанию",
+    "deliveryDaysRange": "Доставка {{min}}–{{max}} дн.",
+    "forVehicle": "для {{vehicle}}",
+    "chooseVehicle": "выбрать авто"
   },
   "home": {
     "savePercent": "СКИДКА {{percent}}%"
@@ -647,7 +661,15 @@
     "platePlaceholder": "01 A 123 BC",
     "plateInvalid": "Введите номер, напр. 01 A 123 BC",
     "vinUnsupported": "Это VIN UzAuto, но модель по нему мы пока определить не можем.",
-    "vinNotFound": "По этому VIN не удалось определить автомобиль. Проверьте номер и попробуйте снова."
+    "vinNotFound": "По этому VIN не удалось определить автомобиль. Проверьте номер и попробуйте снова.",
+    "colorWhite": "Белый",
+    "colorSilver": "Серебристый",
+    "colorGray": "Серый",
+    "colorBlack": "Чёрный",
+    "colorRed": "Красный",
+    "colorBlue": "Синий",
+    "colorGreen": "Зелёный",
+    "colorBeige": "Бежевый"
   },
   "itemDetail": {
     "notFoundTitle": "Товар не найден",
@@ -660,7 +682,6 @@
     "savedToFavorites": "Добавлено в избранное",
     "removedFromFavorites": "Удалено из избранного",
     "viewFullScreen": "Открыть {{title}} на весь экран",
-    "quantity": "Количество",
     "total": "Итого",
     "addToCart": "В корзину",
     "imageCounter": "{{current}} из {{total}}",
@@ -674,7 +695,30 @@
     "shareTitle": "Поделиться запчастью",
     "shareMessage": "{{title}} — {{price}}",
     "shareUnavailable": "Отправка недоступна на этом устройстве",
-    "shareFailed": "Не удалось поделиться товаром"
+    "shareFailed": "Не удалось поделиться товаром",
+    "outOfStock": "Нет в наличии",
+    "deliveryRange": "{{min}}–{{max}} дн.",
+    "deliveryDays": "{{days}} дн.",
+    "discountPercent": "−{{percent}}%",
+    "specsTitle": "Характеристики",
+    "featuresTitle": "Преимущества",
+    "fitsTitle": "Подходит для автомобилей",
+    "oilViscosity": "Вязкость",
+    "oilType": "Тип масла",
+    "oilVolume": "Объём",
+    "arrivesRange": "{{from}} – {{to}}",
+    "youSave": "Вы экономите {{amount}}",
+    "confirmFitTitle": "Подойдёт ли к вашей машине?",
+    "confirmFitBody": "Добавьте авто — мы проверим совместимость этой детали.",
+    "checkingFit": "Проверяем совместимость с {{vehicle}}…",
+    "similarTitle": "Похожие детали",
+    "buyNow": "Купить сейчас",
+    "arrivesLead": "Доставим",
+    "freeShippingLine": "Бесплатная доставка",
+    "freeShippingNeed": "Бесплатная доставка, если добавить ещё на {{amount}}",
+    "paymentLine": "Оплата через Payme, терминалом или наличными при получении",
+    "addYourCar": "Добавить авто",
+    "fullScreen": "Открыть во весь экран"
   },
   "sourcing": {
     "offerTitle": "Предложение",

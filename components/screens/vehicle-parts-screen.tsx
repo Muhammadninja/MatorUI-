@@ -34,7 +34,12 @@ export default function VehiclePartsScreen() {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ make?: string; model?: string; year?: string; label?: string }>();
+  const params = useLocalSearchParams<{
+    make?: string;
+    model?: string;
+    year?: string;
+    label?: string;
+  }>();
 
   const make = params.make?.trim() || undefined;
   const model = params.model?.trim() || undefined;
@@ -73,7 +78,13 @@ export default function VehiclePartsScreen() {
       return;
     }
     triggerHaptic('success');
-    addItem({ id: it.id, title: it.title, description: it.description, price: it.price, imageUrl: it.images?.[0] });
+    addItem({
+      id: it.id,
+      title: it.title,
+      description: it.description,
+      price: it.price,
+      imageUrl: it.images?.[0],
+    });
     toast.success(t('catalog.addedToCart'));
   };
 
@@ -116,29 +127,36 @@ export default function VehiclePartsScreen() {
           contentContainerStyle={{
             paddingTop: 10,
             paddingBottom: Math.max(insets.bottom + 24, 40),
-            paddingHorizontal: 16,
             gap: 8,
           }}
         >
-          <AppText
-            family="accent"
-            weight="bold"
-            transform="uppercase"
-            style={{ fontSize: 11, letterSpacing: 0.8, color: tokens.textMuted }}
-          >
-            {t('vehicleParts.bestsellers')}
-          </AppText>
-
-          {state === 'success' ? (
-            <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>
-              {t('catalog.resultCount', { count: total || items.length })}
+          {/* Rows run edge to edge, so the section copy carries its own inset. */}
+          <AppView px={16} gap={8}>
+            <AppText
+              family="accent"
+              weight="bold"
+              transform="uppercase"
+              style={{ fontSize: 11, letterSpacing: 0.8, color: tokens.textMuted }}
+            >
+              {t('vehicleParts.bestsellers')}
             </AppText>
-          ) : null}
+
+            {state === 'success' ? (
+              <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>
+                {t('catalog.resultCount', { count: total || items.length })}
+              </AppText>
+            ) : null}
+          </AppView>
 
           {state === 'success' ? (
-            <AppView gap={14} style={{ marginTop: 4 }}>
-              {items.map((it) => (
-                <ProductRow key={it.id} item={it} onOpen={openItem} onAdd={addToCart} />
+            <AppView style={{ marginTop: 4 }}>
+              {items.map((it, i) => (
+                <AppView key={it.id}>
+                  {i > 0 ? (
+                    <AppView style={{ height: 1, backgroundColor: tokens.divider }} />
+                  ) : null}
+                  <ProductRow item={it} onOpen={openItem} onAdd={addToCart} />
+                </AppView>
               ))}
             </AppView>
           ) : null}

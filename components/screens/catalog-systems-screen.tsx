@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AutoPartIcon from '@/components/screens-components/catalog/auto-part-icon';
 import { CategoryRowsSkeleton } from '@/components/screens-components/catalog/category-grid-skeleton';
-import VehicleContextBar from '@/components/screens-components/catalog/vehicle-context-bar';
+import FitmentNote from '@/components/screens-components/catalog/fitment-note';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
@@ -62,7 +62,11 @@ export default function CatalogSystemsScreen() {
         style={{ paddingVertical: 16, opacity: resolvingId && resolvingId !== item.id ? 0.5 : 1 }}
       >
         {hideIcon ? null : (
-          <AppView center rounded={12} style={{ width: 44, height: 44, backgroundColor: tokens.backgroundSecondary }}>
+          <AppView
+            center
+            rounded={12}
+            style={{ width: 44, height: 44, backgroundColor: tokens.backgroundSecondary }}
+          >
             <AutoPartIcon name={item.name} iconKey={item.iconKey} size={26} />
           </AppView>
         )}
@@ -83,23 +87,43 @@ export default function CatalogSystemsScreen() {
 
   return (
     <AppView flex={1} colorName="background">
-      <AppSettingsHeader title={vehicleLabel || t('catalog.catalogTitle')} fallbackHref="/explore" />
+      <AppSettingsHeader
+        title={vehicleLabel || t('catalog.catalogTitle')}
+        fallbackHref="/explore"
+      />
       <FlashList
         testID="systems-grid"
         data={categories}
         keyExtractor={(c) => c.id}
         renderItem={renderItem}
         ListHeaderComponent={
-          <AppView gap={12} style={{ paddingBottom: 12 }}>
-            {vehicleLabel ? null : <VehicleContextBar />}
-            <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.7 }}>
-              {vehicleLabel ? t('catalog.systemsFor', { label: vehicleLabel }) : t('catalog.shopBySystem')}
+          <AppView gap={6} style={{ paddingBottom: 12 }}>
+            <AppText
+              family="accent"
+              weight="bold"
+              style={{
+                fontSize: 12,
+                color: tokens.textMuted,
+                textTransform: 'uppercase',
+                letterSpacing: 0.7,
+              }}
+            >
+              {t('catalog.shopBySystem')}
             </AppText>
+            {/* Replaces the fitment bar: the car is named in the section's own
+                subtitle, and the span taps through to the Garage. */}
+            <FitmentNote />
           </AppView>
         }
-        ItemSeparatorComponent={() => <AppView style={{ height: 1, backgroundColor: tokens.divider }} />}
+        ItemSeparatorComponent={() => (
+          <AppView style={{ height: 1, backgroundColor: tokens.divider }} />
+        )}
         ListEmptyComponent={state === 'loading' ? <CategoryRowsSkeleton /> : null}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: Math.max(insets.bottom + 24, 40) }}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingTop: 4,
+          paddingBottom: Math.max(insets.bottom + 24, 40),
+        }}
         showsVerticalScrollIndicator={false}
       />
     </AppView>

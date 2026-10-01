@@ -1,7 +1,14 @@
 // ── Types ────────────────────────────────────────────────────────────
 
-import { brandRegion, CATALOG_REGIONS, isGmBrand, normalizeRegion, type CatalogRegion } from '@/constants/catalog-regions';
+import {
+  brandRegion,
+  CATALOG_REGIONS,
+  isGmBrand,
+  normalizeRegion,
+  type CatalogRegion,
+} from '@/constants/catalog-regions';
 import { cleanCategoryName } from '@/utils/category-label';
+import { normalizePartTitle } from '@/utils/part-title';
 
 export type CatalogItem = {
   id: string;
@@ -10,7 +17,14 @@ export type CatalogItem = {
    *  retired — don't reintroduce them. */
   badge?: string;
   status: string;
+  /** Display title, normalized at the API boundary by `normalizePartTitle` —
+   *  de-shouted, edge junk stripped, qualifiers lifted into `titleDetail`.
+   *  Sellers type titles freehand, so the raw value is not presentable. */
   title: string;
+  /** The qualifiers that were buried in the raw title (vehicle model, side,
+   *  spec code, volume), joined with " · ". Rendered as a secondary line under
+   *  the title; absent when the title had nothing to lift. */
+  titleDetail?: string;
   description: string;
   price: string;
   /** Numeric list price in UZS (the same value `price` is formatted from), kept
@@ -50,6 +64,13 @@ export type CatalogItem = {
   certified?: boolean;
   /** Lowest-price guarantee badge, when the seller carries one. */
   lowestPrice?: boolean;
+  /** Real review aggregate (`rating_avg` / `review_count`). Both absent until
+   *  the part has been reviewed — surfaces must render NOTHING rather than a
+   *  placeholder score. */
+  rating?: number;
+  reviewCount?: number;
+  /** Ops-flagged bestseller (`is_bestseller`), drives the "Bestseller" chip. */
+  bestseller?: boolean;
   /** Seller storefront name, when the catalog part carries one. */
   sellerName?: string;
   /** Category id (e.g. "oil-and-fluids"), kept alongside the display `category`
@@ -319,8 +340,7 @@ export function getCatalogMockList(request: CatalogListRequest): CatalogListResp
     const query = request.search.toLowerCase();
     items = items.filter(
       (item) =>
-        item.title.toLowerCase().includes(query) ||
-        item.description.toLowerCase().includes(query),
+        item.title.toLowerCase().includes(query) || item.description.toLowerCase().includes(query),
     );
   }
 
@@ -464,6 +484,12 @@ type ApiCatalogPart = {
     discount_amount_uzs?: number;
   } | null;
   in_stock?: boolean;
+  /** Review aggregate. `rating_avg` is null until a part has been reviewed —
+   *  the card shows stars ONLY when it is a real number, never a stand-in. */
+  rating_avg?: number | null;
+  review_count?: number | null;
+  /** Seller/ops-flagged bestseller, mirrored from the operator panel. */
+  is_bestseller?: boolean;
   images?: string[];
   specs?: { label: string; value: string }[];
   features?: string[];
@@ -524,8 +550,7 @@ function deriveSpecs(p: ApiCatalogPart): CatalogItemSpec[] {
     if (oil.viscosity) specs.push({ label: 'Viscosity', value: oil.viscosity });
     const oilType = oil.oil_type_label ?? (oil.oil_type ? prettyEnum(oil.oil_type) : undefined);
     if (oilType) specs.push({ label: 'Oil type', value: oilType });
-    const volume =
-      oil.volume_label ?? (oil.volume_ml != null ? `${oil.volume_ml} ml` : undefined);
+    const volume = oil.volume_label ?? (oil.volume_ml != null ? `${oil.volume_ml} ml` : undefined);
     if (volume) specs.push({ label: 'Volume', value: volume });
   }
   const category = p.main_category ? cleanCategoryName(prettyEnum(p.main_category)) : undefined;
@@ -580,6 +605,12 @@ function narrowOilType(v: string | null | undefined): OilType | undefined {
 
 function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
   const partNumber = resolvePartNumber(p);
+  // Seller-entered titles arrive SHOUTED, with trailing punctuation, the car
+  // model glued on the end, spec codes run together with the name, or the brand
+  // repeated. Normalizing HERE (the single mapper every catalog surface goes
+  // through) is what makes the grid, row, detail, cart and order agree.
+  const partBrand = p.part_brand_name ?? p.brand?.name ?? undefined;
+  const titleParts = normalizePartTitle(p.title, { brand: partBrand });
   // Placeholder detection runs on the INTERNAL English `name` (the sentinel is
   // an English backend value, so a localized label would never match), but what
   // we render is the server-localized `label`. Pre-migration `label` is absent
@@ -593,11 +624,13 @@ function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
   return {
     id: p.id,
     status: p.in_stock === false ? 'Out of stock' : 'In stock',
-    title: p.title,
+    // Fall back to the raw title if normalization emptied it (a title of pure
+    // punctuation) — a row must never render a blank name.
+    title: titleParts.title || p.title,
+    titleDetail: titleParts.detail,
     description: [p.brand?.name, categoryLabel].filter(Boolean).join(' · '),
     price:
-      p.price_label ??
-      (p.price_uzs != null ? `UZS' ${p.price_uzs.toLocaleString('ru-RU')}` : ''),
+      p.price_label ?? (p.price_uzs != null ? `UZS' ${p.price_uzs.toLocaleString('ru-RU')}` : ''),
     priceUzs: p.price_uzs ?? undefined,
     priceLabel: '',
     images: p.images ?? [],
@@ -606,7 +639,7 @@ function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
     specs: p.specs?.length ? p.specs : deriveSpecs(p),
     features: p.features ?? [],
     category: categoryLabel ?? '',
-    brand: p.part_brand_name ?? p.brand?.name ?? undefined,
+    brand: partBrand,
     // Exactly one of these is ever set — a part is GM xor OEM (see resolvePartNumber).
     oem: partNumber.oem,
     gm: partNumber.gm,
@@ -619,6 +652,12 @@ function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
     // off; light up automatically the moment the backend ships the fields.
     certified: p.seller?.certified === true,
     lowestPrice: p.seller?.lowest_price === true,
+    // Reviews are real or absent. `rating_avg` is null for an unreviewed part,
+    // and a 0 average means "no score" — neither may become a rendered number.
+    rating: typeof p.rating_avg === 'number' && p.rating_avg > 0 ? p.rating_avg : undefined,
+    reviewCount:
+      typeof p.review_count === 'number' && p.review_count > 0 ? p.review_count : undefined,
+    bestseller: p.is_bestseller === true,
     sellerName: p.seller?.name ?? undefined,
     // Raw ids the client sale matcher needs to resolve CATEGORIES / DEALERS-scoped
     // campaigns (see services/sales-service.ts) — the fallback when the backend
@@ -628,9 +667,7 @@ function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
     // Backend-resolved sale (authoritative). `price_uzs` is already the sale
     // price here, so `original_price_uzs` is the struck-through was.
     salePercent:
-      p.sale && typeof p.sale.discount_percent === 'number'
-        ? p.sale.discount_percent
-        : undefined,
+      p.sale && typeof p.sale.discount_percent === 'number' ? p.sale.discount_percent : undefined,
     originalPriceUzs: p.original_price_uzs ?? undefined,
     // Motor-oil shape — `kind` drives the card; `isUniversal` drives the
     // "Подходит для всех" treatment (never inferred from the category name).
@@ -704,8 +741,10 @@ class HttpCatalogTransport implements CatalogTransport {
     request.viscosities?.forEach((v) => params.append(PARTS_PARAM.viscosity, v));
     request.oilTypes?.forEach((t) => params.append(PARTS_PARAM.oilType, t));
     request.volumesMl?.forEach((v) => params.append(PARTS_PARAM.volumeMl, String(v)));
-    if (request.volumeMlMin != null) params.set(PARTS_PARAM.volumeMlMin, String(request.volumeMlMin));
-    if (request.volumeMlMax != null) params.set(PARTS_PARAM.volumeMlMax, String(request.volumeMlMax));
+    if (request.volumeMlMin != null)
+      params.set(PARTS_PARAM.volumeMlMin, String(request.volumeMlMin));
+    if (request.volumeMlMax != null)
+      params.set(PARTS_PARAM.volumeMlMax, String(request.volumeMlMax));
     const res = await apiClient.get<ApiCatalogPartsResponse>(
       `${API_BASE}/parts?${params.toString()}`,
       { signal: request.signal },

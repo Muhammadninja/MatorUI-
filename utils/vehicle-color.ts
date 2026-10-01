@@ -9,27 +9,33 @@ import type { VehicleColor } from '@/services/garage-service';
  * reads on top of `hex`. Kept here (a non-token-linted util) so the picker
  * component carries no color literals.
  */
-export type VehicleColorSwatch = { hex: string; name: string; onHex: string };
+export type VehicleColorSwatch = {
+  hex: string;
+  /** English name — accessibility hint and the fallback display label. */
+  name: string;
+  /** i18n key under `addVehicle.*` for the visible label. */
+  labelKey: string;
+  /** Check-mark / overlay colour that reads on top of `hex`. */
+  onHex: string;
+};
 
+/**
+ * Eight colours, not eighteen. The picker is a SELECTOR — the handful of
+ * finishes an Uzbek car actually leaves the lot in — not a paint catalogue.
+ * The long list forced a wrapped three-row grid where every extra swatch cost
+ * a decision and bought nothing: `nearestSwatch` still maps any stored
+ * `color_hex` (including ones picked before this list shrank) onto the closest
+ * of these for labelling, so nothing already saved is lost.
+ */
 export const VEHICLE_COLOR_SWATCHES: VehicleColorSwatch[] = [
-  { hex: '#F4F5F7', name: 'White', onHex: '#111827' },
-  { hex: '#C7CBD1', name: 'Silver', onHex: '#111827' },
-  { hex: '#8A9099', name: 'Gray', onHex: '#111827' },
-  { hex: '#4A4F57', name: 'Gunmetal', onHex: '#FFFFFF' },
-  { hex: '#14161A', name: 'Black', onHex: '#FFFFFF' },
-  { hex: '#C42B2B', name: 'Red', onHex: '#FFFFFF' },
-  { hex: '#7C1D22', name: 'Maroon', onHex: '#FFFFFF' },
-  { hex: '#E8641C', name: 'Orange', onHex: '#111827' },
-  { hex: '#EBB40F', name: 'Yellow', onHex: '#111827' },
-  { hex: '#C9A96A', name: 'Beige', onHex: '#111827' },
-  { hex: '#6B4326', name: 'Brown', onHex: '#FFFFFF' },
-  { hex: '#2E7D46', name: 'Green', onHex: '#FFFFFF' },
-  { hex: '#1F4A32', name: 'Dark green', onHex: '#FFFFFF' },
-  { hex: '#1FA3A3', name: 'Teal', onHex: '#FFFFFF' },
-  { hex: '#4FA6E0', name: 'Sky blue', onHex: '#111827' },
-  { hex: '#2456C8', name: 'Blue', onHex: '#FFFFFF' },
-  { hex: '#1E2A52', name: 'Navy', onHex: '#FFFFFF' },
-  { hex: '#6D3BC0', name: 'Purple', onHex: '#FFFFFF' },
+  { hex: '#F4F5F7', name: 'White', labelKey: 'addVehicle.colorWhite', onHex: '#111827' },
+  { hex: '#C7CBD1', name: 'Silver', labelKey: 'addVehicle.colorSilver', onHex: '#111827' },
+  { hex: '#8A9099', name: 'Gray', labelKey: 'addVehicle.colorGray', onHex: '#111827' },
+  { hex: '#14161A', name: 'Black', labelKey: 'addVehicle.colorBlack', onHex: '#FFFFFF' },
+  { hex: '#C42B2B', name: 'Red', labelKey: 'addVehicle.colorRed', onHex: '#FFFFFF' },
+  { hex: '#2456C8', name: 'Blue', labelKey: 'addVehicle.colorBlue', onHex: '#FFFFFF' },
+  { hex: '#2E7D46', name: 'Green', labelKey: 'addVehicle.colorGreen', onHex: '#FFFFFF' },
+  { hex: '#C9A96A', name: 'Beige', labelKey: 'addVehicle.colorBeige', onHex: '#111827' },
 ];
 
 /** Sensible default for a fresh vehicle — white is the most common UZ car color. */
