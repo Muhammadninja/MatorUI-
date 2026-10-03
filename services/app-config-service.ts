@@ -8,7 +8,7 @@
  *     min_supported_version: "1.4.0",   // builds below this MUST update
  *     latest_version?: "1.5.0",
  *     ios_store_url?: "https://apps.apple.com/app/id0000000000",
- *     android_store_url?: "https://play.google.com/store/apps/details?id=com.fotih12.mator"
+ *     android_store_url?: "https://play.google.com/store/apps/details?id=com.mator.myapp"
  *   }
  * Public read (no auth). Until it exists it 404s → fetchAppConfig returns null →
  * no update is ever forced (FAIL-OPEN), so shipping the UI today is safe.

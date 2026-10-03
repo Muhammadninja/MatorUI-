@@ -8,7 +8,7 @@ import { fetchAppConfig } from '@/services/app-config-service';
 // Android resolves by package; iOS needs the numeric App Store id, so the real
 // link should come from the backend (`ios_store_url`).
 const ANDROID_STORE_URL =
-  'https://play.google.com/store/apps/details?id=com.fotih12.mator';
+  'https://play.google.com/store/apps/details?id=com.mator.myapp';
 const IOS_STORE_URL = 'https://apps.apple.com/app/mator';
 
 /** True when dotted-numeric `a` is strictly below `b` (e.g. "1.2.0" < "1.3.0"). */
