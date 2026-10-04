@@ -1,8 +1,10 @@
+import { Plus } from 'lucide-react-native';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import ImageBox from '@/components/screens-components/home/image-box';
+import { AppIconButton } from '@/components/shared/app-icon-button';
 import { splitPrice } from '@/components/shared/app-price';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
@@ -25,9 +27,25 @@ export type ProductRowProps = {
 
 type FitState = 'idle' | 'checking' | 'answered';
 
-/** Image column. Big on purpose — it is the first thing a shopper reads, and
- *  the fitment line moving into the copy column paid for the extra height. */
-const THUMB = 118;
+/**
+ * Row sizing. The row is sized so that roughly THREE listings fill one
+ * screenful — the catalog reads as a stack of real cards you flick through,
+ * not a dense price list.
+ *
+ * The height is derived from the window rather than hard-coded, because
+ * "three per screen" is a statement about the scrollable area, not about a
+ * pixel count: `LIST_CHROME` is everything that is never list (status bar +
+ * screen header, the results toolbar, the tab bar), and what is left over is
+ * split three ways, clamped so the row stays sane on a small phone and does
+ * not balloon on a tablet.
+ */
+const LIST_CHROME = 240;
+const MIN_ROW = 186;
+const MAX_ROW = 264;
+/** Image column width as a share of the row height. The photo stretches to the
+ *  row's full inner height, so this ratio is what keeps the picture a generous
+ *  portrait block without starving the copy column on a narrow phone. */
+const THUMB_RATIO = 0.64;
 
 /**
  * `ProductRow` — the listing card behind every result screen (category,
@@ -125,6 +143,12 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
         })
       : null;
 
+  const { height: windowHeight } = useWindowDimensions();
+  const rowHeight = Math.round(
+    Math.max(MIN_ROW, Math.min(MAX_ROW, (windowHeight - LIST_CHROME) / 3)),
+  );
+  const thumb = Math.round(rowHeight * THUMB_RATIO);
+
   const fitColor =
     fit?.badge.color === 'green'
       ? tokens.success
@@ -136,7 +160,11 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
     // Flat, full-bleed row — no card surface, no corner radius, no outer
     // margin. The list draws a hairline between rows; the only inset is the
     // text's own breathing room from the screen edge.
-    <AppView row gap={13} style={{ paddingHorizontal: 16, paddingVertical: 14 }}>
+    <AppView
+      row
+      gap={14}
+      style={{ paddingHorizontal: 16, paddingVertical: 15, minHeight: rowHeight }}
+    >
       {/* ── Image column ── */}
       {/* The testID lives HERE, not on the card root: E2E taps an element's
        *  centre, and the card's centre now falls on the copy column (the fit
@@ -147,12 +175,12 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
         androidRipple={false}
         accessibilityRole="button"
         accessibilityLabel={item.title}
-        style={{ width: THUMB }}
+        style={{ width: thumb, alignSelf: 'stretch' }}
       >
         <ImageBox
           label={item.title}
           uri={image}
-          height={THUMB}
+          height="100%"
           radius={8}
           contentFit="contain"
           backgroundColor={tokens.white}
@@ -168,7 +196,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
               position: 'absolute',
               left: 0,
               top: 0,
-              maxWidth: THUMB,
+              maxWidth: thumb,
               paddingHorizontal: 5,
               paddingVertical: 2,
               borderTopLeftRadius: 8,
@@ -191,7 +219,11 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
       </AppPressableView>
 
       {/* ── Copy column — runs the full card height ── */}
-      <AppView flex={1} gap={4}>
+      {/* `space-between` (with the gap as the floor) distributes the taller
+       *  row's extra height instead of parking it under the last line: the
+       *  name stays at the top edge, price and add sit at the bottom, level
+       *  with the base of the photo. */}
+      <AppView flex={1} gap={5} justify="space-between">
         {/* Tags above the title, the way a storefront flags a listing. */}
         {item.bestseller || item.certified || item.lowestPrice ? (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5 }}>
@@ -217,7 +249,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
               family="accent"
               weight="bold"
               style={{
-                fontSize: 10,
+                fontSize: 10.5,
                 letterSpacing: 1,
                 color: tokens.textMuted,
                 textTransform: 'uppercase',
@@ -230,7 +262,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
           <AppText
             family="default"
             weight="semibold"
-            style={{ fontSize: 14.5, lineHeight: 19, color: tokens.text }}
+            style={{ fontSize: 15.5, lineHeight: 20.5, color: tokens.text }}
           >
             {item.title}
           </AppText>
@@ -241,7 +273,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
           {secondary ? (
             <AppText
               family="default"
-              style={{ fontSize: 11.5, lineHeight: 15, color: tokens.textMuted }}
+              style={{ fontSize: 12, lineHeight: 16, color: tokens.textMuted }}
             >
               {secondary}
             </AppText>
@@ -304,90 +336,93 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
           </AppPressableView>
         )}
 
-        {/* ── Price ── */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'baseline',
-            flexWrap: 'wrap',
-            columnGap: 7,
-            rowGap: 2,
-            marginTop: 2,
-          }}
-        >
-          <AppText
-            family="heading"
-            weight="bold"
-            style={{ fontSize: 19, lineHeight: 23, letterSpacing: -0.4, color: tokens.text }}
-          >
-            {priceAmount}
-          </AppText>
-          <AppText
-            family="accent"
-            weight="semibold"
-            style={{ fontSize: 11, color: tokens.textMuted }}
-          >
-            {t('common.currency')}
-          </AppText>
-          {wasLabel ? (
-            <AppText
-              family="default"
-              style={{ fontSize: 12, color: tokens.textMuted, textDecorationLine: 'line-through' }}
+        {/* ── Price, and the add control on the far right ── */}
+        {/* The add affordance is a single `+` pinned to the right edge of this
+         *  row, not a full-width pill: the pill spanned the whole copy column,
+         *  read as the card's primary surface, and pushed the real content
+         *  (title, fitment, price) into the top half of the row. A `+` says
+         *  "add this" in the space a chevron would take. */}
+        <AppView row align="center" gap={10} style={{ marginTop: 3 }}>
+          <AppView flex={1} gap={2}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'baseline',
+                flexWrap: 'wrap',
+                columnGap: 7,
+                rowGap: 2,
+              }}
             >
-              {wasLabel}
-            </AppText>
-          ) : null}
-          {savePct > 0 ? (
-            <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.error }}>
-              {`−${savePct}%`}
-            </AppText>
-          ) : null}
-        </View>
+              <AppText
+                family="heading"
+                weight="bold"
+                style={{ fontSize: 21, lineHeight: 25, letterSpacing: -0.4, color: tokens.text }}
+              >
+                {priceAmount}
+              </AppText>
+              <AppText
+                family="accent"
+                weight="semibold"
+                style={{ fontSize: 11, color: tokens.textMuted }}
+              >
+                {t('common.currency')}
+              </AppText>
+              {wasLabel ? (
+                <AppText
+                  family="default"
+                  style={{
+                    fontSize: 12,
+                    color: tokens.textMuted,
+                    textDecorationLine: 'line-through',
+                  }}
+                >
+                  {wasLabel}
+                </AppText>
+              ) : null}
+              {savePct > 0 ? (
+                <AppText
+                  family="accent"
+                  weight="bold"
+                  style={{ fontSize: 12, color: tokens.error }}
+                >
+                  {`−${savePct}%`}
+                </AppText>
+              ) : null}
+            </View>
 
-        {/* Delivery promise, when the part carries an ETA. */}
-        {eta ? (
-          <AppText family="default" style={{ fontSize: 11.5, color: tokens.textMuted }}>
-            {eta}
-          </AppText>
-        ) : null}
-
-        {/* ── Add ── */}
-        {outOfStock ? (
-          <AppView
-            center
-            rounded={999}
-            py={9}
-            style={{ marginTop: 4, backgroundColor: tokens.disabledBg }}
-          >
-            <AppText
-              family="accent"
-              weight="bold"
-              style={{ fontSize: 12.5, color: tokens.disabledFg }}
-            >
-              {t('catalog.outOfStock')}
-            </AppText>
+            {/* Stock first — it decides whether the delivery promise means
+             *  anything — then the ETA when the part carries one. */}
+            {outOfStock ? (
+              <AppText
+                family="accent"
+                weight="bold"
+                style={{ fontSize: 11.5, color: tokens.textMuted }}
+              >
+                {t('catalog.outOfStock')}
+              </AppText>
+            ) : eta ? (
+              <AppText family="default" style={{ fontSize: 11.5, color: tokens.textMuted }}>
+                {eta}
+              </AppText>
+            ) : null}
           </AppView>
-        ) : (
-          <AppPressableView
+
+          <AppIconButton
+            Icon={Plus}
             onPress={() => onAdd(item)}
-            accessibilityRole="button"
-            accessibilityLabel={t('catalog.addToCartAccessibility', { title: item.title })}
-            androidRipple={false}
-            pressedOpacity={0.9}
-            center
-            rounded={999}
-            py={9}
-            style={{ marginTop: 4, backgroundColor: tokens.text }}
-          >
-            <AppText
-              family="accent"
-              weight="bold"
-              style={{ fontSize: 12.5, color: tokens.background }}
-            >
-              {t('catalog.add')}
-            </AppText>
-          </AppPressableView>
-        )}
+            disabled={outOfStock}
+            size={42}
+            iconSize={22}
+            strokeWidth={2.6}
+            backgroundColor={outOfStock ? tokens.disabledBg : tokens.text}
+            color={outOfStock ? tokens.disabledFg : tokens.background}
+            accessibilityLabel={
+              outOfStock
+                ? t('catalog.outOfStock')
+                : t('catalog.addToCartAccessibility', { title: item.title })
+            }
+          />
+        </AppView>
       </AppView>
     </AppView>
   );
