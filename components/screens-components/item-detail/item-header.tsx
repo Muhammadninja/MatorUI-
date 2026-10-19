@@ -8,6 +8,7 @@ import { AppPrice } from '@/components/shared/app-price';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
+import { noBreakDigits } from '@/utils/format-price';
 
 /** Circular control floating over the gallery. */
 function GlassButton({
@@ -222,8 +223,15 @@ export type ItemPriceRowProps = {
   price: string;
   /** Pre-discount price in UZS to strike through; 0 hides it. */
   wasUzs: number;
+  /** The backend's own formatting of that price, when it applied the sale
+   *  itself. Preferred over reformatting `wasUzs` so the server and the client
+   *  never print the same number two ways. */
+  wasLabel?: string;
   /** Discount percent; 0 hides the pill. */
   savePct: number;
+  /** Name of the campaign behind the discount ("Осенняя распродажа"), when the
+   *  backend resolved one. Omitted for a client-matched sale. */
+  saleTitle?: string;
   /** Pre-formatted amount saved per unit; null when nothing is discounted. */
   savingsLabel: string | null;
 };
@@ -234,7 +242,14 @@ export type ItemPriceRowProps = {
  * `/v1/sales` matcher otherwise) — the same resolution the listing card uses,
  * so card and detail never disagree.
  */
-export function ItemPriceRow({ price, wasUzs, savePct, savingsLabel }: ItemPriceRowProps) {
+export function ItemPriceRow({
+  price,
+  wasUzs,
+  wasLabel,
+  savePct,
+  saleTitle,
+  savingsLabel,
+}: ItemPriceRowProps) {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
 
@@ -252,7 +267,9 @@ export function ItemPriceRow({ price, wasUzs, savePct, savingsLabel }: ItemPrice
               marginBottom: 4,
             }}
           >
-            {`${wasUzs.toLocaleString('ru-RU')} ${t('common.currency')}`}
+            {wasLabel
+              ? noBreakDigits(wasLabel)
+              : `${noBreakDigits(wasUzs.toLocaleString('ru-RU'))} ${t('common.currency')}`}
           </AppText>
         ) : null}
         {savePct > 0 ? (
@@ -271,6 +288,13 @@ export function ItemPriceRow({ price, wasUzs, savePct, savingsLabel }: ItemPrice
       {savingsLabel ? (
         <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.success }}>
           {t('itemDetail.youSave', { amount: savingsLabel })}
+        </AppText>
+      ) : null}
+      {/* Which campaign the discount comes from — the backend names it, and a
+       *  named sale reads as a real offer rather than an arbitrary markdown. */}
+      {saleTitle ? (
+        <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted }}>
+          {saleTitle}
         </AppText>
       ) : null}
     </AppView>

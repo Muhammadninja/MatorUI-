@@ -32,13 +32,16 @@ export type PriceSignal = {
  * starts sending `accentTagKind` on every result, this is the only place
  * the client needs to know how to render each kind.
  */
-const ACCENT_KIND_REGISTRY: Record<AccentTagKind, { label: string; Icon: RibbonIcon; tone: IconTone }> = {
+const ACCENT_KIND_REGISTRY: Record<
+  AccentTagKind,
+  { labelKey: string; Icon: RibbonIcon; tone: IconTone }
+> = {
   // Tag (not BadgeCheck) — BadgeCheck's interior check disappears when
   // filled at 12px, collapsing into an unrecognisable blob. Tag has a
   // distinctive hole-punch corner that survives the fill, and reads
   // semantically as "price tag = lowest price."
-  lowest_price: { label: 'Lowest price', Icon: Tag, tone: 'value' },
-  bestseller: { label: 'Bestseller', Icon: Award, tone: 'accolade' },
+  lowest_price: { labelKey: 'search.signal.lowestPrice', Icon: Tag, tone: 'value' },
+  bestseller: { labelKey: 'search.signal.bestseller', Icon: Award, tone: 'accolade' },
 };
 
 /**
@@ -67,11 +70,16 @@ const ACCENT_KIND_REGISTRY: Record<AccentTagKind, { label: string; Icon: RibbonI
  *     accent-tag icon).
  */
 export function resolvePriceSignal({
+  t,
   isCheapest,
   badge,
   accentTagKind,
   accentTagFallback,
 }: {
+  /** i18n lookup — ribbon copy follows the app language, not the bundle's
+   *  English defaults. The server `badge` is passed through verbatim: it is
+   *  editorial text the backend already localizes. */
+  t: (key: string) => string;
   isCheapest?: boolean;
   badge?: string;
   /** Server-supplied accent tag (preferred). */
@@ -87,7 +95,7 @@ export function resolvePriceSignal({
     // rendered filled — stroke-only arrow icons collapse into an
     // unrecognisable blob when filled. The badge's % glyph has cutouts
     // that survive the fill, so the shape stays readable at 12px.
-    matched.push({ label: 'Cheapest', icons: [BadgePercent], tone: 'value' });
+    matched.push({ label: t('search.signal.cheapest'), icons: [BadgePercent], tone: 'value' });
   }
   if (badge) {
     matched.push({ label: badge, icons: [Sparkles], tone: 'accolade' });
@@ -103,14 +111,14 @@ export function resolvePriceSignal({
       ? ACCENT_KIND_REGISTRY[accentTagKind]
       : accentTagFallback;
   if (tag) {
-    matched.push({ label: tag.label, icons: [tag.Icon], tone: tag.tone });
+    matched.push({ label: t(tag.labelKey), icons: [tag.Icon], tone: tag.tone });
   }
 
   if (matched.length === 0) return null;
   if (matched.length === 1) return matched[0];
 
   return {
-    label: 'Mator Pick',
+    label: t('search.signal.matorPick'),
     icons: matched.flatMap((s) => s.icons),
     composite: true,
   };

@@ -17,6 +17,9 @@ import {
 
 import { useThemeContext } from '@/contexts/theme.context';
 import type { ColorName } from '@/themes';
+import { sizedImageUrl } from '@/utils/image-url';
+
+import ImageShimmer from './image-shimmer';
 
 export type AppImageSource = ImageSource | number | string | null | undefined;
 
@@ -64,6 +67,17 @@ export type AppImageProps = {
   // ── States & accessibility ─────────────────────────────────────────
   /** Rendered in place of the image when the source fails to load. */
   fallback?: React.ReactNode;
+  /**
+   * Pulsing loader shown while a remote photo is in flight. Default true.
+   * Pass false for decorative images where a pulse would be noise.
+   */
+  showLoader?: boolean;
+  /**
+   * Width in POINTS the image is drawn at, used to request a right-sized
+   * derivative from the CDN. Only needed when `width` is a percentage — a
+   * numeric `width` is used automatically.
+   */
+  targetWidth?: number;
   /** Accessibility label / alt text. */
   alt?: string;
   /** Override accessibility role. Default 'image'. */
@@ -111,6 +125,8 @@ const AppImageImpl = forwardRef<View, AppImageProps>(function AppImage(
     recyclingKey,
     allowDownscaling = true,
     fallback,
+    showLoader = true,
+    targetWidth,
     alt,
     accessibilityRole = 'image',
     style,
@@ -121,13 +137,26 @@ const AppImageImpl = forwardRef<View, AppImageProps>(function AppImage(
 ) {
   const { tokens } = useThemeContext();
   const [hasError, setHasError] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
 
-  const normalized = useMemo(() => coerceSource(source), [source]);
   const sourceUri = useMemo(() => getSourceUri(source), [source]);
 
-  // Reset error state when the source changes (e.g. user picks a new vehicle).
+  // Remote photos are requested at the size they will actually be drawn
+  // (see `sizedImageUrl`) — the catalog's originals are ~700KB PNGs, which is
+  // what made lists crawl and made slow connections fall through to the
+  // no-photo placeholder. Local `require()` assets are untouched.
+  const normalized = useMemo(() => {
+    const base = coerceSource(source);
+    if (!sourceUri) return base;
+    const resolvedWidth = targetWidth ?? (typeof width === 'number' ? width : undefined);
+    const sized = sizedImageUrl(sourceUri, resolvedWidth);
+    return sized && sized !== sourceUri ? { uri: sized } : base;
+  }, [source, sourceUri, targetWidth, width]);
+
+  // Reset load/error state when the source changes (e.g. user picks a new vehicle).
   useEffect(() => {
     setHasError(false);
+    setIsLoaded(false);
   }, [sourceUri, normalized]);
 
   const resolvedPlaceholder =
@@ -145,23 +174,27 @@ const AppImageImpl = forwardRef<View, AppImageProps>(function AppImage(
       ...(borderWidth != null ? { borderWidth } : null),
       ...(resolvedBorderColor != null ? { borderColor: resolvedBorderColor } : null),
     }),
-    [
-      width,
-      height,
-      aspectRatio,
-      resolvedPlaceholder,
-      rounded,
-      borderWidth,
-      resolvedBorderColor,
-    ],
+    [width, height, aspectRatio, resolvedPlaceholder, rounded, borderWidth, resolvedBorderColor],
   );
 
   const handleError = useCallback(() => {
     setHasError(true);
+    setIsLoaded(true);
     onError?.();
   }, [onError]);
 
+  const handleLoad = useCallback(() => {
+    setIsLoaded(true);
+    onLoad?.();
+  }, [onLoad]);
+
   const showFallback = (hasError || normalized == null) && fallback != null;
+  // Only remote photos get the pulse: a bundled `require()` asset is decoded
+  // from disk in the same frame, so a loader would flash for nothing.
+  const showShimmer = showLoader && !showFallback && !isLoaded && sourceUri != null;
+  // Below ~72px the glyph is bigger than the tile it sits in — pulse only.
+  const shimmerGlyph =
+    (typeof width !== 'number' || width >= 72) && (typeof height !== 'number' || height >= 72);
 
   return (
     <View
@@ -171,12 +204,18 @@ const AppImageImpl = forwardRef<View, AppImageProps>(function AppImage(
       accessibilityLabel={alt}
       accessible={!!alt}
     >
+      {showShimmer ? <ImageShimmer showGlyph={shimmerGlyph} /> : null}
       {showFallback ? (
         <View style={StyleSheet.absoluteFill}>{fallback}</View>
       ) : normalized != null ? (
         <ExpoImage
           source={normalized}
-          style={StyleSheet.absoluteFill}
+          // The radius is repeated on the IMAGE, not left to the container's
+          // `overflow: hidden`. Android clips a rounded parent without
+          // antialiasing, so a photo inside one gets visibly jagged corners
+          // (iOS smooths them); rounding the image itself lets the platform
+          // draw the curve properly. Harmless on iOS — same corner, drawn once.
+          style={[StyleSheet.absoluteFill, rounded != null ? { borderRadius: rounded } : null]}
           contentFit={contentFit}
           contentPosition={contentPosition}
           priority={priority}
@@ -185,7 +224,7 @@ const AppImageImpl = forwardRef<View, AppImageProps>(function AppImage(
           recyclingKey={recyclingKey ?? sourceUri}
           allowDownscaling={allowDownscaling}
           accessible={false}
-          onLoad={onLoad}
+          onLoad={handleLoad}
           onError={handleError}
         />
       ) : null}

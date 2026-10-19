@@ -5,10 +5,7 @@ import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import { triggerHaptic } from '@/utils/haptics';
 
-export default function LikeButton(props: {
-  liked: boolean;
-  onToggle: () => void;
-}) {
+export default function LikeButton(props: { liked: boolean; onToggle: () => void }) {
   const { liked, onToggle } = props;
   const { tokens } = useThemeContext();
 

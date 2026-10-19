@@ -2,6 +2,7 @@ import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 
+import { SEARCH_FONT } from './fonts';
 import { formatCount } from './helpers';
 import StarBar from './star-bar';
 
@@ -16,10 +17,16 @@ export default function RatingRow({
   return (
     <AppView row align="center" gap={5}>
       <StarBar rating={rating} />
-      <AppText textVariant="bodyXs" style={{ color: tokens.gray400, fontSize: 11 }}>
+      <AppText
+        textVariant="bodyXs"
+        style={{ color: tokens.gray400, fontFamily: SEARCH_FONT.semibold, fontSize: 11 }}
+      >
         {rating.toFixed(1)}
       </AppText>
-      <AppText textVariant="bodyXs" style={{ color: tokens.gray400, fontSize: 11 }}>
+      <AppText
+        textVariant="bodyXs"
+        style={{ color: tokens.gray400, fontFamily: SEARCH_FONT.regular, fontSize: 11 }}
+      >
         ({formatCount(reviewCount)})
       </AppText>
     </AppView>

@@ -13,8 +13,8 @@ const ROW_GAP = 20;
 /**
  * Shimmer placeholder that mirrors the geometry of `SearchResultRow`:
  * edge-to-edge card (no divider, gap-only separation), 150×150 thumbnail
- * with rounded corners, text column with title, price line + trailing
- * ribbon placeholder, delivery line + AddToCartButton placeholder pinned
+ * with rounded corners, text column with the signal tag above the title, the
+ * price line, and the delivery line + AddToCartButton placeholder pinned
  * bottom-right. No rating line — the real row hides its rating when the
  * server hasn't supplied `result.rating`, so the skeleton must match.
  *
@@ -83,32 +83,45 @@ export default function SearchResultSkeleton() {
 
         {/* Text column matches search-result-row.tsx: flex: 1,
          *  paddingBottom: 8, internal gap from the rendered children. */}
-        <AppView
-          gap={8}
-          style={{ flex: 1, paddingBottom: 8 }}
-        >
-          {/* Title — two lines, like a typical product title. */}
+        <AppView gap={8} style={{ flex: 1, paddingBottom: 8 }}>
+          {/* Signal tag, then the title — the order the loaded row uses. */}
           <AppView gap={6}>
             <AppView
-              style={{ height: 14, width: '92%', borderRadius: RADIUS_PLACEHOLDER, backgroundColor: highlightColor }}
+              style={{
+                height: 18,
+                width: 96,
+                borderRadius: RADIUS_TAG,
+                backgroundColor: baseColor,
+              }}
             />
             <AppView
-              style={{ height: 14, width: '58%', borderRadius: RADIUS_PLACEHOLDER, backgroundColor: highlightColor }}
+              style={{
+                height: 17,
+                width: '92%',
+                borderRadius: RADIUS_PLACEHOLDER,
+                backgroundColor: highlightColor,
+              }}
+            />
+            <AppView
+              style={{
+                height: 17,
+                width: '58%',
+                borderRadius: RADIUS_PLACEHOLDER,
+                backgroundColor: highlightColor,
+              }}
             />
           </AppView>
 
-          {/* Price line + ribbon placeholder (mirrors PriceBlock's
-           *  align="flex-end" justifyContent: 'space-between'). */}
-          <AppView
-            row
-            align="flex-end"
-            style={{ justifyContent: 'space-between', gap: 8, marginTop: 4 }}
-          >
+          {/* Price line — the signal tag moved up to the title, so this is
+           *  the price alone, at its larger size. */}
+          <AppView row align="flex-end" style={{ gap: 8, marginTop: 4 }}>
             <AppView
-              style={{ height: 18, width: '36%', borderRadius: RADIUS_PLACEHOLDER, backgroundColor: highlightColor }}
-            />
-            <AppView
-              style={{ height: 18, width: 84, borderRadius: RADIUS_TAG, backgroundColor: baseColor }}
+              style={{
+                height: 26,
+                width: '46%',
+                borderRadius: RADIUS_PLACEHOLDER,
+                backgroundColor: highlightColor,
+              }}
             />
           </AppView>
 
@@ -116,11 +129,23 @@ export default function SearchResultSkeleton() {
            *  bottom-right to mirror the real row's right-side action axis. */}
           <AppView row align="flex-end" style={{ gap: 8 }}>
             <AppView
-              style={{ flex: 1, height: 10, borderRadius: RADIUS_PLACEHOLDER, backgroundColor: baseColor, maxWidth: '60%' }}
+              style={{
+                flex: 1,
+                height: 10,
+                borderRadius: RADIUS_PLACEHOLDER,
+                backgroundColor: baseColor,
+                maxWidth: '60%',
+              }}
             />
             <AppView style={{ flex: 1 }} />
             <AppView
-              style={{ width: 32, height: 32, borderRadius: 999, backgroundColor: highlightColor, marginRight: 8 }}
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 999,
+                backgroundColor: highlightColor,
+                marginRight: 8,
+              }}
             />
           </AppView>
         </AppView>

@@ -25,6 +25,9 @@ export type ImageBoxProps = {
    *  white, so pass white here with `contentFit='contain'` for a clean,
    *  fully-visible part in both light and dark mode. */
   backgroundColor?: string;
+  /** Width in POINTS the box is drawn at, so the CDN can hand back a
+   *  right-sized derivative. Only needed when `width` is a percentage. */
+  targetWidth?: number;
 };
 
 /**
@@ -40,6 +43,7 @@ function ImageBox({
   radius = 0,
   contentFit = 'cover',
   backgroundColor,
+  targetWidth,
 }: ImageBoxProps) {
   const placeholder = (
     <PartImagePlaceholder
@@ -62,6 +66,7 @@ function ImageBox({
         fallback={placeholder}
         contentFit={contentFit}
         placeholderColor={backgroundColor}
+        targetWidth={targetWidth}
       />
     );
   }

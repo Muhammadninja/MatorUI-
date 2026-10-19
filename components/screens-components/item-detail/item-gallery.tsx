@@ -77,7 +77,25 @@ function ItemGallery({
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
+        // The gallery is a horizontal pager nested inside the detail screen's
+        // VERTICAL scroll view. On Android nested scrolling is off by default,
+        // so the parent swallowed the horizontal drag and the hero never paged
+        // — the full-screen viewer (a Modal, no scrolling parent) was the only
+        // place swiping worked. `directionalLockEnabled` is the iOS half of the
+        // same fix: it stops a slightly-diagonal swipe from being read as a
+        // vertical scroll of the page behind.
+        nestedScrollEnabled
+        directionalLockEnabled
+        snapToInterval={width}
+        snapToAlignment="start"
+        disableIntervalMomentum
+        decelerationRate="fast"
+        // A slow drag that is released without flinging produces NO momentum
+        // event on either platform, which used to leave the dots and counter
+        // pointing at the previous photo.
         onMomentumScrollEnd={onMomentumScrollEnd}
+        onScrollEndDrag={onMomentumScrollEnd}
+        scrollEventThrottle={16}
         scrollEnabled={total > 1}
       >
         {pages.map((uri, i) => (
@@ -112,21 +130,6 @@ function ItemGallery({
         >
           <AppText family="accent" weight="bold" style={{ fontSize: 11, color: tokens.onValue }}>
             {t('home.savePercent', { percent: savePct })}
-          </AppText>
-        </AppView>
-      ) : null}
-
-      {/* The viewer is the only way to see a photo at full size, and a bare
-          tap target advertises nothing — so name it. Text, not a glyph. */}
-      {images.length > 0 ? (
-        <AppView
-          rounded={999}
-          px={10}
-          py={4}
-          style={{ position: 'absolute', left: 16, bottom: 38, backgroundColor: tokens.scrim }}
-        >
-          <AppText family="accent" weight="semibold" style={{ fontSize: 11, color: tokens.white }}>
-            {t('itemDetail.fullScreen')}
           </AppText>
         </AppView>
       ) : null}

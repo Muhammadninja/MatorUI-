@@ -1,6 +1,7 @@
 import { AppText } from '@/components/shared/app-text';
 import { useThemeContext } from '@/contexts/theme.context';
 
+import { SEARCH_FONT } from './fonts';
 import { isLowStock, statusColor } from './helpers';
 
 /**
@@ -20,8 +21,10 @@ export default function StatusLine({ status }: { status: string }) {
       textVariant="bodyXs"
       style={{
         color: statusColor(status, tokens),
+        // Weight is a FACE here, not a `fontWeight`: a custom family resolves
+        // one file per name on Android, where fontWeight would be ignored.
+        fontFamily: low ? SEARCH_FONT.semibold : SEARCH_FONT.regular,
         fontSize: 12,
-        fontWeight: low ? '600' : '400',
       }}
     >
       {status}

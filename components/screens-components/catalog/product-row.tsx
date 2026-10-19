@@ -6,6 +6,7 @@ import { useWindowDimensions, View } from 'react-native';
 import ImageBox from '@/components/screens-components/home/image-box';
 import { AppIconButton } from '@/components/shared/app-icon-button';
 import { splitPrice } from '@/components/shared/app-price';
+import { noBreakDigits } from '@/utils/format-price';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import WheelLoader from '@/components/shared/wheel-loader/wheel-loader';
@@ -123,7 +124,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
   const sales = useActiveSales();
   const { savePct, wasUzs: wasNum } = resolveItemPricing(item, sales);
   const priceAmount = splitPrice(item.price).amount || item.price;
-  const wasLabel = wasNum > 0 ? wasNum.toLocaleString('ru-RU') : null;
+  const wasLabel = wasNum > 0 ? noBreakDigits(wasNum.toLocaleString('ru-RU')) : null;
 
   const brandEyebrow = (item.brand ?? item.description?.split('·')[0])?.trim();
   const outOfStock = /out of stock/i.test(item.status ?? '');
@@ -353,9 +354,15 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
                 rowGap: 2,
               }}
             >
+              {/* One line, always: the amount shrinks to fit rather than
+               *  wrapping (the separators are already non-breaking, this is
+               *  the floor for a 7-digit price in a narrow column). */}
               <AppText
                 family="heading"
                 weight="bold"
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.7}
                 style={{ fontSize: 21, lineHeight: 25, letterSpacing: -0.4, color: tokens.text }}
               >
                 {priceAmount}

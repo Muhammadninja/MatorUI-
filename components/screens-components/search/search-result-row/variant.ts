@@ -20,7 +20,7 @@ export type CardVariant = {
   delivery: { label: string; kind: DeliveryKind };
   /** Client-side accent-tag fallback. Carries `tone` so the ribbon icon
    *  resolves to the right theme color (value → green, accolade → gold). */
-  accentTag: { label: string; Icon: AccentIcon; tone: IconTone } | null;
+  accentTag: { labelKey: string; Icon: AccentIcon; tone: IconTone } | null;
 };
 
 /**
@@ -46,8 +46,8 @@ export function deriveCardVariant(id: string): CardVariant {
   const delivery = deliveryOptions[h % deliveryOptions.length];
 
   const tagOptions: CardVariant['accentTag'][] = [
-    { label: 'Lowest price', Icon: Tag, tone: 'value' },
-    { label: 'Bestseller', Icon: Award, tone: 'accolade' },
+    { labelKey: 'search.signal.lowestPrice', Icon: Tag, tone: 'value' },
+    { labelKey: 'search.signal.bestseller', Icon: Award, tone: 'accolade' },
     null,
     null,
   ];

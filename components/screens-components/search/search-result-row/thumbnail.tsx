@@ -1,3 +1,4 @@
+import AppImage from '@/components/shared/app-image';
 import { AppView } from '@/components/shared/app-view';
 import PartImagePlaceholder from '@/components/shared/part-image-placeholder';
 
@@ -6,7 +7,18 @@ import { RADIUS_MEDIA } from '../radii';
 const THUMB_WIDTH = 150;
 const THUMB_HEIGHT = 150;
 
-export default function Thumbnail({ alt }: { alt: string }) {
+export type ThumbnailProps = {
+  /** Accessibility label — the part name. */
+  alt: string;
+  /** Real product photo. Omitted/empty → the neutral no-photo placeholder. */
+  uri?: string;
+};
+
+export default function Thumbnail({ alt, uri }: ThumbnailProps) {
+  const placeholder = (
+    <PartImagePlaceholder label={alt} width="100%" height="100%" backgroundColor="transparent" />
+  );
+
   return (
     <AppView
       style={{
@@ -30,16 +42,23 @@ export default function Thumbnail({ alt }: { alt: string }) {
         // visible edge). Letting the card's own bg show through fixes it.
       }}
     >
-      {/* This row has never had a real photo to show — the slot was hard-wired
-       *  to the stand-in PNG. It now draws the neutral part placeholder, which
-       *  also retires the `scale(1.08)` overscan hack that existed only to crop
-       *  the thin border baked into that asset. */}
-      <PartImagePlaceholder
-        label={alt}
-        width="100%"
-        height="100%"
-        backgroundColor="transparent"
-      />
+      {uri ? (
+        // `contain` on a transparent tile: catalog photos are shot on white in
+        // every aspect ratio, so cropping to fill would cut the part in half.
+        <AppImage
+          source={uri}
+          width="100%"
+          height="100%"
+          rounded={RADIUS_MEDIA}
+          targetWidth={THUMB_WIDTH}
+          contentFit="contain"
+          placeholderColor="transparent"
+          fallback={placeholder}
+          alt={alt}
+        />
+      ) : (
+        placeholder
+      )}
     </AppView>
   );
 }

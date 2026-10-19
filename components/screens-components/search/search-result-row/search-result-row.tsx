@@ -2,6 +2,7 @@ import { memo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Pressable, StyleSheet } from 'react-native';
 
+import AppImage from '@/components/shared/app-image';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import PartImagePlaceholder from '@/components/shared/part-image-placeholder';
 import { useCartContext } from '@/contexts/cart.context';
@@ -17,6 +18,7 @@ import DeliveryRow from './delivery-row';
 import HighlightedTitle from './highlighted-title';
 import LikeButton from './like-button';
 import PriceBlock from './price-block';
+import Ribbon from './ribbon';
 import RatingRow from './rating-row';
 import { resolvePriceSignal } from './signal';
 import StatusLine from './status-line';
@@ -39,12 +41,7 @@ export type SearchResultRowProps = {
  * own file under `./`. This file owns only the wrapper pressable and
  * the per-card derived data (rating, review count, variant).
  */
-function SearchResultRow({
-  result,
-  query,
-  isCheapest,
-  onPress,
-}: SearchResultRowProps) {
+function SearchResultRow({ result, query, isCheapest, onPress }: SearchResultRowProps) {
   const { t } = useTranslation();
   const { tokens, scheme } = useThemeContext();
   const isDark = scheme === 'dark';
@@ -52,6 +49,17 @@ function SearchResultRow({
   const { isLiked, toggleLike } = useLikesContext();
   const { addItem } = useCartContext();
   const liked = isLiked(result.id);
+  const image = result.images?.[0];
+  // Resolved once here rather than inline in the price block: the ribbon now
+  // sits ABOVE the title (see below), where a storefront puts a "Лучшая цена" /
+  // "Хит продаж" tag, instead of crowding the price line.
+  const signal = resolvePriceSignal({
+    t,
+    isCheapest,
+    badge: result.badge,
+    accentTagKind: result.accentTagKind,
+    accentTagFallback: variant.accentTag,
+  });
   const [viewerVisible, setViewerVisible] = useState(false);
   // Debounce guard: ignore a second tap within 800ms so rapid taps can't
   // push duplicate line items into the cart.
@@ -69,6 +77,9 @@ function SearchResultRow({
       priceLabel: result.priceLabel,
       badge: result.badge,
       status: result.status,
+      // Without this the part lost its photo on the way to the cart and the
+      // line item fell back to the placeholder.
+      imageUrl: image,
     });
     toastService.success(t('search.addedToCart'), { description: result.title });
   };
@@ -93,18 +104,25 @@ function SearchResultRow({
         borderBottomColor: tokens.divider,
       }}
     >
-      <AppView row gap={10}  align="stretch" flex={1}>
-        <Thumbnail alt={result.title} />
+      <AppView row gap={10} align="stretch" flex={1}>
+        <Thumbnail alt={result.title} uri={image} />
 
-        <AppView
-          flex={1}
-          justify="space-between"
-          pb="md"
-        >
-          {/* Title row + heart LikeButton on the right. Title can grow up
-           *  to 3 lines; LikeButton stays pinned to the top-right corner. */}
+        <AppView flex={1} justify="space-between" pb="md">
+          {/* Signal tag + title, with the heart pinned to the top-right.
+           *  The tag leads the column: it qualifies the PRODUCT, so it reads
+           *  before the name, and the price line below is left to the price. */}
           <AppView row gap={30} align="flex-start">
-            <AppView mt="md" style={{ flex: 1 }}>
+            <AppView mt="md" gap={6} style={{ flex: 1 }}>
+              {signal ? (
+                <AppView row>
+                  <Ribbon
+                    label={signal.label}
+                    icons={signal.icons}
+                    tone={signal.tone}
+                    composite={signal.composite}
+                  />
+                </AppView>
+              ) : null}
               <HighlightedTitle text={result.title} query={query} />
             </AppView>
             <LikeButton liked={liked} onToggle={() => toggleLike(result.id)} />
@@ -117,23 +135,11 @@ function SearchResultRow({
            *  row is last (rating, status, or delivery). */}
           <AppView row align="flex-end" gap="sm">
             <AppView flex={1}>
-              <PriceBlock
-                priceLabel={result.priceLabel}
-                price={result.price}
-                signal={resolvePriceSignal({
-                  isCheapest,
-                  badge: result.badge,
-                  accentTagKind: result.accentTagKind,
-                  accentTagFallback: variant.accentTag,
-                })}
-              />
+              <PriceBlock priceLabel={result.priceLabel} price={result.price} />
               <DeliveryRow delivery={variant.delivery} />
               {result.status ? <StatusLine status={result.status} /> : null}
               {result.rating != null ? (
-                <RatingRow
-                  rating={result.rating}
-                  reviewCount={result.reviewCount ?? 0}
-                />
+                <RatingRow rating={result.rating} reviewCount={result.reviewCount ?? 0} />
               ) : null}
             </AppView>
             <AppView mr="sm">
@@ -170,12 +176,32 @@ function SearchResultRow({
               backgroundColor: isDark ? tokens.card : tokens.white,
             }}
           >
-            <PartImagePlaceholder
-              label={result.title}
-              width="100%"
-              height="100%"
-              backgroundColor="transparent"
-            />
+            {image ? (
+              <AppImage
+                source={image}
+                width="100%"
+                height="100%"
+                targetWidth={PREVIEW_SIZE}
+                contentFit="contain"
+                placeholderColor="transparent"
+                fallback={
+                  <PartImagePlaceholder
+                    label={result.title}
+                    width="100%"
+                    height="100%"
+                    backgroundColor="transparent"
+                  />
+                }
+                alt={result.title}
+              />
+            ) : (
+              <PartImagePlaceholder
+                label={result.title}
+                width="100%"
+                height="100%"
+                backgroundColor="transparent"
+              />
+            )}
           </Pressable>
         </Pressable>
       </Modal>

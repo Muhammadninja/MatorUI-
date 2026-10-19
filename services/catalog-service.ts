@@ -85,9 +85,20 @@ export type CatalogItem = {
    *  the fallback. */
   salePercent?: number;
   originalPriceUzs?: number;
-  /** Product kind. "MOTOR_OIL" listings render an oil card (oil attributes, no
-   *  OEM/GM row); "SPARE_PART" is the default. Absent → treat as a spare part. */
-  kind?: 'SPARE_PART' | 'MOTOR_OIL';
+  /** Backend-formatted pre-discount price, when a sale applies. */
+  originalPriceLabel?: string;
+  /** Name of the campaign behind the discount ("Осенняя распродажа"). */
+  saleTitle?: string;
+  /** Product kind. "MOTOR_OIL" and "ANTIFREEZE" listings carry their own
+   *  attribute block (and no OEM/GM row — the backend sends a null
+   *  `part_number_type` for a kind that has no part-number concept);
+   *  "SPARE_PART" is the default. Absent → treat as a spare part. */
+  kind?: 'SPARE_PART' | 'MOTOR_OIL' | 'ANTIFREEZE';
+  /** The unit a listing is quantified in, from the backend's kind capability
+   *  table — 'PCS' | 'L' | 'KG'. A property of the KIND, never of the listing:
+   *  antifreeze is sold by the kilogram however the seller filed it. Carried so
+   *  no surface ever hardcodes "шт" for a product that isn't sold by the piece. */
+  unit?: 'PCS' | 'L' | 'KG';
   /** Motor-oil attributes — present only for `kind === "MOTOR_OIL"`. Prefer the
    *  pre-localized `*Label` fields for display. */
   motorOil?: {
@@ -100,11 +111,26 @@ export type CatalogItem = {
     /** Pre-localized (e.g. "4 л"). */
     volumeLabel?: string;
   } | null;
+  /** Antifreeze attributes — present only for `kind === "ANTIFREEZE"`. The
+   *  weight is the NET package weight in grams (exact + sortable), with the
+   *  backend's own "2.5 кг" rendering beside it; prefer the label for display. */
+  antifreeze?: {
+    weightG?: number;
+    /** Pre-formatted (e.g. "2.5 кг"). */
+    weightLabel?: string;
+  } | null;
   /** True for universal listings (oils under "Другое"). Universal parts render
    *  "Подходит для всех" and NEVER a compatibility badge — `fits` is empty and
    *  the backend deliberately returns a null compatibility. The single source of
    *  truth for universal vs vehicle-specific; never infer from the category name. */
   isUniversal?: boolean;
+  /** Make-level fitment — the part fits EVERY model of these makes. A part can
+   *  carry these, per-model `fits`, or both; a listing with ONLY make fitment
+   *  used to render an empty "Fits" section. */
+  makeFits?: {
+    makeSlug?: string;
+    makeName?: string;
+  }[];
   /** Vehicle fitments backing the compatibility chips. Empty for universal parts. */
   fits?: {
     makeSlug?: string;
@@ -124,6 +150,16 @@ export type CatalogListRequest = {
   pageSize: number;
   /** System / category key (from the catalog systems screen). */
   category?: string;
+  /**
+   * Top-level vehicle-system bucket (`BRAKE_SYSTEM`, `MAINTENANCE_AND_FLUIDS`,
+   * …) — the taxonomy the home grid browses.
+   *
+   * It is a SEPARATE axis from `category`: `category` matches one exact leaf
+   * ("air-filters"), while this rolls up every leaf in the system. The backend
+   * ignores an unknown value rather than erroring, so only send ids that came
+   * from `/v1/categories?scope=vehicle`.
+   */
+  vehicleCategory?: string;
   search?: string | null;
   sortBy?: 'featured' | 'newest' | 'price_asc' | 'price_desc' | 'relevance' | 'bestseller';
   /** Vehicle-fit context from the Make → Model flow. */
@@ -440,9 +476,13 @@ type ApiCatalogPart = {
   } | null;
   /** Canonical part system, uppercase enum (e.g. "BRAKES", "ENGINE"). */
   main_category?: string;
-  /** Product kind — drives which card to render. Oils carry a `motor_oil` block
-   *  and a null `part_number_type`. Absent on legacy responses → spare part. */
-  kind?: 'SPARE_PART' | 'MOTOR_OIL';
+  /** Product kind — drives which card to render. Oils and antifreeze carry
+   *  their own attribute block and a null `part_number_type`. Absent on legacy
+   *  responses → spare part. */
+  kind?: 'SPARE_PART' | 'MOTOR_OIL' | 'ANTIFREEZE';
+  /** Unit of sale for this kind ('PCS' | 'L' | 'KG'), from the backend's kind
+   *  capability table. */
+  unit?: 'PCS' | 'L' | 'KG' | null;
   /** Motor-oil attributes; `null` for spare parts. `*_label` fields are already
    *  localized by the backend — prefer them for display. */
   motor_oil?: {
@@ -451,6 +491,12 @@ type ApiCatalogPart = {
     oil_type_label?: string | null;
     volume_ml?: number | null;
     volume_label?: string | null;
+  } | null;
+  /** Antifreeze attributes; `null` for every other kind. `weight_g` is the net
+   *  package weight in GRAMS, `weight_label` its pre-formatted rendering. */
+  antifreeze?: {
+    weight_g?: number | null;
+    weight_label?: string | null;
   } | null;
   /** Universal vs vehicle-specific. The authoritative flag — never inferred from
    *  the category. `true` ⟺ `compatibility` is null and `fits` is empty. */
@@ -461,6 +507,13 @@ type ApiCatalogPart = {
     make_name?: string;
     model_slug?: string;
     model_name?: string;
+  }[];
+  /** Make-level fitment: the part fits EVERY model of these makes (an imported
+   *  dealer position whose source names a make but no model). Separate from
+   *  `fits`, which is one entry per model — a part can have either or both. */
+  make_fits?: {
+    make_slug?: string;
+    make_name?: string;
   }[];
   /** Denormalized brand label the backend attaches to the part. */
   part_brand_name?: string | null;
@@ -474,6 +527,8 @@ type ApiCatalogPart = {
    *  applied an active sale to this part (`price_uzs` is then the sale price).
    *  See mator.uz `part.presenter.ts`. Absent = full price, no sale. */
   original_price_uzs?: number | null;
+  /** Pre-formatted pre-discount price ("UZS 44 000"), beside the numeric one. */
+  original_price_label?: string | null;
   sale?: {
     id?: string;
     title?: string;
@@ -553,6 +608,14 @@ function deriveSpecs(p: ApiCatalogPart): CatalogItemSpec[] {
     const volume = oil.volume_label ?? (oil.volume_ml != null ? `${oil.volume_ml} ml` : undefined);
     if (volume) specs.push({ label: 'Volume', value: volume });
   }
+  // Antifreeze carries ONE attribute, its net package weight. Same raw/label
+  // pairing as the oil volume — show the backend's label, fall back to grams.
+  const coolant = p.antifreeze;
+  if (coolant) {
+    const weight =
+      coolant.weight_label ?? (coolant.weight_g != null ? `${coolant.weight_g} g` : undefined);
+    if (weight) specs.push({ label: 'Weight', value: weight });
+  }
   const category = p.main_category ? cleanCategoryName(prettyEnum(p.main_category)) : undefined;
   if (category) specs.push({ label: 'Category', value: category });
   const region = normalizeRegion(p.origin_region ?? p.region);
@@ -630,7 +693,10 @@ function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
     titleDetail: titleParts.detail,
     description: [p.brand?.name, categoryLabel].filter(Boolean).join(' · '),
     price:
-      p.price_label ?? (p.price_uzs != null ? `UZS' ${p.price_uzs.toLocaleString('ru-RU')}` : ''),
+      // `price_label` is the backend's pre-formatted string; the fallback below
+      // only fires when it's absent. (It used to emit a stray apostrophe —
+      // "UZS' 38 661".)
+      p.price_label ?? (p.price_uzs != null ? `UZS ${p.price_uzs.toLocaleString('ru-RU')}` : ''),
     priceUzs: p.price_uzs ?? undefined,
     priceLabel: '',
     images: p.images ?? [],
@@ -669,9 +735,18 @@ function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
     salePercent:
       p.sale && typeof p.sale.discount_percent === 'number' ? p.sale.discount_percent : undefined,
     originalPriceUzs: p.original_price_uzs ?? undefined,
+    // The backend's own formatting of the struck-through "was" — preferred over
+    // reformatting the number client-side, so the two never disagree.
+    originalPriceLabel: p.original_price_label ?? undefined,
+    // Campaign name ("Осенняя распродажа"), shown beside the discount pill.
+    saleTitle: p.sale?.title?.trim() || undefined,
     // Motor-oil shape — `kind` drives the card; `isUniversal` drives the
     // "Подходит для всех" treatment (never inferred from the category name).
     kind: p.kind,
+    // Unit of sale, straight from the backend's kind capability table. Carried
+    // so a quantity is never rendered (or fiscalized) as "шт" for a kind sold
+    // by the litre or kilogram.
+    unit: p.unit ?? undefined,
     motorOil: p.motor_oil
       ? {
           viscosity: p.motor_oil.viscosity ?? undefined,
@@ -681,7 +756,17 @@ function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
           volumeLabel: p.motor_oil.volume_label ?? undefined,
         }
       : undefined,
+    antifreeze: p.antifreeze
+      ? {
+          weightG: p.antifreeze.weight_g ?? undefined,
+          weightLabel: p.antifreeze.weight_label ?? undefined,
+        }
+      : undefined,
     isUniversal: p.is_universal === true,
+    makeFits: (p.make_fits ?? []).map((f) => ({
+      makeSlug: f.make_slug ?? undefined,
+      makeName: f.make_name ?? undefined,
+    })),
     fits: (p.fits ?? []).map((f) => ({
       makeSlug: f.make_slug ?? undefined,
       makeName: f.make_name ?? undefined,
@@ -703,6 +788,7 @@ const PARTS_PARAM = {
   pageSize: 'page_size',
   search: 'q',
   category: 'category',
+  vehicleCategory: 'vehicle_category',
   make: 'make',
   model: 'model',
   brand: 'brand',
@@ -726,6 +812,9 @@ class HttpCatalogTransport implements CatalogTransport {
     });
     if (request.search) params.set(PARTS_PARAM.search, request.search);
     if (request.category) params.set(PARTS_PARAM.category, request.category);
+    if (request.vehicleCategory) {
+      params.set(PARTS_PARAM.vehicleCategory, request.vehicleCategory);
+    }
     if (request.make) params.set(PARTS_PARAM.make, request.make);
     if (request.model) params.set(PARTS_PARAM.model, request.model);
     if (request.brand) params.set(PARTS_PARAM.brand, request.brand);

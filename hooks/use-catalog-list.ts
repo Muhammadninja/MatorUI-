@@ -52,6 +52,7 @@ export function catalogListQueryKey(req: CatalogListRequest) {
     req.page,
     req.pageSize,
     req.category,
+    req.vehicleCategory,
     req.make,
     req.model,
     req.brand,
@@ -63,9 +64,7 @@ export function catalogListQueryKey(req: CatalogListRequest) {
   ] as const;
 }
 
-export function useCatalogList(
-  request: CatalogListRequest = DEFAULT_REQUEST,
-): UseCatalogListValue {
+export function useCatalogList(request: CatalogListRequest = DEFAULT_REQUEST): UseCatalogListValue {
   const query = useQuery({
     queryKey: catalogListQueryKey(request),
     queryFn: ({ signal }) => fetchCatalogList({ ...request, signal }),

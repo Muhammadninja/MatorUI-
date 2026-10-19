@@ -423,7 +423,17 @@
   },
   "category": {
     "partsCount_one": "{{count}} part",
-    "partsCount_other": "{{count}} parts"
+    "partsCount_other": "{{count}} parts",
+    "vehicle": {
+      "BRAKE_SYSTEM": "Brake System",
+      "MAINTENANCE_AND_FLUIDS": "Maintenance & Fluids",
+      "SUSPENSION_AND_STEERING": "Suspension & Steering",
+      "ELECTRICAL_AND_LIGHTING": "Electrical & Lighting",
+      "ENGINE": "Engine",
+      "TRANSMISSION": "Transmission",
+      "HEATING_AND_COOLING": "Heating & Cooling",
+      "TUNING_AND_ACCESSORIES": "Tuning & Accessories"
+    }
   },
   "make": {
     "vehicleFallback": "Vehicle",
@@ -706,7 +716,10 @@
     "freeShippingNeed": "Free shipping when you add {{amount}} more",
     "paymentLine": "Pay with Payme, a card terminal, or cash on delivery",
     "addYourCar": "Add your car",
-    "fullScreen": "Tap to enlarge"
+    "fullScreen": "Tap to enlarge",
+    "antifreezeWeight": "Weight",
+    "weightGrams": "{{grams}} g",
+    "fitsAllModels": "{{make}} — all models"
   },
   "sourcing": {
     "offerTitle": "Offer",
@@ -837,7 +850,13 @@
     "startingAt": "Starting at",
     "addedToCart": "Added to cart",
     "added": "Added",
-    "openItemA11y": "Open {{title}}"
+    "openItemA11y": "Open {{title}}",
+    "signal": {
+      "cheapest": "Best price",
+      "lowestPrice": "Low price",
+      "bestseller": "Bestseller",
+      "matorPick": "Mator pick"
+    }
   },
   "modalHost": {
     "confirmAction": "Confirm action",

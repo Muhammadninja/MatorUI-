@@ -4,13 +4,10 @@ import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 
+import { SEARCH_FONT } from './fonts';
 import type { CardVariant } from './variant';
 
-export default function DeliveryRow({
-  delivery,
-}: {
-  delivery: CardVariant['delivery'];
-}) {
+export default function DeliveryRow({ delivery }: { delivery: CardVariant['delivery'] }) {
   const { tokens } = useThemeContext();
   // Kind → theme token. Free tiers ride `tokens.success` so the green
   // tracks the active theme (lighter in dark, darker in light); the
@@ -23,7 +20,7 @@ export default function DeliveryRow({
       <AppText
         textVariant="bodyXs"
         weight="semibold"
-        style={{ color, fontSize: 10 }}
+        style={{ color, fontFamily: SEARCH_FONT.semibold, fontSize: 10 }}
       >
         {delivery.label}
       </AppText>

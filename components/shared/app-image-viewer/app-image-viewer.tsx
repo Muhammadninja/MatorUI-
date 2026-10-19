@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
+import { sizedImageUrl } from '@/utils/image-url';
 
 export type AppImageViewerImage = { uri: string } | number;
 
@@ -104,33 +105,42 @@ function AppImageViewerBase({
           scrollEnabled={images.length > 1}
           contentOffset={Platform.OS === 'ios' ? { x: initialIndex * width, y: 0 } : undefined}
         >
-          {images.map((image, i) => (
-            <ScrollView
-              key={typeof image === 'number' ? `asset-${i}` : image.uri}
-              style={{ width, height }}
-              contentContainerStyle={{
-                width,
-                height,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              maximumZoomScale={3}
-              minimumZoomScale={1}
-              bouncesZoom
-              centerContent
-              showsHorizontalScrollIndicator={false}
-              showsVerticalScrollIndicator={false}
-            >
-              <Image
-                source={image}
+          {images.map((image, i) => {
+            // Even full-screen only needs screen-width pixels — the catalog's
+            // originals are ~700KB PNGs, and asking the CDN for the drawn size
+            // is the difference between an instant open and a blank black page.
+            const source =
+              typeof image === 'number'
+                ? image
+                : { uri: sizedImageUrl(image.uri, width) ?? image.uri };
+            return (
+              <ScrollView
+                key={typeof image === 'number' ? `asset-${i}` : image.uri}
                 style={{ width, height }}
-                contentFit="contain"
-                transition={120}
-                cachePolicy="memory-disk"
-                accessibilityLabel={t('fields.imageViewer', { index: i + 1 })}
-              />
-            </ScrollView>
-          ))}
+                contentContainerStyle={{
+                  width,
+                  height,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                maximumZoomScale={3}
+                minimumZoomScale={1}
+                bouncesZoom
+                centerContent
+                showsHorizontalScrollIndicator={false}
+                showsVerticalScrollIndicator={false}
+              >
+                <Image
+                  source={source}
+                  style={{ width, height }}
+                  contentFit="contain"
+                  transition={120}
+                  cachePolicy="memory-disk"
+                  accessibilityLabel={t('fields.imageViewer', { index: i + 1 })}
+                />
+              </ScrollView>
+            );
+          })}
         </ScrollView>
 
         {/* Close — chrome, like a back button, so it keeps its glyph. */}

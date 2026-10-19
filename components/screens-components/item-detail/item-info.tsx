@@ -55,6 +55,37 @@ export function ItemTrustRow({ item }: { item: CatalogItem }) {
   );
 }
 
+/**
+ * Product rating + review count (`rating_avg` / `review_count`). These are
+ * ADMIN-CURATED product scores, distinct from the dealer's own rating, and the
+ * backend returns `null` until a part is actually rated — so this renders
+ * nothing rather than an empty five-star row. Detail carried the fields all
+ * along and never showed them; the listing row did.
+ */
+export function ItemRatingRow({ rating, reviewCount }: { rating?: number; reviewCount?: number }) {
+  const { t } = useTranslation();
+  const { tokens } = useThemeContext();
+  if (rating == null || rating <= 0) return null;
+  const filled = Math.round(rating);
+
+  return (
+    <AppView row align="center" gap={7}>
+      <AppText family="accent" weight="bold" style={{ fontSize: 13, letterSpacing: 0.5 }}>
+        <AppText style={{ color: tokens.rating }}>{'★'.repeat(Math.min(5, filled))}</AppText>
+        <AppText style={{ color: tokens.gray300 }}>{'★'.repeat(Math.max(0, 5 - filled))}</AppText>
+      </AppText>
+      <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.text }}>
+        {rating.toFixed(1)}
+      </AppText>
+      {reviewCount ? (
+        <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted }}>
+          {t('catalog.reviewCount', { count: reviewCount })}
+        </AppText>
+      ) : null}
+    </AppView>
+  );
+}
+
 /** Label / value spec table — the catalog's own `specs`, plus any oil rows. */
 export function ItemSpecTable({ specs }: { specs: CatalogItemSpec[] }) {
   const { tokens } = useThemeContext();
@@ -121,15 +152,32 @@ export function ItemFeatureList({ features }: { features: string[] }) {
 }
 
 /**
- * Vehicles this part is listed to fit (`part.fits`). Universal listings carry
- * an empty array and render nothing — they get the "fits all" badge instead.
+ * Vehicles this part is listed to fit. Two backend lists feed it: `fits` is one
+ * entry per MODEL, `makeFits` is make-level ("fits every Chevrolet") — an
+ * imported dealer position whose source named a make but no model. A part can
+ * carry either or both, and a listing with only make-level fitment used to
+ * render an empty section. Universal listings carry neither and render nothing
+ * — they get the "fits all" badge instead.
  */
-export function ItemFitList({ fits }: { fits: NonNullable<CatalogItem['fits']> }) {
+export function ItemFitList({
+  fits,
+  makeFits = [],
+}: {
+  fits: NonNullable<CatalogItem['fits']>;
+  makeFits?: NonNullable<CatalogItem['makeFits']>;
+}) {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
-  const labels = fits
+  const modelLabels = fits
     .map((f) => [f.makeName ?? f.makeSlug, f.modelName ?? f.modelSlug].filter(Boolean).join(' '))
     .filter((l) => l.length > 0);
-  const unique = Array.from(new Set(labels));
+  // Make-level entries say so explicitly — "Chevrolet" alone would read as a
+  // model the part fits, which is a narrower claim than the data makes.
+  const makeLabels = makeFits
+    .map((f) => f.makeName ?? f.makeSlug)
+    .filter((m): m is string => !!m && m.length > 0)
+    .map((make) => t('itemDetail.fitsAllModels', { make }));
+  const unique = Array.from(new Set([...modelLabels, ...makeLabels]));
   if (unique.length === 0) return null;
 
   return (

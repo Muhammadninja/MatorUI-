@@ -5,6 +5,27 @@
  * `price × qty` totals without a numeric price field on the model.
  */
 
+/** Non-breaking space — the only separator a digit group may use. */
+const NBSP = '\u00A0';
+
+/**
+ * Make a formatted amount unbreakable.
+ *
+ * The backend ships display prices with ORDINARY spaces between digit groups
+ * ("UZS 38 661"), and `toLocaleString` under Hermes does the same. Android's
+ * text engine treats that space as a word boundary, so a price in a narrow
+ * column wraps mid-number — "38" on one line, "661" on the next, with the
+ * currency stranded beside the first half. iOS usually had room and hid it.
+ *
+ * Swapping the separators for NBSP is the fix the garage surfaces already use
+ * (`utils/mileage.ts`); this is the same rule for money. Only spaces BETWEEN
+ * DIGITS are replaced — the gap before a currency word still breaks, which is
+ * where a wrap belongs.
+ */
+export function noBreakDigits(text: string): string {
+  return text.replace(/(\d)[ \u202F\u2009](?=\d)/g, `$1${NBSP}`);
+}
+
 type ParsedPrice = {
   amount: number;
   /** Leading currency text, e.g. "UZS" or "$" (empty when none). */

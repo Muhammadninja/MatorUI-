@@ -423,7 +423,17 @@
   },
   "category": {
     "partsCount_one": "{{count}} ta qism",
-    "partsCount_other": "{{count}} ta qism"
+    "partsCount_other": "{{count}} ta qism",
+    "vehicle": {
+      "BRAKE_SYSTEM": "Tormoz tizimi",
+      "MAINTENANCE_AND_FLUIDS": "Texnik xizmat va suyuqliklar",
+      "SUSPENSION_AND_STEERING": "Osma va rul boshqaruvi",
+      "ELECTRICAL_AND_LIGHTING": "Elektr va yoritish",
+      "ENGINE": "Dvigatel",
+      "TRANSMISSION": "Transmissiya",
+      "HEATING_AND_COOLING": "Isitish va sovutish",
+      "TUNING_AND_ACCESSORIES": "Tyuning va aksessuarlar"
+    }
   },
   "make": {
     "vehicleFallback": "Avtomobil",
@@ -706,7 +716,10 @@
     "freeShippingNeed": "Yana {{amount}} qoʻshsangiz, yetkazish bepul",
     "paymentLine": "Payme, terminal yoki yetkazishda naqd pul bilan toʻlash",
     "addYourCar": "Avtomobil qoʻshish",
-    "fullScreen": "Toʻliq ekranda ochish"
+    "fullScreen": "Toʻliq ekranda ochish",
+    "antifreezeWeight": "Ogʻirligi",
+    "weightGrams": "{{grams}} g",
+    "fitsAllModels": "{{make}} — barcha modellar"
   },
   "sourcing": {
     "offerTitle": "Taklif",
@@ -837,7 +850,13 @@
     "startingAt": "Boshlanish narxi",
     "addedToCart": "Savatga qoʻshildi",
     "added": "Qoshildi",
-    "openItemA11y": "{{title}} ni ochish"
+    "openItemA11y": "{{title}} ni ochish",
+    "signal": {
+      "cheapest": "Eng yaxshi narx",
+      "lowestPrice": "Yaxshi narx",
+      "bestseller": "Koʻp sotilgan",
+      "matorPick": "Mator tanlovi"
+    }
   },
   "modalHost": {
     "confirmAction": "Amalni tasdiqlang",

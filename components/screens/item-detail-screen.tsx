@@ -21,6 +21,7 @@ import {
 import {
   ItemFeatureList,
   ItemFitList,
+  ItemRatingRow,
   ItemSectionTitle,
   ItemSpecTable,
   ItemTrustRow,
@@ -43,6 +44,7 @@ import { useToast } from '@/hooks/use-toast';
 import { parsePrice } from '@/services/cart-math';
 import type { CatalogItem, CatalogItemSpec } from '@/services/catalog-service';
 import { resolveItemPricing } from '@/services/sales-service';
+import { noBreakDigits } from '@/utils/format-price';
 import { triggerHaptic } from '@/utils/haptics';
 import { shareItem } from '@/utils/share';
 
@@ -162,7 +164,7 @@ export default function ItemDetailScreen() {
   const unitPriceUzs = item.priceUzs ?? unitPrice;
   const savingsLabel =
     wasUzs > unitPriceUzs
-      ? `${(wasUzs - unitPriceUzs).toLocaleString('ru-RU')} ${t('common.currency')}`
+      ? `${noBreakDigits((wasUzs - unitPriceUzs).toLocaleString('ru-RU'))} ${t('common.currency')}`
       : null;
   const vehicleLabel = activeVehicle
     ? `${activeVehicle.year} ${activeVehicle.make} ${activeVehicle.model ?? ''}`.trim()
@@ -171,6 +173,7 @@ export default function ItemDetailScreen() {
   // the bare brand, so prefer it and fall back when the part carries neither.
   const eyebrow = (item.description || item.brand || '').trim();
   const fits = item.fits ?? [];
+  const makeFits = item.makeFits ?? [];
   const features = item.features ?? [];
 
   const toggleFavorite = () => {
@@ -283,10 +286,15 @@ export default function ItemDetailScreen() {
             gm={item.gm}
           />
 
+          {/* Real review aggregate, or nothing at all. */}
+          <ItemRatingRow rating={item.rating} reviewCount={item.reviewCount} />
+
           <ItemPriceRow
             price={item.price}
             wasUzs={wasUzs}
+            wasLabel={item.originalPriceLabel}
             savePct={savePct}
+            saleTitle={item.saleTitle}
             savingsLabel={savingsLabel}
           />
 
@@ -345,10 +353,10 @@ export default function ItemDetailScreen() {
             </AppView>
           ) : null}
 
-          {fits.length > 0 ? (
+          {fits.length > 0 || makeFits.length > 0 ? (
             <AppView gap={11}>
               <ItemSectionTitle title={t('itemDetail.fitsTitle')} />
-              <ItemFitList fits={fits} />
+              <ItemFitList fits={fits} makeFits={makeFits} />
             </AppView>
           ) : null}
 
@@ -404,16 +412,30 @@ export default function ItemDetailScreen() {
 }
 
 /**
- * Spec rows for the table: the catalog's own `specs`, prefixed with the motor
- * oil attributes when the listing is an oil (the backend keeps those in
- * `motorOil`, not `specs`, so otherwise they'd never reach the shopper).
+ * Spec rows for the table: the catalog's own `specs`, prefixed with the
+ * KIND-specific attributes the backend keeps outside `specs` — a motor oil's
+ * viscosity/type/volume, an antifreeze's net weight. Without this they'd never
+ * reach the shopper, since `specs` is only ever the shared fields.
  */
-function buildSpecs(item: CatalogItem | null, t: (key: string) => string): CatalogItemSpec[] {
+function buildSpecs(
+  item: CatalogItem | null,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): CatalogItemSpec[] {
   if (!item) return [];
+  const kindRows: CatalogItemSpec[] = [];
+
   const oil = item.kind === 'MOTOR_OIL' ? item.motorOil : null;
-  const oilRows: CatalogItemSpec[] = [];
-  if (oil?.viscosity) oilRows.push({ label: t('itemDetail.oilViscosity'), value: oil.viscosity });
-  if (oil?.oilTypeLabel) oilRows.push({ label: t('itemDetail.oilType'), value: oil.oilTypeLabel });
-  if (oil?.volumeLabel) oilRows.push({ label: t('itemDetail.oilVolume'), value: oil.volumeLabel });
-  return [...oilRows, ...(item.specs ?? [])];
+  if (oil?.viscosity) kindRows.push({ label: t('itemDetail.oilViscosity'), value: oil.viscosity });
+  if (oil?.oilTypeLabel) kindRows.push({ label: t('itemDetail.oilType'), value: oil.oilTypeLabel });
+  if (oil?.volumeLabel) kindRows.push({ label: t('itemDetail.oilVolume'), value: oil.volumeLabel });
+
+  // Antifreeze: the backend stores GRAMS and ships the human label beside it
+  // ("2.5 кг"). Render the label; fall back to the raw grams only if it's absent.
+  const coolant = item.kind === 'ANTIFREEZE' ? item.antifreeze : null;
+  const weight =
+    coolant?.weightLabel ??
+    (coolant?.weightG != null ? t('itemDetail.weightGrams', { grams: coolant.weightG }) : null);
+  if (weight) kindRows.push({ label: t('itemDetail.antifreezeWeight'), value: weight });
+
+  return [...kindRows, ...(item.specs ?? [])];
 }

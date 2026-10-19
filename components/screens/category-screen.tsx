@@ -35,9 +35,13 @@ export default function CategoryScreen() {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ cat?: string; label?: string }>();
+  // Two ways in, two different filters: `vehicleCat` is a top-level system
+  // bucket from the home grid (rolls up every leaf under it), `cat` is a single
+  // leaf category id from the catalogue drill-down.
+  const params = useLocalSearchParams<{ cat?: string; vehicleCat?: string; label?: string }>();
   const cat = params.cat ?? 'All';
-  const label = params.label ?? cat;
+  const vehicleCat = params.vehicleCat;
+  const label = params.label ?? vehicleCat ?? cat;
 
   const [sortBy, setSortBy] = useState<CatalogSortBy>('relevance');
 
@@ -45,6 +49,7 @@ export default function CategoryScreen() {
     page: 1,
     pageSize: 24,
     category: cat && cat !== 'All' ? cat : undefined,
+    vehicleCategory: vehicleCat,
     sortBy,
   });
 

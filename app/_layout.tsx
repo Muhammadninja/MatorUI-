@@ -1,10 +1,16 @@
 import {
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
-    Inter_800ExtraBold,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+  Inter_800ExtraBold,
 } from '@expo-google-fonts/inter';
+import {
+  Figtree_400Regular,
+  Figtree_500Medium,
+  Figtree_600SemiBold,
+  Figtree_700Bold,
+} from '@expo-google-fonts/figtree';
 import { Raleway_800ExtraBold } from '@expo-google-fonts/raleway';
 import { useFonts } from 'expo-font';
 import { requireNativeModule } from 'expo-modules-core';
@@ -68,8 +74,8 @@ import { UserProvider } from '@/contexts/user.context';
 import { createNavigationTheme } from '@/themes';
 
 export {
-    // Catch any errors thrown by the Layout component.
-    ErrorBoundary
+  // Catch any errors thrown by the Layout component.
+  ErrorBoundary,
 } from 'expo-router';
 
 export const unstable_settings = {
@@ -89,6 +95,13 @@ export default function RootLayout() {
     Inter_600SemiBold,
     Inter_700Bold,
     Inter_800ExtraBold,
+    // Figtree — the geometric sans the search results are set in (see
+    // `search-result-row/fonts.ts`). Loaded here with the rest of the app's
+    // faces so a row never renders a frame in the fallback font.
+    Figtree_400Regular,
+    Figtree_500Medium,
+    Figtree_600SemiBold,
+    Figtree_700Bold,
     Raleway_800ExtraBold,
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
@@ -171,9 +184,7 @@ function RootNavigation() {
           const nativeModule = requireNativeModule('ExpoNavigationBar') as {
             setStyle?: (style: string) => Promise<unknown> | void;
           };
-          return nativeModule.setStyle?.(
-            resolvedScheme === 'dark' ? 'dark' : 'light',
-          );
+          return nativeModule.setStyle?.(resolvedScheme === 'dark' ? 'dark' : 'light');
         })
         .catch(() => undefined);
     }
@@ -216,14 +227,8 @@ function RootNavigation() {
            *  swipe back off the tabs onto `index`, which instantly redirects
            *  to Explore again ("swipe back from home → home again"). Inner tab
            *  stacks are separate navigators and keep their own swipe-back. */}
-          <Stack.Screen
-            name="index"
-            options={{ headerShown: false, gestureEnabled: false }}
-          />
-          <Stack.Screen
-            name="(tabs)"
-            options={{ headerShown: false, gestureEnabled: false }}
-          />
+          <Stack.Screen name="index" options={{ headerShown: false, gestureEnabled: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false, gestureEnabled: false }} />
           <Stack.Screen
             name="vin-finder"
             options={{
@@ -298,9 +303,7 @@ function RootNavigation() {
           />
         </Stack>
       </NavigationThemeProvider>
-      {splashVisible ? (
-        <SplashOverlay onFinish={() => setSplashVisible(false)} />
-      ) : null}
+      {splashVisible ? <SplashOverlay onFinish={() => setSplashVisible(false)} /> : null}
     </AppView>
   );
 }

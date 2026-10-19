@@ -6,6 +6,7 @@ import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 
 import { RADIUS_TAG } from '../radii';
+import { SEARCH_FONT } from './fonts';
 import type { IconTone } from './signal';
 
 export type RibbonIcon = ComponentType<{
@@ -50,8 +51,7 @@ export default function Ribbon({
   // Single-mode icons match the composite Mator Pick star: filled gold
   // shape so they pop against the dark ribbon. Tone can override (e.g.
   // value=green for Cheapest), otherwise default to accolade gold.
-  const iconColor =
-    tone === 'value' ? tokens.value : tokens.accolade;
+  const iconColor = tone === 'value' ? tokens.value : tokens.accolade;
   const height = composite ? COMPOSITE_HEIGHT : SINGLE_HEIGHT;
   const notch = composite ? COMPOSITE_NOTCH : NOTCH;
   const iconList = icons ?? [];
@@ -101,6 +101,7 @@ export default function Ribbon({
           weight="bold"
           style={{
             color: fg,
+            fontFamily: SEARCH_FONT.bold,
             fontSize: composite ? 10 : 9,
             lineHeight: composite ? 11 : 10,
             letterSpacing: 0.5,

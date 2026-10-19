@@ -7,9 +7,22 @@
  * swap is gated per-domain by `shouldUseHttpTransport('categories')`, so the
  * grid can be brought online independently of the rest of the app.
  *
- * Backend contract (GET /v1/categories):
+ * Backend contract (GET /v1/categories?scope=main|vehicle):
  *   { items: [{ id, name, label, name_ru, name_uz, name_en, slug, count,
  *               iconKey, color }] }
+ *
+ * Two scopes, and they are NOT interchangeable:
+ *   • `main`    — the 12 legacy home tiles. These are LEAF categories that sit
+ *                 beside the ones parts are actually filed under, so their
+ *                 `count` is 0 and `/v1/catalog/parts?category=<id>` returns
+ *                 nothing. Kept for callers that still want the old grid.
+ *   • `vehicle` — the 8 vehicle-system buckets (`BRAKE_SYSTEM`, …) that DO
+ *                 carry live counts and whose ids filter the parts list
+ *                 through `vehicle_category`. This is what the home grid uses.
+ *
+ * `vehicle` rows come back without the `name_*` i18n columns (the enum has no
+ * translation table on the server), so the UI resolves those labels from the
+ * app's own catalogue — see `category.vehicle.*` in `locales/`.
  *
  * The HTTP impl maps that onto the app's `CategoryTileData`. `iconKey` is the
  * server's stable icon handle (e.g. "electrical") which `AutoPartIcon` resolves
@@ -50,8 +63,11 @@ export type CategoryTileData = {
   iconKey: string;
 };
 
+/** Which hierarchy `/v1/categories` should return (see the module note). */
+export type CategoryScope = 'main' | 'vehicle';
+
 export interface CategoriesTransport {
-  list(signal?: AbortSignal): Promise<CategoryTileData[]>;
+  list(scope: CategoryScope, signal?: AbortSignal): Promise<CategoryTileData[]>;
 }
 
 const MOCK_LATENCY_MS = 280;
@@ -73,7 +89,9 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
 // ── Mock transport ─────────────────────────────────────────────────────
 
 class MockCategoriesTransport implements CategoriesTransport {
-  async list(signal?: AbortSignal): Promise<CategoryTileData[]> {
+  // The bundled tiles are one flat list; the scope only matters to the live
+  // backend, so it is accepted and ignored here.
+  async list(_scope: CategoryScope, signal?: AbortSignal): Promise<CategoryTileData[]> {
     await delay(MOCK_LATENCY_MS, signal);
     // The bundled tiles key their icon by display name, so iconKey === name.
     return MATOR_CAT_TILES.map((t) => ({
@@ -112,29 +130,33 @@ type ApiCategoriesResponse = { items: ApiCategory[] };
 const DEFAULT_TILE_COLOR = '#4285f4';
 
 class HttpCategoriesTransport implements CategoriesTransport {
-  async list(signal?: AbortSignal): Promise<CategoryTileData[]> {
-    const res = await apiClient.get<ApiCategoriesResponse>('/v1/categories', { signal });
-    return (res.items ?? [])
-      // Never surface the backend's "Uncategorized" bucket as a tile — show a
-      // real category or nothing.
-      // Matched against the INTERNAL `name`, not `label`: the placeholder is
-      // an English backend sentinel, and its localized label wouldn't match.
-      .filter((c) => cleanCategoryName(c.name))
-      .map((c) => ({
-        id: c.id,
-        name: c.name,
-        // Pre-migration the server omits `label`; fall back to `name` so a
-        // tile is never blank (it just reads English, as it did before).
-        // `||` not `??` so an empty/whitespace label falls through too.
-        label: c.label?.trim() || c.name,
-        nameRu: c.name_ru,
-        nameUz: c.name_uz,
-        nameEn: c.name_en,
-        count: c.count ?? 0,
-        color: c.color ?? DEFAULT_TILE_COLOR,
-        // Icon handles are keyed off the internal name, never the label.
-        iconKey: c.iconKey ?? c.name,
-      }));
+  async list(scope: CategoryScope, signal?: AbortSignal): Promise<CategoryTileData[]> {
+    const res = await apiClient.get<ApiCategoriesResponse>(`/v1/categories?scope=${scope}`, {
+      signal,
+    });
+    return (
+      (res.items ?? [])
+        // Never surface the backend's "Uncategorized" bucket as a tile — show a
+        // real category or nothing.
+        // Matched against the INTERNAL `name`, not `label`: the placeholder is
+        // an English backend sentinel, and its localized label wouldn't match.
+        .filter((c) => cleanCategoryName(c.name))
+        .map((c) => ({
+          id: c.id,
+          name: c.name,
+          // Pre-migration the server omits `label`; fall back to `name` so a
+          // tile is never blank (it just reads English, as it did before).
+          // `||` not `??` so an empty/whitespace label falls through too.
+          label: c.label?.trim() || c.name,
+          nameRu: c.name_ru,
+          nameUz: c.name_uz,
+          nameEn: c.name_en,
+          count: c.count ?? 0,
+          color: c.color ?? DEFAULT_TILE_COLOR,
+          // Icon handles are keyed off the internal name, never the label.
+          iconKey: c.iconKey ?? c.name,
+        }))
+    );
   }
 }
 
@@ -144,6 +166,9 @@ export const categoriesTransport: CategoriesTransport = shouldUseHttpTransport('
   ? new HttpCategoriesTransport()
   : new MockCategoriesTransport();
 
-export function fetchCategories(signal?: AbortSignal): Promise<CategoryTileData[]> {
-  return categoriesTransport.list(signal);
+export function fetchCategories(
+  scope: CategoryScope = 'vehicle',
+  signal?: AbortSignal,
+): Promise<CategoryTileData[]> {
+  return categoriesTransport.list(scope, signal);
 }

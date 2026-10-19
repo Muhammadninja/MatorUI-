@@ -71,6 +71,7 @@ function catalogToResult(item: CatalogItem, score: number): SearchResult {
     price: item.price,
     priceLabel: item.priceLabel,
     priceCents: parsePriceToCents(item.price),
+    images: item.images,
     category: item.category,
     badge: item.badge,
     accentTagKind,
@@ -324,6 +325,9 @@ type RawSearchResult = Partial<SearchResult> & {
   review_count?: number | null;
   /** Live backend key for the stable category id; app uses `categoryId`. */
   category_id?: string | null;
+  /** Singular photo keys some endpoints emit instead of the `images` array. */
+  image_url?: string | null;
+  imageUrl?: string | null;
 };
 
 /**
@@ -354,6 +358,13 @@ type RawSearchResponse = Partial<Omit<SearchResponse, 'results'>> & {
   results?: RawSearchResult[] | null;
 };
 
+/** Collapse the backend's three photo spellings into one clean array. */
+function normalizeImages(r: RawSearchResult): string[] | undefined {
+  const raw = Array.isArray(r.images) ? r.images : [r.image_url ?? r.imageUrl];
+  const clean = raw.filter((u): u is string => typeof u === 'string' && u.trim().length > 0);
+  return clean.length > 0 ? clean : undefined;
+}
+
 function normalizeSearchResult(r: RawSearchResult): SearchResult {
   const price = r.price ?? '';
   // Same title hygiene the catalog mapper applies, so a part reads identically
@@ -365,6 +376,10 @@ function normalizeSearchResult(r: RawSearchResult): SearchResult {
     price,
     priceLabel: r.priceLabel ?? price,
     priceCents: r.priceCents,
+    // Photos: the array when the backend sends one, else the singular key.
+    // Empty/blank entries are dropped so the row shows the honest "no photo"
+    // placeholder instead of an <Image> that resolves to nothing.
+    images: normalizeImages(r),
     // Localized display string from the server — rendered, never keyed on.
     category: r.category ?? '',
     // Stable id (snake_case on the wire); the camelCase fallback covers a
@@ -391,6 +406,55 @@ type RawTypeaheadSuggestion = {
   productId?: string;
 };
 
+/** Catalog rows carry photos; the search envelope does not (yet). */
+type RawCatalogPhotoRow = { id: string; images?: string[] | null };
+
+/** How many catalog rows to pull when hydrating photos. 100 is the backend's
+ *  cap, and comfortably covers the pages a shopper scrolls through. */
+const PHOTO_HYDRATION_PAGE_SIZE = 100;
+
+/**
+ * Fill in the photos `/v1/search` doesn't return.
+ *
+ * The search envelope ships id/title/price/category and nothing else, so every
+ * result row drew the "no photo" placeholder even though the part HAS photos —
+ * `/v1/catalog/parts` returns them for the very same ids. One extra call on the
+ * same query closes the gap until search carries `images` itself, at which
+ * point this becomes a no-op (it is skipped the moment any result arrives with
+ * a photo).
+ *
+ * Best-effort by design: a failure here leaves the placeholder in place rather
+ * than failing the search.
+ */
+async function hydratePhotos(
+  results: SearchResult[],
+  query: string,
+  signal?: AbortSignal,
+): Promise<SearchResult[]> {
+  if (results.length === 0 || results.some((r) => r.images?.length)) return results;
+  const trimmed = query.trim();
+  if (!trimmed) return results;
+
+  try {
+    const path =
+      `/v1/catalog/parts?q=${encodeURIComponent(trimmed)}` +
+      `&page=1&page_size=${PHOTO_HYDRATION_PAGE_SIZE}`;
+    const raw = await apiClient.get<{ items?: RawCatalogPhotoRow[] }>(path, { signal });
+    const photos = new Map<string, string[]>();
+    for (const row of raw.items ?? []) {
+      const clean = (row.images ?? []).filter(
+        (u): u is string => typeof u === 'string' && u.trim().length > 0,
+      );
+      if (clean.length > 0) photos.set(row.id, clean);
+    }
+    if (photos.size === 0) return results;
+    // A part the catalog page didn't cover keeps its honest placeholder.
+    return results.map((r) => (photos.has(r.id) ? { ...r, images: photos.get(r.id) } : r));
+  } catch {
+    return results;
+  }
+}
+
 export class HttpSearchTransport implements SearchTransport {
   async search(req: SearchRequest): Promise<SearchResponse> {
     const { signal, requestId, ...body } = req;
@@ -398,10 +462,15 @@ export class HttpSearchTransport implements SearchTransport {
       signal,
       headers: requestId ? { 'X-Request-Id': requestId } : undefined,
     });
+    const results = await hydratePhotos(
+      (raw.results ?? []).map(normalizeSearchResult),
+      raw.query ?? req.query,
+      signal,
+    );
     return {
       query: raw.query ?? req.query.trim(),
       requestId: raw.requestId ?? requestId ?? '',
-      results: (raw.results ?? []).map(normalizeSearchResult),
+      results,
       total: raw.total ?? 0,
       // Backend returns `null` for "no next page"; the UI expects undefined.
       nextPageToken: raw.nextPageToken ?? undefined,

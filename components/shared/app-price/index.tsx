@@ -1,6 +1,7 @@
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
+import { noBreakDigits } from '@/utils/format-price';
 
 /**
  * Split a formatted price ("UZS 129 000", "$64.99", "280 000 so'm") into a raised
@@ -12,9 +13,11 @@ export function splitPrice(price: string): { currency: string; amount: string; c
   const m = s.match(/^([^\d]+)?\s*([\d\s.,'’]+)\s*([^\d]+)?$/);
   const currency = (m?.[1] ?? m?.[3] ?? '').trim();
   const num = (m?.[2] ?? s).trim();
+  // Digit groups are joined with NBSP so a narrow column can never break the
+  // amount in half (see `noBreakDigits`).
   const frac = num.match(/^(.*?)[.,](\d{2})$/);
-  if (frac) return { currency, amount: frac[1].trim(), cents: frac[2] };
-  return { currency, amount: num };
+  if (frac) return { currency, amount: noBreakDigits(frac[1].trim()), cents: frac[2] };
+  return { currency, amount: noBreakDigits(num) };
 }
 
 export type AppPriceProps = {
@@ -27,6 +30,16 @@ export type AppPriceProps = {
   /** Line cap for the amount. Stays at 1 by default: the amount shrinks to fit
    *  (`adjustsFontSizeToFit`) rather than wrapping or ellipsizing. */
   numberOfLines?: number;
+  /**
+   * Typeface override for a surface that is set in its own font (the search
+   * results are in Figtree, not the app's Inter). Pass the EXACT loaded face —
+   * a custom family resolves one file per name on Android, so "bold" has to be
+   * the bold face, not a `fontWeight` on top of the regular one.
+   *
+   * Both faces are optional and fall back to the app-wide price treatment, so
+   * every other caller is untouched.
+   */
+  fontFamily?: { amount: string; affix: string };
 };
 
 /**
@@ -36,7 +49,13 @@ export type AppPriceProps = {
  * screens) renders identically, just scaled by `size`. At `size={26}` it is
  * pixel-identical to the original product-card PriceTag.
  */
-export function AppPrice({ value, size = 26, color, numberOfLines = 1 }: AppPriceProps) {
+export function AppPrice({
+  value,
+  size = 26,
+  color,
+  numberOfLines = 1,
+  fontFamily,
+}: AppPriceProps) {
   const { tokens } = useThemeContext();
   const c = color ?? tokens.text;
   const { currency, amount, cents } = splitPrice(value);
@@ -46,7 +65,11 @@ export function AppPrice({ value, size = 26, color, numberOfLines = 1 }: AppPric
       <AppText
         family="heading"
         weight="bold"
-        style={{ fontSize: Math.round(size * 0.8), color: c }}
+        style={{
+          fontSize: Math.round(size * 0.8),
+          color: c,
+          ...(fontFamily ? { fontFamily: fontFamily.amount } : null),
+        }}
       >
         {value || '—'}
       </AppText>
@@ -64,7 +87,13 @@ export function AppPrice({ value, size = 26, color, numberOfLines = 1 }: AppPric
         <AppText
           family="accent"
           weight="bold"
-          style={{ fontSize: affix, lineHeight: affix + 3, color: c, marginTop: affixTop, marginRight: 2 }}
+          style={{
+            fontSize: affix,
+            lineHeight: affix + 3,
+            color: c,
+            marginTop: affixTop,
+            marginRight: 2,
+          }}
         >
           {currency}
         </AppText>
@@ -75,7 +104,13 @@ export function AppPrice({ value, size = 26, color, numberOfLines = 1 }: AppPric
         numberOfLines={numberOfLines}
         adjustsFontSizeToFit
         minimumFontScale={0.6}
-        style={{ fontSize: size, lineHeight: size + 2, letterSpacing: 0.2, color: c }}
+        style={{
+          fontSize: size,
+          lineHeight: size + 2,
+          letterSpacing: 0.2,
+          color: c,
+          ...(fontFamily ? { fontFamily: fontFamily.amount } : null),
+        }}
       >
         {amount}
       </AppText>
@@ -83,7 +118,13 @@ export function AppPrice({ value, size = 26, color, numberOfLines = 1 }: AppPric
         <AppText
           family="accent"
           weight="bold"
-          style={{ fontSize: affix, lineHeight: affix + 3, color: c, marginTop: affixTop, marginLeft: 1 }}
+          style={{
+            fontSize: affix,
+            lineHeight: affix + 3,
+            color: c,
+            marginTop: affixTop,
+            marginLeft: 1,
+          }}
         >
           {cents}
         </AppText>

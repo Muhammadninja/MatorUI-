@@ -1,5 +1,5 @@
 import { forwardRef, memo, useMemo } from 'react';
-import { Text, type StyleProp, type TextProps, type TextStyle } from 'react-native';
+import { Platform, Text, type StyleProp, type TextProps, type TextStyle } from 'react-native';
 
 import { useThemeColor } from '@/hooks/use-theme-color';
 import {
@@ -44,6 +44,28 @@ export type AppTextProps = Omit<TextProps, 'style'> & {
 };
 
 const weightToStyle = (w: Weight | undefined) => (w ? getWeightStyle(w) : undefined);
+
+/**
+ * Android text metrics, normalized to iOS.
+ *
+ * `includeFontPadding` is Android-only and ON by default: the platform pads
+ * every line by the font's ascent/descent hints, so the SAME text sits lower in
+ * its box and lines space further apart than on iOS. That is the bulk of why
+ * the app "looks smoother on Apple" — rows, chips, buttons and prices are all
+ * optically off-centre on Android, and the gap compounds in a stack of cards.
+ *
+ * `textBreakStrategy` defaults to 'highQuality', Android's paragraph-level
+ * line-breaker; it balances lines in ways iOS never does (and reaches for a
+ * mid-word break sooner). 'simple' is the greedy, line-at-a-time algorithm iOS
+ * uses, so wrapped copy matches across platforms.
+ *
+ * Both are applied as DEFAULTS — any `AppText` can still pass its own value,
+ * which wins via the props spread below.
+ */
+const ANDROID_TEXT_PARITY = Platform.select({
+  android: { includeFontPadding: false } as TextStyle,
+  default: undefined,
+});
 
 const AppTextImpl = forwardRef<Text, AppTextProps>(function AppText(props, ref) {
   const {
@@ -104,8 +126,10 @@ const AppTextImpl = forwardRef<Text, AppTextProps>(function AppText(props, ref) 
   return (
     <Text
       ref={ref}
+      textBreakStrategy={Platform.OS === 'android' ? 'simple' : undefined}
       style={[
         { color },
+        ANDROID_TEXT_PARITY,
         variantStyle,
         fontSizeStyle,
         weightStyle,

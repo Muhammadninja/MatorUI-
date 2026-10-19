@@ -18,9 +18,7 @@
  * + icon through the registry in `signal.ts` — kind is the contract,
  * the display is an implementation detail.
  */
-export type AccentTagKind =
-  | 'lowest_price'
-  | 'bestseller';
+export type AccentTagKind = 'lowest_price' | 'bestseller';
 
 export type SearchResult = {
   id: string;
@@ -34,6 +32,13 @@ export type SearchResult = {
   priceLabel: string;
   /** Authoritative numeric price in cents. Server-issued. Filterable. */
   priceCents?: number;
+  /**
+   * Product photos, most representative first. The row renders `images[0]`
+   * and falls back to the no-photo placeholder when the array is empty, so a
+   * part with no uploaded photo is visibly different from one that has one.
+   * Wire: `images` (also accepted: `image_url` / `imageUrl` singular).
+   */
+  images?: string[];
   /** Localized category display name — render only, never an identifier. */
   category: string;
   /** Stable category id (wire: `category_id`). Use this for filters, deep

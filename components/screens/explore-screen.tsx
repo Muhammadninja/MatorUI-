@@ -97,8 +97,10 @@ export default function ExploreScreen() {
     });
   }, [refreshCategories, toast, t]);
 
-  // Route by the backend category id (e.g. "ENGINE") so the Category listing
+  // Route by the backend category id (e.g. "filters") so the Category listing
   // filters /v1/catalog/parts correctly; the display name is the header label.
+  // (A vehicle-system bucket would travel as `vehicleCat` instead — see
+  // `useCategories` for when that applies.)
   const openCategory = useCallback((id: string, label: string) => {
     triggerHaptic('selection');
     router.push({ pathname: '/category', params: { cat: id, label } });

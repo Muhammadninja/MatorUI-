@@ -429,7 +429,17 @@
     "partsCount_one": "{{count}} запчасть",
     "partsCount_few": "{{count}} запчасти",
     "partsCount_many": "{{count}} запчастей",
-    "partsCount_other": "{{count}} запчастей"
+    "partsCount_other": "{{count}} запчастей",
+    "vehicle": {
+      "BRAKE_SYSTEM": "Тормозная система",
+      "MAINTENANCE_AND_FLUIDS": "ТО и жидкости",
+      "SUSPENSION_AND_STEERING": "Подвеска и рулевое",
+      "ELECTRICAL_AND_LIGHTING": "Электрика и освещение",
+      "ENGINE": "Двигатель",
+      "TRANSMISSION": "Трансмиссия",
+      "HEATING_AND_COOLING": "Отопление и охлаждение",
+      "TUNING_AND_ACCESSORIES": "Тюнинг и аксессуары"
+    }
   },
   "make": {
     "vehicleFallback": "Автомобиль",
@@ -718,7 +728,10 @@
     "freeShippingNeed": "Бесплатная доставка, если добавить ещё на {{amount}}",
     "paymentLine": "Оплата через Payme, терминалом или наличными при получении",
     "addYourCar": "Добавить авто",
-    "fullScreen": "Открыть во весь экран"
+    "fullScreen": "Открыть во весь экран",
+    "antifreezeWeight": "Вес",
+    "weightGrams": "{{grams}} г",
+    "fitsAllModels": "{{make}} — все модели"
   },
   "sourcing": {
     "offerTitle": "Предложение",
@@ -849,7 +862,13 @@
     "startingAt": "От",
     "addedToCart": "Добавлено в корзину",
     "added": "Добавлено",
-    "openItemA11y": "Открыть {{title}}"
+    "openItemA11y": "Открыть {{title}}",
+    "signal": {
+      "cheapest": "Лучшая цена",
+      "lowestPrice": "Хорошая цена",
+      "bestseller": "Хит продаж",
+      "matorPick": "Выбор Mator"
+    }
   },
   "modalHost": {
     "confirmAction": "Подтвердите действие",

@@ -28,15 +28,39 @@ const LABEL_LINE_HEIGHT = 15;
 const LABEL_BLOCK_HEIGHT = LABEL_LINE_HEIGHT * 2;
 
 /**
+ * Type size for a label, chosen from its LONGEST WORD.
+ *
+ * A grid cell is ~31.5% of the screen — about 110pt on a phone — and a single
+ * Russian category name can be wider than that at the design size
+ * ("Электрооборудование", "Стеклоочистители"). A word with nowhere to break
+ * gets broken anyway, leaving an orphan syllable on its own line.
+ *
+ * Multi-word labels ("Масла и жидкости") wrap between words and keep the full
+ * size; only the long single words step down. This is measured off character
+ * count rather than left to `adjustsFontSizeToFit` alone because Android only
+ * auto-shrinks when the text view's height is already bounded, which a
+ * two-line block that is allowed to grow is not.
+ */
+function labelFontSize(label: string): number {
+  const longestWord = label.split(/\s+/).reduce((max, word) => Math.max(max, word.length), 0);
+  if (longestWord <= 12) return 12.5;
+  if (longestWord <= 15) return 11.5;
+  if (longestWord <= 19) return 10.5;
+  return 9.5;
+}
+
+/**
  * `CategoryTile` — a single "Shop by category" grid cell: realistic part icon
  * + name + count on a bordered card. Presentational; the parent supplies the
  * data + tap handler.
  *
- * The label wraps freely and is never ellipsized: localized names are far
- * longer than the internal English ones ("Электрооборудование", "Kuzov va
- * tashqi qism") and a clamped label cut them mid-word. The block reserves two
- * lines so the counts stay aligned for the common case, and grows for the rare
- * label that needs a third line.
+ * The label is never ellipsized and never broken mid-word: localized names are
+ * far longer than the internal English ones, and a single Russian word can be
+ * wider than a 31.5%-wide cell ("Стеклоочистители", "Электрооборудование") —
+ * free wrapping split them across lines with an orphan letter below. Two lines
+ * are allowed for multi-word names; anything that still doesn't fit SHRINKS
+ * (`adjustsFontSizeToFit`) instead of breaking, which keeps whole words intact
+ * and the counts on a shared baseline across the row.
  */
 function CategoryTile({ name, label, iconKey, count, onPress }: CategoryTileProps) {
   const { t } = useTranslation();
@@ -44,6 +68,7 @@ function CategoryTile({ name, label, iconKey, count, onPress }: CategoryTileProp
   // Everything user-facing reads the localized label; `name` is only ever an
   // icon-resolution fallback.
   const display = label ?? name;
+  const fontSize = labelFontSize(display);
   return (
     <AppPressableView
       onPress={onPress}
@@ -61,8 +86,11 @@ function CategoryTile({ name, label, iconKey, count, onPress }: CategoryTileProp
           <AppText
             family="accent"
             weight="bold"
+            numberOfLines={2}
+            adjustsFontSizeToFit
+            minimumFontScale={0.72}
             style={{
-              fontSize: 12.5,
+              fontSize,
               color: tokens.text,
               textAlign: 'center',
               lineHeight: LABEL_LINE_HEIGHT,
