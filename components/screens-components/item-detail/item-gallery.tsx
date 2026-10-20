@@ -63,7 +63,11 @@ function ItemGallery({
     if (w > 0 && w !== width) setWidth(w);
   };
 
-  const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+  // The counter and dots follow the live scroll position: whichever photo is
+  // more than half in view is the current one. Updating only when a swipe
+  // ended left them on "1" while the photos moved; a scroll event fires on
+  // every frame the pager moves, so a swipe can't slip past without one.
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const next = Math.max(
       0,
       Math.min(total - 1, Math.round(e.nativeEvent.contentOffset.x / width)),
@@ -90,11 +94,7 @@ function ItemGallery({
         snapToAlignment="start"
         disableIntervalMomentum
         decelerationRate="fast"
-        // A slow drag that is released without flinging produces NO momentum
-        // event on either platform, which used to leave the dots and counter
-        // pointing at the previous photo.
-        onMomentumScrollEnd={onMomentumScrollEnd}
-        onScrollEndDrag={onMomentumScrollEnd}
+        onScroll={onScroll}
         scrollEventThrottle={16}
         scrollEnabled={total > 1}
       >
