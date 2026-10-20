@@ -35,9 +35,11 @@ export default function CategoryScreen() {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
-  // Two ways in, two different filters: `vehicleCat` is a top-level system
-  // bucket from the home grid (rolls up every leaf under it), `cat` is a single
-  // leaf category id from the catalogue drill-down.
+  // Two different filters. `cat` is a category id: a bucket slug ("brakes" —
+  // what the home grid sends) rolls up by each part's `main_category`, while a
+  // subcategory id matches just that node (a certified placement may send
+  // either). `vehicleCat` is a vehicle-system bucket (`BRAKE_SYSTEM`, filtered
+  // through `vehicle_category`) — no screen sends it today.
   const params = useLocalSearchParams<{ cat?: string; vehicleCat?: string; label?: string }>();
   const cat = params.cat ?? 'All';
   const vehicleCat = params.vehicleCat;

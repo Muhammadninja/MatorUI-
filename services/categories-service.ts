@@ -12,13 +12,13 @@
  *               iconKey, color }] }
  *
  * Two scopes, and they are NOT interchangeable:
- *   • `main`    — the 12 legacy home tiles. These are LEAF categories that sit
- *                 beside the ones parts are actually filed under, so their
- *                 `count` is 0 and `/v1/catalog/parts?category=<id>` returns
- *                 nothing. Kept for callers that still want the old grid.
- *   • `vehicle` — the 8 vehicle-system buckets (`BRAKE_SYSTEM`, …) that DO
- *                 carry live counts and whose ids filter the parts list
- *                 through `vehicle_category`. This is what the home grid uses.
+ *   • `main`    — the 12 home tiles; this is what the home grid uses. A tile's
+ *                 `id` is its slug ("brakes"). Its `count` and
+ *                 `/v1/catalog/parts?category=<id>` both roll up by each part's
+ *                 `main_category` bucket, so a tap lists what the tile counted.
+ *   • `vehicle` — the 8 vehicle-system buckets (`BRAKE_SYSTEM`, …), whose ids
+ *                 filter the parts list through `vehicle_category`. Not used by
+ *                 the home grid.
  *
  * `vehicle` rows come back without the `name_*` i18n columns (the enum has no
  * translation table on the server), so the UI resolves those labels from the
