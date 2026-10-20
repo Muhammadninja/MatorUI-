@@ -5,6 +5,7 @@ import AutoPartIcon from '@/components/screens-components/catalog/auto-part-icon
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
+import { softWrapLabel } from '@/utils/category-label';
 
 export type CategoryTileProps = {
   /** INTERNAL canonical name — icon fallback key only, never rendered. */
@@ -22,45 +23,42 @@ export type CategoryTileProps = {
   onPress: () => void;
 };
 
-/** Label block floor: two lines at `lineHeight`, so a wrapped label and a
- *  single-word one keep their counts on the same baseline across a row. */
+/**
+ * ONE type size for every label on every device.
+ *
+ * The grid is flexbox: a cell is a share of the row, so it already scales with
+ * the screen, and the label's job is to wrap inside it — not to be re-measured
+ * and re-sized per tile. Per-tile sizing is what made the grid read as a
+ * jumble of different typefaces; a single size is what makes a Pro Max and a
+ * small Android render the same picture.
+ */
+const LABEL_SIZE = 12.5;
+/** Fixed leading, so a one-line label and a two-line one put their counts on
+ *  the same baseline across the row. */
 const LABEL_LINE_HEIGHT = 15;
 const LABEL_BLOCK_HEIGHT = LABEL_LINE_HEIGHT * 2;
 
 /**
- * Type size for a label, chosen from its LONGEST WORD.
+ * Characters a cell fits on one line at `LABEL_SIZE`.
  *
- * A grid cell is ~31.5% of the screen — about 110pt on a phone — and a single
- * Russian category name can be wider than that at the design size
- * ("Электрооборудование", "Стеклоочистители"). A word with nowhere to break
- * gets broken anyway, leaving an orphan syllable on its own line.
- *
- * Multi-word labels ("Масла и жидкости") wrap between words and keep the full
- * size; only the long single words step down. This is measured off character
- * count rather than left to `adjustsFontSizeToFit` alone because Android only
- * auto-shrinks when the text view's height is already bounded, which a
- * two-line block that is allowed to grow is not.
+ * A cell is 31.5% of the content width — ~110pt on a phone — and the bold
+ * accent face runs ~0.64em per Cyrillic glyph, so ~13 of them fit. The number
+ * survives a change of device precisely BECAUSE the cell is a percentage: a
+ * wider screen gives a proportionally wider cell at the same type size.
  */
-function labelFontSize(label: string): number {
-  const longestWord = label.split(/\s+/).reduce((max, word) => Math.max(max, word.length), 0);
-  if (longestWord <= 12) return 12.5;
-  if (longestWord <= 15) return 11.5;
-  if (longestWord <= 19) return 10.5;
-  return 9.5;
-}
+const LABEL_MAX_WORD = 13;
 
 /**
  * `CategoryTile` — a single "Shop by category" grid cell: realistic part icon
  * + name + count on a bordered card. Presentational; the parent supplies the
  * data + tap handler.
  *
- * The label is never ellipsized and never broken mid-word: localized names are
- * far longer than the internal English ones, and a single Russian word can be
- * wider than a 31.5%-wide cell ("Стеклоочистители", "Электрооборудование") —
- * free wrapping split them across lines with an orphan letter below. Two lines
- * are allowed for multi-word names; anything that still doesn't fit SHRINKS
- * (`adjustsFontSizeToFit`) instead of breaking, which keeps whole words intact
- * and the counts on a shared baseline across the row.
+ * The label is never ellipsized, never shrunk, and never snapped mid-syllable.
+ * Localized names run far longer than the internal English ones, and a single
+ * Russian word can outgrow a 31.5%-wide cell ("Стеклоочистители",
+ * "Электрооборудование"): those get a break opportunity at their compound seam
+ * (`softWrapLabel`), so flexbox wraps them as "Электро / оборудование" at the
+ * same size every other tile uses.
  */
 function CategoryTile({ name, label, iconKey, count, onPress }: CategoryTileProps) {
   const { t } = useTranslation();
@@ -68,7 +66,9 @@ function CategoryTile({ name, label, iconKey, count, onPress }: CategoryTileProp
   // Everything user-facing reads the localized label; `name` is only ever an
   // icon-resolution fallback.
   const display = label ?? name;
-  const fontSize = labelFontSize(display);
+  // Invisible break hints only — the a11y label below keeps the raw string, so
+  // a screen reader never meets a zero-width space.
+  const wrapped = softWrapLabel(display, LABEL_MAX_WORD);
   return (
     <AppPressableView
       onPress={onPress}
@@ -83,20 +83,21 @@ function CategoryTile({ name, label, iconKey, count, onPress }: CategoryTileProp
       </AppView>
       <AppView align="center" style={{ alignSelf: 'stretch' }}>
         <AppView justify="center" style={{ minHeight: LABEL_BLOCK_HEIGHT, alignSelf: 'stretch' }}>
+          {/* Three lines, not two: two is what every real label needs, and the
+           *  third is headroom so an unusually long translation grows the tile
+           *  instead of losing its tail to an ellipsis. */}
           <AppText
             family="accent"
             weight="bold"
-            numberOfLines={2}
-            adjustsFontSizeToFit
-            minimumFontScale={0.72}
+            numberOfLines={3}
             style={{
-              fontSize,
+              fontSize: LABEL_SIZE,
               color: tokens.text,
               textAlign: 'center',
               lineHeight: LABEL_LINE_HEIGHT,
             }}
           >
-            {display}
+            {wrapped}
           </AppText>
         </AppView>
         <AppText family="default" style={{ fontSize: 10.5, color: tokens.textMuted, marginTop: 3 }}>

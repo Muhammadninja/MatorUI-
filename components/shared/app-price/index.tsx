@@ -98,6 +98,11 @@ export function AppPrice({
           {currency}
         </AppText>
       ) : null}
+      {/* No explicit `lineHeight` here on purpose: paired with
+       *  `adjustsFontSizeToFit`, iOS shrinks the amount far past
+       *  `minimumFontScale` — down to a few pixels — while its text box keeps
+       *  the full width, which strands the currency beside an unreadable
+       *  number. The natural line height is what keeps the shrink sane. */}
       <AppText
         family="heading"
         weight="bold"
@@ -106,7 +111,6 @@ export function AppPrice({
         minimumFontScale={0.6}
         style={{
           fontSize: size,
-          lineHeight: size + 2,
           letterSpacing: 0.2,
           color: c,
           ...(fontFamily ? { fontFamily: fontFamily.amount } : null),

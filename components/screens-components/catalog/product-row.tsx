@@ -49,6 +49,24 @@ const MAX_ROW = 264;
 const THUMB_RATIO = 0.64;
 
 /**
+ * Price type size. Every real price gets the SAME one (21) — the steps below
+ * exist only for an amount long enough to crowd the add button out of the row,
+ * which in UZS means eight figures and up.
+ *
+ * It cannot be left to `adjustsFontSizeToFit` alone: paired with an explicit
+ * `lineHeight` that prop shrinks the text to a few pixels on iOS while its box
+ * keeps the full width, which is what stranded the currency mid-card. The
+ * amount is only ever digits and non-breaking separators, so the size that
+ * fits the copy column follows from the character count.
+ */
+function priceFontSize(amount: string): number {
+  const n = amount.length;
+  if (n <= 10) return 21;
+  if (n <= 12) return 18;
+  return 16;
+}
+
+/**
  * `ProductRow` — the listing card behind every result screen (category,
  * vehicle parts, catalog directory).
  *
@@ -124,6 +142,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
   const sales = useActiveSales();
   const { savePct, wasUzs: wasNum } = resolveItemPricing(item, sales);
   const priceAmount = splitPrice(item.price).amount || item.price;
+  const priceSize = priceFontSize(priceAmount);
   const wasLabel = wasNum > 0 ? noBreakDigits(wasNum.toLocaleString('ru-RU')) : null;
 
   const brandEyebrow = (item.brand ?? item.description?.split('·')[0])?.trim();
@@ -354,26 +373,33 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
                 rowGap: 2,
               }}
             >
-              {/* One line, always: the amount shrinks to fit rather than
-               *  wrapping (the separators are already non-breaking, this is
-               *  the floor for a 7-digit price in a narrow column). */}
-              <AppText
-                family="heading"
-                weight="bold"
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.7}
-                style={{ fontSize: 21, lineHeight: 25, letterSpacing: -0.4, color: tokens.text }}
-              >
-                {priceAmount}
-              </AppText>
-              <AppText
-                family="accent"
-                weight="semibold"
-                style={{ fontSize: 11, color: tokens.textMuted }}
-              >
-                {t('common.currency')}
-              </AppText>
+              {/* Amount + currency are ONE unbreakable unit: they used to be
+               *  loose children of the wrapping row, so when the amount's text
+               *  box took more width than its glyphs the currency drifted into
+               *  the middle of the card. */}
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', columnGap: 4 }}>
+                {/* One line, always. `priceFontSize` already fits it, so the
+                 *  auto-shrink below is a backstop for an amount nobody has
+                 *  priced yet — and it carries NO explicit `lineHeight`, which
+                 *  is the pair that collapses the text on iOS. */}
+                <AppText
+                  family="heading"
+                  weight="bold"
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                  style={{ fontSize: priceSize, letterSpacing: -0.4, color: tokens.text }}
+                >
+                  {priceAmount}
+                </AppText>
+                <AppText
+                  family="accent"
+                  weight="semibold"
+                  style={{ fontSize: 11, color: tokens.textMuted }}
+                >
+                  {t('common.currency')}
+                </AppText>
+              </View>
               {wasLabel ? (
                 <AppText
                   family="default"
