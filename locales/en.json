@@ -719,7 +719,9 @@
     "fullScreen": "Tap to enlarge",
     "antifreezeWeight": "Weight",
     "weightGrams": "{{grams}} g",
-    "fitsAllModels": "{{make}} — all models"
+    "fitsAllModels": "{{make}} — all models",
+    "fitsShowAll": "Show all ({{count}} more)",
+    "fitsShowLess": "Show fewer"
   },
   "sourcing": {
     "offerTitle": "Offer",

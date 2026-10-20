@@ -73,7 +73,11 @@ export default function VinFinderScreen() {
       style={{ paddingTop: insets.top + 24, paddingHorizontal: 20 }}
       gap={16}
     >
-      <AppText family="heading" weight="bold" style={{ fontSize: 26, color: tokens.text }}>
+      <AppText
+        family="heading"
+        weight="bold"
+        style={{ fontSize: 26, lineHeight: 32, color: tokens.text }}
+      >
         {t('vinFinder.title')}
       </AppText>
       <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted }}>

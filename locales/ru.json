@@ -731,7 +731,9 @@
     "fullScreen": "Открыть во весь экран",
     "antifreezeWeight": "Вес",
     "weightGrams": "{{grams}} г",
-    "fitsAllModels": "{{make}} — все модели"
+    "fitsAllModels": "{{make}} — все модели",
+    "fitsShowAll": "Показать все (ещё {{count}})",
+    "fitsShowLess": "Свернуть"
   },
   "sourcing": {
     "offerTitle": "Предложение",

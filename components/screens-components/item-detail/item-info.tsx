@@ -1,18 +1,36 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AppText } from '@/components/shared/app-text';
-import { AppView } from '@/components/shared/app-view';
+import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import type { CatalogItem, CatalogItemSpec } from '@/services/catalog-service';
 
-/** Section heading used between the Item Detail blocks. */
-export function ItemSectionTitle({ title }: { title: string }) {
+/**
+ * Section heading used between the Item Detail blocks. `count` rides at the end
+ * in muted type: on a page of stacked sections, knowing a list is 4 rows or 40
+ * before you reach it is the difference between scanning and scrolling blind.
+ */
+export function ItemSectionTitle({ title, count }: { title: string; count?: number }) {
   const { tokens } = useThemeContext();
   return (
-    <AppText family="heading" weight="bold" style={{ fontSize: 16.5, color: tokens.text }}>
-      {title}
-    </AppText>
+    <AppView row align="center" gap={7}>
+      <AppText family="heading" weight="bold" style={{ fontSize: 16.5, color: tokens.text }}>
+        {title}
+      </AppText>
+      {count != null && count > 0 ? (
+        <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.textMuted }}>
+          {count}
+        </AppText>
+      ) : null}
+    </AppView>
   );
+}
+
+/** Hairline between two zones of the page, inset to the content column. */
+export function ItemRule() {
+  const { tokens } = useThemeContext();
+  return <AppView style={{ height: 1, backgroundColor: tokens.divider }} />;
 }
 
 /** One soft-tinted trust / status chip — the label carries it, no glyph. */
@@ -151,6 +169,9 @@ export function ItemFeatureList({ features }: { features: string[] }) {
   );
 }
 
+/** How many fitment chips show before the list folds. */
+const VISIBLE_FITS = 12;
+
 /**
  * Vehicles this part is listed to fit. Two backend lists feed it: `fits` is one
  * entry per MODEL, `makeFits` is make-level ("fits every Chevrolet") — an
@@ -168,6 +189,7 @@ export function ItemFitList({
 }) {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
+  const [expanded, setExpanded] = useState(false);
   const modelLabels = fits
     .map((f) => [f.makeName ?? f.makeSlug, f.modelName ?? f.modelSlug].filter(Boolean).join(' '))
     .filter((l) => l.length > 0);
@@ -180,9 +202,16 @@ export function ItemFitList({
   const unique = Array.from(new Set([...modelLabels, ...makeLabels]));
   if (unique.length === 0) return null;
 
+  // A widely-fitting part can list dozens of vehicles, and a forty-chip wall
+  // between the specs and the rest of the page is the single biggest source of
+  // noise here. Show a readable first screenful; the rest is one tap away.
+  const shown = expanded ? unique : unique.slice(0, VISIBLE_FITS);
+  const hidden = unique.length - shown.length;
+
   return (
-    <AppView row wrap gap={7}>
-      {unique.map((label) => (
+    <AppView gap={9}>
+      <AppView row wrap gap={7}>
+      {shown.map((label) => (
         <AppView
           key={label}
           rounded={999}
@@ -197,6 +226,22 @@ export function ItemFitList({
           </AppText>
         </AppView>
       ))}
+      </AppView>
+      {hidden > 0 || expanded ? (
+        <AppPressableView
+          onPress={() => setExpanded((v) => !v)}
+          androidRipple={false}
+          pressedOpacity={0.7}
+          accessibilityRole="button"
+          style={{ alignSelf: 'flex-start' }}
+        >
+          <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.text }}>
+            {expanded
+              ? t('itemDetail.fitsShowLess')
+              : t('itemDetail.fitsShowAll', { count: hidden })}
+          </AppText>
+        </AppPressableView>
+      ) : null}
     </AppView>
   );
 }

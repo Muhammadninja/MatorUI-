@@ -35,8 +35,14 @@ export type ItemAssuranceCardProps = {
 
 /**
  * The reassurance block — written as plain sentences, not a labelled table.
- * When it lands leads, in the same voice a counter clerk would use; shipping,
- * seller, and payment follow as quiet supporting copy under a hairline.
+ * When it lands leads, in the same voice a counter clerk would use; shipping
+ * and payment follow as quiet supporting copy.
+ *
+ * It is deliberately UNBOXED. It used to sit in a tinted card, directly under
+ * the tinted fit verdict and directly above the grey spec table — three
+ * rounded blocks in three tints with nothing ranking them. The page now spends
+ * its one coloured card on the fit verdict (the actual decision) and sets
+ * everything else as type separated by hairlines.
  *
  * Every line is derived, never promised: the arrival window is the backend's
  * `delivery_eta_days_{min,max}` turned into real dates, the shipping line runs
@@ -86,7 +92,7 @@ export function ItemAssuranceCard({
       });
 
   return (
-    <AppView gap={9} rounded={18} px={15} py={14} colorName="backgroundSecondary">
+    <AppView gap={7}>
       {when ? (
         <AppText family="accent" weight="semibold" style={{ fontSize: 14.5, color: tokens.text }}>
           {t('itemDetail.arrivesLead')}{' '}
@@ -107,7 +113,6 @@ export function ItemAssuranceCard({
         {shippingLine}
       </AppText>
 
-      <AppView style={{ height: 1, backgroundColor: tokens.divider, marginVertical: 2 }} />
       <AppText family="default" style={{ fontSize: 12.5, lineHeight: 17, color: tokens.textMuted }}>
         {t('itemDetail.paymentLine')}
       </AppText>

@@ -67,6 +67,7 @@ export function AppPrice({
         weight="bold"
         style={{
           fontSize: Math.round(size * 0.8),
+          lineHeight: undefined,
           color: c,
           ...(fontFamily ? { fontFamily: fontFamily.amount } : null),
         }}
@@ -98,11 +99,14 @@ export function AppPrice({
           {currency}
         </AppText>
       ) : null}
-      {/* No explicit `lineHeight` here on purpose: paired with
-       *  `adjustsFontSizeToFit`, iOS shrinks the amount far past
-       *  `minimumFontScale` — down to a few pixels — while its text box keeps
-       *  the full width, which strands the currency beside an unreadable
-       *  number. The natural line height is what keeps the shrink sane. */}
+      {/* `lineHeight: undefined` CLEARS the one AppText inherits from the
+       *  `body` variant (24). Leaving the key out doesn't fall back to the
+       *  font's natural metrics — it leaves 24 in place, so every amount above
+       *  ~24px was drawn into a short line box and sheared off at the top.
+       *  Clearing it (rather than setting a number) keeps the natural metrics
+       *  the shrink behaviour depends on: paired with `adjustsFontSizeToFit`,
+       *  a hard `lineHeight` makes iOS shrink far past `minimumFontScale`,
+       *  stranding the currency beside an unreadable number. */}
       <AppText
         family="heading"
         weight="bold"
@@ -111,6 +115,7 @@ export function AppPrice({
         minimumFontScale={0.6}
         style={{
           fontSize: size,
+          lineHeight: undefined,
           letterSpacing: 0.2,
           color: c,
           ...(fontFamily ? { fontFamily: fontFamily.amount } : null),

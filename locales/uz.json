@@ -719,7 +719,9 @@
     "fullScreen": "Toʻliq ekranda ochish",
     "antifreezeWeight": "Ogʻirligi",
     "weightGrams": "{{grams}} g",
-    "fitsAllModels": "{{make}} — barcha modellar"
+    "fitsAllModels": "{{make}} — barcha modellar",
+    "fitsShowAll": "Barchasini koʻrsatish (yana {{count}})",
+    "fitsShowLess": "Yigʻish"
   },
   "sourcing": {
     "offerTitle": "Taklif",

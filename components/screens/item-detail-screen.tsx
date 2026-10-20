@@ -22,6 +22,7 @@ import {
   ItemFeatureList,
   ItemFitList,
   ItemRatingRow,
+  ItemRule,
   ItemSectionTitle,
   ItemSpecTable,
   ItemTrustRow,
@@ -172,6 +173,11 @@ export default function ItemDetailScreen() {
   // `description` is the backend's "Brand · Category" meta line — richer than
   // the bare brand, so prefer it and fall back when the part carries neither.
   const eyebrow = (item.description || item.brand || '').trim();
+  // The fit zone's hairline must not strand itself. `ItemVehicleCta` renders
+  // nothing once a vehicle is known and the check is done, so a part whose
+  // check returned no verdict for a known car leaves the whole zone empty.
+  const showFitZone =
+    item.isUniversal || !!compat || !vehicleLabel || (compatLoading && !!vehicleLabel);
   const fits = item.fits ?? [];
   const makeFits = item.makeFits ?? [];
   const features = item.features ?? [];
@@ -265,11 +271,18 @@ export default function ItemDetailScreen() {
           }}
         />
 
-        {/* Content sheet — rides over the bottom of the gallery. */}
+        {/* Content sheet — rides over the bottom of the gallery.
+         *
+         *  Laid out as four ZONES, each answering one question, separated by a
+         *  hairline: what is it and what does it cost → will it fit my car →
+         *  when does it arrive → what are the details. It used to be eleven
+         *  blocks in a flat 18px stack, four of them rounded cards in three
+         *  different tints, so nothing on the page outranked anything else.
+         *  Tight gaps now mean "same thought", a rule means "new thought". */}
         <AppView
           colorName="background"
           px="lg"
-          gap={18}
+          gap={20}
           style={{
             marginTop: -24,
             paddingTop: 20,
@@ -277,67 +290,80 @@ export default function ItemDetailScreen() {
             borderTopRightRadius: 26,
           }}
         >
-          <ItemIdentity
-            eyebrow={eyebrow}
-            badge={item.badge}
-            title={item.title}
-            titleDetail={item.titleDetail}
-            oem={item.oem}
-            gm={item.gm}
-          />
+          {/* ZONE 1 — what it is, what it costs. No containers: the type
+              hierarchy alone carries it. */}
+          <AppView gap={12}>
+            <ItemIdentity
+              eyebrow={eyebrow}
+              badge={item.badge}
+              title={item.title}
+              titleDetail={item.titleDetail}
+              oem={item.oem}
+              gm={item.gm}
+            />
 
-          {/* Real review aggregate, or nothing at all. */}
-          <ItemRatingRow rating={item.rating} reviewCount={item.reviewCount} />
+            {/* Real review aggregate, or nothing at all. */}
+            <ItemRatingRow rating={item.rating} reviewCount={item.reviewCount} />
 
-          <ItemPriceRow
-            price={item.price}
-            wasUzs={wasUzs}
-            wasLabel={item.originalPriceLabel}
-            savePct={savePct}
-            saleTitle={item.saleTitle}
-            savingsLabel={savingsLabel}
-          />
+            <ItemPriceRow
+              price={item.price}
+              wasUzs={wasUzs}
+              wasLabel={item.originalPriceLabel}
+              savePct={savePct}
+              saleTitle={item.saleTitle}
+              savingsLabel={savingsLabel}
+            />
 
-          {/* Seller trust flags + an out-of-stock warning when it applies */}
-          <ItemTrustRow item={item} />
+            {/* Seller trust flags + an out-of-stock warning when it applies */}
+            <ItemTrustRow item={item} />
+          </AppView>
 
-          {/* Fit status. Universal listings (oils under "Другое") fit every car —
+          {/* ZONE 2 — the decision: will it fit? This is the one block that
+              keeps a coloured card, because it is the question that stalls the
+              purchase. Universal listings (oils under "Другое") fit every car —
               a static plaque and NO compatibility badge (answering "maybe" for a
               part that fits everything is misleading). Vehicle-specific parts
               keep the real backend check, which renders nothing until an answer
-              arrives. */}
-          {item.isUniversal ? (
+              arrives; with no garage vehicle the CTA is the one-tap way to get
+              one, and mid-check it says the check is running. */}
+          {showFitZone ? <ItemRule /> : null}
+          {!showFitZone ? null : item.isUniversal ? (
             <ItemUniversalFitBadge />
-          ) : compat ? (
-            <ItemFitBadge
-              result={compat}
-              subtitle={
-                activeVehicle
-                  ? `${activeVehicle.year} ${activeVehicle.make} ${activeVehicle.model} ${activeVehicle.trim ?? ''}`.trim()
-                  : null
-              }
-              onShowAlternatives={() => router.push('/search')}
-            />
-          ) : null}
-
-          {/* No garage vehicle → the one-tap way to answer "will it fit?";
-              mid-check → say the check is running. Nothing once a verdict is
-              in — the plaque above says it. */}
-          {item.isUniversal ? null : (
-            <ItemVehicleCta
-              checking={compatLoading && !compat}
-              vehicleLabel={vehicleLabel}
-              onPress={() => router.navigate('/garage')}
-            />
+          ) : (
+            <AppView gap={12}>
+              {compat ? (
+                <ItemFitBadge
+                  result={compat}
+                  subtitle={
+                    activeVehicle
+                      ? `${activeVehicle.year} ${activeVehicle.make} ${activeVehicle.model} ${activeVehicle.trim ?? ''}`.trim()
+                      : null
+                  }
+                  onShowAlternatives={() => router.push('/search')}
+                />
+              ) : null}
+              <ItemVehicleCta
+                checking={compatLoading && !compat}
+                vehicleLabel={vehicleLabel}
+                onPress={() => router.navigate('/garage')}
+              />
+            </AppView>
           )}
 
-          {/* Arrival date, shipping, seller, payment methods */}
+          {/* ZONE 3 — when it lands and how you pay. Plain sentences, no box. */}
+          <ItemRule />
           <ItemAssuranceCard
             item={item}
             projectedSubtotal={totals.subtotal + unitPrice * qty}
             freeShippingThreshold={freeShippingThreshold}
             formatCurrency={formatCurrency}
           />
+
+          {/* ZONE 4 — the details, for the shopper who wants them. One rule
+              above the group, headed sections inside it. */}
+          {specs.length > 0 || features.length > 0 || fits.length > 0 || makeFits.length > 0 ? (
+            <ItemRule />
+          ) : null}
 
           {specs.length > 0 ? (
             <AppView gap={11}>
@@ -355,7 +381,10 @@ export default function ItemDetailScreen() {
 
           {fits.length > 0 || makeFits.length > 0 ? (
             <AppView gap={11}>
-              <ItemSectionTitle title={t('itemDetail.fitsTitle')} />
+              <ItemSectionTitle
+                title={t('itemDetail.fitsTitle')}
+                count={fits.length + makeFits.length}
+              />
               <ItemFitList fits={fits} makeFits={makeFits} />
             </AppView>
           ) : null}
@@ -364,12 +393,15 @@ export default function ItemDetailScreen() {
               when it's out of stock. Only mounted when there's a scope to
               query (the hook fires on mount). */}
           {item.categoryId || activeVehicle ? (
-            <ItemSimilarRail
-              currentId={item.id}
-              categoryId={item.categoryId}
-              make={activeVehicle?.make}
-              model={activeVehicle?.model ?? undefined}
-            />
+            <>
+              <ItemRule />
+              <ItemSimilarRail
+                currentId={item.id}
+                categoryId={item.categoryId}
+                make={activeVehicle?.make}
+                model={activeVehicle?.model ?? undefined}
+              />
+            </>
           ) : null}
         </AppView>
       </Animated.ScrollView>

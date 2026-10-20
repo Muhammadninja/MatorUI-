@@ -329,7 +329,11 @@ export default function SourcingOfferScreen() {
                   {t('sourcing.priceFromSeller')}
                 </AppText>
                 {priceText ? (
-                  <AppText family="heading" weight="bold" style={{ fontSize: 28, color: tokens.brand }}>
+                  <AppText
+                  family="heading"
+                  weight="bold"
+                  style={{ fontSize: 28, lineHeight: 34, color: tokens.brand }}
+                >
                     {priceText}
                   </AppText>
                 ) : null}
