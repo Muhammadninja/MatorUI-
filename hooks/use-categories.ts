@@ -33,18 +33,19 @@ const FALLBACK_TILES: CategoryTileData[] = MATOR_CAT_TILES.map((t) => ({
 export const CATEGORIES_QUERY_KEY = ['categories', 'list'] as const;
 
 /**
- * The home grid browses the `main` scope — the 12 designed tiles.
+ * The home grid browses the `main` scope — the 12 designed tiles. A tile's id is
+ * its slug ("brakes"); the Category screen sends it back as
+ * `/v1/catalog/parts?category=<id>`, which the backend rolls up by each part's
+ * `main_category` bucket — the same grouping that produces the tile's `count`.
  *
- * Heads-up on today's data: the server reports `count: 0` for 11 of those 12,
- * and `/v1/catalog/parts?category=<tile id>` returns nothing, because parts are
- * filed under leaf categories ("air-filters", "front-brake-pads") that these
- * tiles sit BESIDE rather than above. The fix belongs on the backend — roll
- * descendant parts into each tile's `count`, and make the `category` filter
- * match descendants.
+ * Parts filed on a subcategory ("front-brake-pads", "air-filters") reach their
+ * tile through that bucket, which the backend derives from the category tree
+ * (`CATEGORY_ID_TO_MAIN_CATEGORY` in the backend's category-map.ts). A part whose
+ * category has no home bucket among the 12 (transmission, cooling, …) is on no
+ * tile, but stays reachable through the systems drill and search.
  *
- * Passing `'vehicle'` switches the grid to the 8 vehicle-system buckets, which
- * do carry live counts and whose ids filter the list through
- * `vehicle_category` — a working stand-in if the rollup takes a while.
+ * `'vehicle'` returns the 8 vehicle-system buckets instead, whose ids filter the
+ * list through `vehicle_category` — a separate taxonomy the home grid doesn't use.
  */
 const DEFAULT_SCOPE: CategoryScope = 'main';
 
