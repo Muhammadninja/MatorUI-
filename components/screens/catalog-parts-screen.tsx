@@ -1,7 +1,7 @@
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AlertCircle, ArrowLeft, PackageOpen, Search, X } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Keyboard, ScrollView, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -95,7 +95,7 @@ export default function CatalogPartsScreen() {
   // vehicle fit, region, GM, OEM, sort, and free-text search all go to the backend.
   // Only the brand chips stay a client-side refinement over the fetched page
   // (the backend `brand` param is single-select; the chips are multi-select).
-  const { state, items, total, refresh } = useCatalogList({
+  const { state, items, total, isRefreshing, refresh } = useCatalogList({
     page: 1,
     pageSize: 50,
     category: categoryId || undefined,
@@ -107,6 +107,15 @@ export default function CatalogPartsScreen() {
     gmOnly: filter.gmOnly || undefined,
     oemOnly: filter.oemOnly || undefined,
   });
+
+  const listRef = useRef<FlashListRef<CatalogItem>>(null);
+
+  // Every chip re-queries the catalog, so the rows underneath are a different
+  // list. Holding the old scroll offset would land the shopper somewhere in the
+  // middle of results they never scrolled past — the page appearing to lurch.
+  const resetScroll = useCallback(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, []);
 
   const { addItem } = useCartContext();
   const { isAuthenticated } = useUserContext();
@@ -285,6 +294,7 @@ export default function CatalogPartsScreen() {
               onPress={() => {
                 triggerHaptic('selection');
                 setFilter(DEFAULT_FILTER);
+                resetScroll();
               }}
             />
           ) : null}
@@ -297,6 +307,7 @@ export default function CatalogPartsScreen() {
               onPress={() => {
                 triggerHaptic('selection');
                 c.onPress();
+                resetScroll();
               }}
             />
           ))}
@@ -346,27 +357,38 @@ export default function CatalogPartsScreen() {
           </AppText>
         </AppView>
       ) : (
-        <FlashList
-          data={results}
-          keyExtractor={(it) => it.id}
-          renderItem={renderItem}
-          ItemSeparatorComponent={() => (
-            <AppView style={{ height: 1, backgroundColor: tokens.divider }} />
-          )}
-          ListHeaderComponent={
-            <AppView px={16} style={{ paddingBottom: 10 }}>
-              {/* The vehicle lives in this line now, not in a bar above it. */}
-              <FitmentNote
-                lead={[categoryLabel, t('catalog.partCount', { count: resultCount })]
-                  .filter(Boolean)
-                  .join(' · ')}
-              />
-            </AppView>
-          }
-          contentContainerStyle={{ paddingTop: 4, paddingBottom: insets.bottom + 96 }}
-          showsVerticalScrollIndicator={false}
-          keyboardDismissMode="on-drag"
-        />
+        // Dimmed, not torn down, while the new query is in flight: the rows
+        // stay put and the tapped chip is already lit, so a chip tap reads as
+        // one move instead of a spinner wiping the page.
+        <AppView flex={1} style={{ opacity: isRefreshing ? 0.5 : 1 }}>
+          <FlashList
+            ref={listRef}
+            data={results}
+            keyExtractor={(it) => it.id}
+            renderItem={renderItem}
+            ItemSeparatorComponent={() => (
+              <AppView style={{ height: 1, backgroundColor: tokens.divider }} />
+            )}
+            ListHeaderComponent={
+              <AppView px={16} style={{ paddingBottom: 10 }}>
+                {/* The vehicle lives in this line now, not in a bar above it. */}
+                <FitmentNote
+                  lead={[categoryLabel, t('catalog.partCount', { count: resultCount })]
+                    .filter(Boolean)
+                    .join(' · ')}
+                />
+              </AppView>
+            }
+            // FlashList v2 anchors on the visible row BY DEFAULT; when the rows
+            // swap under a new filter it re-pins the scroll to whatever you were
+            // looking at, which reads as the page jumping down. A filtered browse
+            // list is top-anchored — the new first result is the point.
+            maintainVisibleContentPosition={{ disabled: true }}
+            contentContainerStyle={{ paddingTop: 4, paddingBottom: insets.bottom + 96 }}
+            showsVerticalScrollIndicator={false}
+            keyboardDismissMode="on-drag"
+          />
+        </AppView>
       )}
     </AppView>
   );

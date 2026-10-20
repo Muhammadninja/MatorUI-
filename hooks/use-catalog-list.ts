@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
 import { ApiError } from '@/services/api-client';
 import {
@@ -34,6 +34,11 @@ export type UseCatalogListValue = {
    *  Lets screens degrade offline failures to an empty state instead of a
    *  scary error card. */
   isOffline: boolean;
+  /** True while a NEW request (a different sort, filter, or page) is in
+   *  flight but the previous result is still on screen. Screens use it to
+   *  dim the list instead of tearing it down. A background refetch of the
+   *  SAME key doesn't set it — that would flicker on every mount. */
+  isRefreshing: boolean;
   /** Re-fire the request — invalidates the cache + refetches. */
   refresh: () => void;
 };
@@ -68,6 +73,12 @@ export function useCatalogList(request: CatalogListRequest = DEFAULT_REQUEST): U
   const query = useQuery({
     queryKey: catalogListQueryKey(request),
     queryFn: ({ signal }) => fetchCatalogList({ ...request, signal }),
+    // Changing the sort changes the query key. Without this, React Query
+    // treats it as a first load: `isPending` flips true, the hook reports
+    // 'loading', and the screen empties its list and unmounts the very sort
+    // row that was just tapped — the rows then jump back in when the response
+    // lands. Keeping the previous page makes a re-sort a swap, not a teardown.
+    placeholderData: keepPreviousData,
   });
 
   return useMemo<UseCatalogListValue>(() => {
@@ -86,6 +97,7 @@ export function useCatalogList(request: CatalogListRequest = DEFAULT_REQUEST): U
       state,
       items,
       total,
+      isRefreshing: query.isPlaceholderData,
       error: query.error instanceof Error ? query.error.message : null,
       isOffline,
       refresh: () => {
