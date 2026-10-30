@@ -4,6 +4,7 @@ import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-qu
 import { ApiError } from '@/services/api-client';
 import {
   fetchCatalogList,
+  type CatalogBrandFacet,
   type CatalogItem,
   type CatalogListRequest,
 } from '@/services/catalog-service';
@@ -60,7 +61,7 @@ export function catalogListQueryKey(req: CatalogListRequest) {
     req.vehicleCategory,
     req.make,
     req.model,
-    req.brand,
+    req.brands,
     req.regions,
     req.gmOnly,
     req.oemOnly,
@@ -114,6 +115,9 @@ export const CATALOG_PAGE_SIZE = 24;
 export type CatalogBrowseRequest = Omit<CatalogListRequest, 'page' | 'signal'>;
 
 export type UseCatalogInfiniteListValue = UseCatalogListValue & {
+  /** The part brands the whole result offers, each with its count — the
+   *  server's, so a brand found only on pages not loaded yet is here too. */
+  brandFacets: CatalogBrandFacet[];
   /** The server has rows past the loaded ones. */
   hasMore: boolean;
   /** The next page is in flight — the list's footer spinner. */
@@ -131,9 +135,9 @@ export type UseCatalogInfiniteListValue = UseCatalogListValue & {
 };
 
 /** The React Query key of a scrolled list. Every request field is in it, so
- *  changing any — category, model, search, a filter, the sort — is a new list
- *  that starts again from page 1, and a late answer for the old one lands in
- *  the old one's cache entry, never in the new list. */
+ *  changing any — category, model, search, brands, a filter, the sort — is a
+ *  new list that starts again from page 1, and a late answer for the old one
+ *  lands in the old one's cache entry, never in the new list. */
 export function catalogBrowseQueryKey(req: CatalogBrowseRequest) {
   return ['catalog', 'browse', req] as const;
 }
@@ -201,6 +205,8 @@ export function useCatalogInfiniteList(request: CatalogBrowseRequest): UseCatalo
       items,
       // The newest page's count: the catalogue may have moved since page 1.
       total: pages?.[pages.length - 1]?.total ?? 0,
+      // The newest page's brands, for the same reason.
+      brandFacets: pages?.[pages.length - 1]?.brandFacets ?? [],
       isRefreshing: query.isPlaceholderData,
       error: query.error instanceof Error ? query.error.message : null,
       isOffline: query.error instanceof ApiError && query.error.isNetworkError,

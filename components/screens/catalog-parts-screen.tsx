@@ -30,20 +30,17 @@ const DEFAULT_FILTER: FilterState = {
   sortBy: 'relevance',
 };
 
-/** Brand shown on a part = the part manufacturer (`CatalogItem.brand`, e.g.
- *  "Gates"), falling back to the first segment of its "brand · category"
- *  description for items mapped before `brand` was populated. */
-function brandOf(item: CatalogItem): string {
-  return item.brand?.trim() || item.description?.split('·')[0]?.trim() || '';
-}
+/** A part brand as its chip knows it. */
+type BrandChoice = FilterState['brands'][number];
 
 /**
  * Catalog parts (Stage 3) — the parts list for a chosen system + vehicle.
  * Fixed header (back + search) over a single horizontally-scrolling row of
  * QUICK FILTERS — sort, GM/OEM flags, region, and brand chips that each apply
  * on tap. There is no filter bottom sheet: every refinement is a one-tap chip.
- * All but the brand chips go to the backend; those refine the loaded pages
- * client-side. The list loads a page at a time as the shopper nears its end.
+ * Every chip goes to the backend, so it filters the whole catalogue and the
+ * list starts again from page 1. The list loads a page at a time as the
+ * shopper nears its end.
  */
 export default function CatalogPartsScreen() {
   const { t } = useTranslation();
@@ -86,22 +83,24 @@ export default function CatalogPartsScreen() {
   // Quick-filter mutators — every chip applies immediately (no draft, no Apply).
   const toggleSort = (s: CatalogSortBy) =>
     setFilter((f) => ({ ...f, sortBy: f.sortBy === s ? 'relevance' : s }));
-  const toggleBrand = (b: string) =>
+  const toggleBrand = (b: BrandChoice) =>
     setFilter((f) => ({
       ...f,
-      brands: f.brands.includes(b) ? f.brands.filter((x) => x !== b) : [...f.brands, b],
+      brands: f.brands.some((x) => x.id === b.id)
+        ? f.brands.filter((x) => x.id !== b.id)
+        : [...f.brands, b],
     }));
 
   // All catalog filtering/sorting/search happen SERVER-SIDE so they act on the
   // whole catalog (not just the fetched pages) and the count is accurate:
-  // category, vehicle fit, region, GM, OEM, sort, and free-text search all go to
-  // the backend, and changing any of them starts the list again from page 1.
-  // Only the brand chips stay a client-side refinement over the fetched pages
-  // (the backend `brand` param is single-select; the chips are multi-select).
+  // category, vehicle fit, brand, region, GM, OEM, sort, and free-text search
+  // all go to the backend, and changing any of them starts the list again from
+  // page 1.
   const {
     state,
     items,
     total,
+    brandFacets,
     isRefreshing,
     refresh,
     isLoadingMore,
@@ -115,6 +114,9 @@ export default function CatalogPartsScreen() {
     model: model || undefined,
     search: debouncedSearch || undefined,
     sortBy: filter.sortBy,
+    // In one order whichever order they were tapped in: a set of brands is
+    // one list, one cache entry.
+    brands: filter.brands.length ? filter.brands.map((b) => b.id).sort() : undefined,
     regions: filter.regions.length ? filter.regions : undefined,
     gmOnly: filter.gmOnly || undefined,
     oemOnly: filter.oemOnly || undefined,
@@ -133,22 +135,16 @@ export default function CatalogPartsScreen() {
   const { isAuthenticated } = useUserContext();
   const toast = useToast();
 
-  const brands = useMemo(
-    () => Array.from(new Set(items.map(brandOf).filter(Boolean))).sort(),
-    [items],
-  );
-
-  // Category, region, GM, OEM, sort, and search are all applied server-side, so
-  // the fetched `items` are already the correct, correctly-ordered pages. The
-  // only client-side refinement left is the multi-select brand chip set.
-  const results = useMemo(() => {
-    if (!filter.brands.length) return items;
-    return items.filter((it) => filter.brands.includes(brandOf(it)));
-  }, [items, filter.brands]);
-
-  // Show the TRUE server total for the query; only when the client-side brand
-  // refinement is active does the visible count drop to the filtered rows loaded.
-  const resultCount = filter.brands.length ? results.length : total;
+  // The brand chips: every brand the server counts across the whole result —
+  // not the brands of the rows loaded so far — plus any picked brand the other
+  // filters now leave with no parts, so a pick can always be seen and undone.
+  const brands = useMemo<BrandChoice[]>(() => {
+    const byId = new Map(brandFacets.map((b) => [b.id, b.name]));
+    for (const b of filter.brands) if (!byId.has(b.id)) byId.set(b.id, b.name);
+    return [...byId]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [brandFacets, filter.brands]);
 
   const activeFilterCount =
     filter.brands.length +
@@ -188,11 +184,11 @@ export default function CatalogPartsScreen() {
     ];
     for (const b of brands) {
       list.push({
-        key: `brand:${b}`,
-        label: b,
-        active: filter.brands.includes(b),
+        key: `brand:${b.id}`,
+        label: b.name,
+        active: filter.brands.some((x) => x.id === b.id),
         onPress: () => toggleBrand(b),
-        testID: `filter-brand-${b}`,
+        testID: `filter-brand-${b.name}`,
       });
     }
     return list;
@@ -355,7 +351,7 @@ export default function CatalogPartsScreen() {
             </AppText>
           </AppPressableView>
         </AppView>
-      ) : results.length === 0 ? (
+      ) : items.length === 0 ? (
         <AppView flex={1} center px="xl" gap={10}>
           <PackageOpen size={30} strokeWidth={2} color={tokens.textMuted} />
           <AppText family="heading" weight="bold" style={{ fontSize: 17, color: tokens.text }}>
@@ -375,7 +371,7 @@ export default function CatalogPartsScreen() {
         <AppView flex={1} style={{ opacity: isRefreshing ? 0.5 : 1 }}>
           <FlashList
             ref={listRef}
-            data={results}
+            data={items}
             keyExtractor={(it) => it.id}
             renderItem={renderItem}
             ItemSeparatorComponent={() => (
@@ -385,7 +381,7 @@ export default function CatalogPartsScreen() {
               <AppView px={16} style={{ paddingBottom: 10 }}>
                 {/* The vehicle lives in this line now, not in a bar above it. */}
                 <FitmentNote
-                  lead={[categoryLabel, t('catalog.partCount', { count: resultCount })]
+                  lead={[categoryLabel, t('catalog.partCount', { count: total })]
                     .filter(Boolean)
                     .join(' · ')}
                 />

@@ -12,7 +12,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import { FakeCatalog, partsIn } from './fixtures/catalog-parts';
+import { brandCatalogue, brandId, FakeCatalog, partsIn } from './fixtures/catalog-parts';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -33,7 +33,10 @@ vi.mock('@/services/api-client', () => ({
   },
 }));
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'ru' } }),
+  useTranslation: () => ({
+    t: (k: string, o?: { count?: number }) => (o?.count === undefined ? k : `${k}:${o.count}`),
+    i18n: { language: 'ru' },
+  }),
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -98,7 +101,7 @@ vi.mock('@/components/screens-components/catalog/product-row', () => ({ default:
 vi.mock('@/components/screens-components/catalog/results-toolbar', () => ({
   default: host('toolbar'),
 }));
-vi.mock('@/components/screens-components/catalog/fitment-note', () => ({ default: () => null }));
+vi.mock('@/components/screens-components/catalog/fitment-note', () => ({ default: host('note') }));
 vi.mock('@/contexts/theme.context', () => ({ useThemeContext: () => ({ tokens: {} }) }));
 vi.mock('@/contexts/cart.context', () => ({ useCartContext: () => ({ addItem: () => {} }) }));
 vi.mock('@/contexts/user.context', () => ({ useUserContext: () => ({ isAuthenticated: true }) }));
@@ -351,5 +354,124 @@ describe('Parts screen (brand → model → subcategory)', () => {
         .slice(0, 24)
         .map((p) => p.id),
     );
+  });
+});
+
+describe('Parts screen brand chips (130 parts; 52 Bosch, 2 of them on page 1)', () => {
+  beforeEach(() => {
+    catalog = new FakeCatalog(brandCatalogue());
+    get.mockImplementation(catalog.get);
+    params = {};
+  });
+
+  const brandChips = (r: ReactTestRenderer) =>
+    r.root
+      .findAll((n) => is(n, 'pressable') && String(n.props.testID).startsWith('filter-brand-'))
+      .map((n) => (n.props.testID as string).slice('filter-brand-'.length));
+  const clearChip = (r: ReactTestRenderer) =>
+    r.root.find((n) => is(n, 'pressable') && n.props.testID === 'filter-clear-btn');
+  /** The count the list header shows. */
+  const partCount = (r: ReactTestRenderer) =>
+    Number(/partCount:(\d+)/.exec(r.root.find((n) => is(n, 'note')).props.lead as string)?.[1]);
+  const partsOf = (brand: string) => catalog.rows.filter((p) => p.brand === brand).map((p) => p.id);
+  const brandOf = (id: string) => catalog.rows.find((p) => p.id === id)?.brand;
+  async function search(r: ReactTestRenderer, text: string) {
+    await act(async () => {
+      (r.root.find((n) => is(n, 'input')).props.onChangeText as (s: string) => void)(text);
+    });
+    await settle(350); // past the search debounce
+  }
+
+  test('offers every brand of the catalogue, not only the brands on the loaded page', async () => {
+    const r = await render(<CatalogPartsScreen />);
+    expect(rows(r).map(brandOf)).not.toContain('Sachs');
+    expect(brandChips(r)).toEqual(['Bosch', 'Febi', 'Gates', 'Mann', 'Sachs']);
+  });
+
+  test('a brand lists that brand across the whole catalogue, from page 1 to its last', async () => {
+    const r = await render(<CatalogPartsScreen />);
+    await reachEnd(); // the unfiltered page 2, before the pick
+    const asked = catalog.calls.length;
+    await press(chip(r, 'Bosch'));
+    expect(catalog.paramsSince(asked)).toEqual([
+      expect.objectContaining({ page: '1', brand: brandId('Bosch') }),
+    ]);
+    expect(rows(r)).toEqual(partsOf('Bosch').slice(0, 24));
+    expect(partCount(r)).toBe(52);
+
+    await reachEnd();
+    await reachEnd();
+    await reachEnd();
+    expect(rows(r)).toEqual(partsOf('Bosch'));
+    expect(partCount(r)).toBe(52);
+    expect(pages(asked)).toEqual(['1', '2', '3']);
+  });
+
+  test('a second brand joins the first; unpicking one lists the other alone, from page 1', async () => {
+    const r = await render(<CatalogPartsScreen />);
+    await press(chip(r, 'Bosch'));
+    await press(chip(r, 'Mann'));
+    expect(catalog.params()).toMatchObject({
+      page: '1',
+      brand: `${brandId('Bosch')},${brandId('Mann')}`,
+    });
+    expect(partCount(r)).toBe(62);
+    expect(new Set(rows(r).map(brandOf))).toEqual(new Set(['Bosch', 'Mann']));
+
+    await press(chip(r, 'Bosch'));
+    expect(catalog.params()).toMatchObject({ page: '1', brand: brandId('Mann') });
+    expect(rows(r)).toEqual(partsOf('Mann'));
+    expect(partCount(r)).toBe(10);
+  });
+
+  test('Clear lists the whole catalogue again, from page 1', async () => {
+    const r = await render(<CatalogPartsScreen />);
+    await press(chip(r, 'Bosch'));
+    await reachEnd();
+    await press(clearChip(r));
+    expect(catalog.params()).toMatchObject({ page: '1' });
+    expect(catalog.params()).not.toHaveProperty('brand');
+    expect(rows(r)).toEqual(catalog.rows.slice(0, 24).map((p) => p.id));
+    expect(partCount(r)).toBe(130);
+  });
+
+  test('the brand rides with the model, the category, the sort and the search', async () => {
+    params = {
+      categoryId: 'brake-system',
+      categoryLabel: 'Тормозная система',
+      make: 'Chevrolet',
+      model: 'Cobalt',
+    };
+    const r = await render(<CatalogPartsScreen />);
+    await press(chip(r, 'Bosch'));
+    await press(chip(r, 'catalog.priceAsc'));
+    await search(r, 'pad');
+    const last = catalog.params();
+    expect(last).toMatchObject({
+      page: '1',
+      brand: brandId('Bosch'),
+      category: 'brake-system',
+      make: 'Chevrolet',
+      model: 'Cobalt',
+      sort: 'price_asc',
+      q: 'pad',
+    });
+    const expected = catalog.matching(catalog.calls.at(-1)!).map((p) => p.id);
+    expect(expected).toHaveLength(9);
+    expect(rows(r)).toEqual(expected);
+    expect(partCount(r)).toBe(9);
+  });
+
+  test('a picked brand keeps its chip when nothing matches, so it can be unpicked', async () => {
+    const r = await render(<CatalogPartsScreen />);
+    await press(chip(r, 'Bosch'));
+    await search(r, 'zzz');
+    expect(rows(r)).toEqual([]);
+    expect(brandChips(r)).toEqual(['Bosch']);
+    expect(chip(r, 'Bosch').props.accessibilityState).toEqual({ selected: true });
+
+    await press(chip(r, 'Bosch'));
+    expect(catalog.params()).toMatchObject({ page: '1', q: 'zzz' });
+    expect(catalog.params()).not.toHaveProperty('brand');
   });
 });

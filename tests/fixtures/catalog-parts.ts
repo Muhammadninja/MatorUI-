@@ -1,8 +1,10 @@
 /**
  * TEST-ONLY: GET /v1/catalog/parts over an in-memory catalogue, paged the way
  * the backend pages it — `page` / `page_size` in, `{ items, total, page,
- * page_size, next_page }` out — with the filters the listing screens send
- * (category, make, model, q, gm_only, oem_only, region, sort).
+ * page_size, next_page, facets }` out — with the filters the listing screens
+ * send (category, make, model, brand, q, gm_only, oem_only, region, sort).
+ * Like the backend, it applies `brand` before counting and paging, and counts
+ * `facets.brands` over every filter BUT `brand`.
  *
  * A test can hold answers back and release them in any order (`holding`), or
  * fail the next request (`failNext`). Every request is kept in `calls`.
@@ -11,6 +13,9 @@
 export type FakePart = {
   id: string;
   category: string;
+  /** The subcategory beneath `category` it is filed on, if any: asking for
+   *  either lists it, as the backend lists a root's whole subtree. */
+  subcategory?: string;
   make: string;
   model: string;
   title: string;
@@ -18,8 +23,12 @@ export type FakePart = {
   gm: boolean;
   oem: boolean;
   region: string;
+  /** The part brand's name; the backend knows it by `brandId(brand)`. */
   brand: string;
 };
+
+/** The id the fake backend serves a brand under: 'Bosch' → 'brand_bosch'. */
+export const brandId = (name: string) => `brand_${name.toLowerCase()}`;
 
 /** `n` parts filed on `category`, ids `<prefix>-01`…, shaped by `over(i)`. */
 export function partsIn(
@@ -41,6 +50,43 @@ export function partsIn(
     brand: 'Gates',
     ...over(i),
   }));
+}
+
+const CARS = [
+  { make: 'Chevrolet', model: 'Cobalt' },
+  { make: 'BYD', model: 'Song Plus' },
+  { make: 'Volkswagen', model: 'Polo' },
+];
+
+/**
+ * 130 parts over five brands, 52 of them Bosch — and only two of those (p-005,
+ * p-017) on the first page of 24 the unfiltered list serves; the other 50 are
+ * spread over the pages after it, as is every Sachs part. Brake pads, brake
+ * discs (both under `brake-system`) and oil filters (under `engine-system`),
+ * for a Chevrolet Cobalt, a BYD Song Plus and a Volkswagen Polo in turn.
+ */
+export function brandCatalogue(): FakePart[] {
+  return Array.from({ length: 130 }, (_, i) => {
+    // Neighbours share their filing, car and flags, so every brand gets a mix.
+    const k = Math.floor(i / 2);
+    const engine = k % 4 === 3;
+    const bosch = i < 24 ? i === 4 || i === 16 : i % 2 === 0 && i < 124;
+    const other =
+      i < 24 ? ['Mann', 'Gates', 'Febi'][i % 3] : ['Mann', 'Gates', 'Febi', 'Sachs'][i % 4];
+    const subcategory = engine ? 'oil-filters' : k % 2 ? 'brake-discs' : 'brake-pads';
+    return {
+      id: `p-${String(i + 1).padStart(3, '0')}`,
+      category: engine ? 'engine-system' : 'brake-system',
+      subcategory,
+      ...CARS[k % 3],
+      title: `${engine ? 'Oil filter' : k % 2 ? 'Brake disc' : 'Brake pad'} ${i + 1}`,
+      priceUzs: 100_000 + ((i * 7919) % 50) * 1_000,
+      gm: k % 5 === 0,
+      oem: k % 6 === 0,
+      region: k % 2 ? 'europe' : 'china',
+      brand: bosch ? 'Bosch' : other,
+    };
+  });
 }
 
 type Held = { url: string; release: () => void; fail: () => void };
@@ -90,12 +136,24 @@ export class FakeCatalog {
   /** The rows `url` selects, in its order, before paging. */
   matching(url: string): FakePart[] {
     const q = new URL(url, 'https://api.test').searchParams;
+    const brands = q.get('brand')?.split(',');
+    const rows = this.offered(q);
+    return brands ? rows.filter((p) => brands.includes(brandId(p.brand))) : rows;
+  }
+
+  /** The rows `q` selects by every filter but `brand`, in its order. */
+  private offered(q: URLSearchParams): FakePart[] {
     let rows = this.rows;
     const keep = (param: string, value: (p: FakePart) => string) => {
       const want = q.getAll(param);
       if (want.length) rows = rows.filter((p) => want.includes(value(p)));
     };
-    keep('category', (p) => p.category);
+    const categories = q.getAll('category');
+    if (categories.length) {
+      rows = rows.filter(
+        (p) => categories.includes(p.category) || categories.includes(p.subcategory ?? ''),
+      );
+    }
     keep('make', (p) => p.make);
     keep('model', (p) => p.model);
     keep('region', (p) => p.region);
@@ -117,12 +175,14 @@ export class FakeCatalog {
     const q = new URL(url, 'https://api.test').searchParams;
     const page = Number(q.get('page'));
     const size = Number(q.get('page_size'));
+    const brands = new Map<string, number>();
+    for (const p of this.offered(q)) brands.set(p.brand, (brands.get(p.brand) ?? 0) + 1);
     return {
       items: rows.slice((page - 1) * size, page * size).map((p) => ({
         id: p.id,
         title: p.title,
         price_uzs: p.priceUzs,
-        brand: { id: p.brand.toLowerCase(), name: p.brand },
+        brand: { id: brandId(p.brand), name: p.brand },
         in_stock: true,
         images: [],
       })),
@@ -130,6 +190,9 @@ export class FakeCatalog {
       page,
       page_size: size,
       next_page: page * size < rows.length ? page + 1 : null,
+      facets: {
+        brands: [...brands].map(([name, count]) => ({ id: brandId(name), name, count })),
+      },
     };
   }
 }

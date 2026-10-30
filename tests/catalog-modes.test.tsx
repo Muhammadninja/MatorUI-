@@ -177,6 +177,7 @@ vi.mock('@/hooks/use-catalog-list', () => ({
       state: 'success',
       items: [],
       total: 0,
+      brandFacets: [],
       isRefreshing: false,
       refresh: () => {},
       hasMore: false,
