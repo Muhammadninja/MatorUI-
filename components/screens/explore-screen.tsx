@@ -79,8 +79,8 @@ export default function ExploreScreen() {
   const [headerHeight, setHeaderHeight] = useState(insets.top + 132);
   const toast = useToast();
 
-  // "Shop by category" grid — the roots of the category tree, live from
-  // GET /v1/reference/categories.
+  // "Shop by category" grid — the roots of the category tree with their parts
+  // counts, live from GET /v1/reference/categories.
   const { state: categoriesState, categories, refresh: refreshCategories } = useCategories();
   // "Shop by vehicle" row — live from GET /v1/reference/makes (admin-managed),
   // falling back to the bundled makes on error so it never renders blank.

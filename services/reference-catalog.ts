@@ -75,6 +75,9 @@ export type RefCategory = {
   parentId: string | null;
   level: number;
   sortOrder: number;
+  /** A root's listed parts, its whole subtree counted once — computed by the
+   *  backend. Never on a child; absent when the backend sent none. */
+  productsCount?: number;
 };
 
 /**
@@ -341,6 +344,7 @@ export async function fetchReferenceCategories(
       parentId: (c.parentId as string | null) ?? (c.parent_id as string | null) ?? null,
       level: numOrUndef(c.level) ?? 0,
       sortOrder: numOrUndef(c.sortOrder) ?? numOrUndef(c.sort_order) ?? 0,
+      productsCount: numOrUndef(c.productsCount) ?? numOrUndef(c.products_count),
     }));
   } catch {
     return [];

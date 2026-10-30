@@ -11,6 +11,10 @@
  * attached here from ROOT_META, keyed on the stable root id. A root the map
  * doesn't know still shows, after the known ones, with the default icon.
  *
+ * A home tile also carries its root's parts count (`productsCount`, counted by
+ * the backend over the root's whole subtree). The systems list carries none: it
+ * follows a model pick, and the root's count spans every model.
+ *
  * i18n: `name` is the INTERNAL canonical name — kept for icon resolution,
  * placeholder detection and logs, never rendered. `nameRu`/`nameUz`/`nameEn`
  * are the display names; the hooks resolve `label` from them for the active
@@ -33,8 +37,8 @@ export type CategoryTileData = {
   nameRu?: string;
   nameUz?: string;
   nameEn?: string;
-  /** Parts count, when the source has one. The tree roots carry none, so the
-   *  home grid shows no count line. */
+  /** Parts count shown under the name — a home tile's `productsCount`. Absent
+   *  on the systems list and when the backend sent none: no count line then. */
   count?: number;
   /** Accent color for the tile. */
   color: string;
@@ -89,8 +93,8 @@ export type RootSurface = 'home' | 'systems';
 
 const DEFAULT_TILE_COLOR = '#4285f4';
 
-/** One served root as a tile. */
-function rootTile(root: RefCategory): CategoryTileData {
+/** One served root as a tile on `surface`. */
+function rootTile(root: RefCategory, surface: RootSurface): CategoryTileData {
   const meta = ROOT_META[root.id];
   return {
     id: root.id,
@@ -100,6 +104,7 @@ function rootTile(root: RefCategory): CategoryTileData {
     nameRu: root.titleRu ?? undefined,
     nameUz: root.titleUz ?? undefined,
     nameEn: root.titleEn ?? undefined,
+    count: surface === 'home' ? root.productsCount : undefined,
     color: meta?.color ?? DEFAULT_TILE_COLOR,
     iconKey: meta?.iconKey || root.slug || root.id,
   };
@@ -123,5 +128,8 @@ export async function fetchRootCategories(
   signal?: AbortSignal,
 ): Promise<CategoryTileData[]> {
   const roots = await fetchReferenceCategories(undefined, signal);
-  return sortRoots(roots.map(rootTile), surface === 'home' ? HOME_ROOT_ORDER : SYSTEMS_ROOT_ORDER);
+  return sortRoots(
+    roots.map((root) => rootTile(root, surface)),
+    surface === 'home' ? HOME_ROOT_ORDER : SYSTEMS_ROOT_ORDER,
+  );
 }

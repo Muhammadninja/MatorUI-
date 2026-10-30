@@ -23,7 +23,8 @@ export const CATEGORIES_QUERY_KEY = ['categories', 'list'] as const;
  * (`/v1/catalog/parts?category=<id>`, which the backend widens to the root's
  * whole subtree).
  *
- * Roots carry no parts count, so the tiles show none.
+ * Each tile carries its root's parts count, served on the same response
+ * (`productsCount`); a backend without it leaves the tiles with no count line.
  */
 export function useCategories(): UseCategoriesValue {
   const { i18n } = useTranslation();

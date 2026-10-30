@@ -194,6 +194,9 @@ export type CatalogListResponse = {
   total: number;
   page: number;
   pageSize: number;
+  /** The page after this one, or null on the last page (the backend's
+   *  `next_page`). */
+  nextPage: number | null;
 };
 
 export type CatalogDetailRequest = {
@@ -418,6 +421,7 @@ export function getCatalogMockList(request: CatalogListRequest): CatalogListResp
     total: items.length,
     page: request.page,
     pageSize: request.pageSize,
+    nextPage: nextPageOf(request.page, request.pageSize, items.length),
   };
 }
 
@@ -633,7 +637,8 @@ type ApiCatalogPartsResponse = {
   total: number;
   page: number;
   page_size: number;
-  next_page: number | null;
+  /** Absent from an older backend — derived from the paging numbers then. */
+  next_page?: number | null;
 };
 
 /**
@@ -838,13 +843,17 @@ class HttpCatalogTransport implements CatalogTransport {
       `${API_BASE}/parts?${params.toString()}`,
       { signal: request.signal },
     );
+    const total = res.total ?? 0;
+    const page = res.page ?? request.page;
+    const pageSize = res.page_size ?? request.pageSize;
     return {
       // Guard against a response without an `items` array (empty page / error
       // body) so a filled catalog can't crash the listing.
       items: (res.items ?? []).map(mapPartToCatalogItem),
-      total: res.total ?? 0,
-      page: res.page ?? request.page,
-      pageSize: res.page_size ?? request.pageSize,
+      total,
+      page,
+      pageSize,
+      nextPage: res.next_page !== undefined ? res.next_page : nextPageOf(page, pageSize, total),
     };
   }
   async detail(id: string, signal?: AbortSignal): Promise<CatalogDetailResponse | null> {
@@ -893,4 +902,9 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
 
 function parsePrice(price: string): number {
   return Number(price.replace(/[^0-9.]/g, '')) || 0;
+}
+
+/** The page after `page`, or null when it is the last — the backend's rule. */
+function nextPageOf(page: number, pageSize: number, total: number): number | null {
+  return page * pageSize < total ? page + 1 : null;
 }

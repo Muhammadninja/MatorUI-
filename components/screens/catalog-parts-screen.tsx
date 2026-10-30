@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Keyboard, ScrollView, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import CatalogListFooter from '@/components/screens-components/catalog/catalog-list-footer';
 import ProductRow from '@/components/screens-components/catalog/product-row';
 import FitmentNote from '@/components/screens-components/catalog/fitment-note';
 import { AppText } from '@/components/shared/app-text';
@@ -14,7 +15,7 @@ import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useCartContext } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useUserContext } from '@/contexts/user.context';
-import { useCatalogList } from '@/hooks/use-catalog-list';
+import { CATALOG_PAGE_SIZE, useCatalogInfiniteList } from '@/hooks/use-catalog-list';
 import { useToast } from '@/hooks/use-toast';
 import type { CatalogItem } from '@/services/catalog-service';
 import type { CatalogSortBy, FilterState } from '@/types/catalog-nav';
@@ -41,7 +42,8 @@ function brandOf(item: CatalogItem): string {
  * Fixed header (back + search) over a single horizontally-scrolling row of
  * QUICK FILTERS — sort, GM/OEM flags, region, and brand chips that each apply
  * on tap. There is no filter bottom sheet: every refinement is a one-tap chip.
- * Region + GM go to the backend; the rest refine the fetched page client-side.
+ * All but the brand chips go to the backend; those refine the loaded pages
+ * client-side. The list loads a page at a time as the shopper nears its end.
  */
 export default function CatalogPartsScreen() {
   const { t } = useTranslation();
@@ -91,13 +93,23 @@ export default function CatalogPartsScreen() {
     }));
 
   // All catalog filtering/sorting/search happen SERVER-SIDE so they act on the
-  // whole catalog (not just the fetched page) and the count is accurate: category,
-  // vehicle fit, region, GM, OEM, sort, and free-text search all go to the backend.
-  // Only the brand chips stay a client-side refinement over the fetched page
+  // whole catalog (not just the fetched pages) and the count is accurate:
+  // category, vehicle fit, region, GM, OEM, sort, and free-text search all go to
+  // the backend, and changing any of them starts the list again from page 1.
+  // Only the brand chips stay a client-side refinement over the fetched pages
   // (the backend `brand` param is single-select; the chips are multi-select).
-  const { state, items, total, isRefreshing, refresh } = useCatalogList({
-    page: 1,
-    pageSize: 50,
+  const {
+    state,
+    items,
+    total,
+    isRefreshing,
+    refresh,
+    isLoadingMore,
+    loadMoreError,
+    loadMore,
+    retryLoadMore,
+  } = useCatalogInfiniteList({
+    pageSize: CATALOG_PAGE_SIZE,
     category: categoryId || undefined,
     make: make || undefined,
     model: model || undefined,
@@ -127,15 +139,15 @@ export default function CatalogPartsScreen() {
   );
 
   // Category, region, GM, OEM, sort, and search are all applied server-side, so
-  // the fetched `items` are already the correct, correctly-ordered page. The only
-  // client-side refinement left is the multi-select brand chip set.
+  // the fetched `items` are already the correct, correctly-ordered pages. The
+  // only client-side refinement left is the multi-select brand chip set.
   const results = useMemo(() => {
     if (!filter.brands.length) return items;
     return items.filter((it) => filter.brands.includes(brandOf(it)));
   }, [items, filter.brands]);
 
   // Show the TRUE server total for the query; only when the client-side brand
-  // refinement is active does the visible count drop to the filtered page length.
+  // refinement is active does the visible count drop to the filtered rows loaded.
   const resultCount = filter.brands.length ? results.length : total;
 
   const activeFilterCount =
@@ -379,6 +391,15 @@ export default function CatalogPartsScreen() {
                 />
               </AppView>
             }
+            ListFooterComponent={
+              <CatalogListFooter
+                loading={isLoadingMore}
+                failed={loadMoreError}
+                onRetry={retryLoadMore}
+              />
+            }
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.5}
             // FlashList v2 anchors on the visible row BY DEFAULT; when the rows
             // swap under a new filter it re-pins the scroll to whatever you were
             // looking at, which reads as the page jumping down. A filtered browse

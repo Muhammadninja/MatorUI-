@@ -19,6 +19,7 @@ import {
   CATEGORY_BY_ID,
   CATEGORY_ROWS,
   LANGS,
+  ROOT_PRODUCTS_COUNT,
   csvName,
   referenceCategories,
   referenceNode,
@@ -110,7 +111,15 @@ describe('home grid', () => {
     }
   });
 
-  test('carries no parts count (roots have none)', async () => {
+  test("carries each root's parts count exactly as the backend served it", async () => {
+    const tiles = await fetchRootCategories('home');
+    expect(Object.fromEntries(tiles.map((t) => [t.id, t.count]))).toEqual(ROOT_PRODUCTS_COUNT);
+  });
+
+  test('carries no count from a backend that serves none', async () => {
+    get.mockImplementation(async (url: string) => ({
+      items: referenceCategories(url).items.map(({ productsCount: _count, ...node }) => node),
+    }));
     for (const tile of await fetchRootCategories('home')) expect(tile.count).toBeUndefined();
   });
 
@@ -168,6 +177,10 @@ describe('systems list', () => {
       'tuning-and-accessories',
       'other',
     ]);
+  });
+
+  test('carries no parts count: it follows a model pick, the count spans every model', async () => {
+    for (const tile of await fetchRootCategories('systems')) expect(tile.count).toBeUndefined();
   });
 });
 

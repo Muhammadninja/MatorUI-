@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import CatalogListFooter from '@/components/screens-components/catalog/catalog-list-footer';
 import ProductRow from '@/components/screens-components/catalog/product-row';
 import ResultsToolbar from '@/components/screens-components/catalog/results-toolbar';
 import { AppButton } from '@/components/shared/app-button';
@@ -14,7 +15,7 @@ import { ListLoadingOverlay } from '@/components/shared/wheel-loader';
 import { useCartContext } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useUserContext } from '@/contexts/user.context';
-import { useCatalogList } from '@/hooks/use-catalog-list';
+import { CATALOG_PAGE_SIZE, useCatalogInfiniteList } from '@/hooks/use-catalog-list';
 import { useToast } from '@/hooks/use-toast';
 import type { CatalogItem } from '@/services/catalog-service';
 import type { CatalogSortBy } from '@/types/catalog-nav';
@@ -24,12 +25,13 @@ import { openItemDetail } from '@/utils/nav';
 /**
  * Category (`category`) — the result list for a chosen category (or a
  * "Make Model" / dealer from Explore). Backed by the **real catalog**
- * (`useCatalogList` → `catalog-service`); no mock fixtures.
+ * (`useCatalogInfiniteList` → `catalog-service`); no mock fixtures.
  *
  * The list is a FlashList (it was a ScrollView mapping every row, which built
  * the whole page up-front) under a results toolbar carrying the match count,
  * the vehicle the list is scoped to, and a server-side sort row — so a shopper
- * whose first results aren't right has somewhere to go besides Back.
+ * whose first results aren't right has somewhere to go besides Back. It loads
+ * a page at a time as the shopper nears the end, until every match is shown.
  */
 export default function CategoryScreen() {
   const { t } = useTranslation();
@@ -49,9 +51,18 @@ export default function CategoryScreen() {
 
   const [sortBy, setSortBy] = useState<CatalogSortBy>('relevance');
 
-  const { state, items, total, isRefreshing, refresh } = useCatalogList({
-    page: 1,
-    pageSize: 24,
+  const {
+    state,
+    items,
+    total,
+    isRefreshing,
+    refresh,
+    isLoadingMore,
+    loadMoreError,
+    loadMore,
+    retryLoadMore,
+  } = useCatalogInfiniteList({
+    pageSize: CATALOG_PAGE_SIZE,
     category: cat && cat !== 'All' ? cat : undefined,
     vehicleCategory: vehicleCat,
     sortBy,
@@ -83,6 +94,13 @@ export default function CategoryScreen() {
       </AppView>
     ),
     [total, items.length, sortBy, changeSort],
+  );
+
+  const footer = useMemo(
+    () => (
+      <CatalogListFooter loading={isLoadingMore} failed={loadMoreError} onRetry={retryLoadMore} />
+    ),
+    [isLoadingMore, loadMoreError, retryLoadMore],
   );
 
   const { addItem } = useCartContext();
@@ -167,6 +185,9 @@ export default function CategoryScreen() {
               <AppView style={{ height: 1, backgroundColor: tokens.divider }} />
             )}
             ListHeaderComponent={state === 'loading' ? null : toolbar}
+            ListFooterComponent={footer}
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.5}
             // FlashList v2 keeps the visible content anchored BY DEFAULT: when
             // the rows swap under a new sort it re-pins the scroll to whatever
             // row you were looking at, which reads as the page lurching down.

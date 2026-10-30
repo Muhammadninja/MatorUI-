@@ -94,13 +94,37 @@ export function referenceNode(r: CategoryRow) {
 const bySortOrder = (a: CategoryRow, b: CategoryRow) =>
   a.sortOrder - b.sortOrder || a.name.localeCompare(b.name);
 
-/** The `{ items, total }` body of `url` (`/v1/reference/categories[?parentId=…]`). */
-export function referenceCategories(url: string) {
+/**
+ * Each root's `productsCount` as the backend serves it. The export holds
+ * categories, not parts, so the numbers are made up — picked to land on every
+ * Russian plural form (1/21 one, 22/84/1043 few, 0/5/47/125/312 many).
+ */
+export const ROOT_PRODUCTS_COUNT: Record<string, number> = {
+  'brake-system': 125,
+  'motor-oil': 84,
+  'electrical-and-lighting': 312,
+  'tuning-and-accessories': 21,
+  transmission: 1,
+  'maintenance-and-fluids': 0,
+  'suspension-and-steering': 47,
+  'engine-system': 1043,
+  'heating-and-cooling': 22,
+  other: 5,
+};
+
+type ReferenceItem = ReturnType<typeof referenceNode> & { productsCount?: number };
+
+/** The `{ items, total }` body of `url` (`/v1/reference/categories[?parentId=…]`):
+ *  the roots with their `productsCount`, or a node's children without one. */
+export function referenceCategories(url: string): { items: ReferenceItem[]; total: number } {
   const parentId = new URL(url, 'https://api.test').searchParams.get('parentId');
   const rows = CATEGORY_ROWS.filter((r) =>
     parentId
       ? r.parentId === parentId && r.isActive
       : r.parentId === null && r.level === 0 && r.isActive,
   ).sort(bySortOrder);
-  return { items: rows.map(referenceNode), total: rows.length };
+  const items = parentId
+    ? rows.map(referenceNode)
+    : rows.map((r) => ({ ...referenceNode(r), productsCount: ROOT_PRODUCTS_COUNT[r.id] ?? 0 }));
+  return { items, total: rows.length };
 }

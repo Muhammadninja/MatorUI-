@@ -17,7 +17,7 @@ import React from 'react';
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import { referenceCategories } from './fixtures/part-categories';
+import { ROOT_PRODUCTS_COUNT, referenceCategories } from './fixtures/part-categories';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -167,12 +167,24 @@ vi.mock('@/hooks/use-system-categories', () => ({
   useSystemCategories: () => ({ state: 'success', categories: systemTiles }),
 }));
 
-/** Every catalogue request a listing screen makes. */
+/** Every catalogue request a listing screen makes (the hook pages it). */
 const listRequests: Record<string, unknown>[] = [];
 vi.mock('@/hooks/use-catalog-list', () => ({
-  useCatalogList: (req: Record<string, unknown>) => {
+  CATALOG_PAGE_SIZE: 24,
+  useCatalogInfiniteList: (req: Record<string, unknown>) => {
     listRequests.push(req);
-    return { state: 'success', items: [], total: 0, isRefreshing: false, refresh: () => {} };
+    return {
+      state: 'success',
+      items: [],
+      total: 0,
+      isRefreshing: false,
+      refresh: () => {},
+      hasMore: false,
+      isLoadingMore: false,
+      loadMoreError: false,
+      loadMore: () => {},
+      retryLoadMore: () => {},
+    };
   },
 }));
 
@@ -182,7 +194,7 @@ import CatalogSystemsScreen from '@/components/screens/catalog-systems-screen';
 import CategoryScreen from '@/components/screens/category-screen';
 import ExploreScreen from '@/components/screens/explore-screen';
 import MakeScreen from '@/components/screens/make-screen';
-import { fetchRootCategories } from '@/services/categories-service';
+import { HOME_ROOT_ORDER, fetchRootCategories } from '@/services/categories-service';
 import { localizedCategoryLabel } from '@/utils/category-label';
 
 beforeAll(async () => {
@@ -248,6 +260,12 @@ describe('A. home grid without a picked model', () => {
     ]);
   });
 
+  test('each tile carries the parts count served for its system', async () => {
+    const r = await render(<ExploreScreen />);
+    const counts = r.root.findAll((n) => is(n, 'tile')).map((t) => t.props.count);
+    expect(counts).toEqual(HOME_ROOT_ORDER.map((id) => ROOT_PRODUCTS_COUNT[id]));
+  });
+
   test('a system tile opens all of its parts at once — no subcategory step', async () => {
     const r = await render(<ExploreScreen />);
     for (const tile of r.root.findAll((n) => is(n, 'tile'))) {
@@ -270,7 +288,6 @@ describe('A. home grid without a picked model', () => {
     params = { cat: 'suspension-and-steering', label: 'Подвеска и рулевое' };
     await render(<CategoryScreen />);
     expect(listRequests.at(-1)).toEqual({
-      page: 1,
       pageSize: 24,
       category: 'suspension-and-steering',
       vehicleCategory: undefined,
