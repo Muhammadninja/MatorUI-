@@ -373,6 +373,9 @@ const server = http.createServer(async (req, res) => {
   //     (the garage "Shop parts that fit" bestsellers screen). Mirrors the real
   //     backend's existing `sort=bestseller`. Every seeded part fits the demo
   //     Cobalt, so make/model returns the full list ranked by units_sold.
+  //   &brand=<id>[,<id>…]         → only those part brands. As on the real
+  //     backend, `facets.brands` (the parts screen's brand chips) is counted
+  //     before the brand filter, so a picked brand keeps the others on offer.
   if (req.method === 'GET' && pathname === '/v1/catalog/parts') {
     const q = (url.searchParams.get('q') || '').trim().toLowerCase();
     const make = (url.searchParams.get('make') || '').trim();
@@ -399,7 +402,23 @@ const server = http.createServer(async (req, res) => {
     if (sort === 'bestseller' || make || model) {
       items = [...items].sort((a, b) => (b.units_sold || 0) - (a.units_sold || 0));
     }
-    return send(res, 200, { items, total: items.length, page: 1, page_size: 50, next_page: null });
+
+    const brandCounts = new Map();
+    for (const p of items) {
+      if (!p.brand) continue;
+      const seen = brandCounts.get(p.brand.id);
+      brandCounts.set(p.brand.id, { id: p.brand.id, name: p.brand.name, count: (seen?.count || 0) + 1 });
+    }
+    const brands = (url.searchParams.get('brand') || '').split(',').filter(Boolean);
+    if (brands.length) items = items.filter((p) => p.brand && brands.includes(p.brand.id));
+    return send(res, 200, {
+      items,
+      total: items.length,
+      page: 1,
+      page_size: 50,
+      next_page: null,
+      facets: { brands: [...brandCounts.values()] },
+    });
   }
 
   // BUY PATH — GET /v1/catalog/parts/:id  → a single ApiCatalogPart (Item Detail).

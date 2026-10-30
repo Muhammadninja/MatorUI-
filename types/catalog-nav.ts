@@ -48,11 +48,13 @@ export interface Part {
  *  sales-ranked order (isBestseller → salesCount → reviewCount → rating). */
 export type CatalogSortBy = 'relevance' | 'price_asc' | 'price_desc' | 'newest' | 'bestseller';
 
-/** Local filter state for the parts screen (client-side until the backend
- *  exposes filter params). */
+/** Quick-filter state for the parts screen. Every field goes to the backend,
+ *  so each one filters the whole catalogue, not the rows already loaded. */
 export interface FilterState {
-  /** Selected brand names; empty = all. */
-  brands: string[];
+  /** Picked part brands: the brand id the listing filters on, and the name its
+   *  chip showed (the chip stays, picked, even when the other filters leave
+   *  the brand no parts); empty = all. */
+  brands: { id: string; name: string }[];
   /** Selected market-of-origin regions; empty = all. */
   regions: CatalogRegion[];
   oemOnly: boolean;

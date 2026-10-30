@@ -32,15 +32,18 @@ import {
 const BASE = '/v1/reference';
 
 /**
- * The 12 buyer-grid mainCategory buckets. They belong on the home "Shop by
- * category" grid (GET /v1/categories) — NOT in the reference-tree drill — so we
- * strip them from category listings here, keeping the after-brand
- * categories→subcategories flow to real subcategories only.
+ * Categories the storefront never lists, at any level of the tree:
+ * `cat_uncategorized` is the backend's fallback node for parts nothing
+ * classified, and `rul` is a stand-alone "Руль" node retired from the tree.
+ * The reference endpoint already leaves both out (the first is parked off the
+ * roots, the second is inactive); naming them here keeps them out of the drill
+ * should either be reactivated.
+ *
+ * The 12 home-grid bucket rows (`brakes`, `filters`, `batteries`…) are NOT
+ * hidden: they are children of their system like any other subcategory, and
+ * the drill is the only way to reach them — and the parts filed on them.
  */
-const MAIN_CATEGORY_BUCKET_IDS = new Set([
-  'brakes', 'batteries', 'filters', 'ignition', 'engine', 'electrical-parts',
-  'oil-and-fluids', 'belts-and-hoses', 'wipers', 'lighting', 'suspension', 'exterior',
-]);
+const HIDDEN_CATEGORY_IDS = new Set(['cat_uncategorized', 'rul']);
 
 export type RefMake = {
   id: string;
@@ -72,6 +75,9 @@ export type RefCategory = {
   parentId: string | null;
   level: number;
   sortOrder: number;
+  /** A root's listed parts, its whole subtree counted once — computed by the
+   *  backend. Never on a child; absent when the backend sent none. */
+  productsCount?: number;
 };
 
 /**
@@ -324,7 +330,7 @@ export async function fetchReferenceCategories(
     // The reference node ships camelCase (`parentId`, `sortOrder`) per the spec;
     // tolerate snake_case too so a backend tweak can't silently blank the fields.
     return asItems(res)
-      .filter((c) => !MAIN_CATEGORY_BUCKET_IDS.has(str(c.id)))
+      .filter((c) => !HIDDEN_CATEGORY_IDS.has(str(c.id)))
       .map((c) => ({
       id: str(c.id),
       name: str(c.name),
@@ -338,6 +344,7 @@ export async function fetchReferenceCategories(
       parentId: (c.parentId as string | null) ?? (c.parent_id as string | null) ?? null,
       level: numOrUndef(c.level) ?? 0,
       sortOrder: numOrUndef(c.sortOrder) ?? numOrUndef(c.sort_order) ?? 0,
+      productsCount: numOrUndef(c.productsCount) ?? numOrUndef(c.products_count),
     }));
   } catch {
     return [];

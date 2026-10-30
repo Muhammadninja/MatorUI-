@@ -1,46 +1,52 @@
+import { LayoutGrid, type LucideIcon } from 'lucide-react-native';
 import { Image } from 'react-native';
 
+import { AppView } from '@/components/shared/app-view';
+import { useThemeContext } from '@/contexts/theme.context';
+
+// Several file names predate their artwork; the identifiers say what each shows.
 import AirFilt from '../../../assets/3D _Icons/airfilt.png';
-import Alt from '../../../assets/3D _Icons/atlts.png';
+import AcCompressor from '../../../assets/3D _Icons/atlts.png';
 import Battery from '../../../assets/3D _Icons/battery.png';
 import EngineIcon from '../../../assets/auto-parts/engine.png';
-import Brake from '../../../assets/3D _Icons/brake.png';
-import Brake2 from '../../../assets/3D _Icons/brake2.png';
+import ClutchKit from '../../../assets/3D _Icons/brake.png';
+import BrakeDisc from '../../../assets/3D _Icons/brake2.png';
+import WheelRim from '../../../assets/3D _Icons/disk.png';
 import Light from '../../../assets/3D _Icons/light.png';
 import Oil from '../../../assets/3D _Icons/oil.png';
 import OilFilter from '../../../assets/3D _Icons/oilfilter.png';
-import P from '../../../assets/3D _Icons/p.png';
+import Piston from '../../../assets/3D _Icons/p.png';
 import Susp from '../../../assets/3D _Icons/susp.png';
 import Wipe from '../../../assets/3D _Icons/wipe.png';
 
 /** Category display name → the 3D PNG icon in `assets/3D _Icons/`. */
 const PART_ICONS: Record<string, any> = {
-  Brakes: Brake,
+  Brakes: BrakeDisc,
   Batteries: Battery,
   Filters: AirFilt,
-  Ignition: P,
+  Ignition: Piston,
   Engine: EngineIcon,
-  Electrical: Alt,
+  Electrical: Battery,
   'Oil & Fluids': Oil,
   'Belts & Hoses': OilFilter,
   Wipers: Wipe,
   Lighting: Light,
   Suspension: Susp,
-  Exterior: Brake2,
+  Exterior: BrakeDisc,
 };
 
 /**
  * Backend `iconKey` (stable, lowercase — e.g. "electrical") → the same PNGs.
- * The live `/v1/categories` names ("Electrical Parts") don't always match a
- * legacy display-name key, so resolving by `iconKey` keeps every tile iconed.
+ * The category-tree roots resolve through these keys (`ROOT_META` in
+ * categories-service), each to the artwork of a part from its own system.
  */
 const PART_ICONS_BY_KEY: Record<string, any> = {
-  brakes: Brake,
+  brakes: BrakeDisc,
   batteries: Battery,
   filters: AirFilt,
-  ignition: P,
+  ignition: Piston,
   engine: EngineIcon,
-  electrical: Alt,
+  electrical: Battery,
   oil: Oil,
   oil_fluids: Oil,
   belts: OilFilter,
@@ -48,37 +54,66 @@ const PART_ICONS_BY_KEY: Record<string, any> = {
   wipers: Wipe,
   lighting: Light,
   suspension: Susp,
-  exterior: Brake2,
-  // Systems that also come through the unified /v1/categories list — mapped to
-  // the closest available 3D glyph so every category tile/row shows an icon.
-  maintenance: Oil,
-  transmission: Susp,
-  climate: AirFilt,
-  tuning: Brake2,
+  exterior: BrakeDisc,
+  maintenance: OilFilter,
+  transmission: ClutchKit,
+  // `cooling` is the category table's own key for Heating & Cooling.
+  climate: AcCompressor,
+  cooling: AcCompressor,
+  tuning: WheelRim,
+};
+
+/**
+ * Keys no part artwork can stand for — a catch-all category — drawn with the
+ * app's icon set instead, on a disc the size of the artwork.
+ */
+const GLYPH_ICONS_BY_KEY: Record<string, LucideIcon> = {
+  other: LayoutGrid,
 };
 
 /** Shown when neither `iconKey` nor `name` resolves — a category tile/row must
  *  never render blank, so fall back to a neutral engine glyph. */
 const DEFAULT_ICON = EngineIcon;
 
+/** What a category draws: one of the 3D PNGs, or an icon-set glyph. */
+export type PartIconSource = { image: any } | { glyph: LucideIcon };
+
+/** Resolve by `iconKey` first (live categories), then by display `name`
+ *  (bundled tiles), then the default. */
+export function resolvePartIcon(name: string, iconKey?: string): PartIconSource {
+  const key = iconKey?.toLowerCase();
+  const glyph = key ? GLYPH_ICONS_BY_KEY[key] : undefined;
+  if (glyph) return { glyph };
+  return { image: (key ? PART_ICONS_BY_KEY[key] : undefined) ?? PART_ICONS[name] ?? DEFAULT_ICON };
+}
+
 export type AutoPartIconProps = {
-  /** Category name — must match a key in `MATOR_CAT_TILES`. */
+  /** Category name — the fallback key for bundled tiles (`MATOR_CAT_TILES`). */
   name: string;
-  /** Server icon handle from `/v1/categories`; tried before `name`. */
+  /** Server / root icon handle; tried before `name`. */
   iconKey?: string;
   size?: number;
 };
 
 /**
- * `AutoPartIcon` — renders the 3D PNG illustration for a category. Resolves the
- * glyph by the server's `iconKey` first (live categories), then by display
- * `name` (bundled tiles). Keeps the same size API so tiles/styles don't change.
- * Renders nothing for an unknown key/name.
+ * `AutoPartIcon` — renders the 3D PNG illustration for a category (or, for a
+ * catch-all key, an icon-set glyph on a disc of the same size). Keeps the same
+ * size API so tiles/styles don't change.
  */
 export default function AutoPartIcon({ name, iconKey, size = 36 }: AutoPartIconProps) {
-  const src =
-    (iconKey ? PART_ICONS_BY_KEY[iconKey.toLowerCase()] : undefined) ??
-    PART_ICONS[name] ??
-    DEFAULT_ICON;
-  return <Image source={src} style={{ width: size, height: size }} resizeMode="contain" />;
+  const { tokens } = useThemeContext();
+  const icon = resolvePartIcon(name, iconKey);
+  if ('glyph' in icon) {
+    const Glyph = icon.glyph;
+    return (
+      <AppView
+        center
+        rounded={size / 2}
+        style={{ width: size, height: size, backgroundColor: tokens.backgroundSecondary }}
+      >
+        <Glyph size={Math.round(size * 0.46)} strokeWidth={1.75} color={tokens.text} />
+      </AppView>
+    );
+  }
+  return <Image source={icon.image} style={{ width: size, height: size }} resizeMode="contain" />;
 }

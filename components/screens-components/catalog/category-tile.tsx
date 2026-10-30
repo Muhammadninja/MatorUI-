@@ -10,13 +10,13 @@ import { softWrapLabel } from '@/utils/category-label';
 export type CategoryTileProps = {
   /** INTERNAL canonical name — icon fallback key only, never rendered. */
   name: string;
-  /** Localized display text from the server (`label`). Falls back to `name`
-   *  when the caller has no localized string. */
+  /** Localized display text (`label`). Falls back to `name` when the caller
+   *  has no localized string. */
   label?: string;
-  /** Server icon handle from `/v1/categories`; resolved before `name`. */
+  /** Icon handle; resolved before `name`. */
   iconKey?: string;
-  /** Parts count shown under the label. */
-  count: number;
+  /** Parts count shown under the label; no count line when omitted. */
+  count?: number;
   /** Takes no argument on purpose: the tile has both an internal `name` and a
    *  localized `label`, and handing either one back invites a caller to use
    *  the wrong string. The parent already knows the category it rendered. */
@@ -50,8 +50,8 @@ const LABEL_MAX_WORD = 13;
 
 /**
  * `CategoryTile` — a single "Shop by category" grid cell: realistic part icon
- * + name + count on a bordered card. Presentational; the parent supplies the
- * data + tap handler.
+ * + name (+ parts count, when the caller has one). Presentational; the parent
+ * supplies the data + tap handler.
  *
  * The label is never ellipsized, never shrunk, and never snapped mid-syllable.
  * Localized names run far longer than the internal English ones, and a single
@@ -74,7 +74,9 @@ function CategoryTile({ name, label, iconKey, count, onPress }: CategoryTileProp
       onPress={onPress}
       androidRipple={false}
       accessibilityRole="button"
-      accessibilityLabel={`${display}, ${t('category.partsCount', { count })}`}
+      accessibilityLabel={
+        count === undefined ? display : `${display}, ${t('category.partsCount', { count })}`
+      }
       center
       style={{ width: '31.5%', paddingBottom: 5, gap: 10 }}
     >
@@ -100,9 +102,14 @@ function CategoryTile({ name, label, iconKey, count, onPress }: CategoryTileProp
             {wrapped}
           </AppText>
         </AppView>
-        <AppText family="default" style={{ fontSize: 10.5, color: tokens.textMuted, marginTop: 3 }}>
-          {t('category.partsCount', { count })}
-        </AppText>
+        {count === undefined ? null : (
+          <AppText
+            family="default"
+            style={{ fontSize: 10.5, color: tokens.textMuted, marginTop: 3 }}
+          >
+            {t('category.partsCount', { count })}
+          </AppText>
+        )}
       </AppView>
     </AppPressableView>
   );

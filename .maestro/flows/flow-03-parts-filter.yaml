@@ -6,14 +6,18 @@
 #
 # Mocked endpoint (../mock-server): GET /v1/catalog/parts?systemId=brakes
 #   (the live app sends ?category=brakes — the mock matches both)
-#   res: { items: [Brembo Front Brake Pads, Bosch Brake Rotor], total: 2 }
+#   res: { items: [Brembo Front Brake Pads, Bosch Brake Rotor], total: 2,
+#          facets: { brands: [Brembo, Bosch] } }
+#   …&brand=brembo → { items: [Brembo Front Brake Pads], total: 1 }
 #
 # testIDs: parts-directory-screen · part-card-<id> · quick-filters ·
 #          filter-brand-<Brand> · filter-clear-btn
 #
 # There is NO bottom sheet: the quick-filter row holds tappable brand CHIPS that
 # apply immediately on tap (no Apply). A "Clear" chip appears while any filter is
-# active. Brand chips are derived from the fetched page → "Bosch", "Brembo".
+# active. Brand chips are the listing's brand facet (`facets.brands`, counted by
+# the server over the whole catalogue) → "Bosch", "Brembo"; a tap re-queries the
+# server with `brand=<id>`.
 # ═════════════════════════════════════════════════════════════════════════════
 appId: com.fotih12.mator
 name: flow-03-parts-filter

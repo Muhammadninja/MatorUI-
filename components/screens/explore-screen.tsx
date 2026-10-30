@@ -13,6 +13,7 @@ import CategoryTile from '@/components/screens-components/catalog/category-tile'
 import CertifiedSection from '@/components/screens-components/catalog/certified-section';
 import FitmentNote from '@/components/screens-components/catalog/fitment-note';
 import VehicleMakeTile from '@/components/screens-components/catalog/vehicle-make-tile';
+import { AppButton } from '@/components/shared/app-button';
 import { AppLogo } from '@/components/shared/app-logo';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
@@ -65,7 +66,8 @@ function HeaderFade({ color, height }: { color: string; height: number }) {
  * list). A frosted sticky header (greeting + notifications + pill search)
  * over a scroll of: the vehicle-fit banner, a "Shop by vehicle" make row
  * with custom car silhouettes, and a colorful "Shop by category" grid with
- * custom part icons. Tiles route to the Make / Category screens.
+ * custom part icons. Make tiles route to the Make screen; a category tile
+ * opens every part of its system.
  */
 export default function ExploreScreen() {
   const { t } = useTranslation();
@@ -77,8 +79,8 @@ export default function ExploreScreen() {
   const [headerHeight, setHeaderHeight] = useState(insets.top + 132);
   const toast = useToast();
 
-  // "Shop by category" grid — live from GET /v1/categories (per-domain HTTP
-  // gate), falling back to the bundled tiles on error so it never renders blank.
+  // "Shop by category" grid — the roots of the category tree with their parts
+  // counts, live from GET /v1/reference/categories.
   const { state: categoriesState, categories, refresh: refreshCategories } = useCategories();
   // "Shop by vehicle" row — live from GET /v1/reference/makes (admin-managed),
   // falling back to the bundled makes on error so it never renders blank.
@@ -97,10 +99,10 @@ export default function ExploreScreen() {
     });
   }, [refreshCategories, toast, t]);
 
-  // Route by the backend category id (e.g. "filters") so the Category listing
-  // filters /v1/catalog/parts correctly; the display name is the header label.
-  // (A vehicle-system bucket would travel as `vehicleCat` instead — see
-  // `useCategories` for when that applies.)
+  // A tile lists every part of its system straight away: the backend widens a
+  // root id to the root's whole subtree. The subcategory step belongs to the
+  // make → model flow (the systems screen), and a car in the Garage doesn't
+  // change this grid — it carries no vehicle context.
   const openCategory = useCallback((id: string, label: string) => {
     triggerHaptic('selection');
     router.push({ pathname: '/category', params: { cat: id, label } });
@@ -324,6 +326,21 @@ export default function ExploreScreen() {
         </AppText>
         {categoriesState === 'loading' ? (
           <CategoryGridSkeleton />
+        ) : categoriesState === 'error' ? (
+          <AppView align="center" gap={10} style={{ paddingVertical: 12 }}>
+            <AppText
+              family="default"
+              style={{ fontSize: 13, color: tokens.textMuted, textAlign: 'center' }}
+            >
+              {t('search.catalogueLoadError')}
+            </AppText>
+            <AppButton
+              title={t('common.retry')}
+              kind="secondary"
+              size="sm"
+              onPress={() => void refreshCategories()}
+            />
+          </AppView>
         ) : (
           <AppView row wrap justify="space-between" style={{ rowGap: 12 }}>
             {categories.map((c) => (

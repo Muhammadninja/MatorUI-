@@ -40,7 +40,8 @@ export type CatalogItem = {
   /** Part manufacturer brand (e.g. "Gates", "Dayco"), from the backend `brand`
    *  entity — NOT the car make (the vehicle lives in `title` + the make/model
    *  query filters + per-row compatibility). Shown as the card subtitle (via
-   *  `description`) and drives the client-side Brand filter. */
+   *  `description`). The Brand filter is the backend's, by brand id — see
+   *  `CatalogListRequest.brands`. */
   brand?: string;
   /** Manufacturer / OEM part number ("GM 15823942", "BYD-1090012",
    *  etc.). Rendered as a small gray pill on the card and detail
@@ -165,8 +166,11 @@ export type CatalogListRequest = {
   /** Vehicle-fit context from the Make → Model flow. */
   make?: string;
   model?: string;
-  /** Fine filters. */
-  brand?: string;
+  /** Part brands to list: brand ids (`brand_gates`) as `brandFacets` hands
+   *  them out; empty/undefined = every brand. The backend applies them before
+   *  it counts and pages, so `total` and the pages cover the whole catalogue
+   *  of those brands, not the rows already loaded. */
+  brands?: string[];
   /** Market-of-origin regions (china/europe/russia/korea/usa); empty/undefined = all. */
   regions?: string[];
   /** Restrict to GM-family brands (Chevrolet / Ravon / Daewoo …). */
@@ -189,11 +193,27 @@ export type CatalogListRequest = {
   signal?: AbortSignal;
 };
 
+/** A part brand a listing offers (`facets.brands` of GET /v1/catalog/parts):
+ *  its id — what `CatalogListRequest.brands` takes — its name, and how many
+ *  parts of the WHOLE result carry it, not just the page's. */
+export type CatalogBrandFacet = {
+  id: string;
+  name: string;
+  count: number;
+};
+
 export type CatalogListResponse = {
   items: CatalogItem[];
   total: number;
   page: number;
   pageSize: number;
+  /** The page after this one, or null on the last page (the backend's
+   *  `next_page`). */
+  nextPage: number | null;
+  /** Every part brand the request's other filters leave, with its count. The
+   *  backend counts it without the request's own `brands`, so a picked brand
+   *  keeps the others on offer. Empty from a backend that sends no facets. */
+  brandFacets: CatalogBrandFacet[];
 };
 
 export type CatalogDetailRequest = {
@@ -380,8 +400,8 @@ export function getCatalogMockList(request: CatalogListRequest): CatalogListResp
     );
   }
 
-  // Vehicle-fit + brand + region filters (mirror the HTTP query).
-  for (const term of [request.make, request.model, request.brand]) {
+  // Vehicle-fit + region filters (mirror the HTTP query).
+  for (const term of [request.make, request.model]) {
     if (term) {
       const t = term.toLowerCase();
       items = items.filter(
@@ -404,6 +424,18 @@ export function getCatalogMockList(request: CatalogListRequest): CatalogListResp
     items = items.filter((item) => Boolean(item.oem));
   }
 
+  // Brands are counted before the brand filter, as the backend counts them. A
+  // mock item's brand has no id of its own, so its name stands in for one.
+  const brandCounts = new Map<string, number>();
+  for (const item of items) {
+    if (item.brand) brandCounts.set(item.brand, (brandCounts.get(item.brand) ?? 0) + 1);
+  }
+  const brandFacets = [...brandCounts].map(([name, count]) => ({ id: name, name, count }));
+  if (request.brands?.length) {
+    const want = new Set(request.brands);
+    items = items.filter((item) => item.brand != null && want.has(item.brand));
+  }
+
   if (request.sortBy === 'price_asc') {
     items.sort((a, b) => parsePrice(a.price) - parsePrice(b.price));
   } else if (request.sortBy === 'price_desc') {
@@ -418,6 +450,8 @@ export function getCatalogMockList(request: CatalogListRequest): CatalogListResp
     total: items.length,
     page: request.page,
     pageSize: request.pageSize,
+    nextPage: nextPageOf(request.page, request.pageSize, items.length),
+    brandFacets,
   };
 }
 
@@ -633,7 +667,13 @@ type ApiCatalogPartsResponse = {
   total: number;
   page: number;
   page_size: number;
-  next_page: number | null;
+  /** Absent from an older backend — derived from the paging numbers then. */
+  next_page?: number | null;
+  /** Counted over the whole result. `brands` holds every part brand the other
+   *  filters leave — the request's own `brand` ignored — by brand id. */
+  facets?: {
+    brands?: { id: string | null; name: string; count: number }[] | null;
+  } | null;
 };
 
 /**
@@ -817,7 +857,10 @@ class HttpCatalogTransport implements CatalogTransport {
     }
     if (request.make) params.set(PARTS_PARAM.make, request.make);
     if (request.model) params.set(PARTS_PARAM.model, request.model);
-    if (request.brand) params.set(PARTS_PARAM.brand, request.brand);
+    // Brands go as ONE comma-separated `brand` (brand=brand_bosch,brand_mann):
+    // that is the backend's contract, and a repeated `brand=` fails its
+    // single-string validation with a 400.
+    if (request.brands?.length) params.set(PARTS_PARAM.brand, request.brands.join(','));
     // Region is multi-select → repeated `region=` params (e.g. region=china&region=korea).
     request.regions?.forEach((r) => params.append(PARTS_PARAM.region, r));
     if (request.gmOnly) params.set(PARTS_PARAM.gmOnly, 'true');
@@ -838,13 +881,21 @@ class HttpCatalogTransport implements CatalogTransport {
       `${API_BASE}/parts?${params.toString()}`,
       { signal: request.signal },
     );
+    const total = res.total ?? 0;
+    const page = res.page ?? request.page;
+    const pageSize = res.page_size ?? request.pageSize;
     return {
       // Guard against a response without an `items` array (empty page / error
       // body) so a filled catalog can't crash the listing.
       items: (res.items ?? []).map(mapPartToCatalogItem),
-      total: res.total ?? 0,
-      page: res.page ?? request.page,
-      pageSize: res.page_size ?? request.pageSize,
+      total,
+      page,
+      pageSize,
+      nextPage: res.next_page !== undefined ? res.next_page : nextPageOf(page, pageSize, total),
+      // A brand the response cannot name an id for cannot be filtered on.
+      brandFacets: (res.facets?.brands ?? []).flatMap((b) =>
+        b.id ? [{ id: b.id, name: b.name || b.id, count: b.count ?? 0 }] : [],
+      ),
     };
   }
   async detail(id: string, signal?: AbortSignal): Promise<CatalogDetailResponse | null> {
@@ -893,4 +944,9 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
 
 function parsePrice(price: string): number {
   return Number(price.replace(/[^0-9.]/g, '')) || 0;
+}
+
+/** The page after `page`, or null when it is the last — the backend's rule. */
+function nextPageOf(page: number, pageSize: number, total: number): number | null {
+  return page * pageSize < total ? page + 1 : null;
 }
