@@ -2,12 +2,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 
-import {
-  fetchCategories,
-  type CategoryScope,
-  type CategoryTileData,
-} from '@/services/categories-service';
-import { MATOR_CAT_TILES } from '@/mocks/mator-catalog';
+import { fetchRootCategories, type CategoryTileData } from '@/services/categories-service';
 import { localizedCategoryLabel } from '@/utils/category-label';
 
 export type CategoriesState = 'loading' | 'success' | 'error';
@@ -19,75 +14,43 @@ export type UseCategoriesValue = {
   refresh: () => Promise<unknown>;
 };
 
-/** Bundled tiles as the offline / error fallback, in the UI's normalized shape. */
-const FALLBACK_TILES: CategoryTileData[] = MATOR_CAT_TILES.map((t) => ({
-  id: t.name,
-  name: t.name,
-  // Bundled tiles carry a single name, so it doubles as the display label.
-  label: t.name,
-  count: t.count,
-  color: t.color,
-  iconKey: t.name,
-}));
-
 export const CATEGORIES_QUERY_KEY = ['categories', 'list'] as const;
 
 /**
- * The home grid browses the `main` scope — the 12 designed tiles. A tile's id is
- * its slug ("brakes"); the Category screen sends it back as
- * `/v1/catalog/parts?category=<id>`, which the backend rolls up by each part's
- * `main_category` bucket — the same grouping that produces the tile's `count`.
+ * The home "Shop by category" grid — the ROOTS of the category tree (Brake
+ * System, Motor Oils, … Other), exactly as the backend serves them. A tile's id
+ * is the root's id; a tap lists every part of that root
+ * (`/v1/catalog/parts?category=<id>`, which the backend widens to the root's
+ * whole subtree).
  *
- * Parts filed on a subcategory ("front-brake-pads", "air-filters") reach their
- * tile through that bucket, which the backend derives from the category tree
- * (`CATEGORY_ID_TO_MAIN_CATEGORY` in the backend's category-map.ts). A part whose
- * category has no home bucket among the 12 (transmission, cooling, …) is on no
- * tile, but stays reachable through the systems drill and search.
- *
- * `'vehicle'` returns the 8 vehicle-system buckets instead, whose ids filter the
- * list through `vehicle_category` — a separate taxonomy the home grid doesn't use.
+ * Roots carry no parts count, so the tiles show none.
  */
-const DEFAULT_SCOPE: CategoryScope = 'main';
-
-export function useCategories(scope: CategoryScope = DEFAULT_SCOPE): UseCategoriesValue {
-  const { t, i18n } = useTranslation();
+export function useCategories(): UseCategoriesValue {
+  const { i18n } = useTranslation();
   const lang = i18n.language;
   const query = useQuery({
-    // Language in the key so switching locale refetches with localized labels
-    // instead of serving the previous language's cached tiles.
-    queryKey: [...CATEGORIES_QUERY_KEY, scope, lang],
-    queryFn: ({ signal }) => fetchCategories(scope, signal),
+    // The tiles carry every language's name, so the key needs no language: a
+    // switch re-resolves the labels below without a refetch.
+    queryKey: CATEGORIES_QUERY_KEY,
+    queryFn: ({ signal }) => fetchRootCategories('home', signal),
   });
 
   return useMemo<UseCategoriesValue>(() => {
+    const rows = query.data ?? [];
     let state: CategoriesState;
     if (query.isPending) state = 'loading';
-    else if (query.isError) state = 'error';
+    // The reference fetcher answers a failed read (and a mock/offline build)
+    // with []; a tree always has roots, so an empty answer is a failed load.
+    else if (query.isError || rows.length === 0) state = 'error';
     else state = 'success';
-
-    // On error keep tiles visible using the bundled fallback; otherwise use
-    // whatever the transport returned (mock or live). Either way the label is
-    // re-resolved for the active language (see the note above).
-    const rows = query.isError ? FALLBACK_TILES : (query.data ?? []);
-    // Vehicle-system buckets have no i18n columns on the server (the enum has
-    // no translation table), so their display name comes from the app's own
-    // catalogue, keyed by the enum id. Everything else keeps the server's
-    // localized label; an id we don't carry a translation for falls through to
-    // it too, so a new backend bucket still renders text.
-    const categories = rows.map((c) => ({
-      ...c,
-      label:
-        t(`category.vehicle.${c.id}`, { defaultValue: '' }).trim() ||
-        localizedCategoryLabel(c, lang),
-    }));
 
     return {
       state,
-      categories,
+      categories: rows.map((c) => ({ ...c, label: localizedCategoryLabel(c, lang) })),
       error: query.error instanceof Error ? query.error.message : null,
       refresh: () => query.refetch(),
     };
-  }, [query, lang, t]);
+  }, [query, lang]);
 }
 
 export default useCategories;

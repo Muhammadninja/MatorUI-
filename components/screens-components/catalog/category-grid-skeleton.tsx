@@ -36,18 +36,18 @@ function usePulseOpacity() {
 }
 
 export type CategoryGridSkeletonProps = {
-  /** How many placeholder tiles to render (defaults to a full 12-cat grid). */
+  /** How many placeholder tiles to render (defaults to the home grid's 10 roots). */
   count?: number;
 };
 
 /**
  * Loading shimmer for the "Shop by category" / catalog-systems grid. Mirrors
- * the `CategoryTile` layout (31.5%-wide 3-col cells: 60px icon chip + name +
- * count) so the skeleton → data swap doesn't shift the grid. Same pulse +
- * radius conventions as `GarageSkeleton` / `SearchCatalogueSkeleton`; native
- * driver throughout so a slow `/v1/categories` fetch stays at 60fps.
+ * the home grid's `CategoryTile` layout (31.5%-wide 3-col cells: 60px icon chip
+ * + name, no count) so the skeleton → data swap doesn't shift the grid. Same
+ * pulse + radius conventions as `GarageSkeleton` / `SearchCatalogueSkeleton`;
+ * native driver throughout so a slow category fetch stays at 60fps.
  */
-export default function CategoryGridSkeleton({ count = 12 }: CategoryGridSkeletonProps) {
+export default function CategoryGridSkeleton({ count = 10 }: CategoryGridSkeletonProps) {
   const { tokens, scheme } = useThemeContext();
   const highlightColor = scheme === 'dark' ? tokens.gray300 : tokens.gray200;
   const opacity = usePulseOpacity();
@@ -72,16 +72,6 @@ export default function CategoryGridSkeleton({ count = 12 }: CategoryGridSkeleto
               opacity,
               width: '72%',
               height: 11,
-              borderRadius: RADIUS_PLACEHOLDER,
-              backgroundColor: highlightColor,
-            }}
-          />
-          {/* Count bar */}
-          <Animated.View
-            style={{
-              opacity,
-              width: '44%',
-              height: 9,
               borderRadius: RADIUS_PLACEHOLDER,
               backgroundColor: highlightColor,
             }}
