@@ -60,17 +60,24 @@ export const ROOT_META: Record<string, { iconKey: string; color: string }> = {
   other: { iconKey: 'other', color: '#5F6368' },
 };
 
-/** The home grid's tile order. */
+/**
+ * The home grid's tile order — mirrors the pre-reference-tree bundled layout
+ * (Brakes, Batteries/Ignition/Electrical/Wipers/Lighting, Filters/Belts &
+ * Hoses, Engine, Oil, Suspension, Exterior), grouped onto the 10 roots the
+ * backend now serves. `transmission` and `heating-and-cooling` had no tile of
+ * their own in that layout, so they sit next to their closest mechanical /
+ * climate neighbor.
+ */
 export const HOME_ROOT_ORDER: readonly string[] = [
   'brake-system',
-  'motor-oil',
   'electrical-and-lighting',
-  'tuning-and-accessories',
-  'transmission',
   'maintenance-and-fluids',
-  'suspension-and-steering',
   'engine-system',
+  'transmission',
+  'motor-oil',
   'heating-and-cooling',
+  'suspension-and-steering',
+  'tuning-and-accessories',
   'other',
 ];
 

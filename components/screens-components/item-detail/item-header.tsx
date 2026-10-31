@@ -1,7 +1,6 @@
-import { ArrowLeft, Heart, Share2 } from 'lucide-react-native';
-import type { ReactNode } from 'react';
+import { ArrowLeft } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
-import { Animated } from 'react-native';
+import type { LayoutChangeEvent } from 'react-native';
 
 import { AppOemPill } from '@/components/shared/app-oem-pill';
 import { AppPrice } from '@/components/shared/app-price';
@@ -10,192 +9,71 @@ import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import { noBreakDigits } from '@/utils/format-price';
 
-/** Circular control floating over the gallery. */
-function GlassButton({
-  children,
-  onPress,
-  accessibilityLabel,
-}: {
-  children: ReactNode;
-  onPress: () => void;
-  accessibilityLabel: string;
-}) {
-  const { tokens } = useThemeContext();
-  return (
-    <AppPressableView
-      onPress={onPress}
-      center
-      rounded={999}
-      androidRipple={false}
-      pressedOpacity={0.75}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      style={{
-        width: 40,
-        height: 40,
-        backgroundColor: tokens.scrim,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.18)',
-      }}
-    >
-      {children}
-    </AppPressableView>
-  );
-}
-
-export type ItemFloatingControlsProps = {
-  /** Distance from the top of the screen (safe-area inset + breathing room). */
-  top: number;
-  isFavorite: boolean;
+export type ItemDetailHeaderProps = {
+  /** Safe-area top inset — the header pads itself out below the status bar. */
+  topInset: number;
   onBack: () => void;
-  onShare: () => void;
-  onToggleFavorite: () => void;
+  /** Reports the header's real rendered height, so the page can reserve
+   *  exactly enough room above the gallery. */
+  onLayout?: (event: LayoutChangeEvent) => void;
 };
 
 /**
- * Back / share / favourite, floating over the gallery. The pucks are filled
- * with the theme-independent `scrim` so they read against the white photo tile
- * in BOTH themes — and still against the title bar once it fades in.
+ * Static page header: just the back button. The title lives under the
+ * gallery instead (see `ItemIdentity`) — a long title sitting beside the
+ * icon here either got clipped or wrapped the whole bar tall, so it's been
+ * moved to where it has the full width to itself. It's visible from the
+ * first frame rather than fading in once the photos scroll away, so the
+ * gallery no longer needs to run under the status bar to look full-bleed —
+ * it now starts a clean gap below this bar instead.
  */
-export function ItemFloatingControls({
-  top,
-  isFavorite,
-  onBack,
-  onShare,
-  onToggleFavorite,
-}: ItemFloatingControlsProps) {
+export function ItemDetailHeader({ topInset, onBack, onLayout }: ItemDetailHeaderProps) {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
 
   return (
     <AppView
-      row
-      align="center"
-      justify="space-between"
-      px="lg"
-      style={{ position: 'absolute', left: 0, right: 0, top }}
-    >
-      <GlassButton onPress={onBack} accessibilityLabel={t('itemDetail.back')}>
-        <ArrowLeft size={21} strokeWidth={2.3} color={tokens.white} />
-      </GlassButton>
-      <AppView row align="center" gap={10}>
-        <GlassButton onPress={onShare} accessibilityLabel={t('itemDetail.share')}>
-          <Share2 size={18} strokeWidth={2.3} color={tokens.white} />
-        </GlassButton>
-        <GlassButton
-          onPress={onToggleFavorite}
-          accessibilityLabel={
-            isFavorite ? t('itemDetail.removeFromFavorites') : t('itemDetail.saveToFavorites')
-          }
-        >
-          <Heart
-            size={19}
-            strokeWidth={2.3}
-            color={isFavorite ? tokens.error : tokens.white}
-            fill={isFavorite ? tokens.error : 'none'}
-          />
-        </GlassButton>
-      </AppView>
-    </AppView>
-  );
-}
-
-export type ItemTitleBarProps = {
-  title: string;
-  height: number;
-  /** Driven by scroll position — 0 over the photos, 1 once they're gone. */
-  opacity: Animated.AnimatedInterpolation<number>;
-};
-
-/**
- * Compact title bar that fades in as the gallery scrolls away, so you always
- * know which part you're looking at. `pointerEvents` is off — the floating
- * controls sit above it and stay tappable. The title shrinks to fit rather
- * than truncating.
- */
-export function ItemTitleBar({ title, height, opacity }: ItemTitleBarProps) {
-  const { tokens } = useThemeContext();
-  return (
-    <Animated.View
-      pointerEvents="none"
+      onLayout={onLayout}
+      colorName="background"
       style={{
         position: 'absolute',
         left: 0,
         right: 0,
         top: 0,
-        height,
-        opacity,
-        backgroundColor: tokens.background,
+        paddingTop: topInset + 10,
+        paddingBottom: 14,
+        paddingHorizontal: 20,
         borderBottomWidth: 1,
         borderBottomColor: tokens.divider,
-        justifyContent: 'flex-end',
-        paddingBottom: 12,
-        paddingHorizontal: 72,
       }}
     >
-      <AppText
-        family="accent"
-        weight="bold"
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.75}
-        style={{ fontSize: 15, color: tokens.text, textAlign: 'center' }}
+      <AppPressableView
+        onPress={onBack}
+        androidRipple={false}
+        pressedOpacity={0.7}
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        accessibilityRole="button"
+        accessibilityLabel={t('itemDetail.back')}
+        style={{ alignSelf: 'flex-start' }}
       >
-        {title}
-      </AppText>
-    </Animated.View>
+        <ArrowLeft size={22} strokeWidth={2.3} color={tokens.text} />
+      </AppPressableView>
+    </AppView>
   );
 }
 
 export type ItemIdentityProps = {
-  /** "Brand · Category" meta line from the catalog. */
-  eyebrow: string;
-  /** Optional corner-ribbon label ("Hot pick", "New"). */
-  badge?: string;
   title: string;
-  /** Qualifiers lifted out of the raw title by `normalizePartTitle` (vehicle
-   *  model, side, spec code, volume). Keeps the title to one clean line. */
-  titleDetail?: string;
   oem?: string;
   gm?: string;
 };
 
-/** Eyebrow + badge → title → lifted qualifiers → part-number chips. */
-export function ItemIdentity({ eyebrow, badge, title, titleDetail, oem, gm }: ItemIdentityProps) {
+/** Title → part-number chips, under the gallery (full width, free to wrap). */
+export function ItemIdentity({ title, oem, gm }: ItemIdentityProps) {
   const { tokens } = useThemeContext();
 
   return (
     <AppView gap={9}>
-      {eyebrow || badge ? (
-        <AppView row align="center" wrap gap={8}>
-          {eyebrow ? (
-            <AppText
-              family="accent"
-              weight="bold"
-              style={{
-                fontSize: 10.5,
-                letterSpacing: 1,
-                color: tokens.textMuted,
-                textTransform: 'uppercase',
-              }}
-            >
-              {eyebrow}
-            </AppText>
-          ) : null}
-          {badge ? (
-            <AppView rounded={999} px={8} py={3} style={{ backgroundColor: tokens.brandSoft }}>
-              <AppText
-                family="accent"
-                weight="bold"
-                style={{ fontSize: 10.5, color: tokens.brand }}
-              >
-                {badge}
-              </AppText>
-            </AppView>
-          ) : null}
-        </AppView>
-      ) : null}
-
       <AppText
         family="heading"
         weight="bold"
@@ -203,15 +81,6 @@ export function ItemIdentity({ eyebrow, badge, title, titleDetail, oem, gm }: It
       >
         {title}
       </AppText>
-
-      {titleDetail ? (
-        <AppText
-          family="default"
-          style={{ fontSize: 13.5, lineHeight: 18, color: tokens.textMuted, marginTop: -2 }}
-        >
-          {titleDetail}
-        </AppText>
-      ) : null}
 
       {oem || gm ? <AppOemPill oem={oem} gm={gm} /> : null}
     </AppView>

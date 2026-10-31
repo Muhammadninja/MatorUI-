@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Animated, useWindowDimensions } from 'react-native';
+import { Alert, ScrollView, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import ItemGallery from '@/components/screens-components/item-detail/item-gallery';
@@ -13,10 +13,9 @@ import {
   ItemVehicleCta,
 } from '@/components/screens-components/item-detail/item-fit-badge';
 import {
-  ItemFloatingControls,
+  ItemDetailHeader,
   ItemIdentity,
   ItemPriceRow,
-  ItemTitleBar,
 } from '@/components/screens-components/item-detail/item-header';
 import {
   ItemFeatureList,
@@ -52,10 +51,11 @@ import { shareItem } from '@/utils/share';
 /**
  * Item Detail — backed by the REAL catalog (`useCatalogDetail`).
  *
- * The 2026 pass turns the old stacked page into a storefront product page: a
- * full-bleed swipeable gallery under the status bar, a rounded content sheet
- * that rides over it, a title bar that fades in as you scroll past the photos,
- * and a sticky buy bar. Everything it shows is a real backend field — the
+ * A storefront product page: a static header carries the title (plus back /
+ * share / favourite) from the first frame, the swipeable gallery sits a
+ * breathing gap below it rather than running under the status bar, a rounded
+ * content sheet rides over the gallery's bottom edge, and a sticky buy bar
+ * closes the page out. Everything it shows is a real backend field — the
  * resolved sale (struck "was" + percent), seller trust flags, delivery ETA,
  * stock, spec table, feature bullets, and listed fitments — so the richer page
  * is richer data, not decoration. Fields the catalog doesn't carry (rating,
@@ -71,7 +71,7 @@ export default function ItemDetailScreen() {
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
   const toast = useToast();
-  const { addItem, formatCurrency, totals, freeShippingThreshold } = useCartContext();
+  const { addItem, formatCurrency } = useCartContext();
   const { isLiked, toggleLike } = useLikesContext();
   const { currentActiveVehicle } = useActiveVehicle();
   const { isAuthenticated } = useUserContext();
@@ -79,7 +79,7 @@ export default function ItemDetailScreen() {
   const [qty, setQty] = useState(1);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [imageIndex, setImageIndex] = useState(0);
-  const scrollY = useRef(new Animated.Value(0)).current;
+  const [measuredHeaderHeight, setMeasuredHeaderHeight] = useState<number | null>(null);
 
   const { state, detail, error, refresh } = useCatalogDetail(id ?? null);
   const item = detail?.item ?? null;
@@ -96,21 +96,21 @@ export default function ItemDetailScreen() {
     currentActiveVehicle?.vehicle?.vin,
   );
 
-  // Hero is sized off the window so it scales from an SE to a tablet, and the
-  // fade-in point of the title bar follows it. Near-square: catalog photos are
-  // shot on white in every aspect ratio, and `contain` letterboxes them — the
-  // taller the tile, the more of the part is actually visible before you open
-  // the full-screen viewer.
+  // Hero is sized off the window so it scales from an SE to a tablet.
+  // Near-square: catalog photos are shot on white in every aspect ratio, and
+  // `contain` letterboxes them — the taller the tile, the more of the part is
+  // actually visible before you open the full-screen viewer.
   const heroHeight = Math.round(Math.min(Math.max(width * 0.95, 300), 430));
-  const barHeight = insets.top + 54;
-  const barOpacity = scrollY.interpolate({
-    inputRange: [heroHeight - barHeight - 40, heroHeight - barHeight],
-    outputRange: [0, 1],
-    extrapolate: 'clamp',
-  });
+  // The header is a static overlay now (visible from the first frame, not
+  // faded in on scroll) — its height is measured off the real render. Before
+  // that first measurement lands, fall back to a one-line estimate so the
+  // gallery never flashes under the header.
+  const headerHeight = measuredHeaderHeight ?? insets.top + 56;
+  const galleryTopGap = 16;
 
-  // Oils carry their attributes outside `specs`; fold them in so the spec table
-  // is the single place a shopper looks (memoised: `specs` is a fresh array).
+  // Brand/category/origin/OEM/GM already read from the pill + title, so the
+  // spec table is now ONLY the oil/antifreeze attributes that show nowhere
+  // else on the page (memoised: `specs` is a fresh array).
   const specs = useMemo<CatalogItemSpec[]>(() => buildSpecs(item, t), [item, t]);
 
   if (state === 'loading' || state === 'idle') {
@@ -170,9 +170,6 @@ export default function ItemDetailScreen() {
   const vehicleLabel = activeVehicle
     ? `${activeVehicle.year} ${activeVehicle.make} ${activeVehicle.model ?? ''}`.trim()
     : null;
-  // `description` is the backend's "Brand · Category" meta line — richer than
-  // the bare brand, so prefer it and fall back when the part carries neither.
-  const eyebrow = (item.description || item.brand || '').trim();
   // The fit zone's hairline must not strand itself. `ItemVehicleCta` renders
   // nothing once a vehicle is known and the check is done, so a part whose
   // check returned no verdict for a known car leaves the whole zone empty.
@@ -200,8 +197,8 @@ export default function ItemDetailScreen() {
   };
 
   // Actually add the real catalog item `qty` times (one unit per `addItem`)
-  // and land on Cart.
-  const commitAddToCart = (destination: '/cart' | '/checkout' = '/cart') => {
+  // and land on Cart. REPLACES onto the Cart tab — the item page is done.
+  const commitAddToCart = () => {
     triggerHaptic('success');
     const cartItem = {
       id: item.id,
@@ -212,18 +209,14 @@ export default function ItemDetailScreen() {
     };
     for (let i = 0; i < qty; i += 1) addItem(cartItem);
     setQty(1);
-    // Add-to-cart REPLACES onto the Cart tab (the item page is done). Buy now
-    // PUSHES checkout, so backing out of checkout returns to the part rather
-    // than dumping the shopper on a tab they didn't choose.
-    if (destination === '/checkout') router.push(destination);
-    else router.replace(destination);
+    router.replace('/cart');
   };
 
   // Guest-first purchase gate: guests go to Sign In. Signed-in users add
   // straight away — UNLESS the fit check says the part doesn't fit the active
   // vehicle, in which case a Safety Gate confirms intent first (cuts returns /
   // wrong-fit deliveries).
-  const addToCart = (destination: '/cart' | '/checkout' = '/cart') => {
+  const addToCart = () => {
     if (!isAuthenticated) {
       triggerHaptic('selection');
       router.push('/sign-in?gate=1');
@@ -239,25 +232,21 @@ export default function ItemDetailScreen() {
         {
           text: t('itemDetail.addAnyway'),
           style: 'destructive',
-          onPress: () => commitAddToCart(destination),
+          onPress: commitAddToCart,
         },
       ]);
       return;
     }
-    commitAddToCart(destination);
+    commitAddToCart();
   };
 
   return (
     <AppView flex={1} colorName="background" testID="item-detail-screen">
-      <Animated.ScrollView
+      <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 28 }}
-        scrollEventThrottle={16}
-        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-          useNativeDriver: true,
-        })}
+        contentContainerStyle={{ paddingTop: headerHeight + galleryTopGap, paddingBottom: 28 }}
       >
-        {/* Full-bleed gallery, running under the status bar. */}
+        {/* Full-bleed gallery — starts clear of the static header above it. */}
         <ItemGallery
           images={item.images ?? []}
           title={item.title}
@@ -293,14 +282,7 @@ export default function ItemDetailScreen() {
           {/* ZONE 1 — what it is, what it costs. No containers: the type
               hierarchy alone carries it. */}
           <AppView gap={12}>
-            <ItemIdentity
-              eyebrow={eyebrow}
-              badge={item.badge}
-              title={item.title}
-              titleDetail={item.titleDetail}
-              oem={item.oem}
-              gm={item.gm}
-            />
+            <ItemIdentity title={item.title} oem={item.oem} gm={item.gm} />
 
             {/* Real review aggregate, or nothing at all. */}
             <ItemRatingRow rating={item.rating} reviewCount={item.reviewCount} />
@@ -352,12 +334,7 @@ export default function ItemDetailScreen() {
 
           {/* ZONE 3 — when it lands and how you pay. Plain sentences, no box. */}
           <ItemRule />
-          <ItemAssuranceCard
-            item={item}
-            projectedSubtotal={totals.subtotal + unitPrice * qty}
-            freeShippingThreshold={freeShippingThreshold}
-            formatCurrency={formatCurrency}
-          />
+          <ItemAssuranceCard item={item} formatCurrency={formatCurrency} />
 
           {/* ZONE 4 — the details, for the shopper who wants them. One rule
               above the group, headed sections inside it. */}
@@ -404,16 +381,12 @@ export default function ItemDetailScreen() {
             </>
           ) : null}
         </AppView>
-      </Animated.ScrollView>
+      </ScrollView>
 
-      <ItemTitleBar title={item.title} height={barHeight} opacity={barOpacity} />
-
-      <ItemFloatingControls
-        top={insets.top + 6}
-        isFavorite={isFavorite}
+      <ItemDetailHeader
+        topInset={insets.top}
         onBack={() => router.back()}
-        onShare={shareCurrentItem}
-        onToggleFavorite={toggleFavorite}
+        onLayout={(e) => setMeasuredHeaderHeight(e.nativeEvent.layout.height)}
       />
 
       <ItemBuyBar
@@ -422,8 +395,10 @@ export default function ItemDetailScreen() {
         qty={qty}
         onQtyChange={setQty}
         outOfStock={outOfStock}
-        onAddToCart={() => addToCart('/cart')}
-        onBuyNow={() => addToCart('/checkout')}
+        onAddToCart={addToCart}
+        isFavorite={isFavorite}
+        onToggleFavorite={toggleFavorite}
+        onShare={shareCurrentItem}
         insetBottom={insets.bottom}
       />
 
@@ -444,10 +419,12 @@ export default function ItemDetailScreen() {
 }
 
 /**
- * Spec rows for the table: the catalog's own `specs`, prefixed with the
- * KIND-specific attributes the backend keeps outside `specs` — a motor oil's
- * viscosity/type/volume, an antifreeze's net weight. Without this they'd never
- * reach the shopper, since `specs` is only ever the shared fields.
+ * Spec rows for the table: ONLY the KIND-specific attributes the backend
+ * keeps outside the generic fields — a motor oil's viscosity/type/volume, an
+ * antifreeze's net weight. The catalog's generic `specs` (brand, category,
+ * origin, OEM/GM number) are deliberately left out: brand/OEM/GM already show
+ * in the OEM pill and the part's fit/model already shows in the title, so
+ * repeating them here was redundant.
  */
 function buildSpecs(
   item: CatalogItem | null,
@@ -469,5 +446,5 @@ function buildSpecs(
     (coolant?.weightG != null ? t('itemDetail.weightGrams', { grams: coolant.weightG }) : null);
   if (weight) kindRows.push({ label: t('itemDetail.antifreezeWeight'), value: weight });
 
-  return [...kindRows, ...(item.specs ?? [])];
+  return kindRows;
 }

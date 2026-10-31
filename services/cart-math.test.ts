@@ -4,24 +4,20 @@ import {
   computeSubtotal,
   computeTotals,
   evaluatePromoCode,
-  FLAT_SHIPPING,
   formatCurrency,
-  FREE_SHIPPING_THRESHOLD,
   parsePrice,
   PROMO_CODES,
   PROMO_MIN_SUBTOTAL,
   round,
-  TAX_RATE,
+  SERVICE_FEE_UZS,
+  STANDARD_DELIVERY_UZS,
   type PromoCode,
 } from './cart-math';
 
-const SUBTOTAL_BELOW_FREE = 200; // shipping = FLAT_SHIPPING
-const SUBTOTAL_AT_FREE = FREE_SHIPPING_THRESHOLD; // shipping = 0
-const SUBTOTAL_ABOVE_FREE = FREE_SHIPPING_THRESHOLD + 100; // shipping = 0
+const SUBTOTAL = 200;
 
-const expectedTax = (base: number) => round(base * TAX_RATE);
 const expectedTotal = (base: number, shipping: number) =>
-  round(base + shipping + expectedTax(base));
+  round(base + shipping + SERVICE_FEE_UZS);
 
 describe('parsePrice', () => {
   test('strips currency formatting', () => {
@@ -95,43 +91,40 @@ describe('computeTotals — no promo', () => {
       subtotal: 0,
       discount: 0,
       shipping: 0,
-      tax: 0,
+      serviceFee: 0,
       total: 0,
     });
   });
 
-  test('charges flat shipping below the free-ship threshold', () => {
-    const totals = computeTotals(SUBTOTAL_BELOW_FREE, null);
-    expect(totals.subtotal).toBe(SUBTOTAL_BELOW_FREE);
+  test('charges the flat delivery fee + service fee on any non-empty cart', () => {
+    const totals = computeTotals(SUBTOTAL, null);
+    expect(totals.subtotal).toBe(SUBTOTAL);
     expect(totals.discount).toBe(0);
-    expect(totals.shipping).toBe(FLAT_SHIPPING);
-    expect(totals.tax).toBe(expectedTax(SUBTOTAL_BELOW_FREE));
-    expect(totals.total).toBe(expectedTotal(SUBTOTAL_BELOW_FREE, FLAT_SHIPPING));
+    expect(totals.shipping).toBe(STANDARD_DELIVERY_UZS);
+    expect(totals.serviceFee).toBe(SERVICE_FEE_UZS);
+    expect(totals.total).toBe(expectedTotal(SUBTOTAL, STANDARD_DELIVERY_UZS));
   });
 
-  test('waives shipping AT the free-ship threshold', () => {
-    const totals = computeTotals(SUBTOTAL_AT_FREE, null);
-    expect(totals.shipping).toBe(0);
-    expect(totals.total).toBe(expectedTotal(SUBTOTAL_AT_FREE, 0));
-  });
-
-  test('waives shipping ABOVE the free-ship threshold', () => {
-    const totals = computeTotals(SUBTOTAL_ABOVE_FREE, null);
-    expect(totals.shipping).toBe(0);
-    expect(totals.total).toBe(expectedTotal(SUBTOTAL_ABOVE_FREE, 0));
+  test('the flat fees do not change with subtotal size (no free-shipping threshold)', () => {
+    const small = computeTotals(SUBTOTAL, null);
+    const large = computeTotals(SUBTOTAL * 1000, null);
+    expect(large.shipping).toBe(small.shipping);
+    expect(large.serviceFee).toBe(small.serviceFee);
   });
 });
 
 describe('computeTotals — percent promo (WELCOME10)', () => {
   const promo = PROMO_CODES.WELCOME10;
 
-  test('applies 10% off and recomputes tax on the discounted base', () => {
-    const totals = computeTotals(SUBTOTAL_BELOW_FREE, promo);
-    const expectedDiscount = round(SUBTOTAL_BELOW_FREE * 0.1);
-    const taxedBase = SUBTOTAL_BELOW_FREE - expectedDiscount;
+  test('applies 10% off the subtotal; shipping/service fee are untouched', () => {
+    const totals = computeTotals(SUBTOTAL, promo);
+    const expectedDiscount = round(SUBTOTAL * 0.1);
     expect(totals.discount).toBe(expectedDiscount);
-    expect(totals.tax).toBe(expectedTax(taxedBase));
-    expect(totals.total).toBe(expectedTotal(taxedBase, FLAT_SHIPPING));
+    expect(totals.shipping).toBe(STANDARD_DELIVERY_UZS);
+    expect(totals.serviceFee).toBe(SERVICE_FEE_UZS);
+    expect(totals.total).toBe(
+      round(SUBTOTAL - expectedDiscount + STANDARD_DELIVERY_UZS + SERVICE_FEE_UZS),
+    );
   });
 
   test('no-op on empty cart', () => {
@@ -139,26 +132,26 @@ describe('computeTotals — percent promo (WELCOME10)', () => {
       subtotal: 0,
       discount: 0,
       shipping: 0,
-      tax: 0,
+      serviceFee: 0,
       total: 0,
     });
   });
 });
 
-describe('computeTotals — capped percent promo (RIDE25, max $200)', () => {
+describe('computeTotals — capped percent promo (RIDE25, max 200)', () => {
   const promo = PROMO_CODES.RIDE25;
 
   test('caps the discount at maxDiscount when raw percent would exceed it', () => {
-    // 25% of $1,000 = $250 → clamped to $200
+    // 25% of 1,000 = 250 → clamped to 200
     const totals = computeTotals(1000, promo);
     expect(totals.discount).toBe(200);
-    const taxedBase = 1000 - 200;
-    expect(totals.tax).toBe(expectedTax(taxedBase));
-    expect(totals.total).toBe(expectedTotal(taxedBase, 0)); // above free-ship
+    expect(totals.total).toBe(
+      round(1000 - 200 + STANDARD_DELIVERY_UZS + SERVICE_FEE_UZS),
+    );
   });
 
   test('does NOT cap when raw percent is below the cap', () => {
-    // 25% of $400 = $100 → below the $200 cap, applied as-is
+    // 25% of 400 = 100 → below the 200 cap, applied as-is
     const totals = computeTotals(400, promo);
     expect(totals.discount).toBe(100);
   });
@@ -167,25 +160,19 @@ describe('computeTotals — capped percent promo (RIDE25, max $200)', () => {
 describe('computeTotals — free_shipping promo (FREESHIP)', () => {
   const promo = PROMO_CODES.FREESHIP;
 
-  test('zeros shipping but leaves discount at 0', () => {
-    const totals = computeTotals(SUBTOTAL_BELOW_FREE, promo);
+  test('zeros shipping, leaves discount and the service fee untouched', () => {
+    const totals = computeTotals(SUBTOTAL, promo);
     expect(totals.discount).toBe(0);
     expect(totals.shipping).toBe(0);
-    expect(totals.tax).toBe(expectedTax(SUBTOTAL_BELOW_FREE));
-    expect(totals.total).toBe(expectedTotal(SUBTOTAL_BELOW_FREE, 0));
-  });
-
-  test('is a no-op when shipping was already free (above threshold)', () => {
-    const withPromo = computeTotals(SUBTOTAL_ABOVE_FREE, promo);
-    const withoutPromo = computeTotals(SUBTOTAL_ABOVE_FREE, null);
-    expect(withPromo).toEqual(withoutPromo);
+    expect(totals.serviceFee).toBe(SERVICE_FEE_UZS);
+    expect(totals.total).toBe(round(SUBTOTAL + SERVICE_FEE_UZS));
   });
 });
 
 describe('computeTotals — fixed promo (synthetic)', () => {
   const promo: PromoCode = {
     code: 'TEST50',
-    label: '$50 off',
+    label: '50 off',
     kind: 'fixed',
     value: 50,
   };
@@ -193,17 +180,17 @@ describe('computeTotals — fixed promo (synthetic)', () => {
   test('subtracts the fixed amount', () => {
     const totals = computeTotals(200, promo);
     expect(totals.discount).toBe(50);
-    const taxedBase = 150;
-    expect(totals.tax).toBe(expectedTax(taxedBase));
-    expect(totals.total).toBe(expectedTotal(taxedBase, FLAT_SHIPPING));
+    expect(totals.total).toBe(
+      round(200 - 50 + STANDARD_DELIVERY_UZS + SERVICE_FEE_UZS),
+    );
   });
 
   test('does not let discount exceed subtotal', () => {
-    // Promo value > subtotal: discount caps at subtotal, so net taxed base is 0.
+    // Promo value > subtotal: discount caps at subtotal, so the discounted
+    // base is 0 but the flat fees still apply.
     const totals = computeTotals(30, promo);
     expect(totals.discount).toBe(30);
-    expect(totals.tax).toBe(0);
-    expect(totals.total).toBe(FLAT_SHIPPING);
+    expect(totals.total).toBe(round(STANDARD_DELIVERY_UZS + SERVICE_FEE_UZS));
   });
 });
 
@@ -241,20 +228,12 @@ describe('evaluatePromoCode', () => {
 });
 
 describe('rounding behavior — totals never produce >2-decimal noise', () => {
-  test('floating-point edge case: WELCOME10 on $19,640', () => {
-    // This is the exact value from the verify run; locks in the answer.
+  test('floating-point edge case: WELCOME10 on 19,640', () => {
     const totals = computeTotals(19640, PROMO_CODES.WELCOME10);
     expect(totals.subtotal).toBe(19640);
     expect(totals.discount).toBe(1964);
-    expect(totals.shipping).toBe(0);
-    expect(totals.tax).toBe(1502.46); // (19640-1964) * 0.085 = 1502.46
-    expect(totals.total).toBe(19178.46); // 17676 + 0 + 1502.46
-  });
-
-  test('RIDE25 cap on $19,640 → $200 off, tax on $19,440', () => {
-    const totals = computeTotals(19640, PROMO_CODES.RIDE25);
-    expect(totals.discount).toBe(200);
-    expect(totals.tax).toBe(1652.4); // 19440 * 0.085
-    expect(totals.total).toBe(21092.4); // 19440 + 0 + 1652.40
+    expect(totals.shipping).toBe(STANDARD_DELIVERY_UZS);
+    expect(totals.serviceFee).toBe(SERVICE_FEE_UZS);
+    expect(totals.total).toBe(round(19640 - 1964 + STANDARD_DELIVERY_UZS + SERVICE_FEE_UZS));
   });
 });

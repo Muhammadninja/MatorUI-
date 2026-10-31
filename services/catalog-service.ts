@@ -2,7 +2,6 @@
 
 import {
   brandRegion,
-  CATALOG_REGIONS,
   isGmBrand,
   normalizeRegion,
   type CatalogRegion,
@@ -601,67 +600,6 @@ type ApiCatalogPart = {
   region?: string;
 };
 
-/** "BRAKES" / "BRAKE_SYSTEM" → "Brakes" / "Brake system" for display. */
-function prettyEnum(v: string): string {
-  return v
-    .toLowerCase()
-    .split('_')
-    .map((w, i) => (i === 0 ? w.charAt(0).toUpperCase() + w.slice(1) : w))
-    .join(' ');
-}
-
-/**
- * Build a spec table from the part's structured fields when the backend
- * doesn't ship an explicit `specs` array — so the detail screen shows real
- * data (brand, origin, OEM/GM numbers, stock, seller) instead of nothing.
- */
-/** The single OEM|GM number row for the detail spec table — same GM-xor-OEM
- *  precedence as `resolvePartNumber`, but showing every number of that type. */
-function partNumberSpec(p: ApiCatalogPart): CatalogItemSpec | undefined {
-  const gm = p.gm_numbers?.length ? p.gm_numbers.join(', ') : undefined;
-  const oem = p.oem_numbers?.length ? p.oem_numbers.join(', ') : undefined;
-  const type = (p.part_number_type ?? '').toUpperCase();
-  if (type === 'GM' && (gm ?? oem)) return { label: 'GM number', value: (gm ?? oem)! };
-  if (type === 'OEM' && (oem ?? gm)) return { label: 'OEM number', value: (oem ?? gm)! };
-  if (gm) return { label: 'GM number', value: gm };
-  if (oem) return { label: 'OEM number', value: oem };
-  return undefined;
-}
-
-function deriveSpecs(p: ApiCatalogPart): CatalogItemSpec[] {
-  const specs: CatalogItemSpec[] = [];
-  const brand = p.part_brand_name ?? p.brand?.name;
-  if (brand) specs.push({ label: 'Brand', value: brand });
-  // Motor-oil attributes — shown as their own spec rows (oils carry no OEM/GM
-  // row). Prefer the backend's pre-localized labels; fall back to the raw value.
-  const oil = p.motor_oil;
-  if (oil) {
-    if (oil.viscosity) specs.push({ label: 'Viscosity', value: oil.viscosity });
-    const oilType = oil.oil_type_label ?? (oil.oil_type ? prettyEnum(oil.oil_type) : undefined);
-    if (oilType) specs.push({ label: 'Oil type', value: oilType });
-    const volume = oil.volume_label ?? (oil.volume_ml != null ? `${oil.volume_ml} ml` : undefined);
-    if (volume) specs.push({ label: 'Volume', value: volume });
-  }
-  // Antifreeze carries ONE attribute, its net package weight. Same raw/label
-  // pairing as the oil volume — show the backend's label, fall back to grams.
-  const coolant = p.antifreeze;
-  if (coolant) {
-    const weight =
-      coolant.weight_label ?? (coolant.weight_g != null ? `${coolant.weight_g} g` : undefined);
-    if (weight) specs.push({ label: 'Weight', value: weight });
-  }
-  const category = p.main_category ? cleanCategoryName(prettyEnum(p.main_category)) : undefined;
-  if (category) specs.push({ label: 'Category', value: category });
-  const region = normalizeRegion(p.origin_region ?? p.region);
-  const regionLabel = region && CATALOG_REGIONS.find((r) => r.key === region)?.label;
-  if (regionLabel) specs.push({ label: 'Origin', value: regionLabel });
-  // A part is GM xor OEM — show only the matching number row (the label already
-  // conveys the type), never both.
-  const partNumber = partNumberSpec(p);
-  if (partNumber) specs.push(partNumber);
-  return specs;
-}
-
 type ApiCatalogPartsResponse = {
   items: ApiCatalogPart[];
   total: number;
@@ -740,9 +678,11 @@ function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
     priceUzs: p.price_uzs ?? undefined,
     priceLabel: '',
     images: p.images ?? [],
-    // Prefer an explicit spec array; otherwise synthesize one from the
-    // part's structured fields so the detail screen isn't blank.
-    specs: p.specs?.length ? p.specs : deriveSpecs(p),
+    // The detail screen only reads the oil/antifreeze rows off `motorOil` /
+    // `antifreeze` now — brand/category/origin/OEM/GM live in the OEM pill
+    // and the title instead. Kept passthrough-only for whatever the backend
+    // sends explicitly, rather than synthesizing the retired generic rows.
+    specs: p.specs ?? [],
     features: p.features ?? [],
     category: categoryLabel ?? '',
     brand: partBrand,

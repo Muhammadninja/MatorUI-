@@ -15,7 +15,6 @@ import {
   computeTotals,
   evaluatePromoCode,
   formatCurrency,
-  FREE_SHIPPING_THRESHOLD,
   PROMO_CODES,
   type CartItem,
   type CartTotals,
@@ -28,11 +27,7 @@ import { useUserContext } from '@/contexts/user.context';
 
 // Re-export types and constants so existing imports keep working without churn.
 export type { CartItem, CartTotals, PromoCode, PromoResult };
-export {
-  FREE_SHIPPING_THRESHOLD,
-  TAX_RATE,
-  FLAT_SHIPPING,
-} from '@/services/cart-math';
+export { STANDARD_DELIVERY_UZS, SERVICE_FEE_UZS } from '@/services/cart-math';
 
 type AddCartItemInput = Omit<CartItem, 'quantity'>;
 
@@ -41,8 +36,6 @@ type CartContextValue = {
   itemCount: number;
   totals: CartTotals;
   appliedPromo: PromoCode | null;
-  freeShippingThreshold: number;
-  freeShippingRemaining: number;
   /** True once the persisted cart has been read from storage. */
   isHydrated: boolean;
   /** Set of item IDs currently mid-flight to the transport. UI can grey
@@ -371,19 +364,12 @@ export function CartProvider({ children }: PropsWithChildren) {
     [subtotal, appliedPromo],
   );
 
-  const freeShippingRemaining = useMemo(
-    () => (totals.shipping > 0 ? Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal) : 0),
-    [totals.shipping, subtotal],
-  );
-
   const value = useMemo<CartContextValue>(
     () => ({
       items,
       itemCount,
       totals,
       appliedPromo,
-      freeShippingThreshold: FREE_SHIPPING_THRESHOLD,
-      freeShippingRemaining,
       isHydrated,
       pendingIds,
       error,
@@ -402,7 +388,6 @@ export function CartProvider({ children }: PropsWithChildren) {
       itemCount,
       totals,
       appliedPromo,
-      freeShippingRemaining,
       isHydrated,
       pendingIds,
       error,

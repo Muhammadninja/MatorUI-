@@ -30,8 +30,7 @@ export const ordersQueryKeys = {
   detail: (id: string) => ['orders', 'detail', id] as const,
   addresses: () => ['account', 'addresses'] as const,
   paymentMethods: () => ['account', 'payment-methods'] as const,
-  shippingQuote: (req: ShippingQuoteRequest) =>
-    ['shipping', 'quote', req.addressId, req.subtotal] as const,
+  shippingQuote: (req: ShippingQuoteRequest) => ['shipping', 'quote', req.addressId] as const,
 };
 
 // ── useOrders (list) ───────────────────────────────────────────────────

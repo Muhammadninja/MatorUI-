@@ -44,11 +44,11 @@ import { localizedCategoryLabel } from '@/utils/category-label';
 
 import AcCompressor from '@/assets/3D _Icons/atlts.png';
 import Battery from '@/assets/3D _Icons/battery.png';
-import ClutchKit from '@/assets/3D _Icons/brake.png';
-import BrakeDisc from '@/assets/3D _Icons/brake2.png';
+import BrakePad from '@/assets/3D _Icons/brake.png';
 import WheelRim from '@/assets/3D _Icons/disk.png';
 import Oil from '@/assets/3D _Icons/oil.png';
 import OilFilter from '@/assets/3D _Icons/oilfilter.png';
+import Piston from '@/assets/3D _Icons/p.png';
 import Susp from '@/assets/3D _Icons/susp.png';
 import EngineIcon from '@/assets/auto-parts/engine.png';
 
@@ -265,11 +265,11 @@ describe('root icons', () => {
   const iconFor = (rootId: string) => resolvePartIcon(rootId, ROOT_META[rootId].iconKey);
 
   test('each root shows a part from its own system', () => {
-    expect(iconFor('brake-system')).toEqual({ image: BrakeDisc });
+    expect(iconFor('brake-system')).toEqual({ image: BrakePad });
     expect(iconFor('motor-oil')).toEqual({ image: Oil });
     expect(iconFor('electrical-and-lighting')).toEqual({ image: Battery });
     expect(iconFor('tuning-and-accessories')).toEqual({ image: WheelRim });
-    expect(iconFor('transmission')).toEqual({ image: ClutchKit });
+    expect(iconFor('transmission')).toEqual({ image: Piston });
     expect(iconFor('maintenance-and-fluids')).toEqual({ image: OilFilter });
     expect(iconFor('suspension-and-steering')).toEqual({ image: Susp });
     expect(iconFor('engine-system')).toEqual({ image: EngineIcon });

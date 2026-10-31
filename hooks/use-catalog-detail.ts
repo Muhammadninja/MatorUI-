@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 
+import i18n from '@/services/i18n';
 import {
   fetchCatalogDetail,
   type CatalogDetailResponse,
@@ -27,8 +29,17 @@ export type UseCatalogDetailValue = {
   refresh: () => void;
 };
 
-export function catalogDetailQueryKey(id: string) {
-  return ['catalog', 'detail', id] as const;
+/**
+ * Keyed by language too: `mapPartToCatalogItem` bakes localized text (specs
+ * labels, derived category/origin names) into the cached item at fetch time,
+ * so without the language in the key, a product fetched under one language
+ * would keep showing that language's spec table forever — a switch re-renders
+ * every `t()` call live, but never touches already-cached data. Keying by
+ * language makes a switch a normal RQ cache miss instead, the same fix
+ * `use-categories.ts` already applies to the home category grid.
+ */
+export function catalogDetailQueryKey(id: string, lang: string) {
+  return ['catalog', 'detail', id, lang] as const;
 }
 
 /**
@@ -38,18 +49,22 @@ export function catalogDetailQueryKey(id: string) {
  * slow connection the data is often already back by the time the screen mounts.
  * No-op when `id` is empty; respects the global `staleTime` (won't refetch fresh
  * data); errors are swallowed since this is a best-effort warm-up, not a load.
+ * Fired from a press handler outside React, so it reads `i18n.language`
+ * directly rather than through `useTranslation`.
  */
 export function prefetchCatalogDetail(id: string | null | undefined): void {
   if (!id) return;
   void queryClient.prefetchQuery({
-    queryKey: catalogDetailQueryKey(id),
+    queryKey: catalogDetailQueryKey(id, i18n.language),
     queryFn: ({ signal }) => fetchCatalogDetail(id, signal),
   });
 }
 
 export function useCatalogDetail(id: string | null | undefined): UseCatalogDetailValue {
+  const { i18n: i18nInstance } = useTranslation();
+  const lang = i18nInstance.language;
   const query = useQuery({
-    queryKey: id ? catalogDetailQueryKey(id) : ['catalog', 'detail', 'disabled'],
+    queryKey: id ? catalogDetailQueryKey(id, lang) : ['catalog', 'detail', 'disabled', lang],
     queryFn: ({ signal }) => fetchCatalogDetail(id as string, signal),
     enabled: !!id,
   });

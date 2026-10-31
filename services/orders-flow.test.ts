@@ -8,6 +8,7 @@
 import { describe, expect, test } from 'vitest';
 
 import { MockOrdersTransport, MOCK_SEED, asList } from './orders-api';
+import { STANDARD_DELIVERY_UZS } from './cart-math';
 import type { CreateOrderInput } from './orders-service';
 
 const BASE_INPUT: CreateOrderInput = {
@@ -17,7 +18,7 @@ const BASE_INPUT: CreateOrderInput = {
   ],
   addressId: 'addr_home',
   paymentType: 'cash',
-  shippingOptionKey: 'express',
+  shippingOptionKey: 'courier',
   promoCode: null,
 };
 
@@ -60,7 +61,7 @@ describe('MockOrdersTransport — createOrder', () => {
     const transport = new MockOrdersTransport();
     const result = await transport.createOrder(BASE_INPUT);
     expect(result.orderId).toMatch(/^M-\d{5}$/);
-    expect(result.eta).toBe('1-2 business days'); // express
+    expect(result.eta).toBe('1-3 days'); // courier
   });
 
   test('seeds a fresh detail row so track-order can fetch the new id', async () => {
@@ -92,18 +93,18 @@ describe('MockOrdersTransport — createOrder', () => {
     }
   });
 
-  test('honors standard / express / same_day distinct ETAs', async () => {
+  test('honors pickup / courier distinct ETAs', async () => {
     const transport = new MockOrdersTransport();
-    const standard = await transport.createOrder({
+    const pickup = await transport.createOrder({
       ...BASE_INPUT,
-      shippingOptionKey: 'standard',
+      shippingOptionKey: 'pickup',
     });
-    expect(standard.eta).toBe('3-5 business days');
-    const sameDay = await transport.createOrder({
+    expect(pickup.eta).toBe('Today');
+    const courier = await transport.createOrder({
       ...BASE_INPUT,
-      shippingOptionKey: 'same_day',
+      shippingOptionKey: 'courier',
     });
-    expect(sameDay.eta).toBe('By 9 PM today');
+    expect(courier.eta).toBe('1-3 days');
   });
 });
 
@@ -125,28 +126,13 @@ describe('MockOrdersTransport — account collections', () => {
 });
 
 describe('MockOrdersTransport — shipping quote', () => {
-  test('standard becomes free above $500 (mirrors the free-ship rule)', async () => {
+  test('mirrors the real backend: pickup free, courier a flat fee, no threshold', async () => {
     const transport = new MockOrdersTransport();
-    const above = await transport.getShippingQuote({
-      addressId: 'addr_home',
-      subtotal: 1000,
-    });
-    const standard = above.find((o) => o.key === 'standard');
-    expect(standard?.price).toBe(0);
-  });
-
-  test('standard is still its base price below $500', async () => {
-    const transport = new MockOrdersTransport();
-    const below = await transport.getShippingQuote({
-      addressId: 'addr_home',
-      subtotal: 200,
-    });
-    const standard = below.find((o) => o.key === 'standard');
-    // Base seed has standard at 0 either way (free standard always), but
-    // express must stay 9.99 to prove pricing isn't being zeroed wholesale.
-    const express = below.find((o) => o.key === 'express');
-    expect(express?.price).toBe(9.99);
-    expect(standard).toBeDefined();
+    const quote = await transport.getShippingQuote({ addressId: 'addr_home' });
+    const pickup = quote.find((o) => o.key === 'pickup');
+    const courier = quote.find((o) => o.key === 'courier');
+    expect(pickup?.price).toBe(0);
+    expect(courier?.price).toBe(STANDARD_DELIVERY_UZS);
   });
 });
 

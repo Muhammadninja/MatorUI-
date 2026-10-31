@@ -49,30 +49,34 @@ export function resolveSpace(value: number | SpacingKey | undefined): number | u
   return SPACING[value];
 }
 
-// Mator v2 uses a single family — Inter — across every role, per the
-// design handoff (weights 400/500/600/700/800). The three "family" names
-// (default/heading/accent) still exist so the ~1k existing `family=` call
-// sites keep working; they now all resolve to a Inter weight. The MATOR
-// wordmark is the one exception — it uses Raleway 800 (see `app-logo`).
+// Mator v2 uses a single family — Figtree — across every role (weights
+// 400/500/600/700/800). Figtree is a geometric sans with a tall x-height and
+// round bowls: the closest open face to the one Instagram's UI is set in
+// (Instagram Sans is proprietary and not licensable for embedding). It
+// started out as the search-result row's own face and is now the whole app's.
+// The three "family" names (default/heading/accent) still exist so the ~1k
+// existing `family=` call sites keep working; they now all resolve to a
+// Figtree weight. The MATOR wordmark is the one exception — it uses
+// Raleway 800 (see `app-logo`).
 export const APP_FONTS: Record<FontFamilyName, string | undefined> = {
-  default: 'Inter_400Regular',
-  heading: 'Inter_700Bold',
-  accent: 'Inter_600SemiBold',
+  default: 'Figtree_400Regular',
+  heading: 'Figtree_700Bold',
+  accent: 'Figtree_600SemiBold',
   mono: 'SpaceMono',
 };
 
 export const FONT_PACKAGES = {
   body: {
-    regular: 'Inter_400Regular',
-    medium: 'Inter_500Medium',
-    semibold: 'Inter_600SemiBold',
-    bold: 'Inter_700Bold',
+    regular: 'Figtree_400Regular',
+    medium: 'Figtree_500Medium',
+    semibold: 'Figtree_600SemiBold',
+    bold: 'Figtree_700Bold',
   },
   heading: {
-    bold: 'Inter_700Bold',
+    bold: 'Figtree_700Bold',
   },
   accent: {
-    semibold: 'Inter_600SemiBold',
+    semibold: 'Figtree_600SemiBold',
   },
   mono: {
     regular: 'SpaceMono',
@@ -80,24 +84,24 @@ export const FONT_PACKAGES = {
 } as const;
 
 const textVariants: Record<TextVariant, TextStyle> = {
-  body: { fontSize: 16, lineHeight: 24, fontFamily: 'Inter_400Regular' },
-  bodySm: { fontSize: 14, lineHeight: 20, fontFamily: 'Inter_400Regular' },
-  bodyXs: { fontSize: 12, lineHeight: 16, fontFamily: 'Inter_400Regular' },
-  bodySemibold: { fontSize: 15, lineHeight: 22, fontFamily: 'Inter_600SemiBold' },
-  h3: { fontSize: 24, lineHeight: 30, fontFamily: 'Inter_700Bold' },
-  h4: { fontSize: 20, lineHeight: 26, fontFamily: 'Inter_700Bold' },
-  button: { fontSize: 16, lineHeight: 20, fontFamily: 'Inter_600SemiBold' },
-  buttonSm: { fontSize: 14, lineHeight: 18, fontFamily: 'Inter_600SemiBold' },
-  caption: { fontSize: 11, lineHeight: 14, fontFamily: 'Inter_500Medium' },
-  subtitle: { fontSize: 18, lineHeight: 24, fontFamily: 'Inter_600SemiBold' },
-  title: { fontSize: 28, lineHeight: 34, fontFamily: 'Inter_800ExtraBold' },
+  body: { fontSize: 16, lineHeight: 24, fontFamily: 'Figtree_400Regular' },
+  bodySm: { fontSize: 14, lineHeight: 20, fontFamily: 'Figtree_400Regular' },
+  bodyXs: { fontSize: 12, lineHeight: 16, fontFamily: 'Figtree_400Regular' },
+  bodySemibold: { fontSize: 15, lineHeight: 22, fontFamily: 'Figtree_600SemiBold' },
+  h3: { fontSize: 24, lineHeight: 30, fontFamily: 'Figtree_700Bold' },
+  h4: { fontSize: 20, lineHeight: 26, fontFamily: 'Figtree_700Bold' },
+  button: { fontSize: 16, lineHeight: 20, fontFamily: 'Figtree_600SemiBold' },
+  buttonSm: { fontSize: 14, lineHeight: 18, fontFamily: 'Figtree_600SemiBold' },
+  caption: { fontSize: 11, lineHeight: 14, fontFamily: 'Figtree_500Medium' },
+  subtitle: { fontSize: 18, lineHeight: 24, fontFamily: 'Figtree_600SemiBold' },
+  title: { fontSize: 28, lineHeight: 34, fontFamily: 'Figtree_800ExtraBold' },
 };
 
 const weightStyles: Record<WeightName, TextStyle> = {
-  regular: { fontFamily: 'Inter_400Regular', fontWeight: '400' },
-  medium: { fontFamily: 'Inter_500Medium', fontWeight: '500' },
-  semibold: { fontFamily: 'Inter_600SemiBold', fontWeight: '600' },
-  bold: { fontFamily: 'Inter_700Bold', fontWeight: '700' },
+  regular: { fontFamily: 'Figtree_400Regular', fontWeight: '400' },
+  medium: { fontFamily: 'Figtree_500Medium', fontWeight: '500' },
+  semibold: { fontFamily: 'Figtree_600SemiBold', fontWeight: '600' },
+  bold: { fontFamily: 'Figtree_700Bold', fontWeight: '700' },
 };
 
 export const lightTokens: ThemeTokens = {

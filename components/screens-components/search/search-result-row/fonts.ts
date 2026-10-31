@@ -1,18 +1,18 @@
 /**
- * The search row's own typeface: Figtree.
+ * The search row's typeface: Figtree — the same face the rest of the app is
+ * now set in (see `themes/index.ts`). This module predates that: the row was
+ * the first surface to move off Inter, because results should read as a feed
+ * rather than as interface chrome, and Figtree is the closest face in the
+ * bundle to the geometric sans the social apps use (Instagram Sans is
+ * geometric, round-bowled, tall x-height, tight tracking — and proprietary).
+ * The app has since followed the row.
  *
- * The rest of the app is set in Inter — a neo-grotesque that reads as
- * "interface". Results are the one surface that should read as a feed, so they
- * use the closest thing in the bundle to the geometric sans the social apps
- * use (Instagram Sans is geometric, round-bowled, with a tall x-height and
- * tight tracking): Figtree matches that skeleton almost exactly, and ships in
- * the weights the row needs.
- *
- * Faces are named explicitly rather than selected with `fontWeight`, because a
- * custom family on Android resolves ONE file per family name — a `fontWeight:
- * '700'` on top of `Figtree_400Regular` is silently ignored there and renders
- * bold only on iOS, which is how a layout ends up looking different per
- * platform. Loading happens once in `app/_layout.tsx`.
+ * It still exists as its own module because the row names faces explicitly
+ * rather than selecting them with `fontWeight`: a custom family on Android
+ * resolves ONE file per family name, so a `fontWeight: '700'` on top of
+ * `Figtree_400Regular` is silently ignored there and renders bold only on
+ * iOS, which is how a layout ends up looking different per platform. Loading
+ * happens once in `app/_layout.tsx`.
  */
 export const SEARCH_FONT = {
   /** Supporting copy — delivery, status, review counts. */

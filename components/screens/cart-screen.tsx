@@ -226,7 +226,12 @@ export default function CartScreen() {
         {totals.discount > 0 ? (
           <SummaryRow label={t('cart.discount')} value={`−${formatCurrency(totals.discount)}`} tokens={tokens} />
         ) : null}
-        <SummaryRow label={t('cart.estTax')} value={formatCurrency(totals.tax)} tokens={tokens} />
+        <SummaryRow
+          label={t('cart.shipping')}
+          value={totals.shipping > 0 ? formatCurrency(totals.shipping) : t('cart.free')}
+          tokens={tokens}
+        />
+        <SummaryRow label={t('cart.serviceFee')} value={formatCurrency(totals.serviceFee)} tokens={tokens} />
         {/* The total is a different KIND of number from the breakdown above
          *  it, so a hairline and a size jump say so. */}
         <AppView

@@ -10,7 +10,6 @@ import CategoryGridSkeleton, {
   BrandRowSkeleton,
 } from '@/components/screens-components/catalog/category-grid-skeleton';
 import CategoryTile from '@/components/screens-components/catalog/category-tile';
-import CertifiedSection from '@/components/screens-components/catalog/certified-section';
 import FitmentNote from '@/components/screens-components/catalog/fitment-note';
 import VehicleMakeTile from '@/components/screens-components/catalog/vehicle-make-tile';
 import { AppButton } from '@/components/shared/app-button';
@@ -312,9 +311,6 @@ export default function ExploreScreen() {
             ))}
           </ScrollView>
         )}
-
-        {/* ── MATOR Certified ── */}
-        <CertifiedSection />
 
         {/* ── Shop by category ── */}
         <AppText

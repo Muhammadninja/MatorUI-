@@ -195,12 +195,12 @@ export type PaymentMethod = {
 export type PaymentType = 'payme' | 'terminal' | 'cash';
 
 export type ShippingOption = {
-  /** Stable server key (`standard`, `express`, `same_day`, etc.). */
+  /** Stable server key (`pickup`, `courier`). */
   key: string;
   label: string;
-  /** Server-formatted ETA string ("3–5 business days"). */
+  /** Server-formatted ETA string ("1–3 days"). */
   eta: string;
-  /** Numeric fee in dollars. 0 = free. */
+  /** Numeric fee in UZS. 0 = free (pickup). */
   price: number;
 };
 

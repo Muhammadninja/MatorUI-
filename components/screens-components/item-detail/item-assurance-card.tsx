@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
+import { STANDARD_DELIVERY_UZS } from '@/services/cart-math';
 import type { CatalogItem } from '@/services/catalog-service';
 
 /** BCP-47 tag per app language, for the arrival-date formatting. */
@@ -26,10 +27,6 @@ function addDays(days: number): Date {
 
 export type ItemAssuranceCardProps = {
   item: CatalogItem;
-  /** Cart subtotal once this line is added — decides the free-shipping line. */
-  projectedSubtotal: number;
-  /** The cart's own free-shipping threshold, so both screens agree. */
-  freeShippingThreshold: number;
   formatCurrency: (amount: number) => string;
 };
 
@@ -45,10 +42,11 @@ export type ItemAssuranceCardProps = {
  * everything else as type separated by hairlines.
  *
  * Every line is derived, never promised: the arrival window is the backend's
- * `delivery_eta_days_{min,max}` turned into real dates, the shipping line runs
- * the SAME free-shipping rule the cart runs (`computeTotals`) against this
- * basket plus this item, and the payment line lists the three methods checkout
- * actually offers. Lines with no data behind them don't render.
+ * `delivery_eta_days_{min,max}` turned into real dates, the shipping line
+ * states the SAME flat courier fee the backend actually charges
+ * (`STANDARD_DELIVERY_UZS`, mirroring `orders.service.ts`), and the payment
+ * line lists the three methods checkout actually offers. Lines with no data
+ * behind them don't render.
  *
  * The seller's storefront name is deliberately NOT here. Mator is the shop the
  * customer is buying from; naming the dealer behind the listing ("Sold by
@@ -57,12 +55,7 @@ export type ItemAssuranceCardProps = {
  * and lowest-price are claims about the listing, not an introduction to
  * someone else's storefront.
  */
-export function ItemAssuranceCard({
-  item,
-  projectedSubtotal,
-  freeShippingThreshold,
-  formatCurrency,
-}: ItemAssuranceCardProps) {
+export function ItemAssuranceCard({ item, formatCurrency }: ItemAssuranceCardProps) {
   const { t, i18n } = useTranslation();
   const { tokens } = useThemeContext();
 
@@ -84,12 +77,9 @@ export function ItemAssuranceCard({
     else when = t('itemDetail.deliveryDays', { days: min ?? max });
   }
 
-  const freeShipping = projectedSubtotal >= freeShippingThreshold;
-  const shippingLine = freeShipping
-    ? t('itemDetail.freeShippingLine')
-    : t('itemDetail.freeShippingNeed', {
-        amount: formatCurrency(Math.max(0, freeShippingThreshold - projectedSubtotal)),
-      });
+  const shippingLine = t('itemDetail.deliveryFeeLine', {
+    amount: formatCurrency(STANDARD_DELIVERY_UZS),
+  });
 
   return (
     <AppView gap={7}>
@@ -102,14 +92,7 @@ export function ItemAssuranceCard({
         </AppText>
       ) : null}
 
-      <AppText
-        family="default"
-        style={{
-          fontSize: 13,
-          lineHeight: 18,
-          color: freeShipping ? tokens.success : tokens.textMuted,
-        }}
-      >
+      <AppText family="default" style={{ fontSize: 13, lineHeight: 18, color: tokens.textMuted }}>
         {shippingLine}
       </AppText>
 

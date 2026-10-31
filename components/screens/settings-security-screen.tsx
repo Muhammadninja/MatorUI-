@@ -1,7 +1,6 @@
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
-import { ThemePreferenceCard } from '@/components/screens-components/profile/theme-preference-card';
 import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
@@ -112,11 +111,6 @@ export default function SettingsSecurityScreen() {
                 <ChevronRight />
               </AppPressableView>
             </AppView>
-
-            {/* Appearance — local-only preference, available to guests and
-                signed-in users alike (this screen is reachable from both
-                profile states). */}
-            <ThemePreferenceCard />
           </AppView>
 
           {/* ── Legal ───────────────────────────────────────────────────── */}

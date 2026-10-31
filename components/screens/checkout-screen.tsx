@@ -88,16 +88,18 @@ export default function CheckoutScreen() {
   // Effective delivery address: null when skipped or none available.
   const addr: Address | null = addressSkipped ? null : chosenAddr ?? defaultAddr ?? null;
 
-  // Shipping quote only makes sense with a concrete address. Without one the
-  // order ships via courier (free) and the selector is hidden.
-  const shippingRequest = useMemo(
-    () => (addr ? { addressId: addr.id, subtotal: totals.subtotal } : null),
-    [addr, totals.subtotal],
-  );
+  // Shipping quote only makes sense with a concrete address; without one the
+  // selector stays hidden and we fall back to `totals.shipping` (the same
+  // flat courier fee the quote would return anyway — see cart-math.ts).
+  const shippingRequest = useMemo(() => (addr ? { addressId: addr.id } : null), [addr]);
   const shipping = useShippingQuote(shippingRequest);
   const shipOption = addr ? shipping.options[shipIdx] ?? shipping.options[0] : undefined;
 
-  const grandTotal = totals.total + (shipOption?.price ?? 0);
+  // `shipOption` (when present) is the real per-method quote from the
+  // backend and REPLACES totals.shipping — it must not be added on top of
+  // it, or delivery gets charged twice in the preview.
+  const deliveryFee = shipOption?.price ?? totals.shipping;
+  const grandTotal = totals.subtotal - totals.discount + deliveryFee + totals.serviceFee;
 
   const cycleAddress = () => {
     if (addrItems.length === 0) return;
@@ -242,10 +244,10 @@ export default function CheckoutScreen() {
             ) : null}
             <SummaryRow
               label={t('checkout.shipping')}
-              value={shipOption && shipOption.price > 0 ? formatCurrency(shipOption.price) : t('checkout.free')}
+              value={deliveryFee > 0 ? formatCurrency(deliveryFee) : t('checkout.free')}
               tokens={tokens}
             />
-            <SummaryRow label={t('checkout.tax')} value={formatCurrency(totals.tax)} tokens={tokens} />
+            <SummaryRow label={t('checkout.serviceFee')} value={formatCurrency(totals.serviceFee)} tokens={tokens} />
             <AppView row justify="space-between">
               <AppText family="accent" weight="bold" style={{ fontSize: 16, color: tokens.text }}>{t('checkout.total')}</AppText>
               <AppPrice value={formatCurrency(grandTotal)} size={18} color={tokens.text} />

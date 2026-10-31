@@ -1,10 +1,12 @@
+import { Heart, Share2 } from 'lucide-react-native';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AppButton } from '@/components/shared/app-button';
 import { AppPrice } from '@/components/shared/app-price';
 import { AppQtyStepper } from '@/components/shared/app-qty-stepper';
 import { AppText } from '@/components/shared/app-text';
-import { AppView } from '@/components/shared/app-view';
+import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 
 export type ItemBuyBarProps = {
@@ -14,21 +16,56 @@ export type ItemBuyBarProps = {
   savingsLabel: string | null;
   qty: number;
   onQtyChange: (next: number) => void;
-  /** Out of stock → both CTAs go dead and say why. */
+  /** Out of stock → the Add to cart CTA goes dead and says why. */
   outOfStock: boolean;
   onAddToCart: () => void;
-  onBuyNow: () => void;
+  isFavorite: boolean;
+  onToggleFavorite: () => void;
+  onShare: () => void;
   /** Safe-area bottom inset. */
   insetBottom: number;
 };
 
+/** Square outlined icon action — matches the Add to cart button's height. */
+function IconAction({
+  children,
+  onPress,
+  accessibilityLabel,
+}: {
+  children: ReactNode;
+  onPress: () => void;
+  accessibilityLabel: string;
+}) {
+  const { tokens } = useThemeContext();
+  return (
+    <AppPressableView
+      onPress={onPress}
+      center
+      rounded={12}
+      androidRipple={false}
+      pressedOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      style={{
+        width: 48,
+        height: 48,
+        backgroundColor: tokens.card,
+        borderWidth: 1,
+        borderColor: tokens.border,
+      }}
+    >
+      {children}
+    </AppPressableView>
+  );
+}
+
 /**
- * Sticky buy bar: line total + savings, the quantity stepper, and the two
- * exits — "Buy now" (add and go straight to checkout) and "Add to cart".
+ * Sticky buy bar: line total + savings, the quantity stepper, and the
+ * actions — like / share, and "Add to cart".
  *
  * The stepper lives here rather than in the page body so quantity can be
  * changed at the moment of purchase, without scrolling back up; the total
- * above it updates as you tap. Out of stock disables both CTAs instead of
+ * above it updates as you tap. Out of stock disables the cart CTA instead of
  * letting an order be placed that can't be filled.
  */
 export function ItemBuyBar({
@@ -38,7 +75,9 @@ export function ItemBuyBar({
   onQtyChange,
   outOfStock,
   onAddToCart,
-  onBuyNow,
+  isFavorite,
+  onToggleFavorite,
+  onShare,
   insetBottom,
 }: ItemBuyBarProps) {
   const { t } = useTranslation();
@@ -87,18 +126,23 @@ export function ItemBuyBar({
       </AppView>
 
       <AppView row align="center" gap={10}>
-        <AppView flex={1}>
-          <AppButton
-            testID="buy-now-btn"
-            title={t('itemDetail.buyNow')}
-            kind="secondary"
-            size="lg"
-            fullWidth
-            disabled={outOfStock}
-            onPress={onBuyNow}
+        <IconAction
+          onPress={onToggleFavorite}
+          accessibilityLabel={
+            isFavorite ? t('itemDetail.removeFromFavorites') : t('itemDetail.saveToFavorites')
+          }
+        >
+          <Heart
+            size={20}
+            strokeWidth={2.2}
+            color={isFavorite ? tokens.error : tokens.text}
+            fill={isFavorite ? tokens.error : 'none'}
           />
-        </AppView>
-        <AppView style={{ flex: 1.25 }}>
+        </IconAction>
+        <IconAction onPress={onShare} accessibilityLabel={t('itemDetail.share')}>
+          <Share2 size={19} strokeWidth={2.2} color={tokens.text} />
+        </IconAction>
+        <AppView flex={1}>
           <AppButton
             testID="add-to-cart-btn"
             title={outOfStock ? t('itemDetail.outOfStock') : t('itemDetail.addToCart')}

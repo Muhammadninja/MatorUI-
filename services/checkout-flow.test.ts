@@ -2,8 +2,8 @@
  * Full checkout-flow integration test.
  *
  * Drives the same data path the UI walks the user through:
- *   add → adjust quantity → free-ship progress → apply promo →
- *   pick delivery → place order → cart cleared.
+ *   add → adjust quantity → apply promo → pick delivery → place order →
+ *   cart cleared.
  *
  * Stays React-free on purpose so it runs under Vitest in Node — see
  * cart-math.test.ts for the same convention. The transport layer
@@ -17,19 +17,18 @@ import {
   computeSubtotal,
   computeTotals,
   evaluatePromoCode,
-  FLAT_SHIPPING,
   formatCurrency,
-  FREE_SHIPPING_THRESHOLD,
   PROMO_CODES,
+  SERVICE_FEE_UZS,
+  STANDARD_DELIVERY_UZS,
 } from './cart-math';
 
-// Mirrors checkout-screen's DELIVERY_OPTIONS — kept local so this test
-// breaks loudly if the checkout screen changes shipping fees without
+// Mirrors the real backend's shipping quote (shipping.service.ts) — kept
+// local so this test breaks loudly if that flat-fee model changes without
 // updating the corresponding expectation.
 const DELIVERY_FEES = {
-  standard: 0,
-  express: 9.99,
-  same_day: 19.99,
+  pickup: 0,
+  courier: STANDARD_DELIVERY_UZS,
 } as const;
 
 const TURBO: AddItemInput = {
@@ -78,14 +77,14 @@ describe('Full checkout flow — happy path', () => {
     const turboRow = snapshot.items.find((i) => i.id === TURBO.productId);
     expect(turboRow?.quantity).toBe(2);
 
-    // ── 5. Subtotal: 2 × $1,240 + 1 × $760 = $3,240 (above free-ship) ──
+    // ── 5. Subtotal: 2 × $1,240 + 1 × $760 = $3,240 ──────────────────
     const subtotal = computeSubtotal(snapshot.items);
     expect(subtotal).toBe(2 * 1240 + 760);
-    expect(subtotal).toBeGreaterThan(FREE_SHIPPING_THRESHOLD);
 
-    // ── 6. Pre-promo totals: shipping free, tax on subtotal ─────────
+    // ── 6. Pre-promo totals: flat delivery + service fee, no discount ──
     const preTotals = computeTotals(subtotal, null);
-    expect(preTotals.shipping).toBe(0);
+    expect(preTotals.shipping).toBe(STANDARD_DELIVERY_UZS);
+    expect(preTotals.serviceFee).toBe(SERVICE_FEE_UZS);
     expect(preTotals.discount).toBe(0);
 
     // ── 7. Apply WELCOME10 — valid because subtotal > MIN ───────────
@@ -96,16 +95,18 @@ describe('Full checkout flow — happy path', () => {
     snapshot = await transport.fetch();
     expect(snapshot.appliedPromoCode).toBe('WELCOME10');
 
-    // ── 8. Post-promo totals: 10% off, tax on the discounted base ───
+    // ── 8. Post-promo totals: 10% off the subtotal only ──────────────
     const postTotals = computeTotals(subtotal, promoResult.promo);
     expect(postTotals.discount).toBe(subtotal * 0.1);
     expect(postTotals.total).toBeLessThan(preTotals.total);
 
-    // ── 9. User picks express delivery — grandTotal mirrors the
-    //      checkout screen's `totals.total + deliveryFee` calc ──────
-    const deliveryFee = DELIVERY_FEES.express;
-    const grandTotal = postTotals.total + deliveryFee;
-    expect(grandTotal).toBe(postTotals.total + 9.99);
+    // ── 9. User picks courier delivery — grandTotal mirrors the
+    //      checkout screen's `subtotal - discount + deliveryFee +
+    //      serviceFee` calc (the real quote REPLACES totals.shipping,
+    //      it is not added on top of it) ─────────────────────────────
+    const deliveryFee = DELIVERY_FEES.courier;
+    const grandTotal = postTotals.subtotal - postTotals.discount + deliveryFee + postTotals.serviceFee;
+    expect(grandTotal).toBe(postTotals.subtotal - postTotals.discount + STANDARD_DELIVERY_UZS + SERVICE_FEE_UZS);
 
     // ── 10. Place order — UI calls clearCart() in the success cb ────
     await transport.clear();
@@ -131,7 +132,7 @@ describe('Full checkout flow — guarded edges', () => {
     // surface does (it doesn't optimistically apply a rejected promo).
     const totals = computeTotals(subtotal, null);
     expect(totals.discount).toBe(0);
-    expect(totals.shipping).toBe(FLAT_SHIPPING);
+    expect(totals.shipping).toBe(STANDARD_DELIVERY_UZS);
   });
 
   test('decrement to zero removes the item from the transport', async () => {
@@ -168,10 +169,10 @@ describe('Full checkout flow — guarded edges', () => {
     expect(snapshot.appliedPromoCode).toBeNull();
   });
 
-  test('FREESHIP promo waives shipping below the free-ship threshold', () => {
-    const subtotal = 200; // below threshold, FLAT_SHIPPING normally applies
+  test('FREESHIP promo waives the flat delivery fee', () => {
+    const subtotal = 200;
     const noPromo = computeTotals(subtotal, null);
-    expect(noPromo.shipping).toBe(FLAT_SHIPPING);
+    expect(noPromo.shipping).toBe(STANDARD_DELIVERY_UZS);
 
     const withFreeShip = computeTotals(subtotal, PROMO_CODES.FREESHIP);
     expect(withFreeShip.shipping).toBe(0);

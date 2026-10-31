@@ -8,7 +8,7 @@
  * fetches the active campaigns once and matches each catalog item against them
  * locally (`resolveItemSale`), rather than reading a discount off the part.
  *
- * Same swap-by-injection pattern as `placements-service`: a mock impl (empty —
+ * Same swap-by-injection pattern as `categories-service`: a mock impl (empty —
  * there are no offline sales to seed) and an HTTP impl calling `/v1/sales`.
  * Gated per-domain by `shouldUseHttpTransport('sales')`, so it stays on the mock
  * until `sales` is in `EXPO_PUBLIC_HTTP_DOMAINS`.

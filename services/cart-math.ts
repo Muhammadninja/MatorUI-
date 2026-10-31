@@ -39,7 +39,7 @@ export type CartTotals = {
   subtotal: number;
   discount: number;
   shipping: number;
-  tax: number;
+  serviceFee: number;
   total: number;
 };
 
@@ -49,9 +49,16 @@ export type PromoResult =
 
 // ── Constants ────────────────────────────────────────────────────────
 
-export const TAX_RATE = 0.085;
-export const FLAT_SHIPPING = 49;
-export const FREE_SHIPPING_THRESHOLD = 500;
+/**
+ * Flat courier delivery fee, UZS. Mirrors the backend's real pricing
+ * (`DELIVERY_COURIER_UZS`, default 25,000 in `orders.service.ts` /
+ * `shipping.service.ts`) — there is no free-shipping threshold server-side,
+ * every order is charged this unless the buyer picks pickup (0).
+ */
+export const STANDARD_DELIVERY_UZS = 25000;
+/** Flat per-order service fee, UZS. Mirrors the backend's `SERVICE_FEE_UZS`
+ *  (default 5,000), charged on every order regardless of subtotal. */
+export const SERVICE_FEE_UZS = 5000;
 export const PROMO_MIN_SUBTOTAL = 100;
 
 export const PROMO_CODES: Record<string, PromoCode> = {
@@ -96,19 +103,25 @@ export function formatCurrency(amount: number): string {
 /**
  * Compute the full totals breakdown given a subtotal and an optional promo.
  *
+ * Mirrors the backend's real order math (`orders.service.ts`:
+ * `total = subtotal + deliveryUzs + serviceFeeUzs - discount`) exactly, so
+ * this preview never disagrees with what `POST /v1/orders` actually charges.
+ * There is no tax line and no free-shipping threshold — the backend has
+ * neither.
+ *
  * Rules:
- *  - Shipping is FLAT_SHIPPING for any non-zero subtotal below
- *    FREE_SHIPPING_THRESHOLD, otherwise 0.
+ *  - Shipping is STANDARD_DELIVERY_UZS for any non-zero subtotal (the
+ *    checkout screen zeroes it itself when the buyer picks pickup).
+ *  - The service fee is SERVICE_FEE_UZS for any non-zero subtotal.
  *  - 'percent' promos apply to subtotal and respect maxDiscount cap.
  *  - 'fixed' promos cap to subtotal (no negative balances).
  *  - 'free_shipping' promos zero shipping but leave discount at 0.
- *  - Tax is computed on the discounted base (subtotal − discount), never
- *    on shipping.
  *  - All returned numbers are rounded to 2 decimal places.
  */
 export function computeTotals(subtotal: number, promo: PromoCode | null): CartTotals {
   let discount = 0;
-  let shipping = subtotal > 0 ? (subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : FLAT_SHIPPING) : 0;
+  let shipping = subtotal > 0 ? STANDARD_DELIVERY_UZS : 0;
+  const serviceFee = subtotal > 0 ? SERVICE_FEE_UZS : 0;
 
   if (promo && subtotal > 0) {
     if (promo.kind === 'percent') {
@@ -121,15 +134,14 @@ export function computeTotals(subtotal: number, promo: PromoCode | null): CartTo
     }
   }
 
-  const taxedBase = Math.max(0, subtotal - discount);
-  const tax = taxedBase * TAX_RATE;
-  const total = taxedBase + shipping + tax;
+  const discountedBase = Math.max(0, subtotal - discount);
+  const total = discountedBase + shipping + serviceFee;
 
   return {
     subtotal: round(subtotal),
     discount: round(discount),
     shipping: round(shipping),
-    tax: round(tax),
+    serviceFee: round(serviceFee),
     total: round(total),
   };
 }

@@ -126,7 +126,7 @@ describe('typography per size (what changed)', () => {
     ['lg', 16, 20, 48],
   ] as const)('%s → SemiBold %ipx / %ipx line, %ipx tall', (size, fontSize, lineHeight, height) => {
     const b = render({ size: size as ButtonSize, kind: 'brand' });
-    expect(b.face).toBe('Inter_600SemiBold');
+    expect(b.face).toBe('Figtree_600SemiBold');
     expect(b.fontSize).toBe(fontSize);
     expect(b.lineHeight).toBe(lineHeight);
     expect(b.height).toBe(height);
@@ -183,7 +183,7 @@ describe('colours are untouched (both themes)', () => {
       }
       expect(b.box.opacity).toBe(1);
       // Typography is the same whatever the kind.
-      expect(b.face).toBe('Inter_600SemiBold');
+      expect(b.face).toBe('Figtree_600SemiBold');
     });
 
     test(`${scheme}: disabled keeps its greyed fill, label and opacity`, () => {
@@ -191,7 +191,7 @@ describe('colours are untouched (both themes)', () => {
       expect(b.box.backgroundColor).toBe(tokens.disabledBg);
       expect(b.labelColor).toBe(tokens.disabledFg);
       expect(b.box.opacity).toBe(0.6);
-      expect(b.face).toBe('Inter_600SemiBold');
+      expect(b.face).toBe('Figtree_600SemiBold');
     });
   }
 });

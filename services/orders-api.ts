@@ -9,6 +9,7 @@
  * mutations" stance (an aborted mutation may already be committed
  * server-side; silent local cancel would mask that).
  */
+import { STANDARD_DELIVERY_UZS } from '@/services/cart-math';
 import type {
   Address,
   AddressInput,
@@ -33,9 +34,6 @@ export type OrderListRequest = {
 
 export type ShippingQuoteRequest = {
   addressId: string;
-  /** Subtotal in dollars at quote time. Lets the server flip "free
-   *  shipping" thresholds without the client guessing. */
-  subtotal: number;
 };
 
 export interface OrdersTransport {
@@ -101,10 +99,11 @@ const SEED_PAYMENT_METHODS: PaymentMethod[] = [
   { id: 'pm_visa_1881', brand: 'Visa', last4: '1881', exp: '03/26', isDefault: false },
 ];
 
+// Mirrors the real backend quote (`shipping.service.ts`): pickup is free,
+// courier is the flat `DELIVERY_COURIER_UZS` fee (default 25,000).
 const BASE_SHIPPING_OPTIONS: ShippingOption[] = [
-  { key: 'standard', label: 'Standard', eta: '3-5 business days', price: 0 },
-  { key: 'express', label: 'Express', eta: '1-2 business days', price: 9.99 },
-  { key: 'same_day', label: 'Same day', eta: 'By 9 PM today', price: 19.99 },
+  { key: 'pickup', label: 'Pickup', eta: 'Today', price: 0 },
+  { key: 'courier', label: 'Courier', eta: '1-3 days', price: STANDARD_DELIVERY_UZS },
 ];
 
 function detailFor(row: { id: string; total: string }, statusKey: 'in_transit' | 'delivered' | 'cancelled'): OrderDetail {
@@ -212,7 +211,7 @@ export class MockOrdersTransport implements OrdersTransport {
     }
     const orderId = `M-${Math.floor(40000 + Math.random() * 60000)}`;
     const shipping = BASE_SHIPPING_OPTIONS.find((o) => o.key === input.shippingOptionKey);
-    const eta = shipping?.eta ?? '3-5 business days';
+    const eta = shipping?.eta ?? '1-3 days';
     // Real server calculates this authoritatively; the mock echoes the
     // client's optimistic grand-total hint so the just-placed order's
     // confirmation + track screens show a real total instead of a blank.
@@ -314,16 +313,13 @@ export class MockOrdersTransport implements OrdersTransport {
   }
 
   async getShippingQuote(
-    request: ShippingQuoteRequest,
+    _request: ShippingQuoteRequest,
     signal?: AbortSignal,
   ): Promise<ShippingOption[]> {
     await delay(MOCK_LATENCY_MS, signal);
-    // Real shipping API would scale by zip + weight + cart subtotal.
-    // For the mock we just bump standard to free above $500 to mirror
-    // the cart's free-shipping rule.
-    return BASE_SHIPPING_OPTIONS.map((o) =>
-      o.key === 'standard' && request.subtotal >= 500 ? { ...o, price: 0 } : o,
-    );
+    // Mirrors the real backend's flat quote (shipping.service.ts): pickup is
+    // free, courier is a flat fee — no subtotal-based threshold exists there.
+    return BASE_SHIPPING_OPTIONS;
   }
 }
 
@@ -346,7 +342,10 @@ export class MockOrdersTransport implements OrdersTransport {
  *   PATCH  /v1/payment-methods/:id                  → PaymentMethod
  *   DELETE /v1/payment-methods/:id                  → 204
  *   POST   /v1/payment-methods/:id/default          → 204
- *   POST   /v1/shipping/quote                      → ShippingOption[]
+ *   POST   /v1/shipping/quote                      → { options: [{ type, label,
+ *          price_uzs, eta_days_min, eta_days_max }], currency }  — NOT a bare
+ *          array, and the request body is `{ delivery_address_id }`
+ *          (snake_case), not `{ addressId }`.
  */
 import { shouldUseHttpTransport } from '@/config/api';
 import { apiClient, ApiError } from '@/services/api-client';
@@ -645,7 +644,7 @@ export class HttpOrdersTransport implements OrdersTransport {
     // exactly the whitelisted fields.
     const body: Record<string, unknown> = {
       cart_snapshot: {
-        delivery_method: 'courier',
+        delivery_method: input.shippingOptionKey === 'pickup' ? 'pickup' : 'courier',
         delivery_address_id: input.addressId ?? null,
         promo_code: input.promoCode ?? null,
       },
@@ -720,9 +719,29 @@ export class HttpOrdersTransport implements OrdersTransport {
     req: ShippingQuoteRequest,
     signal?: AbortSignal,
   ): Promise<ShippingOption[]> {
-    return asList<ShippingOption>(
-      await apiClient.post<unknown>('/v1/shipping/quote', req, { signal }),
+    const raw = await apiClient.post<{
+      options?: {
+        type?: string;
+        label?: string;
+        price_uzs?: number;
+        eta_days_min?: number;
+        eta_days_max?: number;
+      }[];
+    }>(
+      '/v1/shipping/quote',
+      { delivery_address_id: req.addressId },
+      { signal },
     );
+    return (raw?.options ?? []).map((o) => {
+      const min = o.eta_days_min ?? 0;
+      const max = o.eta_days_max ?? min;
+      return {
+        key: o.type ?? 'courier',
+        label: o.label ?? '',
+        eta: min === 0 && max === 0 ? 'Today' : min === max ? `${min}d` : `${min}-${max}d`,
+        price: o.price_uzs ?? 0,
+      };
+    });
   }
 }
 
