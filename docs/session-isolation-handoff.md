@@ -26,3 +26,5 @@
 - Тёмная тема/другие локали после этих исправлений, второй реальный аккаунт, Android и native rebuild остаются непроверенными.
 
 В отдельный коммит не включены предшествующие изменения `garage-switch-row.tsx`, `compatibility-service.ts` и старые материалы `docs/audits/real-integration/`.
+
+Последующая проверка реального API и текущие ограничения: [production report](production-integration-check.md).
