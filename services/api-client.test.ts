@@ -14,7 +14,7 @@ vi.mock('@/config/api', () => ({
   shouldUseHttpTransport: () => true,
 }));
 
-import { apiClient, ApiError, setAppLanguage, setUnauthorizedHandler } from './api-client';
+import { apiClient, ApiError, invalidateAuthRequests, setAppLanguage, setUnauthorizedHandler } from './api-client';
 import * as config from '@/config/api';
 
 const originalFetch = globalThis.fetch;
@@ -240,6 +240,45 @@ describe('apiClient — 4xx client errors', () => {
 });
 
 describe('apiClient — abort propagation', () => {
+  test('native cancellation errors normalize to AbortError for caller aborts', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    fetchMock.mockRejectedValueOnce(new Error('fetch failed: FetchRequestCanceledException Expo/NativeResponse.swift:63'));
+    await expect(apiClient.patch('/v1/cart/items/test', { quantity: 2 }, { signal: controller.signal }))
+      .rejects.toMatchObject({ name: 'AbortError', message: 'Request cancelled' });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  test('native timeout errors show a safe message and never retry a cart write', async () => {
+    vi.useFakeTimers();
+    try {
+      fetchMock.mockImplementation((_url, init) => new Promise((_resolve, reject) => {
+        init!.signal!.addEventListener('abort', () => reject(
+          new Error('fetch failed: FetchRequestCanceledException Expo/NativeResponse.swift:63'),
+        ));
+      }));
+      const rejected = expect(apiClient.patch('/v1/cart/items/test', { quantity: 2 }, { timeoutMs: 10 }))
+        .rejects.toMatchObject({ code: 'TIMEOUT', message: 'Request timed out.' });
+      await vi.advanceTimersByTimeAsync(10);
+      await rejected;
+      expect(fetchMock).toHaveBeenCalledOnce();
+    } finally { vi.useRealTimers(); }
+  });
+
+  test('native read timeout errors retain the bounded retry policy', async () => {
+    vi.useFakeTimers();
+    try {
+      fetchMock.mockImplementation((_url, init) => new Promise((_resolve, reject) => {
+        init!.signal!.addEventListener('abort', () => reject(new Error('native request cancelled')));
+      }));
+      const rejected = expect(apiClient.get('/v1/cart', { timeoutMs: 10, maxRetries: 1 }))
+        .rejects.toMatchObject({ code: 'TIMEOUT', message: 'Request timed out.' });
+      await vi.runAllTimersAsync();
+      await rejected;
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally { vi.useRealTimers(); }
+  });
+
   test('pre-aborted signal propagates as AbortError, not ApiError', async () => {
     // Aborting before the call is simpler than racing: fetch sees an
     // already-aborted signal and rejects immediately.
@@ -256,5 +295,44 @@ describe('apiClient — abort propagation', () => {
       .catch((e) => e);
     expect(err).toBeInstanceOf(DOMException);
     expect((err as DOMException).name).toBe('AbortError');
+  });
+});
+
+describe('apiClient — session isolation', () => {
+  test('an old response is discarded after the session changes', async () => {
+    let resolve!: (response: Response) => void;
+    fetchMock.mockReturnValueOnce(new Promise<Response>((done) => { resolve = done; }));
+    const request = apiClient.get('/v1/cart');
+    const rejected = expect(request).rejects.toMatchObject({ name: 'AbortError' });
+    await Promise.resolve();
+    invalidateAuthRequests();
+    resolve(ok({ items: ['previous-account'] }));
+    await rejected;
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  test('a previous session 401 never refreshes the new account', async () => {
+    let resolve!: (response: Response) => void;
+    fetchMock.mockReturnValueOnce(new Promise<Response>((done) => { resolve = done; }));
+    const handler = vi.fn();
+    setUnauthorizedHandler(handler);
+    const request = apiClient.patch('/v1/cart/items/old', { quantity: 2 });
+    const rejected = expect(request).rejects.toMatchObject({ name: 'AbortError' });
+    await Promise.resolve();
+    invalidateAuthRequests();
+    resolve(bad({ message: 'expired' }, 401));
+    await rejected;
+    expect(handler).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  test('a transient failure cannot retry with a different account', async () => {
+    fetchMock.mockImplementationOnce(async () => {
+      invalidateAuthRequests();
+      throw new TypeError('offline');
+    });
+    await expect(apiClient.patch('/v1/cart/items/old', { quantity: 2 }))
+      .rejects.toMatchObject({ name: 'AbortError' });
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 });

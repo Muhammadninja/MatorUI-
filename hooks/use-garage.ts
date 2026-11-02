@@ -61,7 +61,8 @@ export function useGarage(): UseGarageState {
   // Garage is a per-user resource — only signed-in users have one. Guests get an
   // empty state (with an Add button that triggers auth), so we never fire a
   // doomed unauthenticated GET /v1/garage/vehicles (which 401s → error state).
-  const { isAuthenticated, isHydrating } = useUserContext();
+  const { isAuthenticated, isHydrating, profile } = useUserContext();
+  const ownerId = isAuthenticated ? profile?.id ?? null : null;
   const [vehicles, setVehicles] = useState<Vehicle[]>(() => garageService.getVehicles());
   const [isLoading, setIsLoading] = useState(!garageService.hasLoadedOnce());
   const [isMutating, setIsMutating] = useState(false);
@@ -100,6 +101,9 @@ export function useGarage(): UseGarageState {
   // next sign-in always re-fetches (never serves a stale account's vehicles).
   useEffect(() => {
     if (isHydrating) return;
+    garageService.setSession(ownerId);
+    setIsMutating(false);
+    setError(null);
     if (!isAuthenticated) {
       garageService.reset();
       setError(null);
@@ -127,9 +131,10 @@ export function useGarage(): UseGarageState {
     return () => {
       controller.abort();
     };
-  }, [isAuthenticated, isHydrating]);
+  }, [isAuthenticated, isHydrating, ownerId]);
 
   const refresh = useCallback(async () => {
+    if (isHydrating || ownerId === null || !garageService.isSession(ownerId)) return;
     setError(null);
     // Abort any in-flight read before starting the new one.
     readAbortRef.current?.abort();
@@ -142,10 +147,14 @@ export function useGarage(): UseGarageState {
       if (mountedRef.current) setError(toMessage(e));
       throw e;
     }
-  }, []);
+  }, [isHydrating, ownerId]);
 
   const runMutation = useCallback(
     async <T,>(fn: () => Promise<T>): Promise<T> => {
+      if (isHydrating || ownerId === null || !garageService.isSession(ownerId)) {
+        throw new DOMException('Garage session changed', 'AbortError');
+      }
+      const version = garageService.sessionVersion();
       setIsMutating(true);
       setError(null);
       try {
@@ -154,15 +163,15 @@ export function useGarage(): UseGarageState {
         // AbortError here means the mutation's internal refresh was
         // superseded — the write itself succeeded server-side. Don't
         // surface as a user-facing error.
-        if (!isAbortError(e) && mountedRef.current) {
+        if (!isAbortError(e) && mountedRef.current && version === garageService.sessionVersion()) {
           setError(toMessage(e));
         }
         throw e;
       } finally {
-        if (mountedRef.current) setIsMutating(false);
+        if (mountedRef.current && version === garageService.sessionVersion()) setIsMutating(false);
       }
     },
-    [],
+    [isHydrating, ownerId],
   );
 
   const addVehicle = useCallback(
@@ -216,9 +225,9 @@ export function useGarage(): UseGarageState {
 
   return {
     state,
-    vehicles,
-    primaryVehicle,
-    secondaryVehicles,
+    vehicles: !isHydrating && ownerId !== null && garageService.isSession(ownerId) ? vehicles : [],
+    primaryVehicle: !isHydrating && ownerId !== null && garageService.isSession(ownerId) ? primaryVehicle : undefined,
+    secondaryVehicles: !isHydrating && ownerId !== null && garageService.isSession(ownerId) ? secondaryVehicles : [],
     isLoading,
     isMutating,
     error,

@@ -44,6 +44,9 @@ let listeners: ((v: V[]) => void)[] = [];
 const emit = () => listeners.forEach((l) => l(vehicles));
 
 const setPrimaryOnServer = vi.fn(async (_id: string) => {});
+vi.mock('@/contexts/user.context', () => ({
+  useUserContext: () => ({ profile: { id: 'account-vin' }, isAuthenticated: true, isHydrating: false }),
+}));
 
 /** What `useGarage().addVehicle` does against the server: create, then the
  *  post-create refresh lands and the cache emits. */
@@ -70,6 +73,7 @@ const addVehicle = vi.fn(async (input: Record<string, unknown>) => {
 
 vi.mock('@/services/garage-service', () => ({
   garageService: {
+    setSession: vi.fn(),
     subscribe: (fn: (v: V[]) => void) => {
       listeners.push(fn);
       fn(vehicles);
@@ -82,7 +86,7 @@ vi.mock('@/services/garage-service', () => ({
   },
 }));
 
-let snapshot: { vehicleId: string } | null = null;
+let snapshot: { vehicleId: string; ownerId?: string | null } | null = null;
 vi.mock('@/services/active-vehicle-storage', () => ({
   loadActiveVehicle: async () => snapshot,
   saveActiveVehicle: async (s: { vehicleId: string }) => { snapshot = s; },
@@ -224,6 +228,7 @@ describe('VIN route → active vehicle', () => {
     const r = await mount();
     await addByVin(r);
     expect(snapshot?.vehicleId).toBe('v-malibu');
+    expect(snapshot?.ownerId).toBe('account-vin');
   });
 
   test('no second primary flip is sent — the create already made it primary', async () => {

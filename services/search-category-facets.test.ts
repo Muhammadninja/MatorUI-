@@ -18,6 +18,12 @@ vi.mock('@/config/api', () => ({
   shouldUseHttpTransport: () => true,
 }));
 
+// These tests exercise pure facet mapping and the HTTP search contract;
+// the native auth/provider graph is outside that boundary.
+vi.mock('@/contexts/active-vehicle.context', () => ({
+  useSearchVehicleContext: vi.fn(),
+}));
+
 import { deriveCategoryFacets } from '@/hooks/use-search';
 import { HttpSearchTransport } from '@/services/search-service';
 import type { SearchResponse } from '@/types/search';

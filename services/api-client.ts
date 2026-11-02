@@ -71,6 +71,12 @@ export class ApiError extends Error {
 
 type UnauthorizedHandler = () => void | Promise<void>;
 let unauthorizedHandler: UnauthorizedHandler | null = null;
+let authRequestEpoch = 0;
+
+/** Invalidate responses and retries belonging to a former login session. */
+export function invalidateAuthRequests(): void {
+  authRequestEpoch += 1;
+}
 
 /** Register the auth layer's 401 callback. Called by `user.context.tsx`
  *  on mount. The handler typically attempts a token refresh and, on
@@ -133,6 +139,12 @@ async function request<T>(
   body: unknown,
   opts: RequestOptions = {},
 ): Promise<T> {
+  const epoch = authRequestEpoch;
+  const assertCurrentSession = () => {
+    if (!opts.skipAuth && epoch !== authRequestEpoch) {
+      throw new DOMException('Authentication session changed', 'AbortError');
+    }
+  };
   const baseUrl = getApiBaseUrl();
   if (!baseUrl) {
     throw new ApiError(
@@ -151,6 +163,7 @@ async function request<T>(
   let authRetried = false;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    assertCurrentSession();
     const { signal, cleanup } = composeSignal(opts.signal, timeoutMs);
     try {
       const headers: Record<string, string> = {
@@ -163,6 +176,7 @@ async function request<T>(
       };
       if (!opts.skipAuth) {
         const token = await getAuthToken();
+        assertCurrentSession();
         if (token) headers.Authorization = `Bearer ${token}`;
       }
 
@@ -177,12 +191,14 @@ async function request<T>(
         signal,
       });
       const ms = Date.now() - startedAt;
+      assertCurrentSession();
       debugLog('api', `← ${res.status} ${method} ${path} (${ms}ms)`);
 
       if (res.status === 204) return undefined as T;
 
       // Try to parse JSON, but tolerate non-JSON bodies (e.g. empty 200).
       const text = await res.text();
+      assertCurrentSession();
       const parsed = text ? safeJsonParse(text) : undefined;
 
       if (!res.ok) {
@@ -199,7 +215,10 @@ async function request<T>(
           if (!opts.skipAuth && !authRetried && unauthorizedHandler) {
             authRetried = true;
             await unauthorizedHandler();
-            if (await getAuthToken()) {
+            assertCurrentSession();
+            const refreshedToken = await getAuthToken();
+            assertCurrentSession();
+            if (refreshedToken) {
               // Don't let the refresh-retry consume the transient-retry budget.
               attempt--;
               continue;
@@ -230,13 +249,17 @@ async function request<T>(
 
       return parsed as T;
     } catch (raw) {
-      // Caller-initiated abort — surface as-is (no retry, no wrap).
-      if (raw instanceof DOMException && raw.name === 'AbortError' && opts.signal?.aborted) {
-        throw raw;
+      assertCurrentSession();
+      // Expo fetch may reject cancellation with an ordinary native Error.
+      // The signals distinguish caller cancellation from our timeout reliably.
+      if (opts.signal?.aborted) {
+        throw raw instanceof DOMException && raw.name === 'AbortError'
+          ? raw
+          : new DOMException('Request cancelled', 'AbortError');
       }
       // Internal timeout abort or network error: treat as transient.
-      const isAbort = raw instanceof DOMException && raw.name === 'AbortError';
-      const isNetwork = raw instanceof TypeError; // fetch's network-error shape
+      const isAbort = signal.aborted || (raw instanceof DOMException && raw.name === 'AbortError');
+      const isNetwork = !isAbort && raw instanceof TypeError; // fetch's network-error shape
       if (isAbort || isNetwork) {
         debugLog('api', `✗ ${isAbort ? 'TIMEOUT' : 'NETWORK'} ${method} ${path}`);
         const err = new ApiError(

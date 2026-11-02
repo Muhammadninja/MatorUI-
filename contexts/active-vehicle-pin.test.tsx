@@ -43,6 +43,10 @@ const NEXIA: V = {
 let vehicles: V[] = [];
 let listeners: ((v: V[]) => void)[] = [];
 const emit = () => listeners.forEach((l) => l(vehicles));
+const auth = vi.hoisted(() => ({ profile: { id: 'account-a' } as { id: string } | null, isHydrating: false }));
+vi.mock('@/contexts/user.context', () => ({
+  useUserContext: () => ({ ...auth, isAuthenticated: auth.profile !== null }),
+}));
 
 const setPrimaryOnServer = vi.fn(async (id: string) => {
   vehicles = vehicles.map((v) => ({ ...v, isPrimary: v.id === id }));
@@ -51,6 +55,7 @@ const setPrimaryOnServer = vi.fn(async (id: string) => {
 
 vi.mock('@/services/garage-service', () => ({
   garageService: {
+    setSession: vi.fn(),
     subscribe: (fn: (v: V[]) => void) => {
       listeners.push(fn);
       fn(vehicles);
@@ -66,8 +71,9 @@ vi.mock('@/services/garage-service', () => ({
 
 // The pin is persisted to AsyncStorage; keep it in memory for the test.
 let snapshot: unknown = null;
+let delayedLoad: Promise<unknown> | null = null;
 vi.mock('@/services/active-vehicle-storage', () => ({
-  loadActiveVehicle: async () => snapshot,
+  loadActiveVehicle: async () => delayedLoad ?? snapshot,
   saveActiveVehicle: async (s: unknown) => { snapshot = s; },
   clearActiveVehicle: async () => { snapshot = null; },
 }));
@@ -94,9 +100,12 @@ async function mount(): Promise<ReactTestRenderer> {
 
 describe('active vehicle pin', () => {
   beforeEach(() => {
+    auth.profile = { id: 'account-a' };
+    auth.isHydrating = false;
     vehicles = [{ ...COBALT }, { ...NEXIA }];
     listeners = [];
     snapshot = null;
+    delayedLoad = null;
     setPrimaryOnServer.mockClear();
   });
 
@@ -159,5 +168,44 @@ describe('active vehicle pin', () => {
     });
 
     expect(api.currentActiveVehicle?.vehicleId).toBe('v-cobalt');
+  });
+
+  test('logout clears the pin and disk; old cache emissions cannot restore it', async () => {
+    const tree = await mount();
+    await act(async () => { await api.setPrimaryVehicle('v-nexia', { skipBackend: true }); });
+    expect(snapshot).toMatchObject({ ownerId: 'account-a' });
+    await act(async () => {
+      auth.profile = null;
+      tree.update(<ActiveVehicleProvider><Probe /></ActiveVehicleProvider>);
+    });
+    await act(async () => { emit(); });
+    expect(api.currentActiveVehicle).toBeNull();
+    expect(snapshot).toBeNull();
+    await act(async () => tree.unmount());
+  });
+
+  test('another account never hydrates the previous account pin', async () => {
+    snapshot = { ownerId: 'account-a', vehicleId: 'v-nexia', fitment: { brandId: 'chevrolet', modelId: 'nexia' }, savedAt: 1 };
+    auth.profile = { id: 'account-b' };
+    vehicles = [];
+    const tree = await mount();
+    expect(api.currentActiveVehicle).toBeNull();
+    await act(async () => tree.unmount());
+  });
+
+  test('delayed hydration cannot restore a pin after logout', async () => {
+    let finish!: (value: unknown) => void;
+    delayedLoad = new Promise((resolve) => { finish = resolve; });
+    const tree = await mount();
+    await act(async () => {
+      auth.profile = null;
+      tree.update(<ActiveVehicleProvider><Probe /></ActiveVehicleProvider>);
+    });
+    await act(async () => {
+      finish({ ownerId: 'account-a', vehicleId: 'v-nexia', fitment: { brandId: 'chevrolet', modelId: 'nexia' }, savedAt: 1 });
+    });
+    expect(api.currentActiveVehicle).toBeNull();
+    expect(snapshot).toBeNull();
+    await act(async () => tree.unmount());
   });
 });

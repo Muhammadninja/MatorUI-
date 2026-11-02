@@ -26,7 +26,7 @@ import {
   type PropsWithChildren,
 } from 'react';
 
-import { setUnauthorizedHandler, ApiError } from '@/services/api-client';
+import { setUnauthorizedHandler, invalidateAuthRequests, ApiError } from '@/services/api-client';
 import {
   authTransport,
   type RequestOtpInput,
@@ -43,32 +43,10 @@ import {
   type AuthSession,
 } from '@/services/auth-storage';
 import { userTransport } from '@/services/user-api';
-import { debugLog, DEBUG_API_ENABLED } from '@/services/debug-log';
-import { getDeviceId } from '@/services/device-id';
+import { debugLog } from '@/services/debug-log';
+import { garageService } from '@/services/garage-service';
+import { cartTransport } from '@/services/cart-api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-/**
- * DEV-ONLY: print the full auth credentials (refresh token, account phone/id,
- * device id) so they can be copied — e.g. to seed the admin panel's
- * MATOR_REFRESH_TOKEN without going through the OTP flow. Gated on
- * DEBUG_API_ENABLED (dev / EXPO_PUBLIC_DEBUG_API), never in a silent release.
- * Deliberately NOT redacted (unlike debugLog) — that's the point.
- */
-async function logAuthCreds(
-  label: string,
-  session: AuthSession | null,
-  user: { id?: string; phone?: string | null } | null,
-): Promise<void> {
-  if (!DEBUG_API_ENABLED || !session) return;
-  const deviceId = await getDeviceId().catch(() => 'unknown');
-  console.log(`[mator:creds] ${label}`, {
-    phone: user?.phone ?? null,
-    account_id: user?.id ?? null,
-    device_id: deviceId,
-    refresh_token: session.refreshToken,
-    access_token: session.accessToken,
-  });
-}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -154,23 +132,46 @@ export function UserProvider({ children }: PropsWithChildren) {
   // token refresh must NOT sign the user out — the restored session + cached
   // profile keep them logged in; the token retries on the next request.
   const bootingRef = useRef(true);
+  const lifecycleRef = useRef(0);
+  const persistenceRef = useRef<Promise<void>>(Promise.resolve());
+  const profilePersistenceRef = useRef<Promise<void>>(Promise.resolve());
+  const refreshInFlightRef = useRef<Promise<boolean> | null>(null);
 
   // Set the profile in memory AND persist it, so the next cold boot can render
   // the user as logged-in immediately, without waiting on `/me`.
   const applyProfile = useCallback((p: UserProfile | null) => {
+    const generation = lifecycleRef.current;
+    garageService.setSession(p?.id ?? null);
+    cartTransport.setSession?.(p?.id ?? null);
     setProfile(p);
-    void saveProfileCache(p);
+    profilePersistenceRef.current = profilePersistenceRef.current.then(() => {
+      if (generation === lifecycleRef.current) return saveProfileCache(p);
+    });
   }, []);
 
   // Atomically swap the persisted session: SecureStore + in-memory cache.
-  const persistSession = useCallback(async (session: AuthSession | null) => {
+  const persistSession = useCallback(async (session: AuthSession | null, generation = lifecycleRef.current) => {
+    if (generation !== lifecycleRef.current) return false;
     setCurrentSession(session);
-    if (session) await saveAuthSession(session);
-    else await clearAuthSession();
+    const work = persistenceRef.current.then(async () => {
+      if (generation !== lifecycleRef.current) return;
+      if (session) await saveAuthSession(session);
+      else await clearAuthSession();
+    });
+    persistenceRef.current = work.catch(() => undefined);
+    await work;
+    return generation === lifecycleRef.current;
   }, []);
 
   const signOut = useCallback(async () => {
     const existing = getCurrentSession();
+    lifecycleRef.current += 1;
+    invalidateAuthRequests();
+    refreshInFlightRef.current = null;
+    bootingRef.current = false;
+    setIsHydrating(false);
+    setIsLoading(false);
+    setError(null);
     applyProfile(null);
     await persistSession(null);
     // Best-effort revocation — don't block the sign-out UX on it.
@@ -183,40 +184,47 @@ export function UserProvider({ children }: PropsWithChildren) {
     // Erase server-side FIRST; only clear the local session if the backend
     // confirms. On failure we rethrow so the caller can surface an error and
     // the user stays signed in (never a fake "deleted").
+    const generation = lifecycleRef.current;
     await userTransport.deleteMe();
-    applyProfile(null);
-    await persistSession(null);
-  }, [applyProfile, persistSession]);
+    if (generation === lifecycleRef.current) await signOut();
+  }, [signOut]);
 
   const requestOtp = useCallback(async (input: RequestOtpInput) => {
+    const generation = lifecycleRef.current;
     setIsLoading(true);
     setError(null);
     try {
       return await authTransport.requestOtp(input);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not send the code.');
+      if (generation === lifecycleRef.current) setError(err instanceof Error ? err.message : 'Could not send the code.');
       throw err;
     } finally {
-      setIsLoading(false);
+      if (generation === lifecycleRef.current) setIsLoading(false);
     }
   }, []);
 
   const verifyOtp = useCallback(
     async (input: VerifyOtpInput) => {
+      const generation = ++lifecycleRef.current;
+      invalidateAuthRequests();
+      refreshInFlightRef.current = null;
+      bootingRef.current = false;
+      setIsHydrating(false);
       setIsLoading(true);
       setError(null);
       try {
         const result = await authTransport.verifyOtp(input);
-        await persistSession(result.session);
+        if (!(await persistSession(result.session, generation))) {
+          throw new DOMException('Sign-in superseded', 'AbortError');
+        }
         applyProfile(result.user);
         debugLog('auth', 'verifyOtp OK — session established', result.user);
-        void logAuthCreds('verifyOtp', result.session, result.user);
       } catch (err) {
         debugLog('auth', 'verifyOtp FAILED', { message: (err as Error)?.message });
-        setError(err instanceof Error ? err.message : 'Verification failed.');
+        if (generation === lifecycleRef.current) setError(err instanceof Error ? err.message : 'Verification failed.');
         throw err;
       } finally {
-        setIsLoading(false);
+        if (generation === lifecycleRef.current) setIsLoading(false);
       }
     },
     [persistSession],
@@ -224,6 +232,7 @@ export function UserProvider({ children }: PropsWithChildren) {
 
   const refreshProfile = useCallback(async () => {
     if (!getCurrentSession()) return;
+    const generation = lifecycleRef.current;
     setIsLoading(true);
     setError(null);
     try {
@@ -231,26 +240,29 @@ export function UserProvider({ children }: PropsWithChildren) {
       // Persist to the profile cache (not just memory) so the freshly-fetched
       // avatar/name survive the next cold boot. Using bare setProfile here left
       // the cache holding a pre-avatar profile → the avatar vanished on relaunch.
-      applyProfile(me);
+      if (generation === lifecycleRef.current) applyProfile(me);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load profile.');
+      if (generation === lifecycleRef.current) setError(err instanceof Error ? err.message : 'Failed to load profile.');
     } finally {
-      setIsLoading(false);
+      if (generation === lifecycleRef.current) setIsLoading(false);
     }
   }, [applyProfile]);
 
   const updateProfile = useCallback(
     async (patch: Partial<Omit<UserProfile, 'id' | 'memberSince'>>) => {
       if (!profile) return;
+      const generation = lifecycleRef.current;
       const previous = profile;
       debugLog('profile', 'updateProfile → patch', patch);
       // Optimistic update
       setProfile((prev) => (prev ? { ...prev, ...patch } : prev));
       try {
         const updated = await userTransport.updateMe(patch);
+        if (generation !== lifecycleRef.current) return;
         applyProfile(updated);
         debugLog('profile', 'updateProfile OK — saved profile', updated);
       } catch (err) {
+        if (generation !== lifecycleRef.current) return;
         applyProfile(previous);
         setError(err instanceof Error ? err.message : 'Failed to update profile.');
         debugLog('profile', 'updateProfile FAILED — rolled back', { message: (err as Error)?.message });
@@ -269,8 +281,9 @@ export function UserProvider({ children }: PropsWithChildren) {
     async (phone: string, otp: string) => {
       // Confirming rebinds the account to the new number and issues a NEW session
       // (the login identity changed) — persist it and swap the profile.
+      const generation = lifecycleRef.current;
       const { user, session } = await userTransport.confirmPhoneChange(phone, otp);
-      await persistSession(session);
+      if (!(await persistSession(session, generation))) return;
       applyProfile(user);
       debugLog('profile', 'phone changed — session swapped', { phone: user.phone });
     },
@@ -280,19 +293,19 @@ export function UserProvider({ children }: PropsWithChildren) {
   // ── Hydration on mount ──────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
+    const generation = lifecycleRef.current;
     (async () => {
       const [session, cachedProfile] = await Promise.all([loadAuthSession(), loadProfileCache()]);
-      if (cancelled) return;
+      if (cancelled || generation !== lifecycleRef.current) return;
       setCurrentSession(session);
       if (session) {
         // Render the returning user as logged-in IMMEDIATELY from the cached
         // profile. The `/me` refresh below is best-effort — it must never be
         // able to log them out.
-        if (cachedProfile) setProfile(cachedProfile);
+        if (cachedProfile) applyProfile(cachedProfile);
         try {
           const me = await userTransport.getMe();
-          if (!cancelled) applyProfile(me);
-          void logAuthCreds('hydrate (restored session)', session, me);
+          if (!cancelled && generation === lifecycleRef.current) applyProfile(me);
         } catch (err) {
           // NEVER wipe the session on cold boot. A failed `/me` — expired
           // access token whose refresh was rejected, offline, timeout, 5xx —
@@ -308,7 +321,7 @@ export function UserProvider({ children }: PropsWithChildren) {
           });
         }
       }
-      if (!cancelled) {
+      if (!cancelled && generation === lifecycleRef.current) {
         debugLog('auth', `BOOT DONE — restoredSession=${!!session} restoredProfile=${!!cachedProfile}`);
         bootingRef.current = false;
         setIsHydrating(false);
@@ -324,7 +337,6 @@ export function UserProvider({ children }: PropsWithChildren) {
   // Attempts ONE refresh against the current refresh token. On failure
   // signs the user out and routes to /sign-in. Concurrent 401s during
   // the refresh are coalesced via the `refreshInFlight` ref.
-  const refreshInFlightRef = useRef<Promise<boolean> | null>(null);
   useEffect(() => {
     const handler = async () => {
       if (refreshInFlightRef.current) {
@@ -333,6 +345,7 @@ export function UserProvider({ children }: PropsWithChildren) {
       }
       const session = getCurrentSession();
       if (!session) return;
+      const generation = lifecycleRef.current;
       const work = (async () => {
         // The transport now distinguishes the two failure modes (see its doc):
         //   THROW  → transient (offline / timeout / 5xx / bad body): the token may
@@ -348,6 +361,7 @@ export function UserProvider({ children }: PropsWithChildren) {
           debugLog('auth', 'refresh transient — keeping session + cached profile');
           return false;
         }
+        if (generation !== lifecycleRef.current) return false;
         if (!result) {
           if (bootingRef.current) {
             // Never wipe the session mid-cold-boot — a definitive 401 during
@@ -357,22 +371,23 @@ export function UserProvider({ children }: PropsWithChildren) {
             return false;
           }
           debugLog('auth', 'refresh rejected — signing out and routing to /sign-in');
-          await signOut();
-          router.replace('/sign-in');
+          const logout = signOut();
+          const signedOutGeneration = lifecycleRef.current;
+          await logout;
+          if (signedOutGeneration === lifecycleRef.current) router.replace('/sign-in');
           return false;
         }
-        await persistSession(result.session);
+        if (!(await persistSession(result.session, generation))) return false;
         // Refresh may omit the user object; only overwrite the profile when it
         // actually carries one (else keep the cached / current profile).
         if (result.user?.id) applyProfile(result.user);
-        void logAuthCreds('token refreshed', result.session, result.user);
         return true;
       })();
       refreshInFlightRef.current = work;
       try {
         await work;
       } finally {
-        refreshInFlightRef.current = null;
+        if (refreshInFlightRef.current === work) refreshInFlightRef.current = null;
       }
     };
     setUnauthorizedHandler(handler);

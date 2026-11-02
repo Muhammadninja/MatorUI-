@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type PropsWithChildren,
+  type SetStateAction,
 } from 'react';
 
 import { cartTransport, type AddItemInput } from '@/services/cart-api';
@@ -24,6 +25,7 @@ import {
 import { clearStoredCart, loadCart, saveCart } from '@/services/cart-storage';
 import { toastService } from '@/services/toast-service';
 import { useUserContext } from '@/contexts/user.context';
+import { CartMutationQueue } from '@/services/cart-mutation-queue';
 
 // Re-export types and constants so existing imports keep working without churn.
 export type { CartItem, CartTotals, PromoCode, PromoResult };
@@ -60,11 +62,22 @@ const CartContext = createContext<CartContextValue | undefined>(undefined);
 const PROMO_PENDING_ID = '__promo__';
 
 export function CartProvider({ children }: PropsWithChildren) {
-  const [items, setItems] = useState<CartItem[]>([]);
-  const [appliedPromo, setAppliedPromo] = useState<PromoCode | null>(null);
+  const { profile, isHydrating } = useUserContext();
+  const ownerId = profile?.id ?? null;
+  return <CartSessionProvider key={ownerId ?? 'guest'} ownerId={ownerId} hydrating={!!isHydrating}>{children}</CartSessionProvider>;
+}
+
+function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren<{ ownerId: string | null; hydrating: boolean }>) {
+  const [items, setItemsState] = useState<CartItem[]>([]);
+  const [appliedPromo, setAppliedPromoState] = useState<PromoCode | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [pendingIds, setPendingIds] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
+  const [mutations] = useState(() => new CartMutationQueue());
+  useEffect(() => {
+    cartTransport.setSession?.(ownerId);
+    return () => { mutations.invalidate(true); };
+  }, [mutations, ownerId]);
 
   // The server-side cart endpoints require auth. Guests use a purely LOCAL cart
   // (persisted to storage); we only talk to the remote cart once signed in —
@@ -73,8 +86,12 @@ export function CartProvider({ children }: PropsWithChildren) {
   const { isAuthenticated } = useUserContext();
   const authedRef = useRef(isAuthenticated);
   useEffect(() => {
+    if (authedRef.current !== isAuthenticated) {
+      mutations.invalidate(true);
+      setPendingIds(new Set());
+    }
     authedRef.current = isAuthenticated;
-  }, [isAuthenticated]);
+  }, [isAuthenticated, mutations]);
 
   // Always-current snapshot for rollback during optimistic mutations.
   // We can't rely on closure values inside async callbacks because they
@@ -83,9 +100,16 @@ export function CartProvider({ children }: PropsWithChildren) {
     items: [],
     appliedPromo: null,
   });
-  useEffect(() => {
-    snapshotRef.current = { items, appliedPromo };
-  }, [items, appliedPromo]);
+  // Update the intended state immediately: multiple taps can precede a render.
+  const setItems = useCallback((update: SetStateAction<CartItem[]>) => {
+    const next = typeof update === 'function' ? update(snapshotRef.current.items) : update;
+    snapshotRef.current = { ...snapshotRef.current, items: next };
+    setItemsState(next);
+  }, []);
+  const setAppliedPromo = useCallback((promo: PromoCode | null) => {
+    snapshotRef.current = { ...snapshotRef.current, appliedPromo: promo };
+    setAppliedPromoState(promo);
+  }, []);
 
   // ── Pending-set helpers ───────────────────────────────────────────
   const markPending = useCallback((id: string) => {
@@ -106,9 +130,10 @@ export function CartProvider({ children }: PropsWithChildren) {
 
   // ── Hydrate: load the local cache instantly so the cart renders offline-first.
   useEffect(() => {
+    if (hydrating) return;
     let cancelled = false;
     const hydrate = async () => {
-      const stored = await loadCart();
+      const stored = await loadCart(ownerId);
       if (!cancelled && stored) {
         setItems(stored.items);
         if (stored.appliedPromoCode) {
@@ -122,7 +147,7 @@ export function CartProvider({ children }: PropsWithChildren) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [hydrating, ownerId]);
 
   // ── Reconcile with the server whenever we're signed in. This runs on every
   // transition into an authenticated state — not just at mount — because auth
@@ -133,10 +158,11 @@ export function CartProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     if (!isAuthenticated || !isHydrated) return;
     let cancelled = false;
+    const version = mutations.readVersion();
     void (async () => {
       try {
-        const remote = await cartTransport.fetch();
-        if (cancelled) return;
+        const remote = await mutations.read(() => cartTransport.fetch());
+        if (!remote || cancelled || version !== mutations.readVersion()) return;
         // A successful authenticated response is authoritative, including an
         // empty cart. Cached lines must not survive only in the UI and inflate
         // checkout totals. Failed fetches still retain the offline cache.
@@ -160,9 +186,9 @@ export function CartProvider({ children }: PropsWithChildren) {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
       if (items.length === 0 && !appliedPromo) {
-        void clearStoredCart();
+        void clearStoredCart(ownerId);
       } else {
-        void saveCart({ items, appliedPromo });
+        void saveCart({ items, appliedPromo }, ownerId);
       }
     }, 250);
     return () => {
@@ -171,7 +197,7 @@ export function CartProvider({ children }: PropsWithChildren) {
         saveTimeoutRef.current = null;
       }
     };
-  }, [items, appliedPromo, isHydrated]);
+  }, [items, appliedPromo, isHydrated, ownerId]);
 
   // ── Optimistic mutation helper ────────────────────────────────────
   const withOptimistic = useCallback(
@@ -180,32 +206,76 @@ export function CartProvider({ children }: PropsWithChildren) {
       optimistic: () => void,
       apiCall: () => Promise<T>,
       operationName: string,
+      reconcile?: (result: T) => void,
     ): Promise<T | null> => {
       const snapshot = snapshotRef.current;
+      const ticket = mutations.begin(pendingId);
+      const mutationVersion = mutations.readVersion();
+      if (pendingId === 'cart') setPendingIds(new Set());
       optimistic();
       markPending(pendingId);
       try {
         // Guests: local-only cart. Skip the server call (it requires auth and
         // would 401 → rollback). The optimistic update still persists to storage.
-        const result = authedRef.current ? await apiCall() : null;
-        setError(null);
-        return result;
+        const result = authedRef.current ? await mutations.enqueue(ticket, apiCall) : undefined;
+        if (mutations.isLatest(ticket)) {
+          if (result !== undefined) reconcile?.(result);
+          setError(null);
+        }
+        return result ?? null;
       } catch (err) {
-        // Roll local state back to the pre-optimistic snapshot.
-        setItems(snapshot.items);
-        setAppliedPromo(snapshot.appliedPromo);
+        if (!mutations.isLatest(ticket)) return null;
+        // Keep optimistic changes to other items when this request fails.
+        if (pendingId === 'cart') {
+          // A later action must survive a failed clear.
+          if (mutations.readVersion() === mutationVersion) {
+            setItems(snapshot.items);
+            setAppliedPromo(snapshot.appliedPromo);
+          }
+        } else if (pendingId === PROMO_PENDING_ID) {
+          setAppliedPromo(snapshot.appliedPromo);
+        } else {
+          const previous = snapshot.items.find((item) => item.id === pendingId);
+          setItems((current) => {
+            if (previous && current.some((item) => item.id === pendingId)) {
+              return current.map((item) => item.id === pendingId ? previous : item);
+            }
+            const remaining = current.filter((item) => item.id !== pendingId);
+            if (previous) remaining.splice(Math.min(snapshot.items.indexOf(previous), remaining.length), 0, previous);
+            return remaining;
+          });
+        }
         const message = err instanceof Error ? err.message : `${operationName} failed`;
         setError(message);
         toastService.danger(message, {
           description: 'Cart was rolled back. Try again.',
         });
+        // Earlier same-item responses may have been superseded. Read the
+        // canonical cart after queued writes, without replacing newer intent.
+        const version = mutations.readVersion();
+        try {
+          const remote = await mutations.enqueue(ticket, () => cartTransport.fetch());
+          if (remote && version === mutations.readVersion()) {
+            setItems(remote.items);
+            setAppliedPromo(remote.appliedPromoCode ? PROMO_CODES[remote.appliedPromoCode] ?? null : null);
+          }
+        } catch { /* Offline: retain the scoped rollback. */ }
         return null;
       } finally {
-        clearPending(pendingId);
+        if (mutations.finish(ticket)) clearPending(pendingId);
       }
     },
-    [markPending, clearPending],
+    [markPending, clearPending, mutations],
   );
+
+  const reconcileItem = useCallback((id: string, canonical: CartItem | null) => {
+    setItems((current) => {
+      if (!canonical) return current.filter((item) => item.id !== id);
+      return current.some((item) => item.id === id)
+        ? current.map((item) => item.id === id ? { ...item, ...canonical } : item)
+        : [...current, canonical];
+    });
+  }, []);
 
   // ── Public mutations (sync signature, async internals) ────────────
   const addItem = useCallback(
@@ -235,9 +305,10 @@ export function CartProvider({ children }: PropsWithChildren) {
         },
         () => cartTransport.addItem(apiInput),
         'Add to cart',
+        (item) => reconcileItem(incomingItem.id, item),
       );
     },
-    [withOptimistic],
+    [withOptimistic, reconcileItem],
   );
 
   const incrementItem = useCallback(
@@ -253,9 +324,10 @@ export function CartProvider({ children }: PropsWithChildren) {
         },
         () => cartTransport.updateQuantity(itemId, nextQty),
         'Update quantity',
+        (item) => reconcileItem(itemId, item),
       );
     },
-    [withOptimistic],
+    [withOptimistic, reconcileItem],
   );
 
   const decrementItem = useCallback(
@@ -276,9 +348,10 @@ export function CartProvider({ children }: PropsWithChildren) {
         },
         () => cartTransport.updateQuantity(itemId, nextQty),
         'Update quantity',
+        (item) => reconcileItem(itemId, item),
       );
     },
-    [withOptimistic],
+    [withOptimistic, reconcileItem],
   );
 
   const removeItem = useCallback(
@@ -339,18 +412,22 @@ export function CartProvider({ children }: PropsWithChildren) {
   );
 
   const refresh = useCallback(async () => {
+    if (!authedRef.current) return;
+    const version = mutations.readVersion();
     try {
-      const remote = await cartTransport.fetch();
+      const remote = await mutations.read(() => cartTransport.fetch());
+      if (!remote || version !== mutations.readVersion()) return;
       setItems(remote.items);
       const promo = remote.appliedPromoCode ? PROMO_CODES[remote.appliedPromoCode] : null;
       setAppliedPromo(promo ?? null);
       setError(null);
     } catch (err) {
+      if (version !== mutations.readVersion()) return;
       const message = err instanceof Error ? err.message : 'Refresh failed';
       setError(message);
       toastService.danger('Could not refresh cart', { description: message });
     }
-  }, []);
+  }, [mutations, setItems, setAppliedPromo]);
 
   // ── Derived ───────────────────────────────────────────────────────
   const itemCount = useMemo(

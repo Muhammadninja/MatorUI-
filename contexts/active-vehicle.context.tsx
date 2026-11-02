@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type PropsWithChildren,
 } from 'react';
@@ -15,6 +16,7 @@ import {
   type ActiveVehicleSnapshot,
 } from '@/services/active-vehicle-storage';
 import { garageService, type Vehicle } from '@/services/garage-service';
+import { useUserContext } from '@/contexts/user.context';
 import {
   buildSearchVehicleContext,
   getModel,
@@ -84,13 +86,36 @@ const ActiveVehicleContext = createContext<ActiveVehicleContextValue | undefined
 export function ActiveVehicleProvider({ children }: PropsWithChildren) {
   const [active, setActive] = useState<ActiveVehicle | null>(null);
   const [isHydrating, setIsHydrating] = useState(true);
+  const { profile, isAuthenticated, isHydrating: authHydrating } = useUserContext();
+  const ownerId = isAuthenticated ? profile?.id ?? null : null;
+  const ownerRef = useRef(ownerId);
+  ownerRef.current = ownerId;
+  const epochRef = useRef(0);
+  const activeOwnerRef = useRef<string | null | undefined>(undefined);
+  const previousOwnerRef = useRef<string | null | undefined>(undefined);
+  const persistenceRef = useRef<Promise<unknown>>(Promise.resolve());
+  const persist = useCallback((write: () => Promise<void>) => {
+    const next = persistenceRef.current.then(write, write);
+    persistenceRef.current = next.catch(() => undefined);
+    return next;
+  }, []);
 
-  // Step 1: hydrate from disk on mount. Runs once.
+  // Account changes invalidate hydration, pending pin changes and disk writes.
   useEffect(() => {
+    if (authHydrating) return;
     let cancelled = false;
-    void loadActiveVehicle().then((snapshot) => {
-      if (cancelled) return;
-      if (snapshot) {
+    const epoch = ++epochRef.current;
+    const changed = previousOwnerRef.current !== undefined && previousOwnerRef.current !== ownerId;
+    previousOwnerRef.current = ownerId;
+    activeOwnerRef.current = ownerId;
+    setActive(null);
+    setIsHydrating(true);
+    garageService.setSession(ownerId);
+    void (async () => {
+      if (changed || ownerId === null) await persist(clearActiveVehicle);
+      const snapshot = ownerId === null ? null : await loadActiveVehicle();
+      if (cancelled || epoch !== epochRef.current || ownerRef.current !== ownerId) return;
+      if (snapshot && snapshot.ownerId === ownerId) {
         setActive({
           vehicleId: snapshot.vehicleId,
           fitment: snapshot.fitment,
@@ -100,11 +125,11 @@ export function ActiveVehicleProvider({ children }: PropsWithChildren) {
         });
       }
       setIsHydrating(false);
-    });
+    })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [ownerId, authHydrating, persist]);
 
   // Step 2: subscribe to the garage cache. Whenever the list of
   // vehicles changes — initial load, primary flip from realtime,
@@ -112,6 +137,8 @@ export function ActiveVehicleProvider({ children }: PropsWithChildren) {
   // (or from the persisted vehicleId if it still exists in the list).
   useEffect(() => {
     const unsubscribe = garageService.subscribe((vehicles) => {
+      if (authHydrating || ownerId === null || ownerRef.current !== ownerId) return;
+      activeOwnerRef.current = ownerId;
       setActive((curr) => {
         const persistedHit = curr ? vehicles.find((v) => v.id === curr.vehicleId) : undefined;
         const primary = vehicles.find((v) => v.isPrimary) ?? vehicles[0];
@@ -127,20 +154,28 @@ export function ActiveVehicleProvider({ children }: PropsWithChildren) {
       });
     });
     return unsubscribe;
-  }, []);
+  }, [ownerId, authHydrating]);
 
   const setPrimaryVehicle = useCallback<ActiveVehicleContextValue['setPrimaryVehicle']>(
     async (id, opts) => {
+      if (authHydrating || ownerId === null || ownerRef.current !== ownerId) return;
       const vehicle = garageService.getById(id);
       if (!vehicle) return;
+      const epoch = ++epochRef.current;
+      setIsHydrating(false);
       const fitment = deriveFitment(vehicle);
       const snapshot: ActiveVehicleSnapshot = {
+        ownerId,
         vehicleId: id,
         fitment,
         savedAt: Date.now(),
       };
       setActive({ vehicleId: id, fitment, vehicle });
-      await saveActiveVehicle(snapshot);
+      activeOwnerRef.current = ownerId;
+      await persist(async () => {
+        if (epoch === epochRef.current && ownerRef.current === ownerId) await saveActiveVehicle(snapshot);
+      });
+      if (epoch !== epochRef.current || ownerRef.current !== ownerId) return;
       if (!opts?.skipBackend && !vehicle.isPrimary) {
         try {
           await garageService.setPrimary(id);
@@ -150,36 +185,44 @@ export function ActiveVehicleProvider({ children }: PropsWithChildren) {
         }
       }
     },
-    [],
+    [ownerId, authHydrating, persist],
   );
 
   const setFitment = useCallback<ActiveVehicleContextValue['setFitment']>((patch) => {
+    if (authHydrating || ownerId === null || ownerRef.current !== ownerId) return;
+    const epoch = epochRef.current;
     setActive((curr) => {
       if (!curr) return curr;
       const next: VehicleFitment = { ...curr.fitment, ...patch };
-      void saveActiveVehicle({
-        vehicleId: curr.vehicleId,
-        fitment: next,
-        savedAt: Date.now(),
+      void persist(async () => {
+        if (epoch !== epochRef.current || ownerRef.current !== ownerId) return;
+        await saveActiveVehicle({
+          ownerId,
+          vehicleId: curr.vehicleId,
+          fitment: next,
+          savedAt: Date.now(),
+        });
       });
       return { ...curr, fitment: next };
     });
-  }, []);
+  }, [ownerId, authHydrating, persist]);
 
   const clearActive = useCallback<ActiveVehicleContextValue['clearActive']>(async () => {
     setActive(null);
-    await clearActiveVehicle();
-  }, []);
+    setIsHydrating(false);
+    epochRef.current++;
+    await persist(clearActiveVehicle);
+  }, [persist]);
 
   const value = useMemo<ActiveVehicleContextValue>(
     () => ({
-      currentActiveVehicle: active,
-      isHydrating,
+      currentActiveVehicle: !authHydrating && activeOwnerRef.current === ownerId ? active : null,
+      isHydrating: authHydrating || isHydrating,
       setPrimaryVehicle,
       setFitment,
       clearActive,
     }),
-    [active, isHydrating, setPrimaryVehicle, setFitment, clearActive],
+    [active, isHydrating, authHydrating, ownerId, setPrimaryVehicle, setFitment, clearActive],
   );
 
   return <ActiveVehicleContext.Provider value={value}>{children}</ActiveVehicleContext.Provider>;

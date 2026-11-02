@@ -17,6 +17,7 @@ import type { VehicleFitment } from '@/services/uz-vehicle-catalog';
 const STORAGE_KEY = '@mator/active-vehicle/v1';
 
 export type ActiveVehicleSnapshot = {
+  ownerId?: string | null;
   vehicleId: string;
   fitment: VehicleFitment;
   /** unix epoch ms — used to expire stale snapshots if we ever decide

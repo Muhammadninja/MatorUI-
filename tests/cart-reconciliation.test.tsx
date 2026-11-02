@@ -10,7 +10,7 @@ const state = vi.hoisted(() => ({
   load: vi.fn(),
 }));
 vi.mock('@/contexts/user.context', () => ({
-  useUserContext: () => ({ isAuthenticated: state.authenticated }),
+    useUserContext: () => ({ isAuthenticated: state.authenticated, profile: state.authenticated ? { id: 'user-a' } : null }),
 }));
 vi.mock('@/services/cart-api', () => ({ cartTransport: { fetch: state.fetch } }));
 vi.mock('@/services/cart-storage', () => ({

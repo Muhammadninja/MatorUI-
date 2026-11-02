@@ -183,6 +183,21 @@ class GarageService {
    *  refresh that lands after a fast mutation would revert the fresh
    *  cache to the stale snapshot. */
   private refreshSeq = 0;
+  private sessionEpoch = 0;
+  private ownerId: string | null | undefined;
+
+  setSession(ownerId: string | null): void {
+    if (this.ownerId === ownerId) return;
+    this.ownerId = ownerId;
+    this.reset();
+  }
+
+  isSession(ownerId: string | null): boolean { return this.ownerId === ownerId; }
+  sessionVersion(): number { return this.sessionEpoch; }
+
+  private assertSession(epoch: number): void {
+    if (epoch !== this.sessionEpoch) throw new DOMException('Garage session changed', 'AbortError');
+  }
 
   constructor(transport: GarageTransport) {
     this.transport = transport;
@@ -202,6 +217,7 @@ class GarageService {
    * read from the signed-out session is discarded when it resolves.
    */
   reset(): void {
+    this.sessionEpoch++;
     this.refreshSeq++;
     this.vehicles = [];
     this.hasLoaded = false;
@@ -258,7 +274,9 @@ class GarageService {
   }
 
   async addVehicle(input: VehicleInput, signal?: AbortSignal): Promise<Vehicle> {
+    const epoch = this.sessionEpoch;
     const created = await this.transport.create(input, signal);
+    this.assertSession(epoch);
     // Server is the source of truth for isPrimary semantics; refresh the list.
     // Internal refresh inherits the same signal — if the consumer unmounts
     // while the post-create refresh is in flight, we drop the cache update
@@ -272,19 +290,27 @@ class GarageService {
     patch: VehiclePatch,
     signal?: AbortSignal,
   ): Promise<Vehicle> {
+    const epoch = this.sessionEpoch;
     const updated = await this.transport.update(id, patch, signal);
+    this.assertSession(epoch);
     this.vehicles = this.vehicles.map((v) => (v.id === id ? updated : v));
     this.emit();
     return updated;
   }
 
   async removeVehicle(id: string, signal?: AbortSignal): Promise<void> {
+    const epoch = this.sessionEpoch;
     await this.transport.remove(id, signal);
+    this.assertSession(epoch);
     await this.refresh(signal);
   }
 
   async setPrimary(id: string, signal?: AbortSignal): Promise<void> {
+    const epoch = this.sessionEpoch;
+    const seq = ++this.refreshSeq;
     const nextList = await this.transport.setPrimary(id, signal);
+    this.assertSession(epoch);
+    if (seq !== this.refreshSeq) throw new DOMException('Stale primary change superseded', 'AbortError');
     this.vehicles = nextList;
     this.emit();
   }

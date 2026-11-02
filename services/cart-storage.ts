@@ -14,7 +14,13 @@ import type { CartItem, PromoCode } from '@/contexts/cart.context';
  * still be cached here as an offline-first fallback.
  */
 
-const CART_STORAGE_KEY = 'cart:v1';
+const cartStorageKey = (ownerId: string | null) => `cart:v2:${ownerId === null ? 'guest' : `user:${ownerId}`}`;
+let writes: Promise<unknown> = Promise.resolve();
+function write(operation: () => Promise<void>): Promise<void> {
+  const result = writes.then(operation);
+  writes = result.catch(() => undefined);
+  return result;
+}
 const CART_SCHEMA_VERSION = 1;
 
 export type StoredCart = {
@@ -38,9 +44,10 @@ function isStoredEnvelope(value: unknown): value is StoredEnvelope {
   );
 }
 
-export async function loadCart(): Promise<StoredCart | null> {
+export async function loadCart(ownerId: string | null = null): Promise<StoredCart | null> {
   try {
-    const raw = await AsyncStorage.getItem(CART_STORAGE_KEY);
+    await writes;
+    const raw = await AsyncStorage.getItem(cartStorageKey(ownerId));
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
     if (!isStoredEnvelope(parsed) || parsed.v !== CART_SCHEMA_VERSION) return null;
@@ -57,22 +64,22 @@ export async function loadCart(): Promise<StoredCart | null> {
 export async function saveCart(state: {
   items: CartItem[];
   appliedPromo: PromoCode | null;
-}): Promise<void> {
+}, ownerId: string | null = null): Promise<void> {
   try {
     const envelope: StoredEnvelope = {
       v: CART_SCHEMA_VERSION,
       items: state.items,
       appliedPromoCode: state.appliedPromo?.code ?? null,
     };
-    await AsyncStorage.setItem(CART_STORAGE_KEY, JSON.stringify(envelope));
+    await write(() => AsyncStorage.setItem(cartStorageKey(ownerId), JSON.stringify(envelope)));
   } catch {
     // Silent — persistence failure shouldn't break the UI.
   }
 }
 
-export async function clearStoredCart(): Promise<void> {
+export async function clearStoredCart(ownerId: string | null = null): Promise<void> {
   try {
-    await AsyncStorage.removeItem(CART_STORAGE_KEY);
+    await write(() => AsyncStorage.removeItem(cartStorageKey(ownerId)));
   } catch {
     // ignore
   }

@@ -28,6 +28,7 @@ export type AddItemInput = {
 };
 
 export interface CartTransport {
+  setSession?(ownerId: string | null): void;
   fetch(): Promise<CartSnapshot>;
   addItem(input: AddItemInput): Promise<CartItem>;
   updateQuantity(itemId: string, quantity: number): Promise<CartItem | null>;
@@ -200,6 +201,19 @@ const MAX_CART_QUANTITY = 999;
 export class HttpCartTransport implements CartTransport {
   /** part_id → cart-line id, rebuilt from every server response. */
   private lineIdByPart = new Map<string, string>();
+  private ownerId: string | null | undefined;
+  private epoch = 0;
+
+  setSession(ownerId: string | null): void {
+    if (this.ownerId === ownerId) return;
+    this.ownerId = ownerId;
+    this.epoch += 1;
+    this.lineIdByPart.clear();
+  }
+
+  private assertSession(epoch: number): void {
+    if (epoch !== this.epoch) throw new DOMException('Cart session changed', 'AbortError');
+  }
 
   private mapItem(i: ApiCartItem): CartItem {
     return {
@@ -209,8 +223,9 @@ export class HttpCartTransport implements CartTransport {
       title: i.title ?? '',
       description: '',
       price:
-        i.price ??
-        (i.price_uzs != null ? `UZS ${i.price_uzs.toLocaleString('ru-RU')}` : ''),
+        typeof i.price_uzs === 'number' && Number.isFinite(i.price_uzs)
+          ? `UZS ${String(i.price_uzs)}`
+          : i.price ?? '',
       imageUrl: i.imageUrl ?? undefined,
       // No catalog part and no service behind it → a sourced-offer line.
       sourced: !i.part_id && !i.service_id,
@@ -226,14 +241,17 @@ export class HttpCartTransport implements CartTransport {
    * `item_01K…` id, so a part_id there 404s "Cart item not found").
    */
   private async resolveLineId(partId: string): Promise<string | null> {
+    const epoch = this.epoch;
     const known = this.lineIdByPart.get(partId);
     if (known) return known;
     await this.fetch(); // rebuilds lineIdByPart via ingest()
+    this.assertSession(epoch);
     return this.lineIdByPart.get(partId) ?? null;
   }
 
   /** Fold a full-cart response into a CartSnapshot and refresh the id map. */
-  private ingest(cart: ApiCart | undefined): CartSnapshot {
+  private ingest(cart: ApiCart | undefined, epoch: number): CartSnapshot {
+    this.assertSession(epoch);
     this.lineIdByPart.clear();
     const items = (cart?.items ?? []).map((i) => {
       // Key by the same id mapItem exposes, so PATCH/DELETE resolve the line id
@@ -245,15 +263,17 @@ export class HttpCartTransport implements CartTransport {
   }
 
   async fetch(): Promise<CartSnapshot> {
-    return this.ingest(await apiClient.get<ApiCart>('/v1/cart'));
+    const epoch = this.epoch;
+    return this.ingest(await apiClient.get<ApiCart>('/v1/cart'), epoch);
   }
 
   async addItem(input: AddItemInput): Promise<CartItem> {
+    const epoch = this.epoch;
     const cart = await apiClient.post<ApiCart>('/v1/cart/items', {
       part_id: input.productId,
       quantity: 1,
     });
-    const snap = this.ingest(cart);
+    const snap = this.ingest(cart, epoch);
     // Return the reconciled server line; fall back to the optimistic input
     // if the server omitted it (shouldn't happen, but keeps the type honest).
     return (
@@ -272,11 +292,13 @@ export class HttpCartTransport implements CartTransport {
   }
 
   async updateQuantity(itemId: string, quantity: number): Promise<CartItem | null> {
+    const epoch = this.epoch;
     if (quantity <= 0) {
       await this.removeItem(itemId);
       return null;
     }
     const lineId = await this.resolveLineId(itemId);
+    this.assertSession(epoch);
     if (!lineId) {
       // The line genuinely isn't on the server cart (the map was cold AND a
       // refresh still didn't find it — e.g. the cart was cleared server-side
@@ -293,12 +315,14 @@ export class HttpCartTransport implements CartTransport {
       `/v1/cart/items/${encodeURIComponent(lineId)}`,
       { quantity: Math.min(quantity, MAX_CART_QUANTITY) },
     );
-    const snap = this.ingest(cart);
+    const snap = this.ingest(cart, epoch);
     return snap.items.find((i) => i.id === itemId) ?? null;
   }
 
   async removeItem(itemId: string): Promise<void> {
+    const epoch = this.epoch;
     const lineId = await this.resolveLineId(itemId);
+    this.assertSession(epoch);
     // No line for this part even after a refresh → already absent server-side,
     // so the desired end state (gone) is already met; nothing to delete.
     if (!lineId) return;
@@ -306,16 +330,18 @@ export class HttpCartTransport implements CartTransport {
       `/v1/cart/items/${encodeURIComponent(lineId)}`,
     );
     // DELETE returns the updated cart; refresh the map from it.
-    this.ingest(cart);
+    this.ingest(cart, epoch);
   }
 
   async clear(): Promise<void> {
-    this.ingest(await apiClient.post<ApiCart>('/v1/cart/clear'));
+    const epoch = this.epoch;
+    this.ingest(await apiClient.post<ApiCart>('/v1/cart/clear'), epoch);
   }
 
   async applyPromo(code: string): Promise<PromoResult> {
+    const epoch = this.epoch;
     const cart = await apiClient.post<ApiCart>('/v1/cart/promo', { code });
-    this.ingest(cart);
+    this.ingest(cart, epoch);
     // The provider applies promos optimistically from its own PROMO_CODES
     // table and discards this return; we still echo an honest result.
     const applied = cart?.promo?.code ? PROMO_CODES[cart.promo.code] : undefined;
@@ -323,7 +349,8 @@ export class HttpCartTransport implements CartTransport {
   }
 
   async removePromo(): Promise<void> {
-    this.ingest(await apiClient.delete<ApiCart>('/v1/cart/promo'));
+    const epoch = this.epoch;
+    this.ingest(await apiClient.delete<ApiCart>('/v1/cart/promo'), epoch);
   }
 }
 
