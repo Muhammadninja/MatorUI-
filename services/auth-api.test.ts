@@ -8,6 +8,8 @@
  */
 import { describe, expect, test } from 'vitest';
 
+vi.mock('@/config/environment', () => ({ allowLocalDevOtp: () => false }));
+
 // Pin to mock impl by ensuring shouldUseHttpTransport returns false.
 vi.mock('@/config/api', () => ({
   getApiBaseUrl: () => null,

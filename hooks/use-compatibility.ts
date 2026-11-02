@@ -17,31 +17,35 @@ export function useCompatibility(
   vehicleId?: string,
   vin?: string,
 ): { result: CompatibilityResult | null; loading: boolean } {
-  const [result, setResult] = useState<CompatibilityResult | null>(null);
-  const [loading, setLoading] = useState(false);
+  const requestKey = JSON.stringify([partId, vehicleId, vin]);
+  const [check, setCheck] = useState<{
+    key: string | null;
+    result: CompatibilityResult | null;
+    loading: boolean;
+  }>({ key: null, result: null, loading: false });
 
   useEffect(() => {
     if (!partId || (!vehicleId && !vin)) {
-      setResult(null);
-      setLoading(false);
+      setCheck({ key: requestKey, result: null, loading: false });
       return;
     }
     let cancelled = false;
-    setLoading(true);
+    setCheck({ key: requestKey, result: null, loading: true });
     checkCompatibility(partId, { vehicleId, vin })
       .then((r) => {
-        if (!cancelled) setResult(r);
+        if (!cancelled) setCheck({ key: requestKey, result: r, loading: false });
       })
       .catch(() => {
-        if (!cancelled) setResult(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setCheck({ key: requestKey, result: null, loading: false });
       });
     return () => {
       cancelled = true;
     };
-  }, [partId, vehicleId, vin]);
+  }, [partId, vehicleId, vin, requestKey]);
 
-  return { result, loading };
+  // Props change before the effect runs. Never show the previous vehicle's
+  // positive badge for even that first render of the new selection.
+  return check.key === requestKey
+    ? { result: check.result, loading: check.loading }
+    : { result: null, loading: Boolean(partId && (vehicleId || vin)) };
 }

@@ -131,19 +131,18 @@ export function CartProvider({ children }: PropsWithChildren) {
   // line_id map for the persisted cart, so a subsequent quantity update PATCHes
   // the right line instead of 404ing on a cold map.
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !isHydrated) return;
     let cancelled = false;
     void (async () => {
       try {
         const remote = await cartTransport.fetch();
         if (cancelled) return;
-        // Empty server cart shouldn't wipe local; only reconcile when the
-        // server actually has data (offline-first hedge).
-        if (remote.items.length > 0) {
-          setItems(remote.items);
-          const promo = remote.appliedPromoCode ? PROMO_CODES[remote.appliedPromoCode] : null;
-          setAppliedPromo(promo ?? null);
-        }
+        // A successful authenticated response is authoritative, including an
+        // empty cart. Cached lines must not survive only in the UI and inflate
+        // checkout totals. Failed fetches still retain the offline cache.
+        setItems(remote.items);
+        const promo = remote.appliedPromoCode ? PROMO_CODES[remote.appliedPromoCode] : null;
+        setAppliedPromo(promo ?? null);
       } catch {
         // Offline / fetch failed — silently keep local state. The transport
         // self-heals the id map lazily on the next mutation if needed.
@@ -152,7 +151,7 @@ export function CartProvider({ children }: PropsWithChildren) {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isHydrated]);
 
   // ── Debounce-write to local cache after every change.
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);

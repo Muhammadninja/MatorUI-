@@ -63,3 +63,5 @@ ruvector.db
 
 
 .npm-global/
+# Isolated local integration databases, private runtime config and logs
+/.local/

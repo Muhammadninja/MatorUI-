@@ -1,0 +1,32 @@
+diff --git a/src/main.ts b/src/main.ts
+--- a/src/main.ts
++++ b/src/main.ts
+@@ -190,7 +190,7 @@
+   // Fire OnModuleDestroy on SIGTERM/SIGINT so the Telegram bot stops its long
+   // poll cleanly on restart (otherwise the next instance gets a 409 Conflict).
+   app.enableShutdownHooks();
+-  await app.listen(process.env.PORT ?? 3000);
++  await app.listen(process.env.PORT ?? 3000, '127.0.0.1');
+   logger.log(`Mator backend listening on port ${process.env.PORT ?? 3000}`);
+ }
+ bootstrap();
+diff --git a/src/catalog/parts/parts.service.ts b/src/catalog/parts/parts.service.ts
+--- a/src/catalog/parts/parts.service.ts
++++ b/src/catalog/parts/parts.service.ts
+@@ -313,7 +313,7 @@
+       },
+       maybe: {
+         status: 'UNCERTAIN',
+-        isCompatible: true,
++        isCompatible: false,
+         color: 'yellow',
+         text: 'Требует уточнения (проверьте VIN)',
+         matchedBy: 'MODEL_REF',
+diff --git a/src/app.module.ts b/src/app.module.ts
+--- a/src/app.module.ts
++++ b/src/app.module.ts
+@@ -58,3 +58,3 @@
+     // defaults; no other environment variable is inspected.
+-    ConfigModule.forRoot({ isGlobal: true, validate: validatePaymeEnv }),
++    ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true, validate: validatePaymeEnv }),
+     // Global baseline rate limit; sensitive auth routes tighten this further.

@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 import path from 'node:path';
 
 /**
@@ -12,9 +12,11 @@ import path from 'node:path';
  *   three methods the auth-storage module uses.
  */
 export default defineConfig({
+  test: { exclude: [...configDefaults.exclude, '**/.local/**'] },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './'),
+      'expo-constants': path.resolve(__dirname, './tests/__shims__/expo-constants.ts'),
       'expo-secure-store': path.resolve(
         __dirname,
         './tests/__shims__/expo-secure-store.ts',

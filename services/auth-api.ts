@@ -27,6 +27,7 @@
 
 import { apiClient, ApiError } from '@/services/api-client';
 import { debugLog } from '@/services/debug-log';
+import { allowLocalDevOtp } from '@/config/environment';
 import type { AuthSession } from '@/services/auth-storage';
 import type { LanguageCode } from '@/services/language-storage';
 import type { LegalRegistrationVersions } from '@/types/legal';
@@ -342,7 +343,7 @@ class HttpAuthTransport implements AuthTransport {
       expiresIn: expiresAt
         ? Math.max(0, expiresAt - Math.floor(Date.now() / 1000))
         : (r.resend_after_seconds ?? 300),
-      devCode: r.dev_otp_code, // undefined on the real backend
+      devCode: allowLocalDevOtp() ? r.dev_otp_code : undefined,
     };
   }
 
@@ -445,6 +446,9 @@ class HttpAuthTransport implements AuthTransport {
 
 import { shouldUseHttpTransport } from '@/config/api';
 
-export const authTransport: AuthTransport = shouldUseHttpTransport('auth')
+// A shipped bundle always uses server authentication. A missing transport gate
+// must never turn a release into an offline/demo sign-in implementation.
+const useHttpAuth = (typeof __DEV__ !== 'undefined' && !__DEV__) || shouldUseHttpTransport('auth');
+export const authTransport: AuthTransport = useHttpAuth
   ? new HttpAuthTransport()
   : new MockAuthTransport();

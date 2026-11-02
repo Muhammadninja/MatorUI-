@@ -16,10 +16,11 @@
  */
 
 import { getCurrentSession } from '@/services/auth-storage';
+import { getAppEnvironment } from '@/config/environment';
 
 /** Returns the configured API base URL, or null when running on mocks. */
 export function getApiBaseUrl(): string | null {
-  const raw = process.env.EXPO_PUBLIC_API_BASE_URL;
+  const raw = getAppEnvironment().apiBaseUrl;
   if (!raw || raw.trim().length === 0) return null;
   // Strip trailing slash so transports can do `${base}/path` without
   // worrying about double-slash bugs.
@@ -42,7 +43,7 @@ export function getApiBaseUrl(): string | null {
  */
 export function shouldUseHttpTransport(domain?: string): boolean {
   if (getApiBaseUrl() === null) return false;
-  const raw = process.env.EXPO_PUBLIC_HTTP_DOMAINS;
+  const raw = getAppEnvironment().httpDomains;
   const allow = raw ? raw.split(',').map((d) => d.trim()).filter(Boolean) : [];
   if (allow.length === 0) return true; // no filter → every domain uses HTTP
   return domain ? allow.includes(domain) : false;

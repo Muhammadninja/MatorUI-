@@ -51,6 +51,7 @@ import { initSentry } from '@/services/sentry';
 initSentry();
 
 import { AppToastHost } from '@/components/shared/app-toast';
+import { DevelopmentEnvironmentBadge } from '@/components/shared/development-environment-badge';
 import { AppView } from '@/components/shared/app-view';
 import GlobalModalHost from '@/components/shared/global-modal-host';
 import LikesListSuggestionHost from '@/components/shared/likes-list-suggestion-host';
@@ -295,6 +296,7 @@ function RootNavigation() {
           />
         </Stack>
       </NavigationThemeProvider>
+      {__DEV__ ? <DevelopmentEnvironmentBadge /> : null}
       {splashVisible ? <SplashOverlay onFinish={() => setSplashVisible(false)} /> : null}
     </AppView>
   );

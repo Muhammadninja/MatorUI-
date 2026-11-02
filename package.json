@@ -113,7 +113,16 @@
     "lint:tokens": "node scripts/lint-tokens.mjs",
     "i18n:push": "npx --yes @tolgee/cli push",
     "i18n:pull": "npx --yes @tolgee/cli pull",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "start:local": "node scripts/app-environment.cjs local",
+    "start:production": "node scripts/app-environment.cjs production",
+    "export:production:ios": "node scripts/app-environment.cjs production export --platform ios",
+    "integration:setup": "node scripts/local-integration/run.mjs setup",
+    "integration:start": "node scripts/local-integration/run.mjs start",
+    "integration:stop": "node scripts/local-integration/run.mjs stop",
+    "integration:seed": "node scripts/local-integration/run.mjs seed",
+    "integration:smoke": "node scripts/local-integration/run.mjs smoke",
+    "integration:status": "node scripts/local-integration/run.mjs status"
   },
   "private": true,
   "overrides": {

@@ -10,7 +10,10 @@
       "channel": "development",
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://api.dev.matorui.com",
-        "EXPO_PUBLIC_SENTRY_ENV": "development"
+        "EXPO_PUBLIC_SENTRY_ENV": "development",
+        "EXPO_PUBLIC_APP_ENV": "development",
+        "EXPO_PUBLIC_ALLOW_DEV_OTP": "false",
+        "AUTH_DEV_MODE": "false"
       },
       "ios": {
         "resourceClass": "m-medium"
@@ -25,7 +28,10 @@
       "channel": "development",
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://api.dev.matorui.com",
-        "EXPO_PUBLIC_SENTRY_ENV": "development"
+        "EXPO_PUBLIC_SENTRY_ENV": "development",
+        "EXPO_PUBLIC_APP_ENV": "development",
+        "EXPO_PUBLIC_ALLOW_DEV_OTP": "false",
+        "AUTH_DEV_MODE": "false"
       },
       "ios": {
         "resourceClass": "m-medium",
@@ -37,7 +43,10 @@
       "channel": "preview",
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://api.staging.matorui.com",
-        "EXPO_PUBLIC_SENTRY_ENV": "staging"
+        "EXPO_PUBLIC_SENTRY_ENV": "staging",
+        "EXPO_PUBLIC_APP_ENV": "staging",
+        "EXPO_PUBLIC_ALLOW_DEV_OTP": "false",
+        "AUTH_DEV_MODE": "false"
       },
       "ios": {
         "resourceClass": "m-medium",
@@ -52,9 +61,12 @@
       "channel": "production",
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://api.mator.uz",
-        "EXPO_PUBLIC_HTTP_DOMAINS": "categories,catalog,search,auth,user,cart,garage,notifications,orders,avatar,dealers,sales,chat,legal",
+        "EXPO_PUBLIC_HTTP_DOMAINS": "",
         "EXPO_PUBLIC_SENTRY_ENV": "production",
-        "SENTRY_ALLOW_FAILURE": "true"
+        "SENTRY_ALLOW_FAILURE": "true",
+        "EXPO_PUBLIC_APP_ENV": "production",
+        "EXPO_PUBLIC_ALLOW_DEV_OTP": "false",
+        "AUTH_DEV_MODE": "false"
       },
       "ios": {
         "resourceClass": "m-medium"

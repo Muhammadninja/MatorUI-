@@ -46,6 +46,25 @@ const NOT_COMPATIBLE: CompatibilityResult = {
   details: { matchedBy: 'MODEL_REF', oemNumber: '96484900' },
 };
 
+const UNCERTAIN: CompatibilityResult = {
+  ...NOT_COMPATIBLE,
+  status: 'UNCERTAIN',
+  isCompatible: false,
+  badge: { text: 'Требует уточнения (проверьте VIN)', color: 'yellow' },
+};
+const EXACT_MATCH: CompatibilityResult = {
+  ...NOT_COMPATIBLE,
+  status: 'EXACT_MATCH',
+  isCompatible: true,
+  badge: { text: 'Подходит', color: 'green' },
+};
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
 beforeEach(() => {
   gate.http = true;
   post.mockReset();
@@ -80,6 +99,11 @@ describe('checkCompatibility — request building', () => {
 });
 
 describe('checkCompatibility — fails soft (no false badge)', () => {
+  test('preserves an unknown answer without converting it into a positive match', async () => {
+    post.mockResolvedValue(UNCERTAIN);
+    const res = await checkCompatibility('p1', { vehicleId: 'v1' });
+    expect(res).toMatchObject({ status: 'UNCERTAIN', isCompatible: false, badge: { color: 'yellow' } });
+  });
   test('returns null on a mock/offline build (no HTTP transport) and never calls the API', async () => {
     gate.http = false;
     const res = await checkCompatibility('p1', { vehicleId: 'v1' });
@@ -98,15 +122,22 @@ describe('checkCompatibility — fails soft (no false badge)', () => {
 // react-test-renderer runs it cleanly in the node test env.
 async function renderHook(partId: string | null, vehicleId?: string, vin?: string) {
   const seen: Array<ReturnType<typeof useCompatibility>> = [];
+  let input = { partId, vehicleId, vin };
   function Probe() {
-    seen.push(useCompatibility(partId, vehicleId, vin));
+    seen.push(useCompatibility(input.partId, input.vehicleId, input.vin));
     return null;
   }
   let tree: TestRenderer.ReactTestRenderer | undefined;
   await act(async () => {
     tree = TestRenderer.create(createElement(Probe));
   });
-  return { seen, last: () => seen[seen.length - 1], tree };
+  return {
+    seen, last: () => seen[seen.length - 1], tree,
+    update: async (next: typeof input) => {
+      input = next;
+      await act(async () => { tree?.update(createElement(Probe)); });
+    },
+  };
 }
 
 describe('useCompatibility — mount flow', () => {
@@ -127,5 +158,31 @@ describe('useCompatibility — mount flow', () => {
     expect(post).not.toHaveBeenCalled();
     expect(last().result).toBeNull();
     await act(async () => tree?.unmount());
+  });
+
+  test('network failure is no answer, never a fabricated positive badge', async () => {
+    post.mockRejectedValue(new Error('offline'));
+    const { last, tree } = await renderHook('p1', 'v1');
+    expect(last()).toEqual({ result: null, loading: false });
+    await act(async () => tree?.unmount());
+  });
+
+  test.each([
+    { partId: 'p1', vehicleId: 'v2', vin: undefined },
+    { partId: 'p2', vehicleId: 'v1', vin: undefined },
+    { partId: 'p1', vehicleId: 'v1', vin: 'WVWZZZ1KZAW000001' },
+  ])('does not expose the prior positive badge while a changed selection is pending: %j', async (next) => {
+    post.mockResolvedValueOnce(EXACT_MATCH);
+    const hook = await renderHook('p1', 'v1');
+    expect(hook.last().result?.status).toBe('EXACT_MATCH');
+    const request = deferred<CompatibilityResult>();
+    post.mockReturnValueOnce(request.promise);
+    const start = hook.seen.length;
+    await hook.update(next);
+    expect(hook.seen.slice(start).every(({ result }) => result === null)).toBe(true);
+    expect(hook.last()).toEqual({ result: null, loading: true });
+    await act(async () => { request.resolve({ ...UNCERTAIN, partId: next.partId, vehicleId: next.vehicleId }); });
+    expect(hook.last().result).toMatchObject({ status: 'UNCERTAIN', isCompatible: false });
+    await act(async () => hook.tree?.unmount());
   });
 });

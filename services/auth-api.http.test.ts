@@ -9,6 +9,9 @@
  */
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
+const localAuth = vi.hoisted(() => ({ enabled: false }));
+vi.mock('@/config/environment', () => ({ allowLocalDevOtp: () => localAuth.enabled }));
+
 // Force the HTTP transport singleton (not the mock) at module load.
 vi.mock('@/config/api', () => ({
   getApiBaseUrl: () => 'https://api.test',
@@ -34,6 +37,7 @@ import { ApiError } from '@/services/api-client';
 import { authTransport, mapBackendUser } from './auth-api';
 
 beforeEach(() => {
+  localAuth.enabled = false;
   post.mockReset();
   get.mockReset();
   patch.mockReset();
@@ -125,7 +129,7 @@ describe('HttpAuthTransport — request-otp', () => {
     expect(res.expiresIn).toBe(45);
   });
 
-  test('surfaces dev_otp_code as devCode (undefined on a real backend)', async () => {
+  test('ignores dev_otp_code unless local development auth is explicitly enabled', async () => {
     post.mockResolvedValueOnce({ request_id: 'otp_Y', dev_otp_code: '424242' });
     const res = await authTransport.requestOtp({
       channel: 'phone',
@@ -133,6 +137,14 @@ describe('HttpAuthTransport — request-otp', () => {
       purpose: 'sign-in',
       lang: 'en',
     });
+    expect(res.devCode).toBeUndefined();
+  });
+
+  test('surfaces dev_otp_code only in the guarded local development environment', async () => {
+    localAuth.enabled = true;
+    post.mockResolvedValueOnce({ request_id: 'otp_local', dev_otp_code: '424242' });
+    const res = await authTransport.requestOtp({ channel: 'phone', identifier: '+998900000001',
+      purpose: 'sign-in', lang: 'ru' });
     expect(res.devCode).toBe('424242');
   });
 });

@@ -1,0 +1,11 @@
+{
+  "description": "Native local services; never a production connection",
+  "host": "127.0.0.1",
+  "backendPort": 3300,
+  "postgresPort": 55432,
+  "redisPort": 56379,
+  "database": "mator_integration",
+  "databaseUser": "mator_local",
+  "externalProviders": "disabled; synthetic test data only",
+  "backendRevisionVerified": "0381bc5637969069e7fd22c96423775f31e27c7b"
+}
