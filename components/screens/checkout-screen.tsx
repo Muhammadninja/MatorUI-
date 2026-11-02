@@ -22,6 +22,7 @@ import { useUserContext } from '@/contexts/user.context';
 import { useToast } from '@/hooks/use-toast';
 import { useAddresses, useCreateAddress, useCreateOrder, useShippingQuote } from '@/hooks/use-orders';
 import { parsePrice } from '@/services/cart-math';
+import { localizeShipping } from '@/services/checkout-presentation';
 import garageService from '@/services/garage-service';
 import type { Address, PaymentType } from '@/services/orders-service';
 import { paymentsTransport } from '@/services/payments-service';
@@ -94,6 +95,7 @@ export default function CheckoutScreen() {
   const shippingRequest = useMemo(() => (addr ? { addressId: addr.id } : null), [addr]);
   const shipping = useShippingQuote(shippingRequest);
   const shipOption = addr ? shipping.options[shipIdx] ?? shipping.options[0] : undefined;
+  const shipCopy = shipOption ? localizeShipping(shipOption, t) : undefined;
 
   // `shipOption` (when present) is the real per-method quote from the
   // backend and REPLACES totals.shipping — it must not be added on top of
@@ -213,8 +215,8 @@ export default function CheckoutScreen() {
           {addr && shipOption ? (
             <SectionCard
               label={t('checkout.shipping')}
-              main={`${shipOption.label} · ${shipOption.price === 0 ? t('checkout.free') : formatCurrency(shipOption.price)}`}
-              sub={shipOption.eta}
+              main={`${shipCopy?.label} · ${shipOption.price === 0 ? t('checkout.free') : formatCurrency(shipOption.price)}`}
+              sub={shipCopy?.eta ?? ''}
               onChange={
                 shipping.options.length > 1
                   ? () => setShipIdx((i) => (i + 1) % shipping.options.length)
@@ -384,12 +386,13 @@ function PaymentRow({
   tokens: Tokens;
 }) {
   const Icon = option.icon;
+  const { t } = useTranslation();
   return (
     <AppPressableView
       onPress={onPress}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
-      accessibilityLabel={option.label}
+      accessibilityLabel={t(option.labelKey)}
       rounded={16}
       p={14}
       colorName="card"
@@ -400,8 +403,8 @@ function PaymentRow({
       <AppView row align="center" gap={12}>
         <Icon size={20} strokeWidth={2} color={tokens.text} />
         <AppView flex={1}>
-          <AppText family="default" weight="semibold" style={{ fontSize: 15, color: tokens.text }}>{option.label}</AppText>
-          <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted, marginTop: 1 }}>{option.description}</AppText>
+          <AppText family="default" weight="semibold" style={{ fontSize: 15, color: tokens.text }}>{t(option.labelKey)}</AppText>
+          <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted, marginTop: 1 }}>{t(option.descriptionKey)}</AppText>
         </AppView>
         <AppView
           center

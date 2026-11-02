@@ -177,7 +177,13 @@
   },
   "paymentMethods": {
     "title": "Способы оплаты",
-    "intro": "Мы не храним карты в вашем аккаунте."
+    "intro": "Мы не храним карты в вашем аккаунте.",
+    "payme": "Payme",
+    "paymeDescription": "Онлайн-оплата через Payme",
+    "terminal": "Терминал",
+    "terminalDescription": "Картой через терминал при получении",
+    "cash": "Наличные",
+    "cashDescription": "Наличными при получении"
   },
   "account": {
     "editAddress": "Изменить адрес",
@@ -352,6 +358,14 @@
     "orderSummary": "Сводка заказа"
   },
   "checkout": {
+    "pickup": "Самовывоз",
+    "courier": "Курьер",
+    "etaToday": "Сегодня",
+    "etaDays_one": "{{count}} день",
+    "etaDays_few": "{{count}} дня",
+    "etaDays_many": "{{count}} дней",
+    "etaDays_other": "{{count}} дня",
+    "etaRange": "{{min}}–{{max}} дн.",
     "title": "Оформление заказа",
     "back": "Назад",
     "payment": "Оплата",

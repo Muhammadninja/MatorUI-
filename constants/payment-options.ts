@@ -4,9 +4,9 @@ import type { PaymentType } from '@/services/orders-service';
 
 export type PaymentOption = {
   id: PaymentType;
-  label: string;
+  labelKey: string;
   /** One-line explainer shown under the label at checkout. */
-  description: string;
+  descriptionKey: string;
   icon: LucideIcon;
 };
 
@@ -17,9 +17,9 @@ export type PaymentOption = {
  * cash-on-delivery.
  */
 export const PAYMENT_OPTIONS: PaymentOption[] = [
-  { id: 'payme', label: 'Payme', description: 'Pay online with Payme', icon: Wallet },
-  { id: 'terminal', label: 'Terminal', description: 'Card terminal on delivery', icon: CreditCard },
-  { id: 'cash', label: 'Cash', description: 'Cash on delivery', icon: Banknote },
+  { id: 'payme', labelKey: 'paymentMethods.payme', descriptionKey: 'paymentMethods.paymeDescription', icon: Wallet },
+  { id: 'terminal', labelKey: 'paymentMethods.terminal', descriptionKey: 'paymentMethods.terminalDescription', icon: CreditCard },
+  { id: 'cash', labelKey: 'paymentMethods.cash', descriptionKey: 'paymentMethods.cashDescription', icon: Banknote },
 ];
 
 export const DEFAULT_PAYMENT_TYPE: PaymentType = 'payme';

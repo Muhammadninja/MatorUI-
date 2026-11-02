@@ -47,10 +47,10 @@ export default function PaymentMethodsScreen() {
               </AppView>
               <AppView flex={1}>
                 <AppText family="heading" weight="bold" style={{ fontSize: 16, color: tokens.text }}>
-                  {opt.label}
+                  {t(opt.labelKey)}
                 </AppText>
                 <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted, marginTop: 2 }}>
-                  {opt.description}
+                  {t(opt.descriptionKey)}
                 </AppText>
               </AppView>
             </AppView>

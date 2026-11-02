@@ -177,7 +177,13 @@
   },
   "paymentMethods": {
     "title": "Payment methods",
-    "intro": "No card is stored on your account."
+    "intro": "No card is stored on your account.",
+    "payme": "Payme",
+    "paymeDescription": "Pay online with Payme",
+    "terminal": "Terminal",
+    "terminalDescription": "Card terminal on delivery",
+    "cash": "Cash",
+    "cashDescription": "Cash on delivery"
   },
   "account": {
     "editAddress": "Edit address",
@@ -350,6 +356,12 @@
     "orderSummary": "Order summary"
   },
   "checkout": {
+    "pickup": "Pickup",
+    "courier": "Courier",
+    "etaToday": "Today",
+    "etaDays_one": "{{count}} day",
+    "etaDays_other": "{{count}} days",
+    "etaRange": "{{min}}–{{max}} days",
     "title": "Checkout",
     "back": "Back",
     "payment": "Payment",

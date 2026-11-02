@@ -177,7 +177,13 @@
   },
   "paymentMethods": {
     "title": "Toʻlov usullari",
-    "intro": "Kartalar hisobingizda saqlanmaydi."
+    "intro": "Kartalar hisobingizda saqlanmaydi.",
+    "payme": "Payme",
+    "paymeDescription": "Payme orqali onlayn toʻlov",
+    "terminal": "Terminal",
+    "terminalDescription": "Qabul qilishda terminal orqali karta bilan toʻlash",
+    "cash": "Naqd pul",
+    "cashDescription": "Qabul qilishda naqd pul bilan toʻlash"
   },
   "account": {
     "editAddress": "Manzilni tahrirlash",
@@ -350,6 +356,12 @@
     "orderSummary": "Buyurtma xulosasi"
   },
   "checkout": {
+    "pickup": "Olib ketish",
+    "courier": "Kuryer",
+    "etaToday": "Bugun",
+    "etaDays_one": "{{count}} kun",
+    "etaDays_other": "{{count}} kun",
+    "etaRange": "{{min}}–{{max}} kun",
     "title": "Buyurtma berish",
     "back": "Orqaga",
     "payment": "Toʻlov",
