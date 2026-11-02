@@ -96,7 +96,7 @@ export function ItemBuyBar({
       }}
     >
       <AppView row align="center" justify="space-between" gap={12}>
-        <AppView gap={2}>
+        <AppView flex={1} gap={2}>
           <AppView row align="center" gap={7}>
             <AppText family="default" style={{ fontSize: 11, color: tokens.textMuted }}>
               {t('itemDetail.total')}
@@ -119,7 +119,7 @@ export function ItemBuyBar({
           value={qty}
           onIncrement={() => onQtyChange(qty + 1)}
           onDecrement={() => onQtyChange(Math.max(1, qty - 1))}
-          size="sm"
+          size="md"
           disabled={outOfStock}
           testID="item-qty"
         />

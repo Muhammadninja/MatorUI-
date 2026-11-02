@@ -17,7 +17,7 @@ export type CardVariant = {
    *  (`delivery-row.tsx`) maps kind → theme token so the green/gray
    *  follows the theme instead of being a literal hex baked into the
    *  data layer. */
-  delivery: { label: string; kind: DeliveryKind };
+  delivery: { labelKey: string; kind: DeliveryKind };
   /** Client-side accent-tag fallback. Carries `tone` so the ribbon icon
    *  resolves to the right theme color (value → green, accolade → gold). */
   accentTag: { labelKey: string; Icon: AccentIcon; tone: IconTone } | null;
@@ -25,7 +25,7 @@ export type CardVariant = {
 
 /**
  * Deterministic per-item card variation so every result reads as distinct:
- *  - Delivery copy rotates Same-day → 1-day → 2-day → Standard.
+ *  - Search has no delivery quote; never invent a free tier or an ETA.
  *  - About 50% of cards get an accent tag (Lowest price / Bestseller)
  *    for rhythm; the rest stay plain.
  *
@@ -37,13 +37,10 @@ export type CardVariant = {
 export function deriveCardVariant(id: string): CardVariant {
   const h = hashCode(id);
 
-  const deliveryOptions: CardVariant['delivery'][] = [
-    { label: 'Free same-day delivery', kind: 'free' },
-    { label: 'Free 1-day delivery', kind: 'free' },
-    { label: 'Free 2-day delivery', kind: 'free' },
-    { label: 'Standard delivery 3-5 days', kind: 'standard' },
-  ];
-  const delivery = deliveryOptions[h % deliveryOptions.length];
+  const delivery: CardVariant['delivery'] = {
+    labelKey: 'search.deliveryAtCheckout',
+    kind: 'standard',
+  };
 
   const tagOptions: CardVariant['accentTag'][] = [
     { labelKey: 'search.signal.lowestPrice', Icon: Tag, tone: 'value' },

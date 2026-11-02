@@ -13,7 +13,9 @@
     "from": "From",
     "to": "To",
     "swipeToDismiss": "Swipe down to dismiss.",
-    "currency": "UZS"
+    "currency": "UZS",
+    "decreaseQuantity": "Decrease quantity",
+    "increaseQuantity": "Increase quantity"
   },
   "nav": {
     "explore": "Explore",
@@ -707,7 +709,10 @@
     "weightGrams": "{{grams}} g",
     "fitsAllModels": "{{make}} — all models",
     "fitsShowAll": "Show all ({{count}} more)",
-    "fitsShowLess": "Show fewer"
+    "fitsShowLess": "Show fewer",
+    "fitConfirmed": "Fits your vehicle",
+    "fitNotCompatible": "Does not fit your vehicle",
+    "fitUnknown": "Compatibility data unavailable"
   },
   "sourcing": {
     "offerTitle": "Offer",
@@ -819,9 +824,9 @@
     "promoCta": "Shop the deals",
     "promoBannerA11y": "{{headline}}. {{cta}}.",
     "priceAny": "Any price",
-    "priceUnder1k": "Under $1,000",
-    "price1kTo10k": "$1k - $10k",
-    "priceOver10k": "Over $10,000",
+    "priceUnder1k": "Under 1,000 UZS",
+    "price1kTo10k": "1,000–10,000 UZS",
+    "priceOver10k": "Over 10,000 UZS",
     "ratingAny": "Any rating",
     "rating3Plus": "3.0 ★ & up",
     "rating4Plus": "4.0 ★ & up",
@@ -844,7 +849,11 @@
       "lowestPrice": "Low price",
       "bestseller": "Bestseller",
       "matorPick": "Mator pick"
-    }
+    },
+    "deliveryAtCheckout": "Delivery calculated at checkout",
+    "extendedFiltersUnavailable": "Price and rating filters are not available yet.",
+    "resultCount_one": "{{count}} result for “{{query}}”",
+    "resultCount_other": "{{count}} results for “{{query}}”"
   },
   "modalHost": {
     "confirmAction": "Confirm action",

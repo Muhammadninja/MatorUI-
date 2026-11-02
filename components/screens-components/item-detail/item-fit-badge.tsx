@@ -5,7 +5,7 @@ import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useThemeContext } from '@/contexts/theme.context';
-import type { CompatibilityColor, CompatibilityResult } from '@/services/compatibility-service';
+import type { CompatibilityResult } from '@/services/compatibility-service';
 
 export type ItemFitBadgeProps = {
   result: CompatibilityResult;
@@ -18,16 +18,19 @@ export type ItemFitBadgeProps = {
  * Fit verdict, driven by the real backend compatibility check.
  *
  * The verdict carries in a coloured rule down the left edge and in the colour
- * of the sentence itself — green fits, amber unsure, red doesn't — rather than
+ * of the sentence itself — green fits, neutral unknown, red doesn't — rather than
  * a glyph in a circle. The red state keeps the "show alternatives" CTA.
  */
 export function ItemFitBadge({ result, subtitle, onShowAlternatives }: ItemFitBadgeProps) {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
 
-  const colorFor = (c: CompatibilityColor) =>
-    c === 'green' ? tokens.success : c === 'red' ? tokens.error : tokens.warning;
-  const accent = colorFor(result.badge.color);
+  const accent =
+    result.status === 'EXACT_MATCH' || result.status === 'UNIVERSAL'
+      ? tokens.success
+      : result.status === 'NOT_COMPATIBLE'
+        ? tokens.error
+        : tokens.textMuted;
 
   return (
     <AppView row gap={13} rounded={18} p={14} style={{ backgroundColor: `${accent}12` }}>
@@ -35,7 +38,13 @@ export function ItemFitBadge({ result, subtitle, onShowAlternatives }: ItemFitBa
       <AppView flex={1} gap={10}>
         <AppView gap={3}>
           <AppText family="accent" weight="bold" style={{ fontSize: 14.5, color: accent }}>
-            {result.badge.text}
+            {t(
+              result.status === 'EXACT_MATCH' || result.status === 'UNIVERSAL'
+                ? 'itemDetail.fitConfirmed'
+                : result.status === 'NOT_COMPATIBLE'
+                  ? 'itemDetail.fitNotCompatible'
+                  : 'itemDetail.fitUnknown',
+            )}
           </AppText>
           {subtitle ? (
             <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted }}>
@@ -110,7 +119,17 @@ export function ItemVehicleCta({ checking, vehicleLabel, onPress }: ItemVehicleC
     );
   }
 
-  if (vehicleLabel) return null;
+  if (vehicleLabel)
+    return (
+      <AppView gap={4}>
+        <AppText textVariant="bodySm" weight="semibold">
+          {t('itemDetail.fitUnknown')}
+        </AppText>
+        <AppText textVariant="bodySm" colorName="textMuted">
+          {vehicleLabel}
+        </AppText>
+      </AppView>
+    );
 
   return (
     <AppPressableView

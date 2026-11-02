@@ -28,13 +28,13 @@ export default function ResultsHeader({
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
   return (
-    <AppView row align="center" justify="space-between" pb={10}>
-      <AppText textVariant="bodyXs" colorName="gray400">
+    <AppView row align="center" justify="space-between" px="lg" gap="md" pb={10}>
+      <AppText textVariant="bodyXs" colorName="textMuted" numberOfLines={2} style={{ flex: 1 }}>
         {t('search.resultCount', { count: total, query: query.trim() })}
       </AppText>
       <AppView row align="center" gap={10}>
         {__DEV__ && durationMs != null ? (
-          <AppText textVariant="bodyXs" colorName="gray400">
+          <AppText textVariant="bodyXs" colorName="textMuted">
             {durationMs} ms
           </AppText>
         ) : null}
@@ -45,17 +45,17 @@ export default function ResultsHeader({
             onPress={onFilterPress}
             androidRipple
             accessibilityLabel={t('search.filters')}
-            hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-            style={{ width: 28, height: 28 }}
+            accessibilityRole="button"
+            style={{ width: 44, height: 44 }}
           >
-            <SlidersHorizontal size={16} strokeWidth={2} color={tokens.text} />
+            <SlidersHorizontal size={20} strokeWidth={2} color={tokens.text} />
             {hasActiveFilters ? (
               <AppView
                 rounded={36}
                 style={{
                   position: 'absolute',
-                  top: 2,
-                  right: 2,
+                  top: 8,
+                  right: 8,
                   width: 6,
                   height: 6,
                   backgroundColor: tokens.text,

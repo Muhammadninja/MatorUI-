@@ -1,4 +1,5 @@
 import { Minus, Plus } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
@@ -35,6 +36,7 @@ export default function AppQtyStepper({
   disabled = false,
   testID,
 }: QtyStepperProps) {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const box = size === 'md' ? 42 : 30;
   const iconSize = size === 'md' ? 18 : 15;
@@ -57,7 +59,7 @@ export default function AppQtyStepper({
       borderName="border"
       accessibilityRole="button"
       testID={testID ? `${testID}-${kind}` : undefined}
-      accessibilityLabel={kind === 'dec' ? 'Decrease quantity' : 'Increase quantity'}
+      accessibilityLabel={t(kind === 'dec' ? 'common.decreaseQuantity' : 'common.increaseQuantity')}
       style={{ width: box, height: box, opacity: enabled ? 1 : 0.4 }}
     >
       {kind === 'dec' ? (

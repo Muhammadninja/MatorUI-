@@ -41,8 +41,10 @@ export default function ResultsEmpty({
       <AppView gap={14} px={16} pt={40} align="center">
         <Sparkles size={40} strokeWidth={2} color={tokens.text} />
         <AppView gap={6} align="center">
-          <AppText textVariant="bodySemibold">{t('search.noMatchesFor', { query: query.trim() })}</AppText>
-          <AppText textVariant="bodySm" colorName="gray400" style={{ textAlign: 'center' }}>
+          <AppText textVariant="bodySemibold" weight="semibold" align="center">
+            {t('search.noMatchesFor', { query: query.trim() })}
+          </AppText>
+          <AppText textVariant="bodySm" colorName="textMuted" style={{ textAlign: 'center' }}>
             {t('search.didYouMean')}
           </AppText>
           <AppPressableView
@@ -71,12 +73,14 @@ export default function ResultsEmpty({
   if (hasActiveFilters) {
     return (
       <AppView gap={14} px={16} pt={40} align="center">
-        <Filter size={40} strokeWidth={2} color={tokens.gray400} />
+        <Filter size={40} strokeWidth={2} color={tokens.textMuted} />
         <AppView gap={4} align="center">
-          <AppText textVariant="bodySemibold">{t('search.noFilterMatchTitle')}</AppText>
+          <AppText textVariant="bodySemibold" weight="semibold" align="center">
+            {t('search.noFilterMatchTitle')}
+          </AppText>
           <AppText
             textVariant="bodySm"
-            colorName="gray400"
+            colorName="textMuted"
             style={{ textAlign: 'center', maxWidth: 280 }}
           >
             {t('search.noFilterMatchSubtitle')}
@@ -107,10 +111,12 @@ export default function ResultsEmpty({
   // 3) Plain "no match" — try a different word.
   return (
     <AppView gap={14} px={16} pt={40} align="center">
-      <SearchX size={48} strokeWidth={2} color={tokens.gray400} />
+      <SearchX size={48} strokeWidth={2} color={tokens.textMuted} />
       <AppView gap={4} align="center">
-        <AppText textVariant="bodySemibold">{t('search.noMatchesTitle')}</AppText>
-        <AppText textVariant="bodySm" colorName="gray400" style={{ textAlign: 'center' }}>
+        <AppText textVariant="bodySemibold" weight="semibold" align="center">
+          {t('search.noMatchesTitle')}
+        </AppText>
+        <AppText textVariant="bodySm" colorName="textMuted" style={{ textAlign: 'center' }}>
           {t('search.noMatchesBody', { query: query.trim() })}
         </AppText>
       </AppView>

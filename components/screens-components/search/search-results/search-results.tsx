@@ -1,4 +1,6 @@
 import { useCallback, useMemo } from 'react';
+import { ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import SearchResultRow from '@/components/screens-components/search/search-result-row';
 import AppList from '@/components/shared/app-list';
@@ -63,6 +65,7 @@ export default function SearchResults({
   topInset = 0,
   onFilterPress,
 }: SearchResultsProps) {
+  const insets = useSafeAreaInsets();
   const cheapestId = useMemo(() => findCheapestId(results), [results]);
 
   const handleOpen = useCallback((result: SearchResult) => {
@@ -85,33 +88,25 @@ export default function SearchResults({
 
   const keyExtractor = useCallback((item: SearchResult) => item.id, []);
 
-  if (state === 'loading') {
+  if (state === 'loading' || state === 'empty' || state === 'error') {
     return (
-      <AppView style={{ paddingTop: topInset }}>
-        <ResultsLoading query={query} />
-      </AppView>
-    );
-  }
-
-  if (state === 'empty') {
-    return (
-      <AppView style={{ paddingTop: topInset }}>
-        <ResultsEmpty
-          query={query}
-          didYouMean={didYouMean}
-          hasActiveFilters={hasActiveFilters}
-          onClearFilters={onClearFilters}
-          onUseSuggestion={onUseSuggestion}
-        />
-      </AppView>
-    );
-  }
-
-  if (state === 'error') {
-    return (
-      <AppView style={{ paddingTop: topInset }}>
-        <ResultsError error={error} />
-      </AppView>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingTop: topInset, paddingBottom: insets.bottom + 24 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        {state === 'loading' ? <ResultsLoading query={query} /> : null}
+        {state === 'empty' ? (
+          <ResultsEmpty
+            query={query}
+            didYouMean={didYouMean}
+            hasActiveFilters={hasActiveFilters}
+            onClearFilters={onClearFilters}
+            onUseSuggestion={onUseSuggestion}
+          />
+        ) : null}
+        {state === 'error' ? <ResultsError error={error} /> : null}
+      </ScrollView>
     );
   }
 
@@ -123,7 +118,8 @@ export default function SearchResults({
         keyExtractor={keyExtractor}
         onEndReached={onEndReached}
         onEndReachedThreshold={0.5}
-        contentContainerStyle={{ paddingTop: topInset }}
+        contentContainerStyle={{ paddingTop: topInset, paddingBottom: insets.bottom + 16 }}
+        keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
           <ResultsHeader
             query={query}

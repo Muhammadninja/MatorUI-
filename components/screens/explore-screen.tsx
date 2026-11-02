@@ -62,9 +62,9 @@ function HeaderFade({ color, height }: { color: string; height: number }) {
 
 /**
  * Explore (home) — v2 AutoZone-style **category browser** (not a product
- * list). A frosted sticky header (greeting + notifications + pill search)
- * over a scroll of: the vehicle-fit banner, a "Shop by vehicle" make row
- * with custom car silhouettes, and a colorful "Shop by category" grid with
+ * list). A frosted sticky header (logo + notifications + pill search)
+ * over a scroll of: the inline vehicle selection, a "Shop by vehicle" make row
+ * with brand logos, and a "Shop by category" grid with
  * custom part icons. Make tiles route to the Make screen; a category tile
  * opens every part of its system.
  */
@@ -170,7 +170,7 @@ export default function ExploreScreen() {
               accessibilityLabel={t('explore.notifications')}
               androidRipple={false}
               center
-              style={{ width: 42, height: 42 }}
+              style={{ width: 44, height: 44 }}
             >
               <Bell size={21} strokeWidth={2.2} color={tokens.text} />
               {unreadCount > 0 ? (
@@ -208,7 +208,11 @@ export default function ExploreScreen() {
             borderName="border"
           >
             <Search size={20} strokeWidth={2.2} color={tokens.textMuted} />
-            <AppText family="default" style={{ fontSize: 15, color: tokens.textMuted }}>
+            <AppText
+              family="default"
+              numberOfLines={1}
+              style={{ flex: 1, fontSize: 15, color: tokens.textMuted }}
+            >
               {t('explore.searchPlaceholder')}
             </AppText>
           </AppPressableView>
@@ -268,14 +272,15 @@ export default function ExploreScreen() {
       >
         {/* ── Shop by vehicle ── */}
         <AppView gap={4} style={{ marginTop: 2 }}>
-          <AppView row align="center" justify="space-between">
-            <AppText family="heading" weight="bold" style={{ fontSize: 18 }}>
+          <AppView row align="center" justify="space-between" gap="sm">
+            <AppText family="heading" weight="bold" style={{ flex: 1, fontSize: 18 }}>
               {t('explore.shopByVehicle')}
             </AppText>
             <AppPressableView
               onPress={() => router.navigate('/garage')}
               androidRipple={false}
               accessibilityRole="button"
+              hitSlop={{ top: 12, bottom: 12, left: 8, right: 0 }}
             >
               <AppText
                 family="accent"
@@ -288,7 +293,7 @@ export default function ExploreScreen() {
           </AppView>
           {/* Replaces the fitment banner that used to sit above this section —
               same job, one line, no box. */}
-          <FitmentNote />
+          <FitmentNote size={14} />
         </AppView>
         {makesState === 'loading' ? (
           <BrandRowSkeleton />

@@ -105,7 +105,7 @@ function CategoryTile({ name, label, iconKey, count, onPress }: CategoryTileProp
         {count === undefined ? null : (
           <AppText
             family="default"
-            style={{ fontSize: 10.5, color: tokens.textMuted, marginTop: 3 }}
+            style={{ fontSize: 11.5, lineHeight: 16, color: tokens.textMuted, marginTop: 4 }}
           >
             {t('category.partsCount', { count })}
           </AppText>

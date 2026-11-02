@@ -13,7 +13,9 @@
     "from": "От",
     "to": "До",
     "swipeToDismiss": "Смахните вниз, чтобы закрыть.",
-    "currency": "сум"
+    "currency": "сум",
+    "decreaseQuantity": "Уменьшить количество",
+    "increaseQuantity": "Увеличить количество"
   },
   "nav": {
     "explore": "Обзор",
@@ -719,7 +721,10 @@
     "weightGrams": "{{grams}} г",
     "fitsAllModels": "{{make}} — все модели",
     "fitsShowAll": "Показать все (ещё {{count}})",
-    "fitsShowLess": "Свернуть"
+    "fitsShowLess": "Свернуть",
+    "fitConfirmed": "Подходит для вашего автомобиля",
+    "fitNotCompatible": "Не подходит для вашего автомобиля",
+    "fitUnknown": "Нет данных о совместимости"
   },
   "sourcing": {
     "offerTitle": "Предложение",
@@ -831,9 +836,9 @@
     "promoCta": "К предложениям",
     "promoBannerA11y": "{{headline}}. {{cta}}.",
     "priceAny": "Любая цена",
-    "priceUnder1k": "До $1 000",
-    "price1kTo10k": "$1 тыс. – $10 тыс.",
-    "priceOver10k": "Свыше $10 000",
+    "priceUnder1k": "До 1 000 сум",
+    "price1kTo10k": "1 000–10 000 сум",
+    "priceOver10k": "Свыше 10 000 сум",
     "ratingAny": "Любой рейтинг",
     "rating3Plus": "3.0 ★ и выше",
     "rating4Plus": "4.0 ★ и выше",
@@ -856,7 +861,13 @@
       "lowestPrice": "Хорошая цена",
       "bestseller": "Хит продаж",
       "matorPick": "Выбор Mator"
-    }
+    },
+    "deliveryAtCheckout": "Доставка рассчитывается при оформлении",
+    "extendedFiltersUnavailable": "Фильтры цены и рейтинга пока недоступны.",
+    "resultCount_one": "{{count}} результат по «{{query}}»",
+    "resultCount_few": "{{count}} результата по «{{query}}»",
+    "resultCount_many": "{{count}} результатов по «{{query}}»",
+    "resultCount_other": "{{count}} результата по «{{query}}»"
   },
   "modalHost": {
     "confirmAction": "Подтвердите действие",

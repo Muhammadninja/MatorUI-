@@ -25,12 +25,13 @@ export type SearchResult = {
   title: string;
   description: string;
   /**
-   * Display-formatted price string ("$26,750"). Kept for UI back-compat;
-   * new code should prefer `priceCents` since it's not localized.
+   * Display-formatted UZS price ("UZS 369 000"). Live search currently
+   * supplies this string, not a numeric amount.
    */
   price: string;
   priceLabel: string;
-  /** Authoritative numeric price in cents. Server-issued. Filterable. */
+  /** Legacy minor-unit field: the mock uses tiyin (UZS × 100).
+   * Absent from the current live response; never interpret as whole UZS. */
   priceCents?: number;
   /**
    * Product photos, most representative first. The row renders `images[0]`

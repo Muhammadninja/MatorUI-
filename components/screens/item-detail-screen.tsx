@@ -170,11 +170,7 @@ export default function ItemDetailScreen() {
   const vehicleLabel = activeVehicle
     ? `${activeVehicle.year} ${activeVehicle.make} ${activeVehicle.model ?? ''}`.trim()
     : null;
-  // The fit zone's hairline must not strand itself. `ItemVehicleCta` renders
-  // nothing once a vehicle is known and the check is done, so a part whose
-  // check returned no verdict for a known car leaves the whole zone empty.
-  const showFitZone =
-    item.isUniversal || !!compat || !vehicleLabel || (compatLoading && !!vehicleLabel);
+  // Keep an explicit unknown state when a selected vehicle has no verdict.
   const fits = item.fits ?? [];
   const makeFits = item.makeFits ?? [];
   const features = item.features ?? [];
@@ -305,11 +301,11 @@ export default function ItemDetailScreen() {
               purchase. Universal listings (oils under "Другое") fit every car —
               a static plaque and NO compatibility badge (answering "maybe" for a
               part that fits everything is misleading). Vehicle-specific parts
-              keep the real backend check, which renders nothing until an answer
-              arrives; with no garage vehicle the CTA is the one-tap way to get
-              one, and mid-check it says the check is running. */}
-          {showFitZone ? <ItemRule /> : null}
-          {!showFitZone ? null : item.isUniversal ? (
+              keep the real backend check. Missing answers remain explicitly
+              unknown; with no garage vehicle the CTA offers selection, and
+              mid-check it says the check is running. */}
+          <ItemRule />
+          {item.isUniversal ? (
             <ItemUniversalFitBadge />
           ) : (
             <AppView gap={12}>
@@ -324,11 +320,13 @@ export default function ItemDetailScreen() {
                   onShowAlternatives={() => router.push('/search')}
                 />
               ) : null}
-              <ItemVehicleCta
-                checking={compatLoading && !compat}
-                vehicleLabel={vehicleLabel}
-                onPress={() => router.navigate('/garage')}
-              />
+              {!compat ? (
+                <ItemVehicleCta
+                  checking={compatLoading && !compat}
+                  vehicleLabel={vehicleLabel}
+                  onPress={() => router.navigate('/garage')}
+                />
+              ) : null}
             </AppView>
           )}
 

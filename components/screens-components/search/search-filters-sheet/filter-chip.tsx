@@ -27,17 +27,13 @@ export default function FilterChip({
         paddingVertical: 8,
         borderWidth: 1,
         borderColor: selected ? tokens.text : tokens.border,
-        backgroundColor: selected
-          ? isDark
-            ? tokens.gray200
-            : tokens.gray100
-          : 'transparent',
+        backgroundColor: selected ? (isDark ? tokens.gray200 : tokens.gray100) : 'transparent',
       }}
     >
       <AppText
         textVariant="bodySm"
         weight={selected ? 'semibold' : 'medium'}
-        colorName={selected ? 'text' : 'gray400'}
+        colorName={selected ? 'text' : 'textMuted'}
       >
         {label}
       </AppText>

@@ -22,7 +22,8 @@ export default function ResultsLoading({ query }: ResultsLoadingProps) {
     <AppView gap={10}>
       <AppText
         textVariant="bodyXs"
-        colorName="gray400"
+        colorName="textMuted"
+        numberOfLines={2}
         style={{ paddingHorizontal: 16 }}
       >
         {t('search.searchingFor', { query: query.trim() })}

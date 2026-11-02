@@ -17,8 +17,10 @@ export default function ResultsError({ error }: ResultsErrorProps) {
     <AppView gap={14} px={16} pt={40} align="center">
       <AlertCircle size={48} strokeWidth={2} color={tokens.error} />
       <AppView gap={4} align="center">
-        <AppText textVariant="bodySemibold">{t('search.searchFailed')}</AppText>
-        <AppText textVariant="bodySm" colorName="gray400" style={{ textAlign: 'center' }}>
+        <AppText textVariant="bodySemibold" weight="semibold" align="center">
+          {t('search.searchFailed')}
+        </AppText>
+        <AppText textVariant="bodySm" colorName="textMuted" style={{ textAlign: 'center' }}>
           {error ?? t('search.genericError')}
         </AppText>
       </AppView>
