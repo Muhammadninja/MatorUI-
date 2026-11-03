@@ -1,0 +1,27 @@
+{
+  "captured_at_utc": "2026-11-03T23:39:54.029267+00:00",
+  "source": "https://api.mator.uz",
+  "method": "GET",
+  "path": "/v1/orders/<existing delivered order; identifier omitted>",
+  "http_status": 200,
+  "data_source": "existing real order; read-only authenticated request",
+  "fields": {
+    "currency": { "present": true, "value": "UZS" },
+    "subtotal_uzs": { "present": true, "value": 100000 },
+    "delivery_uzs": { "present": true, "value": 25000 },
+    "service_fee_uzs": { "present": true, "value": 5000 },
+    "discount_uzs": { "present": true, "value": 0 },
+    "total_uzs": { "present": true, "value": 130000 }
+  },
+  "items": [{
+    "qty": { "present": true, "value": 1 },
+    "price_uzs": { "present": true, "value": 100000 },
+    "line_total_uzs": { "present": true, "value": 100000 }
+  }],
+  "checks": {
+    "line_total_equals_unit_times_quantity": true,
+    "line_totals_equal_subtotal": true,
+    "subtotal_plus_delivery_plus_fee_minus_discount_equals_total": true
+  },
+  "privacy": "No credentials, account/order/product identifiers, names, contacts, addresses, VINs or raw response stored."
+}

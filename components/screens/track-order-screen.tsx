@@ -8,7 +8,7 @@ import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/shared/app-button';
-import { AppPrice } from '@/components/shared/app-price';
+import { OrderLinePrice, OrderPriceBreakdown } from '@/components/screens-components/orders/order-price-breakdown';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
@@ -171,24 +171,19 @@ export default function TrackOrderScreen() {
             >
               {t('trackOrder.items')}
             </AppText>
-            {order.items.map((line) => (
+            {order.items.map((line, index) => (
               <AppView key={line.id} row justify="space-between" style={{ gap: 12 }}>
                 <AppText
                   family="default"
                   style={{ fontSize: 14, color: tokens.textMuted, flex: 1 }}
                 >
-                  {line.title} × {line.quantity}
+                  {line.title}{line.quantity > 0 ? ` × ${line.quantity}` : ''}
                 </AppText>
-                <AppPrice value={line.price} size={14} color={tokens.text} />
+                <OrderLinePrice line={order.pricing?.lines[index]} />
               </AppView>
             ))}
             <AppView style={{ height: 1, backgroundColor: tokens.divider, marginVertical: 2 }} />
-            <AppView row justify="space-between">
-              <AppText family="default" weight="semibold" style={{ fontSize: 14, color: tokens.textMuted }}>
-                {t('trackOrder.total')}
-              </AppText>
-              <AppPrice value={order.totalLabel} size={16} color={tokens.text} />
-            </AppView>
+            <OrderPriceBreakdown pricing={order.pricing} />
           </AppView>
 
           {/* Timeline */}

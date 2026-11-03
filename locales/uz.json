@@ -407,6 +407,9 @@
     "dateItems_other": "{{date}} · {{count}} ta mahsulot"
   },
   "trackOrder": {
+    "unitPrice": "Bir dona narxi",
+    "breakdownUnavailable": "Server narxning to‘liq tafsilotlarini bermadi. Faqat mavjud summalar ko‘rsatilgan.",
+    "amountsMismatch": "Serverdan olingan summalar mos kelmaydi. Buyurtma jami o‘zgarishsiz ko‘rsatilgan.",
     "title": "Buyurtmani kuzatish",
     "notFound": "Bu buyurtma topilmadi.",
     "backToShopping": "Xaridga qaytish",

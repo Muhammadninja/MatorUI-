@@ -1,5 +1,7 @@
 # MATOR functionality review — 2026-11-03
 
+> Актуальный единый список оставшихся пунктов: [REMAINING.md](REMAINING.md). Исправление финансовой разбивки после исходного smoke: [ORDER-PRICING.md](ORDER-PRICING.md). Старые списки и failed-наблюдения ниже сохранены как история, не как текущий статус исправления.
+
 This is an isolated frontend change set, **not a completed release certification**. Branch: `codex/functionality-audit-2026-11-03`; base: `9a64a98`; fix commit: `250daf6c2f29a44057d087bbc64a95ee9e85ab9f`. Worktree (permanently saved): `/Users/muhammadfotihabdullaev/Desktop/matorui/.local/worktrees/functionality-audit`. No restyling, dependencies, native configuration, account data, backend code, orders or payments were changed. Follow-up fixes add existing-component auth/error/exit paths and two notification messages in RU/UZ/EN. No screenshots were collected, per the latest instruction.
 
 ## Combined integration result

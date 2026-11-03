@@ -1,5 +1,7 @@
 # Integration completed selectively — short smoke recorded
 
+> Актуальный единый список оставшихся пунктов: [REMAINING.md](REMAINING.md). Исправление финансовой разбивки после исходного smoke: [ORDER-PRICING.md](ORDER-PRICING.md). Старые списки и failed-наблюдения ниже сохранены как история, не как текущий статус исправления.
+
 Current result: [COMBINED-SMOKE.md](COMBINED-SMOKE.md). Branch `integration/approved-design-functionality-2026-11-03`, approved design base `44b7d28`, runtime source `63f82d8`. The owner explicitly released the simulator. Selected commit mapping, resolved overlap, unchanged orders API, OTP exclusion and passed/failed/blocked checks are recorded there. Earlier future-tense handoff below is historical; it does not mean integration is still pending. No release-ready claim.
 
 # Coordination with Claude

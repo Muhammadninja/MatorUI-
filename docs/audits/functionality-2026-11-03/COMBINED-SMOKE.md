@@ -1,5 +1,7 @@
 # Selective integration and short native smoke — 2026-11-03
 
+> Актуальный единый список оставшихся пунктов: [REMAINING.md](REMAINING.md). Исправление финансовой разбивки после исходного smoke: [ORDER-PRICING.md](ORDER-PRICING.md). Старые списки и failed-наблюдения ниже сохранены как история, не как текущий статус исправления.
+
 Branch: `integration/approved-design-functionality-2026-11-03`.
 Permanent checkout: `/Users/muhammadfotihabdullaev/Desktop/matorui/.local/worktrees/design-functionality-integration`.
 Approved design base: `44b7d28f4c842f204262e244b24d48576d947527`, containing `f04772e` and `4f5d05c`.

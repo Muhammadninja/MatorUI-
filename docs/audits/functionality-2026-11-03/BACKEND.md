@@ -1,5 +1,7 @@
 # Backend employee handoff
 
+> Актуальный единый список оставшихся пунктов: [REMAINING.md](REMAINING.md). Исправление финансовой разбивки после исходного smoke: [ORDER-PRICING.md](ORDER-PRICING.md). Старые списки и failed-наблюдения ниже сохранены как история, не как текущий статус исправления.
+
 No backend code was changed or deployed. These are real public read-only requests, without credentials or account data, to the currently deployed API. Evidence: [public-api.json](public-api.json). Deployment SHA is unknown and should be attached by its owner.
 
 Run each request once:

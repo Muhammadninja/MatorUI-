@@ -1,5 +1,7 @@
 # Claude findings follow-up and integration queue
 
+> Актуальный единый список оставшихся пунктов: [REMAINING.md](REMAINING.md). Исправление финансовой разбивки после исходного smoke: [ORDER-PRICING.md](ORDER-PRICING.md). Старые списки и failed-наблюдения ниже сохранены как история, не как текущий статус исправления.
+
 Updated 2026-11-03. Candidate branch `codex/functionality-audit-2026-11-03` is saved in the permanent project Git repository. The checkout moved from `/private/tmp/mator-functionality-audit` to `/Users/muhammadfotihabdullaev/Desktop/matorui/.local/worktrees/functionality-audit`. The `.local` location is ignored by Git and blocked from the parent project's Metro index. It is a frontend worktree only: no backend/database was started.
 
 **Simulator reservation:** Claude owns the shared running simulator. No simulator/computer interaction was performed in this follow-up. Release of that reservation has not been received. No screenshots, account mutations, orders or payments.

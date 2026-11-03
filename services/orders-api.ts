@@ -10,6 +10,7 @@
  * server-side; silent local cancel would mask that).
  */
 import i18next from 'i18next';
+import { formatOrderMoney, getOrderPricing } from '@/services/order-pricing';
 
 import { STANDARD_DELIVERY_UZS } from '@/services/cart-math';
 import type {
@@ -440,11 +441,11 @@ export type RawBackendOrder = {
   /** Payment-oriented lifecycle: pending_payment | paid | packed | shipped |
    *  out_for_delivery | delivered | cancelled | expired | refunded | … */
   status: string;
-  subtotal_uzs?: number;
-  delivery_uzs?: number;
-  service_fee_uzs?: number;
-  discount_uzs?: number;
-  total_uzs?: number;
+  subtotal_uzs?: number | null;
+  delivery_uzs?: number | null;
+  service_fee_uzs?: number | null;
+  discount_uzs?: number | null;
+  total_uzs?: number | null;
   currency?: string;
   vehicle_id?: string | null;
   delivery_address_id?: string | null;
@@ -453,9 +454,9 @@ export type RawBackendOrder = {
     part_id?: string | null;
     service_id?: string | null;
     title?: string;
-    qty?: number;
-    price_uzs?: number;
-    line_total_uzs?: number;
+    qty?: number | null;
+    price_uzs?: number | null;
+    line_total_uzs?: number | null;
     scheduled_at?: string | null;
   }>;
   expires_at?: string;
@@ -465,10 +466,8 @@ export type RawBackendOrder = {
 
 /** "280000" → "280 000 so'm". Manual thousands grouping (no reliance on Intl,
  *  which is patchy under Hermes). */
-function formatUzs(n: number | undefined): string {
-  const v = Math.round(n ?? 0);
-  const grouped = String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-  return `${grouped} so'm`;
+function formatUzs(n: number | null | undefined, currency?: string | null): string {
+  return currency == null || currency === 'UZS' ? formatOrderMoney(n) : '';
 }
 
 const DATE_LOCALES: Record<string, string> = { en: 'en-US', ru: 'ru-RU', uz: 'uz-UZ' };
@@ -574,7 +573,7 @@ export function mapOrderToListRow(o: RawBackendOrder): OrderListRow {
     date: formatDate(o.created_at),
     status: mapListStatus(o.status),
     items: totalItemCount(o),
-    total: formatUzs(o.total_uzs),
+    total: formatUzs(o.total_uzs, o.currency),
     summary: orderSummary(o),
   };
 }
@@ -585,6 +584,7 @@ export function mapOrderToListRow(o: RawBackendOrder): OrderListRow {
 export function mapOrderToDetail(o: RawBackendOrder): OrderDetail {
   const status = mapDetailStatus(o.status);
   const placedAt = formatDate(o.created_at);
+  const pricing = getOrderPricing(o);
   const activeIndex = STEP_DEFS.findIndex((s) => s.key === status);
   return {
     id: o.order_id,
@@ -608,10 +608,11 @@ export function mapOrderToDetail(o: RawBackendOrder): OrderDetail {
     items: (o.items ?? []).map((it, i) => ({
       id: it.part_id ?? it.service_id ?? `item_${i}`,
       title: it.title ?? 'Item',
-      quantity: it.qty ?? 1,
-      price: formatUzs(it.price_uzs),
+      quantity: pricing.lines[i].quantity ?? 0,
+      price: formatUzs(pricing.lines[i].unitPrice),
     })),
-    totalLabel: formatUzs(o.total_uzs),
+    totalLabel: formatUzs(pricing.total),
+    pricing,
   };
 }
 
@@ -667,7 +668,7 @@ export class HttpOrdersTransport implements OrdersTransport {
     return {
       orderId: r.order_id,
       eta: r.status === 'pending_payment' ? 'Awaiting payment' : formatDate(r.created_at),
-      totalLabel: formatUzs(r.total_uzs),
+      totalLabel: formatUzs(r.total_uzs, r.currency),
     };
   }
 

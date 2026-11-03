@@ -407,6 +407,9 @@
     "dateItems_other": "{{date}} · {{count}} items"
   },
   "trackOrder": {
+    "unitPrice": "Unit price",
+    "breakdownUnavailable": "The server has not provided a complete price breakdown. Only available amounts are shown.",
+    "amountsMismatch": "The amounts supplied by the server do not reconcile. The order total is shown as received.",
     "title": "Track order",
     "notFound": "This order could not be found.",
     "backToShopping": "Back to shopping",
