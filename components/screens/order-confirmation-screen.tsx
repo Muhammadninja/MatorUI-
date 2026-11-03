@@ -186,13 +186,7 @@ export default function OrderConfirmationScreen() {
               >
                 {line.title} × {line.quantity}
               </AppText>
-              <AppText
-                family="accent"
-                weight="semibold"
-                style={{ fontSize: 13, color: tokens.text }}
-              >
-                {line.price}
-              </AppText>
+              <AppPrice value={line.price} size={14} color={tokens.text} />
             </AppView>
           ))}
         </AppView>

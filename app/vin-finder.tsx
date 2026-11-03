@@ -86,11 +86,11 @@ export default function VinFinderScreen() {
 
       {/* VIN input */}
       <AppView
-        rounded={14}
+        rounded={12}
         px={16}
-        colorName="backgroundSecondary"
+        colorName="surface"
         borderWidth={1}
-        borderName="border"
+        borderName="controlBorder"
         style={{ height: 52, justifyContent: 'center' }}
       >
         <TextInput

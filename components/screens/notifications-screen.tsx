@@ -592,7 +592,7 @@ export default function NotificationsScreen() {
           >
             <AppText
               weight="semibold"
-              style={{ fontSize: 14, lineHeight: 20, color: tokens.brand }}
+              style={{ fontSize: 14, lineHeight: 20, color: tokens.brandText }}
             >
               {t('notifications.markAllRead')}
             </AppText>

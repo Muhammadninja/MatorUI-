@@ -70,16 +70,24 @@ export default function LikedScreen() {
           <WheelLoader size={26} color={tokens.textMuted} />
         </AppView>
       ) : state === 'empty' || state === 'error' ? (
-        <AppView flex={1} center px="xl" gap={12}>
-          <Heart size={30} strokeWidth={2} color={tokens.textMuted} />
+        <AppView flex={1} center px="xl" gap={12} style={{ paddingBottom: 72 }}>
+          <AppView
+            center
+            rounded={999}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={{ width: 72, height: 72, backgroundColor: tokens.brandSoft }}
+          >
+            <Heart size={32} strokeWidth={2} color={tokens.brand} />
+          </AppView>
           <AppView align="center" gap={4}>
-            <AppText family="heading" colorName="text" style={{ fontSize: 17, lineHeight: 22 }}>
+            <AppText textVariant="h4" weight="bold" align="center" colorName="text">
               {t('liked.emptyTitle')}
             </AppText>
             <AppText
               family="default"
               colorName="textMuted"
-              style={{ fontSize: 13, lineHeight: 18, textAlign: 'center', maxWidth: 280 }}
+              style={{ fontSize: 14, lineHeight: 20, textAlign: 'center', maxWidth: 280 }}
             >
               {t('liked.emptyBody')}
             </AppText>

@@ -266,11 +266,7 @@ export default function CatalogPartsScreen() {
             <TextInput
               value={search}
               onChangeText={setSearch}
-              placeholder={
-                categoryLabel
-                  ? t('catalog.searchIn', { label: categoryLabel })
-                  : t('catalog.searchParts')
-              }
+              placeholder={t('search.inputPlaceholder')}
               placeholderTextColor={tokens.textMuted}
               autoCorrect={false}
               autoCapitalize="none"

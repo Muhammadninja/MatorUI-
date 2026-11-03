@@ -227,8 +227,8 @@ export default function VehicleDetailScreen() {
               keyboardType="number-pad"
               maxLength={9}
               containerRounded={12}
-              containerColorName="backgroundSecondary"
-              containerBorderName="border"
+              containerColorName="surface"
+              containerBorderName="controlBorder"
             />
             <AppTextField
               label={t('vehicleDetail.plate')}
@@ -245,8 +245,8 @@ export default function VehicleDetailScreen() {
                   : undefined
               }
               containerRounded={12}
-              containerColorName="backgroundSecondary"
-              containerBorderName="border"
+              containerColorName="surface"
+              containerBorderName="controlBorder"
             />
             <VehicleColorPicker
               value={form.colorHex}

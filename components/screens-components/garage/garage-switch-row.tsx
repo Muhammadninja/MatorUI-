@@ -76,7 +76,7 @@ export function GarageSwitchRow({ vehicle, onSetActive, onOpenDetail }: GarageSw
         <AppText
           family="accent"
           weight="semibold"
-          style={{ fontSize: 14, lineHeight: 20, marginTop: 4, color: tokens.brand }}
+          style={{ fontSize: 14, lineHeight: 20, marginTop: 4, color: tokens.brandText }}
         >
           {t('garage.setActive')}
         </AppText>

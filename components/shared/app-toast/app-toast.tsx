@@ -123,7 +123,7 @@ function AppToastImpl({ toast, onDismiss, reduceMotion = false }: AppToastProps)
               accessibilityRole="button"
               style={({ pressed }) => [styles.action, { opacity: pressed ? 0.7 : 1 }]}
             >
-              <AppText weight="medium" style={[styles.text, { color: tokens.brand }]}>
+              <AppText weight="medium" style={[styles.text, { color: tokens.brandText }]}>
                 {toast.actionLabel}
               </AppText>
             </Pressable>

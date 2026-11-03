@@ -55,7 +55,7 @@ export default function AiChatSuggestionChip({ label, Icon, onPress }: AiChatSug
       <AppText
         textVariant="bodySm"
         weight="semibold"
-        style={{ color: tokens.brand, marginLeft: 10, marginRight: 12 }}
+        style={{ color: tokens.brandText, marginLeft: 10, marginRight: 12 }}
       >
         {label}
       </AppText>

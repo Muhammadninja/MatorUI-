@@ -308,6 +308,10 @@ function StatCell({ label, value }: { label: string; value: string }) {
         textVariant="bodyXs"
         weight="medium"
         align="center"
+        // Shrinks rather than breaking a word in its narrow column at large text.
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.6}
         style={{ color: tokens.textMuted }}
       >
         {label}

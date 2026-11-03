@@ -375,7 +375,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
             style={{
               fontSize: 12,
               lineHeight: 16,
-              color: fitState === 'checking' ? tokens.textMuted : tokens.brand,
+              color: fitState === 'checking' ? tokens.textMuted : tokens.brandText,
             }}
           >
             {fitState === 'checking'

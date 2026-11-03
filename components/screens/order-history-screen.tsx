@@ -159,7 +159,7 @@ const OrderCard = React.memo(function OrderCard({ order }: { order: OrderListRow
       </AppText>
 
       {/* Bottom row: date · N items + total */}
-      <AppView row align="center" justify="space-between" style={{ marginTop: 6 }}>
+      <AppView row wrap align="center" justify="space-between" style={{ marginTop: 6 }}>
         <AppText
           family="default"
           style={{ fontSize: 13, color: tokens.textMuted }}

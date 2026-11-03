@@ -90,7 +90,7 @@ function FitmentNote({ lead, size = 13 }: FitmentNoteProps) {
   // Set: full-strength text — it states a fact, so it reads as a fact, not as
   // greyed-out chrome. Unset: a real link colour, because it is the one thing
   // on the line worth tapping.
-  const linkColor = vehicle ? tokens.text : tokens.info;
+  const linkColor = vehicle ? tokens.text : tokens.brandText;
 
   return (
     <AppView row align="flex-start" gap={7}>

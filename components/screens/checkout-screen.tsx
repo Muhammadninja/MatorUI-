@@ -176,8 +176,8 @@ export default function CheckoutScreen() {
       >
         {/* Header */}
         <AppView row align="center" gap={12} px="lg" style={{ paddingBottom: 14 }}>
-          <AppPressableView onPress={() => router.back()} center rounded={12} borderWidth={1} borderName="border" accessibilityRole="button" accessibilityLabel={t('checkout.back')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ width: 40, height: 40 }}>
-            <ArrowLeft size={22} strokeWidth={2.2} color={tokens.text} />
+          <AppPressableView onPress={() => router.back()} center rounded={999} borderWidth={1} borderName="border" colorName="surface" accessibilityRole="button" accessibilityLabel={t('checkout.back')} style={{ width: 36, height: 36 }}>
+            <ArrowLeft size={18} strokeWidth={2.2} color={tokens.text} />
           </AppPressableView>
           <AppText family="heading" weight="bold" style={{ fontSize: 20, color: tokens.text }}>{t('checkout.title')}</AppText>
         </AppView>
@@ -315,7 +315,7 @@ function DeliverySection({
         <SectionLabel tokens={tokens}>{t('checkout.deliveryAddress')}</SectionLabel>
         {addr && canChange ? (
           <AppPressableView onPress={onChange} accessibilityRole="button" accessibilityLabel={t('checkout.changeAddress')}>
-            <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.text }}>{t('checkout.change')}</AppText>
+            <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.brandText }}>{t('checkout.change')}</AppText>
           </AppPressableView>
         ) : null}
       </AppView>
@@ -332,7 +332,7 @@ function DeliverySection({
             </AppView>
           </AppView>
           <AppView row gap={18} style={{ marginTop: 2 }}>
-            <LinkAction label={t('checkout.addNew')} onPress={onAdd} color={tokens.text} />
+            <LinkAction label={t('checkout.addNew')} onPress={onAdd} color={tokens.brandText} />
             <LinkAction label={t('checkout.skipForNow')} onPress={onSkip} color={tokens.textMuted} />
           </AppView>
         </>
@@ -344,7 +344,7 @@ function DeliverySection({
               {t('checkout.noAddressCourier')}
             </AppText>
           </AppView>
-          <LinkAction label={t('checkout.addAnAddress')} onPress={onAdd} color={tokens.text} />
+          <LinkAction label={t('checkout.addAnAddress')} onPress={onAdd} color={tokens.brandText} />
         </>
       ) : (
         <>
@@ -398,7 +398,7 @@ function PaymentRow({
       colorName="card"
       borderWidth={1}
       borderName={selected ? undefined : 'border'}
-      style={selected ? { borderWidth: 1.5, borderColor: tokens.text } : undefined}
+      style={selected ? { borderWidth: 1.5, borderColor: tokens.brand } : undefined}
     >
       <AppView row align="center" gap={12}>
         <Icon size={20} strokeWidth={2} color={tokens.text} />
@@ -414,10 +414,10 @@ function PaymentRow({
             height: 22,
             borderWidth: selected ? 0 : 1.5,
             borderColor: tokens.border,
-            backgroundColor: selected ? tokens.text : 'transparent',
+            backgroundColor: selected ? tokens.brand : 'transparent',
           }}
         >
-          {selected ? <Check size={14} strokeWidth={3} color={tokens.background} /> : null}
+          {selected ? <Check size={14} strokeWidth={3} color={tokens.onBrand} /> : null}
         </AppView>
       </AppView>
     </AppPressableView>
@@ -440,7 +440,7 @@ function SectionCard({ label, main, sub, onChange, tokens }: { label: string; ma
         <SectionLabel tokens={tokens}>{label}</SectionLabel>
         {onChange ? (
           <AppPressableView onPress={onChange} accessibilityRole="button" accessibilityLabel={t('checkout.changeLabel', { label })}>
-            <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.text }}>{t('checkout.change')}</AppText>
+            <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.brandText }}>{t('checkout.change')}</AppText>
           </AppPressableView>
         ) : null}
       </AppView>

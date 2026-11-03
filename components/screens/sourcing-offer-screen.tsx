@@ -67,7 +67,7 @@ function Chip({ label, tokens }: { label: string; tokens: Tokens }) {
         backgroundColor: tokens.brandSoft,
       }}
     >
-      <AppText family="accent" weight="semibold" style={{ fontSize: 12, color: tokens.brand }}>
+      <AppText family="accent" weight="semibold" style={{ fontSize: 12, color: tokens.brandText }}>
         {label}
       </AppText>
     </AppView>
@@ -348,7 +348,7 @@ export default function SourcingOfferScreen() {
                     backgroundColor: tokens.brandSoft,
                   }}
                 >
-                  <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.brand, marginBottom: 3 }}>
+                  <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.brandText, marginBottom: 3 }}>
                     {t('sourcing.sellerNote')}
                   </AppText>
                   <AppText family="default" style={{ fontSize: 14, color: tokens.text, lineHeight: 20 }}>

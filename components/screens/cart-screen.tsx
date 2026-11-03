@@ -211,7 +211,6 @@ export default function CartScreen() {
                   <AppText
                     family="default"
                     weight="semibold"
-                    numberOfLines={2}
                     style={{
                       flex: 1,
                       minWidth: 0,

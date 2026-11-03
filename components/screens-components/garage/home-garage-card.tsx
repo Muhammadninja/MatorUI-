@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useWindowDimensions } from 'react-native';
 
 import GarageBrandBadge from '@/components/screens-components/garage/garage-brand-badge';
 import { AppButton } from '@/components/shared/app-button';
@@ -80,6 +81,7 @@ function summarize(
  * `/vehicle-parts` list the Garage hero's "shop parts" opens.
  */
 function HomeGarageCard() {
+  const { fontScale } = useWindowDimensions();
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const { currentActiveVehicle, isHydrating } = useActiveVehicle();
@@ -110,6 +112,9 @@ function HomeGarageCard() {
     });
   };
 
+  // At large text the row stacks, or the name breaks mid-word beside "change".
+  const stacked = fontScale >= 1.3;
+
   if (isHydrating) {
     return (
       <AppView
@@ -136,10 +141,10 @@ function HomeGarageCard() {
     >
       {/* The name's column flexes and wraps; "change" keeps its own fixed space, so
        *  they can't collide however long the name or narrow the phone. */}
-      <AppView row align="center" gap="md">
+      <AppView row={!stacked} align={stacked ? 'flex-start' : 'center'} gap="md">
         {summary?.make ? <GarageBrandBadge make={summary.make} size={LOGO_CHIP_SIZE} /> : null}
 
-        <AppView flex={1} style={{ minWidth: 0 }}>
+        <AppView style={stacked ? { alignSelf: 'stretch' } : { flex: 1, minWidth: 0 }}>
           <AppText textVariant="h4" weight="bold" style={{ color: tokens.onVehicleBanner }}>
             {summary ? summary.name : t('explore.addVehicleTitle')}
           </AppText>
@@ -169,13 +174,13 @@ function HomeGarageCard() {
               flexShrink: 0,
               minHeight: 48,
               minWidth: 48,
-              marginTop: -12,
+              marginTop: stacked ? 0 : -12,
             }}
           >
             <AppText
               textVariant="bodySm"
               weight="semibold"
-              style={{ color: tokens.vehicleBannerAction, textDecorationLine: 'underline' }}
+              style={{ color: tokens.brandText, textDecorationLine: 'underline' }}
             >
               {t('explore.changeVehicle')}
             </AppText>

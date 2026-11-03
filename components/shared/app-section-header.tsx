@@ -50,7 +50,7 @@ export function AppSectionHeader({
             <AppText
               textVariant="bodySm"
               weight="semibold"
-              style={{ color: tokens.brand }}
+              style={{ color: tokens.brandText }}
             >
               {actionLabel}
             </AppText>

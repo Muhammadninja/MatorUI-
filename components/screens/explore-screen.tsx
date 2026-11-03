@@ -266,7 +266,7 @@ export default function ExploreScreen() {
           >
             <Search size={20} strokeWidth={2.2} color={tokens.textMuted} />
             <AppText textVariant="body" colorName="textMuted" style={{ flex: 1 }}>
-              {t('explore.searchPlaceholder')}
+              {t('search.inputPlaceholder')}
             </AppText>
           </AppPressableView>
         </AppView>
@@ -426,7 +426,7 @@ export default function ExploreScreen() {
                 <AppView row center gap={4} style={{ minHeight: 48, paddingHorizontal: 12 }}>
                   <AppText
                     weight="medium"
-                    style={{ fontSize: 15, lineHeight: 20, color: tokens.brand }}
+                    style={{ fontSize: 15, lineHeight: 20, color: tokens.brandText }}
                   >
                     {t(categoriesExpanded ? 'explore.collapseCategories' : 'explore.allCategories')}
                   </AppText>

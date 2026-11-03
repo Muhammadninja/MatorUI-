@@ -268,7 +268,7 @@ const AddressCard = React.memo(function AddressCard({
           <AppText
             family="accent"
             weight="bold"
-            style={{ fontSize: 13, color: tokens.text }}
+            style={{ fontSize: 13, color: tokens.brandText }}
           >
             {t('addresses.edit')}
           </AppText>

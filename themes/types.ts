@@ -31,6 +31,9 @@ export type ThemeTokens = {
   /** Outline of the solid `secondary` button. */
   secondaryBorder: string;
   brand: string;
+  /** Teal for normal-size text: darker than `brand` so it stays readable on
+   *  the page, secondary and pale teal backgrounds. Fills and icons use `brand`. */
+  brandText: string;
   brandBg: string;
   brandPressed: string;
   onBrand: string;
@@ -121,6 +124,5 @@ export type ThemeTokens = {
   /** Vehicle name, supporting text and "change" action on `vehicleBanner`. */
   onVehicleBanner: string;
   vehicleBannerMuted: string;
-  vehicleBannerAction: string;
   [key: string]: string;
 };

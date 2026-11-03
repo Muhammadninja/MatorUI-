@@ -116,7 +116,7 @@ export default function SearchPromoBanner() {
                 textVariant="caption"
                 weight="bold"
                 style={{
-                  color: tokens.brand,
+                  color: tokens.brandText,
                   letterSpacing: 0.4,
                   lineHeight: 12,
                   includeFontPadding: false,
@@ -155,7 +155,7 @@ export default function SearchPromoBanner() {
                 textVariant="caption"
                 weight="semibold"
                 style={{
-                  color: tokens.brand,
+                  color: tokens.brandText,
                   lineHeight: 14,
                   includeFontPadding: false,
                 }}

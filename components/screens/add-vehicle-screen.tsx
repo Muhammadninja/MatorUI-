@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Sparkles } from 'lucide-react-native';
+import { ArrowLeft, Sparkles } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -207,17 +207,17 @@ export default function AddVehicleScreen() {
       >
         <AppPressableView
           center
-          rounded={12}
+          rounded={999}
           borderWidth={1}
           borderName="border"
+          colorName="surface"
           androidRipple={false}
           onPress={() => router.back()}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"
           accessibilityLabel={t('addVehicle.goBack')}
-          style={{ width: 40, height: 40 }}
+          style={{ width: 36, height: 36 }}
         >
-          <AppText colorName="text" style={{ fontSize: 20 }}>‹</AppText>
+          <ArrowLeft size={18} strokeWidth={2.2} color={tokens.text} />
         </AppPressableView>
         <AppText
           family="heading"
@@ -260,8 +260,8 @@ export default function AddVehicleScreen() {
             autoCorrect={false}
             maxLength={17}
             containerRounded={12}
-            containerColorName="backgroundSecondary"
-            containerBorderName="border"
+            containerColorName="surface"
+            containerBorderName="controlBorder"
           />
 
           {/* Decode action — appears once a full 17-char VIN is present */}
@@ -285,7 +285,7 @@ export default function AddVehicleScreen() {
               <AppText
                 family="accent"
                 weight="semibold"
-                style={{ fontSize: 13, color: tokens.brand }}
+                style={{ fontSize: 13, color: tokens.brandText }}
               >
                 {decoding ? t('addVehicle.decodingVin') : t('addVehicle.identifyFromVin')}
               </AppText>
@@ -404,8 +404,8 @@ export default function AddVehicleScreen() {
                 keyboardType="number-pad"
                 maxLength={9}
                 containerRounded={12}
-                containerColorName="backgroundSecondary"
-                containerBorderName="border"
+                containerColorName="surface"
+            containerBorderName="controlBorder"
               />
               <AppTextField
                 label={t('addVehicle.fieldPlate')}
@@ -418,8 +418,8 @@ export default function AddVehicleScreen() {
                 maxLength={UZ_PLATE_DISPLAY_MAXLENGTH}
                 errorText={plate.length > 0 && !isValidUzPlate(plate) ? t('addVehicle.plateInvalid') : undefined}
                 containerRounded={12}
-                containerColorName="backgroundSecondary"
-                containerBorderName="border"
+                containerColorName="surface"
+            containerBorderName="controlBorder"
               />
               <VehicleColorPicker
                 value={colorHex}

@@ -129,6 +129,7 @@ export const lightTokens: ThemeTokens = {
   onSecondaryBg: '#18181B',
   secondaryBorder: '#858591',
   brand: '#007F86',
+  brandText: '#00737A',
   brandBg: '#007F86',
   brandPressed: '#00666C',
   onBrand: '#FFFFFF',
@@ -182,7 +183,6 @@ export const lightTokens: ThemeTokens = {
   vehicleBannerBorder: '#C5E3E1',
   onVehicleBanner: '#18181B',
   vehicleBannerMuted: '#61616B',
-  vehicleBannerAction: '#007F86',
 };
 
 export const darkTokens: ThemeTokens = {
@@ -209,6 +209,7 @@ export const darkTokens: ThemeTokens = {
   onSecondaryBg: '#000000',
   secondaryBorder: '#ffffff',
   brand: '#ffffff',
+  brandText: '#ffffff',
   brandBg: '#ffffff',
   brandPressed: '#e5e5e5',
   onBrand: '#000000',
@@ -266,7 +267,6 @@ export const darkTokens: ThemeTokens = {
   vehicleBannerBorder: '#111111',
   onVehicleBanner: '#ffffff',
   vehicleBannerMuted: '#8f8f8f',
-  vehicleBannerAction: '#ffffff',
 };
 
 export function createNavigationTheme(scheme: 'light' | 'dark') {

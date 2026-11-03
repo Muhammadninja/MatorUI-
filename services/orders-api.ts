@@ -9,6 +9,8 @@
  * mutations" stance (an aborted mutation may already be committed
  * server-side; silent local cancel would mask that).
  */
+import i18next from 'i18next';
+
 import { STANDARD_DELIVERY_UZS } from '@/services/cart-math';
 import type {
   Address,
@@ -469,13 +471,18 @@ function formatUzs(n: number | undefined): string {
   return `${grouped} so'm`;
 }
 
+const DATE_LOCALES: Record<string, string> = { en: 'en-US', ru: 'ru-RU', uz: 'uz-UZ' };
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-/** ISO → "Jul 21, 2026". Empty string on missing/invalid input. */
+/** ISO → a date in the active language ("Jul 21, 2026" before i18n starts). Empty string on missing/invalid input. */
 function formatDate(iso?: string): string {
   if (!iso) return '';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
+  const locale = i18next.isInitialized ? DATE_LOCALES[i18next.language] : undefined;
+  if (locale) {
+    return d.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
+  }
   return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 }
 

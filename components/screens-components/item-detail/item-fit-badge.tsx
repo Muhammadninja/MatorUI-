@@ -157,7 +157,7 @@ export function ItemVehicleCta({ checking, vehicleLabel, onPress }: ItemVehicleC
       <AppText
         family="accent"
         weight="bold"
-        style={{ fontSize: 14, lineHeight: 20, color: tokens.brand, marginTop: 2 }}
+        style={{ fontSize: 14, lineHeight: 20, color: tokens.brandText, marginTop: 2 }}
       >
         {`${t('itemDetail.addYourCar')} →`}
       </AppText>
