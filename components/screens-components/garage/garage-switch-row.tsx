@@ -69,10 +69,10 @@ export function GarageSwitchRow({
             {sub}
           </AppText>
         ) : null}
+        <AppText family="accent" weight="bold" colorName="textMuted" style={{ fontSize: 11.5, marginTop: 5 }}>
+          {t('garage.setActive')}
+        </AppText>
       </AppView>
-      <AppText family="accent" weight="bold" colorName="textMuted" style={{ fontSize: 11.5, flexShrink: 1, maxWidth: 96, textAlign: 'right' }}>
-        {t('garage.setActive')}
-      </AppText>
       <AppPressableView
         onPress={() => onOpenDetail(vehicle.id)}
         androidRipple={false}
