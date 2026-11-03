@@ -5,7 +5,8 @@
  *
  * The screens, the paging hook, React Query and the HTTP transport are all
  * real. The list is a stand-in that renders its header, rows and footer and
- * lets a test reach its end (`onEndReached`), as a scroll does.
+ * lets a test reach its end (`onEndReached`), as a scroll does. The rows are
+ * stand-ins too, in their real cell gutters (`productCellStyle`).
  */
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -50,13 +51,15 @@ vi.mock('lucide-react-native', () => ({
 }));
 
 // Hoisted with the mocks below, which call it while building their factories.
-const { host, list } = vi.hoisted(() => ({
+const { grid, host, list } = vi.hoisted(() => ({
+  /** What `useProductGridColumns` answers: two, or one under large text. */
+  grid: { columns: 2 },
   host:
     (type: string) =>
     ({ children, ...p }: Record<string, unknown> & { children?: React.ReactNode }) =>
       React.createElement(type, p, children),
   /** The props the list last rendered with. */
-  list: { props: {} as { onEndReached?: () => void } },
+  list: { props: {} as { numColumns?: number; onEndReached?: () => void } },
 }));
 vi.mock('react-native', () => ({
   Keyboard: { dismiss: () => {} },
@@ -97,11 +100,23 @@ vi.mock('@/components/shared/wheel-loader', () => ({
 vi.mock('@/components/screens-components/search/search-results/footer-spinner', () => ({
   default: host('spinner'),
 }));
-vi.mock('@/components/screens-components/catalog/product-row', () => ({
+vi.mock('@/components/screens-components/catalog/product-row', async (importOriginal) => ({
   default: host('row'),
-  productCellStyle: () => ({}),
-  useProductGridColumns: () => 1,
+  productCellStyle: (
+    await importOriginal<typeof import('@/components/screens-components/catalog/product-row')>()
+  ).productCellStyle,
+  useProductGridColumns: () => grid.columns,
 }));
+// Loaded with the real `productCellStyle`, never rendered.
+vi.mock('@/components/screens-components/home/image-box', () => ({}));
+vi.mock('@/components/shared/app-icon-button', () => ({}));
+vi.mock('@/components/shared/app-price', () => ({}));
+vi.mock('@/components/shared/wheel-loader/wheel-loader', () => ({}));
+vi.mock('@/contexts/active-vehicle.context', () => ({}));
+vi.mock('@/contexts/likes.context', () => ({}));
+vi.mock('@/hooks/use-sales', () => ({}));
+vi.mock('@/services/compatibility-service', () => ({}));
+vi.mock('@/services/sales-service', () => ({}));
 vi.mock('@/components/screens-components/catalog/results-toolbar', () => ({
   default: host('toolbar'),
 }));
@@ -136,6 +151,7 @@ beforeEach(() => {
   get.mockImplementation(catalog.get);
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   list.props = {};
+  grid.columns = 2;
 });
 // A screen left mounted would keep its timers and its list, and could answer
 // the next test's scroll.
@@ -477,5 +493,35 @@ describe('Parts screen brand chips (130 parts; 52 Bosch, 2 of them on page 1)', 
     await press(chip(r, 'Bosch'));
     expect(catalog.params()).toMatchObject({ page: '1', q: 'zzz' });
     expect(catalog.params()).not.toHaveProperty('brand');
+  });
+});
+
+describe('Card gutters', () => {
+  /** How far each full row sits from the screen's two edges, as `left/right`. */
+  const screenGutters = (r: ReactTestRenderer) => {
+    const cells = r.root
+      .findAll((n) => is(n, 'row'))
+      .map((n) => n.parent!.parent!.props.style as { paddingLeft: number; paddingRight: number });
+    const columns = list.props.numColumns ?? 1;
+    const gutters = new Set<string>();
+    for (let i = 0; i + columns <= cells.length; i += columns) {
+      gutters.add(`${cells[i].paddingLeft}/${cells[i + columns - 1].paddingRight}`);
+    }
+    return [...gutters];
+  };
+
+  test('Parts screen: every card sits centred, on the same 16pt as the header', async () => {
+    params = { categoryId: 'brake-system', categoryLabel: 'Тормозная система' };
+    const r = await render(<CatalogPartsScreen />);
+    expect(rows(r)).toHaveLength(24);
+    expect(screenGutters(r)).toEqual(['16/16']);
+  });
+
+  test.each([2, 1])('Category screen: balanced at %i column(s)', async (columns) => {
+    grid.columns = columns;
+    params = { cat: 'brake-system', label: 'Тормозная система' };
+    const r = await render(<CategoryScreen />);
+    expect(list.props.numColumns).toBe(columns);
+    expect(screenGutters(r)).toEqual(['16/16']);
   });
 });

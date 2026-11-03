@@ -8,7 +8,6 @@ import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useUserContext } from '@/contexts/user.context';
-import { useGlobalModal } from '@/hooks/use-global-modal';
 import { triggerHaptic } from '@/utils/haptics';
 
 // Same elevation tier as the authenticated profile cards. Guest empty no
@@ -23,11 +22,13 @@ const CARD_ELEVATION = Platform.select({
   android: { elevation: 2 },
 });
 
+/** `router.push` doesn't dedupe, so a quick double tap would stack two sign-in sheets. */
+const LOGIN_DEBOUNCE_MS = 500;
+
 export default function ProfileGuestEmpty() {
   const { tokens } = useThemeContext();
   const { t } = useTranslation();
   const { guestId } = useUserContext();
-  const { openAuthRequired } = useGlobalModal();
 
   const handleSettings = () => {
     triggerHaptic('selection');
@@ -36,11 +37,7 @@ export default function ProfileGuestEmpty() {
 
   const handleLogin = () => {
     triggerHaptic('selection');
-    openAuthRequired({
-      title: t('profileCards.welcomeTitle'),
-      message: t('profileCards.welcomeMessage'),
-      redirectTo: '/profile',
-    });
+    router.push('/sign-in?next=%2Fprofile');
   };
 
   return (
@@ -106,6 +103,7 @@ export default function ProfileGuestEmpty() {
           kind="brand"
           size="md"
           fullWidth
+          debounceMs={LOGIN_DEBOUNCE_MS}
           onPress={handleLogin}
           accessibilityLabel={t('profileCards.logInToAccount')}
           containerStyle={{ width: '100%', marginTop: 4 }}

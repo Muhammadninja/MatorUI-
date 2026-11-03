@@ -7,10 +7,7 @@ import { Keyboard, ScrollView, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import CatalogListFooter from '@/components/screens-components/catalog/catalog-list-footer';
-import ProductRow, {
-  productCellStyle,
-  useProductGridColumns,
-} from '@/components/screens-components/catalog/product-row';
+import ProductRow, { productCellStyle } from '@/components/screens-components/catalog/product-row';
 import FitmentNote from '@/components/screens-components/catalog/fitment-note';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
@@ -35,6 +32,11 @@ const DEFAULT_FILTER: FilterState = {
 
 /** A part brand as its chip knows it. */
 type BrandChoice = FilterState['brands'][number];
+
+/** One card per row. The list and its cells share this so they can't disagree:
+ *  `productCellStyle` only balances the screen gutters for the column count the
+ *  list actually renders. */
+const LIST_COLUMNS = 1;
 
 /**
  * Catalog parts (Stage 3) — the parts list for a chosen system + vehicle.
@@ -202,8 +204,6 @@ export default function CatalogPartsScreen() {
     openItemDetail(it.id);
   }, []);
 
-  const columns = useProductGridColumns();
-
   const addToCart = useCallback(
     (it: CatalogItem) => {
       if (!isAuthenticated) {
@@ -226,11 +226,11 @@ export default function CatalogPartsScreen() {
 
   const renderItem = useCallback(
     ({ item, index }: { item: CatalogItem; index: number }) => (
-      <AppView style={productCellStyle(index, columns)}>
+      <AppView style={productCellStyle(index, LIST_COLUMNS)}>
         <ProductRow item={item} onOpen={openItem} onAdd={addToCart} />
       </AppView>
     ),
-    [openItem, addToCart, columns],
+    [openItem, addToCart],
   );
 
   return (
@@ -381,6 +381,7 @@ export default function CatalogPartsScreen() {
             data={items}
             keyExtractor={(it) => it.id}
             renderItem={renderItem}
+            numColumns={LIST_COLUMNS}
             ItemSeparatorComponent={() => (
               <AppView style={{ height: 1, backgroundColor: tokens.divider }} />
             )}
