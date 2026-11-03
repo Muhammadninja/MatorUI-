@@ -27,7 +27,7 @@ import { APP_FONTS } from '@/themes';
  */
 export default function MatorSearchScreen() {
   const { t } = useTranslation();
-  const { tokens } = useThemeContext();
+  const { tokens, scheme } = useThemeContext();
   const insets = useSafeAreaInsets();
   const { q: initialQuery } = useLocalSearchParams<{ q?: string }>();
 
@@ -72,7 +72,7 @@ export default function MatorSearchScreen() {
     >
       <AppView
         flex={1}
-        colorName="card"
+        colorName="background"
         testID="search-screen"
         style={{ paddingTop: insets.top + 6 }}
       >
@@ -86,7 +86,7 @@ export default function MatorSearchScreen() {
             borderName="border"
             accessibilityRole="button"
             accessibilityLabel={t('search.back')}
-            style={{ width: 44, height: 44 }}
+            style={{ width: 48, height: 48 }}
           >
             <ArrowLeft size={22} strokeWidth={2.2} color={tokens.text} />
           </AppPressableView>
@@ -96,12 +96,12 @@ export default function MatorSearchScreen() {
             align="center"
             gap={10}
             flex={1}
-            rounded={14}
-            px={14}
-            colorName="backgroundSecondary"
+            rounded={12}
+            px="lg"
+            colorName={scheme === 'dark' ? 'backgroundSecondary' : 'surface'}
             borderWidth={1}
-            borderName="border"
-            style={{ height: 44 }}
+            borderName="controlBorder"
+            style={{ minHeight: 48 }}
           >
             <Search size={20} strokeWidth={2.2} color={tokens.textMuted} />
             <TextInput

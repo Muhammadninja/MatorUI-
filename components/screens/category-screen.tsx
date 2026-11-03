@@ -5,7 +5,10 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import CatalogListFooter from '@/components/screens-components/catalog/catalog-list-footer';
-import ProductRow from '@/components/screens-components/catalog/product-row';
+import ProductRow, {
+  productCellStyle,
+  useProductGridColumns,
+} from '@/components/screens-components/catalog/product-row';
 import ResultsToolbar from '@/components/screens-components/catalog/results-toolbar';
 import { AppButton } from '@/components/shared/app-button';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
@@ -107,6 +110,7 @@ export default function CategoryScreen() {
   const { isAuthenticated } = useUserContext();
   const toast = useToast();
 
+  const columns = useProductGridColumns();
   const openItem = useCallback((it: CatalogItem) => openItemDetail(it.id), []);
 
   // Guest-first purchase gate, mirroring Item Detail.
@@ -131,10 +135,12 @@ export default function CategoryScreen() {
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: CatalogItem }) => (
-      <ProductRow item={item} onOpen={openItem} onAdd={addToCart} />
+    ({ item, index }: { item: CatalogItem; index: number }) => (
+      <AppView style={productCellStyle(index, columns)}>
+        <ProductRow item={item} onOpen={openItem} onAdd={addToCart} />
+      </AppView>
     ),
-    [openItem, addToCart],
+    [openItem, addToCart, columns],
   );
 
   return (
@@ -181,9 +187,7 @@ export default function CategoryScreen() {
             data={items}
             keyExtractor={(it) => it.id}
             renderItem={renderItem}
-            ItemSeparatorComponent={() => (
-              <AppView style={{ height: 1, backgroundColor: tokens.divider }} />
-            )}
+            numColumns={columns}
             ListHeaderComponent={state === 'loading' ? null : toolbar}
             ListFooterComponent={footer}
             onEndReached={loadMore}

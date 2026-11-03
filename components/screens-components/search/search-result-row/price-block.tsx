@@ -28,7 +28,7 @@ export default function PriceBlock({ priceLabel, price }: { priceLabel: string; 
       {lead ? (
         <AppText
           textVariant="bodyXs"
-          style={{ color: tokens.gray400, fontFamily: SEARCH_FONT.regular, fontSize: 12 }}
+          style={{ color: tokens.textMuted, fontFamily: SEARCH_FONT.regular, fontSize: 12 }}
         >
           {lead}
         </AppText>
@@ -37,7 +37,7 @@ export default function PriceBlock({ priceLabel, price }: { priceLabel: string; 
        *  beside the title — it is the row's headline number, in theme text
        *  color (white in dark mode) rather than link blue. */}
       <AppView row align="flex-end" style={{ gap: 8, flexWrap: 'wrap' }}>
-        <AppPrice value={price} size={24} color={tokens.text} fontFamily={PRICE_FONT} />
+        <AppPrice value={price} size={18} color={tokens.text} fontFamily={PRICE_FONT} />
       </AppView>
     </AppView>
   );

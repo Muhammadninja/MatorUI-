@@ -51,8 +51,10 @@ export type NotificationItem = {
   tone: NotificationTone;
   title: string;
   body: string;
-  /** Pre-formatted relative time for display (e.g. "2m", "1h", "2d"). */
+  /** Pre-formatted relative time (e.g. "2m", "1h", "2d"). */
   time: string;
+  /** ISO timestamp from the backend; the feed localizes and groups by it. */
+  createdAt?: string;
   unread: boolean;
   /** Where a tap on the row should route (backend `deeplink_path`). */
   deeplinkPath?: string | null;
@@ -64,6 +66,8 @@ export type NotificationItem = {
   /** Lowercased backend order status from `data.status` (e.g. "delivered") —
    *  the feed renders a LOCALIZED label from it instead of the backend's copy. */
   orderStatus?: string;
+  /** Vehicle id from `data.vehicle_id` on `vehicle_status_updated` rows. */
+  vehicleId?: string;
 };
 
 export interface NotificationsTransport {
@@ -182,6 +186,7 @@ export function mapRawNotification(raw: RawNotification): NotificationItem {
     title: raw.title ?? '',
     body: raw.body ?? raw.message ?? '',
     time: relativeTime(raw.created_at ?? raw.createdAt),
+    createdAt: raw.created_at ?? raw.createdAt,
     unread: isUnread(raw),
     deeplinkPath: raw.deeplink_path ?? raw.deeplinkPath ?? null,
   };
@@ -197,6 +202,10 @@ export function mapRawNotification(raw: RawNotification): NotificationItem {
     const d = raw.data as { order_id?: unknown; status?: unknown };
     if (typeof d.order_id === 'string') item.orderId = d.order_id;
     if (typeof d.status === 'string') item.orderStatus = d.status;
+  }
+  if (type === 'vehicle_status_updated' && raw.data && typeof raw.data === 'object') {
+    const d = raw.data as { vehicle_id?: unknown };
+    if (typeof d.vehicle_id === 'string') item.vehicleId = d.vehicle_id;
   }
   return item;
 }

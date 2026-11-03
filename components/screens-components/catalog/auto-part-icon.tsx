@@ -9,7 +9,6 @@ import AirFilt from '../../../assets/3D _Icons/airfilt.png';
 import AcCompressor from '../../../assets/3D _Icons/atlts.png';
 import Battery from '../../../assets/3D _Icons/battery.png';
 import EngineIcon from '../../../assets/auto-parts/engine.png';
-import BrakePad from '../../../assets/3D _Icons/brake.png';
 import BrakeDisc from '../../../assets/3D _Icons/brake2.png';
 import WheelRim from '../../../assets/3D _Icons/disk.png';
 import Light from '../../../assets/3D _Icons/light.png';
@@ -21,7 +20,7 @@ import Wipe from '../../../assets/3D _Icons/wipe.png';
 
 /** Category display name → the 3D PNG icon in `assets/3D _Icons/`. */
 const PART_ICONS: Record<string, any> = {
-  Brakes: BrakePad,
+  Brakes: BrakeDisc,
   Batteries: Battery,
   Filters: AirFilt,
   Ignition: Piston,
@@ -41,7 +40,7 @@ const PART_ICONS: Record<string, any> = {
  * categories-service), each to the artwork of a part from its own system.
  */
 const PART_ICONS_BY_KEY: Record<string, any> = {
-  brakes: BrakePad,
+  brakes: BrakeDisc,
   batteries: Battery,
   filters: AirFilt,
   ignition: Piston,

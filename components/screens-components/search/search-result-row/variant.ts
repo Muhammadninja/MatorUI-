@@ -11,10 +11,7 @@ export type AccentIcon = ComponentType<{
 export type DeliveryKind = 'free' | 'standard';
 
 export type CardVariant = {
-  /** Delivery line carries a semantic kind, not a color. The component
-   *  (`delivery-row.tsx`) maps kind → theme token so the green/gray
-   *  follows the theme instead of being a literal hex baked into the
-   *  data layer. */
+  /** Delivery line carries a semantic kind, not a color. */
   delivery: { labelKey: string; kind: DeliveryKind };
   /** No inferred commercial claims when the server supplies no accent. */
   accentTag: { labelKey: string; Icon: AccentIcon; tone: IconTone } | null;

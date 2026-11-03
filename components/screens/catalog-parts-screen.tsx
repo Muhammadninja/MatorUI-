@@ -7,7 +7,10 @@ import { Keyboard, ScrollView, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import CatalogListFooter from '@/components/screens-components/catalog/catalog-list-footer';
-import ProductRow from '@/components/screens-components/catalog/product-row';
+import ProductRow, {
+  productCellStyle,
+  useProductGridColumns,
+} from '@/components/screens-components/catalog/product-row';
 import FitmentNote from '@/components/screens-components/catalog/fitment-note';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
@@ -199,6 +202,8 @@ export default function CatalogPartsScreen() {
     openItemDetail(it.id);
   }, []);
 
+  const columns = useProductGridColumns();
+
   const addToCart = useCallback(
     (it: CatalogItem) => {
       if (!isAuthenticated) {
@@ -220,10 +225,12 @@ export default function CatalogPartsScreen() {
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: CatalogItem }) => (
-      <ProductRow item={item} onOpen={openItem} onAdd={addToCart} />
+    ({ item, index }: { item: CatalogItem; index: number }) => (
+      <AppView style={productCellStyle(index, columns)}>
+        <ProductRow item={item} onOpen={openItem} onAdd={addToCart} />
+      </AppView>
     ),
-    [openItem, addToCart],
+    [openItem, addToCart, columns],
   );
 
   return (

@@ -15,7 +15,7 @@ export function ItemSectionTitle({ title, count }: { title: string; count?: numb
   const { tokens } = useThemeContext();
   return (
     <AppView row align="center" gap={7}>
-      <AppText family="heading" weight="bold" style={{ fontSize: 16.5, color: tokens.text }}>
+      <AppText textVariant="h4" weight="bold" style={{ color: tokens.text }}>
         {title}
       </AppText>
       {count != null && count > 0 ? (
@@ -36,8 +36,8 @@ export function ItemRule() {
 /** One soft-tinted trust / status chip — the label carries it, no glyph. */
 function Chip({ label, color, bg }: { label: string; color: string; bg: string }) {
   return (
-    <AppView rounded={999} px={11} py={5} style={{ backgroundColor: bg }}>
-      <AppText family="accent" weight="bold" style={{ fontSize: 11.5, color }}>
+    <AppView rounded={8} px={8} py={4} style={{ backgroundColor: bg }}>
+      <AppText weight="medium" style={{ fontSize: 12, lineHeight: 16, color }}>
         {label}
       </AppText>
     </AppView>
@@ -61,7 +61,7 @@ export function ItemTrustRow({ item }: { item: CatalogItem }) {
   return (
     <AppView row wrap gap={7}>
       {outOfStock ? (
-        <Chip label={t('itemDetail.outOfStock')} color={tokens.error} bg={`${tokens.error}1a`} />
+        <Chip label={t('itemDetail.outOfStock')} color={tokens.error} bg={tokens.errorSoft} />
       ) : null}
       {item.certified ? (
         <Chip label={t('catalog.matorCertified')} color={tokens.success} bg={tokens.successSoft} />
@@ -110,12 +110,18 @@ export function ItemSpecTable({ specs }: { specs: CatalogItemSpec[] }) {
   if (specs.length === 0) return null;
 
   return (
-    <AppView rounded={18} colorName="backgroundSecondary" style={{ overflow: 'hidden' }}>
+    <AppView
+      rounded={12}
+      colorName="card"
+      borderWidth={1}
+      borderName="border"
+      style={{ overflow: 'hidden' }}
+    >
       {specs.map((row, i) => (
         <AppView
           key={`${row.label}-${i}`}
           row
-          align="center"
+          align="flex-start"
           justify="space-between"
           gap={16}
           style={{
@@ -125,13 +131,13 @@ export function ItemSpecTable({ specs }: { specs: CatalogItemSpec[] }) {
             borderBottomColor: tokens.divider,
           }}
         >
-          <AppText family="default" style={{ flex: 1, fontSize: 13, color: tokens.textMuted }}>
+          <AppText family="default" style={{ flex: 1, fontSize: 14, lineHeight: 20, color: tokens.textMuted }}>
             {row.label}
           </AppText>
           <AppText
             family="accent"
             weight="semibold"
-            style={{ flex: 1, fontSize: 13, color: tokens.text, textAlign: 'right' }}
+            style={{ flex: 1, fontSize: 14, lineHeight: 20, color: tokens.text, textAlign: 'right' }}
           >
             {row.value}
           </AppText>

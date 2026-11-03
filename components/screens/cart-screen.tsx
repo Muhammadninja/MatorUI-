@@ -1,11 +1,12 @@
 import { router } from 'expo-router';
-import { AlertCircle, X } from 'lucide-react-native';
+import { AlertCircle, ShoppingBag, Trash2 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { RefreshControl, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import ImageBox from '@/components/screens-components/home/image-box';
 import { AppButton } from '@/components/shared/app-button';
+import { AppPrice } from '@/components/shared/app-price';
 import { AppQtyStepper } from '@/components/shared/app-qty-stepper';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
@@ -16,18 +17,17 @@ import { useUserContext } from '@/contexts/user.context';
 import { parsePrice } from '@/services/cart-math';
 
 /**
- * Cart — faithful rebuild of the prototype's `scCart`, now on the real
- * transport-abstracted cart context (`useCartContext`): line items (84px
- * thumb, title, line price, 30px stepper, ✕ remove) and a sticky Subtotal /
- * Est. tax / Total footer + auth-gated Checkout.
+ * Cart, on the real transport-abstracted cart context (`useCartContext`): one
+ * white card per line item (compact image, two-line title, line price, one
+ * − / qty / + control, remove), then the cost breakdown, with the total and
+ * auth-gated Checkout fixed above the tab bar.
  *
  * Quantity mutations and removal are optimistic; a row mid-flight to the
- * transport is greyed via `pendingIds`. State flips to the live backend the
- * moment `EXPO_PUBLIC_API_BASE_URL` is set — no code change here.
+ * transport is greyed via `pendingIds`.
  */
 export default function CartScreen() {
   const { t } = useTranslation();
-  const { tokens } = useThemeContext();
+  const { tokens, scheme } = useThemeContext();
   const insets = useSafeAreaInsets();
   const { isAuthenticated } = useUserContext();
   const {
@@ -59,7 +59,13 @@ export default function CartScreen() {
   if (!isHydrated) {
     return (
       <AppView flex={1} colorName="background" style={{ paddingTop: insets.top + 8 }}>
-        <AppText family="heading" colorName="text" style={{ fontSize: 26, lineHeight: 32, paddingHorizontal: 20, paddingTop: 6 }}>
+        <AppText
+          textVariant="h3"
+          weight="bold"
+          colorName="text"
+          accessibilityRole="header"
+          style={{ paddingHorizontal: 16, paddingTop: 8 }}
+        >
           {t('cart.title')}
         </AppText>
         <AppView flex={1} center gap={14} px="xl">
@@ -69,13 +75,17 @@ export default function CartScreen() {
               <AppText family="heading" colorName="text" style={{ fontSize: 18, lineHeight: 24 }}>
                 {t('cart.loadErrorTitle')}
               </AppText>
-              <AppText family="default" colorName="textMuted" style={{ fontSize: 13, lineHeight: 18, textAlign: 'center', maxWidth: 280 }}>
+              <AppText
+                family="default"
+                colorName="textMuted"
+                style={{ fontSize: 13, lineHeight: 18, textAlign: 'center', maxWidth: 280 }}
+              >
                 {error}
               </AppText>
               <AppButton title={t('common.retry')} kind="secondary" size="sm" onPress={refresh} />
             </>
           ) : (
-            <WheelLoader size={30} color={tokens.text} />
+            <WheelLoader size={30} color={tokens.brand} />
           )}
         </AppView>
       </AppView>
@@ -84,28 +94,46 @@ export default function CartScreen() {
 
   if (items.length === 0) {
     return (
-      <AppView flex={1} colorName="background" testID="cart-screen" style={{ paddingTop: insets.top + 8 }}>
-        <AppText family="heading" colorName="text" style={{ fontSize: 26, lineHeight: 32, paddingHorizontal: 20, paddingTop: 6 }}>
+      <AppView
+        flex={1}
+        colorName="background"
+        testID="cart-screen"
+        style={{ paddingTop: insets.top + 8 }}
+      >
+        <AppText
+          textVariant="h3"
+          weight="bold"
+          colorName="text"
+          accessibilityRole="header"
+          style={{ paddingHorizontal: 16, paddingTop: 8 }}
+        >
           {t('cart.title')}
         </AppText>
-        {/* Type and one action, sitting above the optical centre. The tinted
-         *  disc with a shopping bag in it was drawing a picture of the empty
-         *  thing the sentence already names. */}
+        {/* The group sits slightly above the centre of the content area. */}
         <AppView flex={1} center gap={12} px="xl" style={{ paddingBottom: 72 }}>
-          <AppText family="heading" weight="bold" colorName="text" style={{ fontSize: 21, lineHeight: 27 }}>
+          <AppView
+            center
+            rounded={999}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={{ width: 72, height: 72, backgroundColor: tokens.brandSoft }}
+          >
+            <ShoppingBag size={32} strokeWidth={2} color={tokens.brand} />
+          </AppView>
+          <AppText textVariant="h4" weight="bold" colorName="text" align="center">
             {t('cart.emptyTitle')}
           </AppText>
           <AppText
-            family="default"
+            textVariant="bodySm"
             colorName="textMuted"
-            style={{ fontSize: 13.5, lineHeight: 19, textAlign: 'center', maxWidth: 250 }}
+            style={{ textAlign: 'center', maxWidth: 280 }}
           >
             {t('cart.emptySubtitle')}
           </AppText>
           <AppButton
             title={t('cart.startShopping')}
             kind="brand"
-            size="md"
+            size="lg"
             onPress={() => router.navigate('/explore')}
             containerStyle={{ marginTop: 4 }}
           />
@@ -118,144 +146,224 @@ export default function CartScreen() {
     <AppView flex={1} colorName="background" testID="cart-screen">
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: insets.top + 8, paddingHorizontal: 20, paddingBottom: 24, gap: 16 }}
+        contentContainerStyle={{
+          paddingTop: insets.top + 8,
+          paddingHorizontal: 16,
+          paddingBottom: 16,
+          gap: 8,
+        }}
         refreshControl={
-          <RefreshControl refreshing={false} onRefresh={refresh} tintColor={tokens.textMuted} colors={[tokens.brandBg]} />
+          <RefreshControl
+            refreshing={false}
+            onRefresh={refresh}
+            tintColor={tokens.textMuted}
+            colors={[tokens.brandBg]}
+          />
         }
       >
-        <AppText family="heading" weight="bold" style={{ fontSize: 26, lineHeight: 32, color: tokens.text, paddingTop: 6 }}>
-          {t('cart.titleWithCount', { count: itemCount })}
-        </AppText>
+        <AppView style={{ paddingTop: 8, paddingBottom: 4 }}>
+          <AppText textVariant="h3" weight="bold" colorName="text" accessibilityRole="header">
+            {t('cart.title')}
+          </AppText>
+          <AppText textVariant="bodySm" colorName="textMuted">
+            {t('cart.itemCount', { count: itemCount })}
+          </AppText>
+        </AppView>
 
         {error ? (
           <AppView row align="center" gap={8}>
             <AlertCircle size={16} strokeWidth={2} color={tokens.error} />
-            <AppText family="default" style={{ fontSize: 12.5, color: tokens.error }}>{error}</AppText>
+            <AppText textVariant="bodySm" style={{ flex: 1, color: tokens.error }}>
+              {error}
+            </AppText>
           </AppView>
         ) : null}
 
-        {/* One grouped card, hairline between rows — not a stack of bordered
-         *  boxes. A card per item drew a frame around every line and made a
-         *  three-item cart look like a component gallery. */}
-        <AppView rounded={18} colorName="card" style={{ overflow: 'hidden' }}>
-          {items.map((item, index) => {
-            const pending = pendingIds.has(item.id);
-            return (
-              <AppView
-                key={item.id}
-                testID={`cart-item-${item.id}`}
-                row
-                gap={12}
-                p={14}
-                style={{
-                  opacity: pending ? 0.55 : 1,
-                  borderTopWidth: index === 0 ? 0 : 1,
-                  borderTopColor: tokens.divider,
-                }}
-              >
-                {/* Every thumbnail goes through ImageBox, including sourced
-                 *  offers with no dealer photo: its placeholder is a neutral
-                 *  part outline, so the tinted tile with an icon in it bought
-                 *  nothing the shared component did not already do. */}
-                <AppView style={{ width: 80 }}>
-                  <ImageBox label={item.title} uri={item.imageUrl} height={80} radius={12} small />
+        {items.map((item) => {
+          const pending = pendingIds.has(item.id);
+          return (
+            <AppView
+              key={item.id}
+              testID={`cart-item-${item.id}`}
+              row
+              gap="md"
+              rounded={12}
+              colorName="card"
+              borderWidth={1}
+              borderName="border"
+              style={{ padding: 12, opacity: pending ? 0.55 : 1 }}
+            >
+              <AppView style={{ width: 72, alignSelf: 'flex-start' }}>
+                <ImageBox
+                  label={item.title}
+                  uri={item.imageUrl}
+                  height={72}
+                  radius={8}
+                  contentFit="contain"
+                  backgroundColor={tokens.white}
+                  targetWidth={72}
+                  small
+                />
+              </AppView>
+
+              <AppView flex={1} gap={4} style={{ minWidth: 0 }}>
+                <AppView row align="flex-start" gap="xs">
+                  <AppText
+                    family="default"
+                    weight="semibold"
+                    numberOfLines={2}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      fontSize: 14,
+                      lineHeight: 20,
+                      color: tokens.text,
+                    }}
+                  >
+                    {item.title}
+                  </AppText>
+                  {/* Secondary: a muted glyph, with the full 48-unit target. */}
+                  <AppPressableView
+                    onPress={() => removeItem(item.id)}
+                    testID={`cart-remove-${item.id}`}
+                    androidRipple={false}
+                    pressedOpacity={0.6}
+                    center
+                    accessibilityRole="button"
+                    accessibilityLabel={t('cart.removeItem', { title: item.title })}
+                    style={{ width: 48, height: 48, margin: -12, marginLeft: 0, flexShrink: 0 }}
+                  >
+                    <Trash2 size={18} strokeWidth={2} color={tokens.textMuted} />
+                  </AppPressableView>
                 </AppView>
 
-                <AppView flex={1} gap={3}>
-                  <AppView row align="flex-start" gap={10}>
-                    <AppText
-                      family="default"
-                      weight="semibold"
-                      style={{ flex: 1, fontSize: 14.5, lineHeight: 19, color: tokens.text }}
-                    >
-                      {item.title}
-                    </AppText>
-                    <AppPressableView
-                      onPress={() => removeItem(item.id)}
-                      testID={`cart-remove-${item.id}`}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('cart.removeItem', { title: item.title })}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      style={{ marginTop: 1 }}
-                    >
-                      <X size={15} strokeWidth={2.2} color={tokens.textMuted} />
-                    </AppPressableView>
-                  </AppView>
+                {item.description ? (
+                  <AppText textVariant="bodyXs" colorName="textMuted">
+                    {item.description}
+                  </AppText>
+                ) : null}
+                {item.badge ? (
+                  <AppText textVariant="bodyXs" weight="medium" colorName="textMuted">
+                    {item.badge}
+                  </AppText>
+                ) : null}
 
-                  {item.badge ? (
-                    <AppText
-                      family="accent"
-                      weight="semibold"
-                      style={{ fontSize: 11.5, color: tokens.textMuted }}
-                    >
-                      {item.badge}
-                    </AppText>
-                  ) : null}
-
-                  <AppView
-                    row
-                    align="center"
-                    justify="space-between"
-                    style={{ marginTop: 'auto', paddingTop: 10 }}
-                  >
-                    <AppText
-                      family="heading"
-                      weight="bold"
-                      style={{ fontSize: 16.5, color: tokens.text }}
-                    >
-                      {formatCurrency(parsePrice(item.price) * item.quantity)}
-                    </AppText>
-                    <AppQtyStepper
-                      testID={`cart-qty-${item.id}`}
-                      value={item.quantity}
-                      onIncrement={() => incrementItem(item.id)}
-                      onDecrement={() => decrementItem(item.id)}
-                      size="sm"
-                    />
-                  </AppView>
+                <AppView
+                  row
+                  wrap
+                  align="center"
+                  justify="space-between"
+                  gap="sm"
+                  style={{ marginTop: 'auto', paddingTop: 8 }}
+                >
+                  <AppPrice
+                    value={formatCurrency(parsePrice(item.price) * item.quantity)}
+                    size={16}
+                    color={tokens.text}
+                  />
+                  <AppQtyStepper
+                    testID={`cart-qty-${item.id}`}
+                    value={item.quantity}
+                    onIncrement={() => incrementItem(item.id)}
+                    onDecrement={() => decrementItem(item.id)}
+                    size="sm"
+                  />
                 </AppView>
               </AppView>
-            );
-          })}
+            </AppView>
+          );
+        })}
+
+        {/* The cost breakdown follows the items; only the total and checkout stay
+         *  fixed, and the scroll view ends above them so nothing is covered. */}
+        <AppView
+          rounded={16}
+          colorName="card"
+          borderWidth={1}
+          borderName="border"
+          gap="sm"
+          style={{ padding: 16, marginTop: 8 }}
+        >
+          <SummaryRow
+            label={t('cart.subtotal')}
+            value={formatCurrency(totals.subtotal)}
+            tokens={tokens}
+          />
+          {totals.discount > 0 ? (
+            <SummaryRow
+              label={t('cart.discount')}
+              value={`−${formatCurrency(totals.discount)}`}
+              tokens={tokens}
+            />
+          ) : null}
+          <SummaryRow
+            label={t('cart.shipping')}
+            value={totals.shipping > 0 ? formatCurrency(totals.shipping) : t('cart.free')}
+            tokens={tokens}
+          />
+          <SummaryRow
+            label={t('cart.serviceFee')}
+            value={formatCurrency(totals.serviceFee)}
+            tokens={tokens}
+          />
         </AppView>
       </ScrollView>
 
-      {/* Sticky footer */}
-      <AppView colorName="background" px="lg" style={{ paddingTop: 16, paddingBottom: Math.max(insets.bottom, 20), borderTopWidth: 1, borderTopColor: tokens.divider }}>
-        <SummaryRow label={t('cart.subtotal')} value={formatCurrency(totals.subtotal)} tokens={tokens} />
-        {totals.discount > 0 ? (
-          <SummaryRow label={t('cart.discount')} value={`−${formatCurrency(totals.discount)}`} tokens={tokens} />
-        ) : null}
-        <SummaryRow
-          label={t('cart.shipping')}
-          value={totals.shipping > 0 ? formatCurrency(totals.shipping) : t('cart.free')}
-          tokens={tokens}
-        />
-        <SummaryRow label={t('cart.serviceFee')} value={formatCurrency(totals.serviceFee)} tokens={tokens} />
-        {/* The total is a different KIND of number from the breakdown above
-         *  it, so a hairline and a size jump say so. */}
-        <AppView
-          style={{ height: 1, backgroundColor: tokens.divider, marginTop: 10, marginBottom: 12 }}
-        />
-        <AppView row align="center" justify="space-between" style={{ marginBottom: 14 }}>
-          <AppText family="accent" weight="bold" style={{ fontSize: 15, color: tokens.textMuted }}>
+      {/* Fixed above the tab bar, which owns the bottom safe area. */}
+      <AppView
+        colorName={scheme === 'dark' ? 'background' : 'surface'}
+        px="lg"
+        gap="sm"
+        style={{
+          paddingTop: 12,
+          paddingBottom: 12,
+          borderTopWidth: 1,
+          borderTopColor: tokens.divider,
+        }}
+      >
+        <AppView row align="center" justify="space-between" gap="sm">
+          <AppText textVariant="bodySm" weight="medium" colorName="textMuted">
             {t('cart.total')}
           </AppText>
-          <AppText family="heading" weight="bold" style={{ fontSize: 23, color: tokens.text }}>
-            {formatCurrency(totals.total)}
-          </AppText>
+          <AppPrice value={formatCurrency(totals.total)} size={20} color={tokens.text} />
         </AppView>
-        <AppButton testID="cart-checkout-btn" title={t('cart.checkout')} kind="brand" size="lg" fullWidth onPress={goCheckout} />
+        <AppButton
+          testID="cart-checkout-btn"
+          title={t('cart.checkout')}
+          kind="brand"
+          size="lg"
+          fullWidth
+          onPress={goCheckout}
+        />
       </AppView>
     </AppView>
   );
 }
 
-function SummaryRow({ label, value, tokens }: { label: string; value: string; tokens: ReturnType<typeof useThemeContext>['tokens'] }) {
+function SummaryRow({
+  label,
+  value,
+  tokens,
+}: {
+  label: string;
+  value: string;
+  tokens: ReturnType<typeof useThemeContext>['tokens'];
+}) {
   return (
-    <AppView row justify="space-between" style={{ marginBottom: 6 }}>
-      <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>{label}</AppText>
-      <AppText family="accent" weight="semibold" style={{ fontSize: 13, color: tokens.text }}>{value}</AppText>
+    <AppView row justify="space-between" gap="md">
+      <AppText
+        family="default"
+        style={{ flex: 1, fontSize: 14, lineHeight: 20, color: tokens.textMuted }}
+      >
+        {label}
+      </AppText>
+      <AppText
+        family="accent"
+        weight="semibold"
+        style={{ fontSize: 14, lineHeight: 20, color: tokens.text, fontVariant: ['tabular-nums'] }}
+      >
+        {value}
+      </AppText>
     </AppView>
   );
 }

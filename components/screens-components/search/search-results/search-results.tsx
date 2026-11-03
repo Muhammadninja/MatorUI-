@@ -1,15 +1,15 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 import { ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import SearchResultRow from '@/components/screens-components/search/search-result-row';
 import AppList from '@/components/shared/app-list';
 import { AppView } from '@/components/shared/app-view';
+import { useThemeContext } from '@/contexts/theme.context';
 import type { SearchResult, SearchState } from '@/types/search';
 import { openItemDetail } from '@/utils/nav';
 
 import FooterSpinner from './footer-spinner';
-import { findCheapestId } from './helpers';
 import ResultsEmpty from './results-empty';
 import ResultsError from './results-error';
 import ResultsHeader from './results-header';
@@ -44,6 +44,23 @@ export type SearchResultsProps = {
   onFilterPress?: () => void;
 };
 
+/** Hairline on the row's white surface, starting at the text column. */
+function RowSeparator() {
+  const { tokens } = useThemeContext();
+  return (
+    <AppView colorName="card">
+      <AppView
+        style={{
+          height: 1,
+          marginLeft: 20 + 104 + 12,
+          marginRight: 20,
+          backgroundColor: tokens.divider,
+        }}
+      />
+    </AppView>
+  );
+}
+
 /**
  * Search results surface. Owns only state routing + the success list;
  * every state (loading / empty / error) and list piece (header, footer)
@@ -66,7 +83,6 @@ export default function SearchResults({
   onFilterPress,
 }: SearchResultsProps) {
   const insets = useSafeAreaInsets();
-  const cheapestId = useMemo(() => findCheapestId(results), [results]);
 
   const handleOpen = useCallback((result: SearchResult) => {
     openItemDetail(result.id);
@@ -74,16 +90,9 @@ export default function SearchResults({
 
   const renderItem = useCallback(
     ({ item }: { item: SearchResult }) => (
-      <AppView style={{ marginBottom: 16 }}>
-        <SearchResultRow
-          result={item}
-          query={query}
-          isCheapest={item.id === cheapestId}
-          onPress={handleOpen}
-        />
-      </AppView>
+      <SearchResultRow result={item} query={query} onPress={handleOpen} />
     ),
-    [query, cheapestId, handleOpen],
+    [query, handleOpen],
   );
 
   const keyExtractor = useCallback((item: SearchResult) => item.id, []);
@@ -120,6 +129,7 @@ export default function SearchResults({
         onEndReachedThreshold={0.5}
         contentContainerStyle={{ paddingTop: topInset, paddingBottom: insets.bottom + 16 }}
         keyboardShouldPersistTaps="handled"
+        ItemSeparatorComponent={RowSeparator}
         ListHeaderComponent={
           <ResultsHeader
             query={query}

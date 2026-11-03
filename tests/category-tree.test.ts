@@ -44,7 +44,7 @@ import { localizedCategoryLabel } from '@/utils/category-label';
 
 import AcCompressor from '@/assets/3D _Icons/atlts.png';
 import Battery from '@/assets/3D _Icons/battery.png';
-import BrakePad from '@/assets/3D _Icons/brake.png';
+import BrakeDisc from '@/assets/3D _Icons/brake2.png';
 import WheelRim from '@/assets/3D _Icons/disk.png';
 import Oil from '@/assets/3D _Icons/oil.png';
 import OilFilter from '@/assets/3D _Icons/oilfilter.png';
@@ -265,7 +265,7 @@ describe('root icons', () => {
   const iconFor = (rootId: string) => resolvePartIcon(rootId, ROOT_META[rootId].iconKey);
 
   test('each root shows a part from its own system', () => {
-    expect(iconFor('brake-system')).toEqual({ image: BrakePad });
+    expect(iconFor('brake-system')).toEqual({ image: BrakeDisc });
     expect(iconFor('motor-oil')).toEqual({ image: Oil });
     expect(iconFor('electrical-and-lighting')).toEqual({ image: Battery });
     expect(iconFor('tuning-and-accessories')).toEqual({ image: WheelRim });

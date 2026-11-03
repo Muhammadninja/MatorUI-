@@ -34,8 +34,9 @@ export type AppTabBarProps = {
   activeKey?: string;
 };
 
-/** Soft indigo accent for the emphasized AI Assistant button (both themes). */
-const ASSISTANT_ACCENT = '#000';
+/** Dark-theme fill of the emphasized AI Assistant button. Light uses `brand`;
+ *  dark can't, because `brand` is white there and the icon is white too. */
+const ASSISTANT_ACCENT_DARK = '#000';
 
 /** Diameter of the emphasized Assistant button (drives the shine geometry). */
 const EMPHASIZED_SIZE = 46;
@@ -157,12 +158,15 @@ export default function AppTabBar({ items = PREVIEW_ITEMS, activeKey = 'home' }:
     return null;
   }
 
+  // A white bar over the light theme's grey page; dark keeps its own background.
+  const barColorName = scheme === 'dark' ? 'background' : 'surface';
+
   return (
-    <AppView style={styles.container} colorName="background">
+    <AppView style={styles.container} colorName={barColorName}>
       <AppView
         row
         style={styles.bar}
-        colorName="background"
+        colorName={barColorName}
         borderTopWidth={1}
         borderName="divider"
         px={10}
@@ -182,7 +186,8 @@ export default function AppTabBar({ items = PREVIEW_ITEMS, activeKey = 'home' }:
                 <AppPressableView
                   onPress={item.onPress}
                   accessibilityLabel={item.label}
-                  accessibilityRole="button"
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: isActive, disabled: !!item.disabled }}
                   disabled={item.disabled}
                   rounded={999}
                   androidRipple={false}
@@ -192,11 +197,9 @@ export default function AppTabBar({ items = PREVIEW_ITEMS, activeKey = 'home' }:
                   style={[
                     styles.emphasized,
                     {
-                      // The AI Assistant button gets its own soft indigo accent
-                      // (same in both themes) so it reads as "smart/AI" instead
-                      // of a hard black disc. Faint top-sheen rim + a gentle
-                      // color-tinted shadow keep it modern but modest.
-                      backgroundColor: ASSISTANT_ACCENT,
+                      // Faint top-sheen rim + a gentle color-tinted shadow keep
+                      // the AI Assistant button modern but modest.
+                      backgroundColor: scheme === 'dark' ? ASSISTANT_ACCENT_DARK : tokens.brand,
                       borderWidth: 1,
                       borderColor: 'rgba(255, 255, 255, 0.22)',
                       ...(isActive
@@ -230,8 +233,8 @@ export default function AppTabBar({ items = PREVIEW_ITEMS, activeKey = 'home' }:
                 style={[
                   styles.indicator,
                   {
-                    backgroundColor: scheme === 'dark' ? tokens.white : tokens.black,
-                    borderColor: scheme === 'dark' ? tokens.white : tokens.black,
+                    backgroundColor: tokens.brand,
+                    borderColor: tokens.brand,
                   },
                   !isActive ? styles.indicatorHidden : undefined,
                 ]}
@@ -239,7 +242,8 @@ export default function AppTabBar({ items = PREVIEW_ITEMS, activeKey = 'home' }:
               <AppPressableView
                 onPress={item.onPress}
                 accessibilityLabel={item.label}
-                accessibilityRole="button"
+                accessibilityRole="tab"
+                accessibilityState={{ selected: isActive, disabled: !!item.disabled }}
                 disabled={item.disabled}
                 rounded={18}
                 androidRipple={false}
@@ -258,20 +262,34 @@ export default function AppTabBar({ items = PREVIEW_ITEMS, activeKey = 'home' }:
                         style={[
                           styles.badge,
                           {
-                            backgroundColor: scheme === 'dark' ? tokens.white : tokens.black,
+                            backgroundColor: tokens.brand,
                           },
                         ]}
                       >
                         <AppText
                           textVariant="bodyXs"
                           weight="bold"
-                          style={{ color: scheme === 'dark' ? tokens.black : tokens.white }}
+                          style={{ color: tokens.onBrand }}
                         >
                           {item.badgeLabel}
                         </AppText>
                       </AppView>
                     ) : null}
                   </AppView>
+                  <AppText
+                    weight="medium"
+                    align="center"
+                    // Five columns can't hold a scaled word: it broke mid-letter.
+                    maxFontSizeMultiplier={1.2}
+                    style={{
+                      fontSize: 11,
+                      lineHeight: 14,
+                      marginTop: 3,
+                      color: isActive ? tokens.brand : tokens.textMuted,
+                    }}
+                  >
+                    {item.label}
+                  </AppText>
                 </AppView>
               </AppPressableView>
             </AppView>

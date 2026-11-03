@@ -1,10 +1,9 @@
 import {
-  Figtree_400Regular,
-  Figtree_500Medium,
-  Figtree_600SemiBold,
-  Figtree_700Bold,
-  Figtree_800ExtraBold,
-} from '@expo-google-fonts/figtree';
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from '@expo-google-fonts/inter';
 import { Raleway_800ExtraBold } from '@expo-google-fonts/raleway';
 import { useFonts } from 'expo-font';
 import { requireNativeModule } from 'expo-modules-core';
@@ -85,16 +84,13 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
-    // Figtree — the app's typeface, every role. A geometric sans with a tall
-    // x-height and round bowls, the closest face in the bundle to the one
-    // Instagram is set in (Instagram Sans itself is proprietary). Every weight
-    // the type scale names is loaded here, so no surface ever renders a frame
-    // in the system fallback.
-    Figtree_400Regular,
-    Figtree_500Medium,
-    Figtree_600SemiBold,
-    Figtree_700Bold,
-    Figtree_800ExtraBold,
+    // Inter — the app's typeface, every role, with Cyrillic and Uzbek Latin
+    // coverage. Every weight the type scale names is loaded here, so no surface
+    // ever renders a frame in the system fallback.
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
     Raleway_800ExtraBold,
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });

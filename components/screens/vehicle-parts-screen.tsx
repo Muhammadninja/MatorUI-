@@ -4,7 +4,10 @@ import { useTranslation } from 'react-i18next';
 import { ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import ProductRow from '@/components/screens-components/catalog/product-row';
+import ProductRow, {
+  productCellStyle,
+  useProductGridColumns,
+} from '@/components/screens-components/catalog/product-row';
 import { RADIUS_PILL } from '@/components/screens-components/search/radii';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
@@ -34,6 +37,7 @@ export default function VehiclePartsScreen() {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
+  const columns = useProductGridColumns();
   const params = useLocalSearchParams<{
     make?: string;
     model?: string;
@@ -149,13 +153,12 @@ export default function VehiclePartsScreen() {
           </AppView>
 
           {state === 'success' ? (
-            <AppView style={{ marginTop: 4 }}>
+            <AppView row wrap style={{ marginTop: 4 }}>
               {items.map((it, i) => (
-                <AppView key={it.id}>
-                  {i > 0 ? (
-                    <AppView style={{ height: 1, backgroundColor: tokens.divider }} />
-                  ) : null}
-                  <ProductRow item={it} onOpen={openItem} onAdd={addToCart} />
+                <AppView key={it.id} style={{ width: `${100 / columns}%` }}>
+                  <AppView style={productCellStyle(i, columns)}>
+                    <ProductRow item={it} onOpen={openItem} onAdd={addToCart} />
+                  </AppView>
                 </AppView>
               ))}
             </AppView>

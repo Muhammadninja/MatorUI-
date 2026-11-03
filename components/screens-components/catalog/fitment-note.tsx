@@ -39,7 +39,7 @@ export type FitmentNoteProps = {
  * point is what makes the whole fit-check flow reachable.
  *
  * Attention is spent only where there is something to do. A 5px dot leads the
- * line — quiet green when a car is set, amber and breathing three times when
+ * line — quiet teal when a car is set (green would claim a verified fit), amber and breathing three times when
  * one isn't — and the unattended span is coloured as a link. Settled state
  * stays silent: a marker that pulses forever is a nag, not a cue.
  */
@@ -86,7 +86,7 @@ function FitmentNote({ lead, size = 13 }: FitmentNoteProps) {
     return () => animation.stop();
   }, [needsVehicle, pulse]);
 
-  const dotColor = vehicle ? tokens.success : tokens.warning;
+  const dotColor = vehicle ? tokens.brand : tokens.warning;
   // Set: full-strength text — it states a fact, so it reads as a fact, not as
   // greyed-out chrome. Unset: a real link colour, because it is the one thing
   // on the line worth tapping.

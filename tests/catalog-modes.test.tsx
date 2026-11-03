@@ -67,6 +67,7 @@ vi.mock('react-native', () => ({
   ScrollView: host('scroll'),
   StyleSheet: { absoluteFill: {}, create: <T,>(s: T) => s },
   TextInput: () => null,
+  useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
   View: host('rn-view'),
 }));
 vi.mock('@shopify/flash-list', () => ({
@@ -115,7 +116,12 @@ vi.mock('@/components/screens-components/catalog/certified-section', () => ({
   default: () => null,
 }));
 vi.mock('@/components/screens-components/catalog/fitment-note', () => ({ default: () => null }));
-vi.mock('@/components/screens-components/catalog/product-row', () => ({ default: () => null }));
+vi.mock('@/components/screens-components/garage/home-garage-card', () => ({ default: () => null }));
+vi.mock('@/components/screens-components/catalog/product-row', () => ({
+  default: () => null,
+  productCellStyle: () => ({}),
+  useProductGridColumns: () => 1,
+}));
 vi.mock('@/components/screens-components/catalog/results-toolbar', () => ({ default: () => null }));
 
 vi.mock('@/contexts/theme.context', () => ({
@@ -238,14 +244,27 @@ const is = (n: ReactTestInstance, type: string) => (n.type as unknown) === type;
 const pressable = (r: ReactTestRenderer, label: string) =>
   r.root.find((n) => is(n, 'pressable') && n.props.accessibilityLabel === label);
 
+/** Explore lists six tiles until asked; these checks cover every root. */
+async function expandCategories(r: ReactTestRenderer) {
+  await press(r.root.find((n) => is(n, 'button') && n.props.testID === 'explore-toggle-categories'));
+}
+
 const childLookups = () =>
   get.mock.calls.map(([url]) => String(url)).filter((url) => url.includes('parentId='));
 
 // ── A. no model picked ─────────────────────────────────────────────────
 
 describe('A. home grid without a picked model', () => {
+  test('shows six tiles first, with the rest one tap away', async () => {
+    const r = await render(<ExploreScreen />);
+    expect(r.root.findAll((n) => is(n, 'tile'))).toHaveLength(6);
+    await expandCategories(r);
+    expect(r.root.findAll((n) => is(n, 'tile'))).toHaveLength(10);
+  });
+
   test('shows the 10 systems, "Другое" included', async () => {
     const r = await render(<ExploreScreen />);
+    await expandCategories(r);
     const tiles = r.root.findAll((n) => is(n, 'tile'));
     expect(tiles.map((t) => t.props.label)).toEqual([
       'Тормозная система',
@@ -263,12 +282,14 @@ describe('A. home grid without a picked model', () => {
 
   test('each tile carries the parts count served for its system', async () => {
     const r = await render(<ExploreScreen />);
+    await expandCategories(r);
     const counts = r.root.findAll((n) => is(n, 'tile')).map((t) => t.props.count);
     expect(counts).toEqual(HOME_ROOT_ORDER.map((id) => ROOT_PRODUCTS_COUNT[id]));
   });
 
   test('a system tile opens all of its parts at once — no subcategory step', async () => {
     const r = await render(<ExploreScreen />);
+    await expandCategories(r);
     for (const tile of r.root.findAll((n) => is(n, 'tile'))) {
       push.mockReset();
       await press(tile);
@@ -298,6 +319,7 @@ describe('A. home grid without a picked model', () => {
 
   test('"Другое" lists its goods the same way', async () => {
     const r = await render(<ExploreScreen />);
+    await expandCategories(r);
     await press(r.root.find((n) => is(n, 'tile') && n.props.label === 'Другое'));
     expect(push).toHaveBeenCalledWith({
       pathname: '/category',

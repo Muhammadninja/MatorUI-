@@ -79,7 +79,7 @@ describe('AppButton label typography', () => {
     expect(variant).toBe('button');
     // Tight line height from the variant, SemiBold face from the weight…
     expect(getTextStyle(variant).lineHeight).toBe(20);
-    expect(face).toBe('Figtree_600SemiBold');
+    expect(face).toBe('Inter_600SemiBold');
     // …and the size is the variant's own 16px.
     expect(style.fontSize).toBe(16);
   });
@@ -92,7 +92,7 @@ describe('AppButton label typography', () => {
     for (const size of Object.keys(SIZE_MAP) as ButtonSize[]) {
       const { variant, face } = label(size);
       expect(variant, size).not.toBe('body');
-      expect(face, size).toBe('Figtree_600SemiBold');
+      expect(face, size).toBe('Inter_600SemiBold');
     }
   });
 
@@ -103,7 +103,7 @@ describe('AppButton label typography', () => {
   });
 
   test('a caller-chosen weight still wins', () => {
-    expect(label('lg', undefined, 'bold').face).toBe('Figtree_700Bold');
+    expect(label('lg', undefined, 'bold').face).toBe('Inter_700Bold');
   });
 
   test('a wrapped label is centred in a centred button', () => {

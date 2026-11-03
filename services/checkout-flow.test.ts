@@ -116,7 +116,7 @@ describe('Full checkout flow — happy path', () => {
 
     // ── 11. Sanity: the CTA label assembled in cart-screen ──────────
     const ctaLabel = `Checkout · ${formatCurrency(grandTotal)}`;
-    expect(ctaLabel).toMatch(/^Checkout · UZS \d/);
+    expect(ctaLabel).toMatch(/^Checkout · [\d\u00A0]+ UZS$/);
   });
 });
 

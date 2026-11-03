@@ -28,7 +28,7 @@ export default function ResultsHeader({
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
   return (
-    <AppView row align="center" justify="space-between" px="lg" gap="md" pb={10}>
+    <AppView row align="center" justify="space-between" px="lg" gap="md">
       <AppText textVariant="bodyXs" colorName="textMuted" numberOfLines={2} style={{ flex: 1 }}>
         {t('search.resultCount', { count: total, query: query.trim() })}
       </AppText>
@@ -46,9 +46,9 @@ export default function ResultsHeader({
             androidRipple
             accessibilityLabel={t('search.filters')}
             accessibilityRole="button"
-            style={{ width: 44, height: 44 }}
+            style={{ width: 48, height: 48 }}
           >
-            <SlidersHorizontal size={20} strokeWidth={2} color={tokens.text} />
+            <SlidersHorizontal size={20} strokeWidth={2} color={tokens.brand} />
             {hasActiveFilters ? (
               <AppView
                 rounded={36}
@@ -58,7 +58,7 @@ export default function ResultsHeader({
                   right: 8,
                   width: 6,
                   height: 6,
-                  backgroundColor: tokens.text,
+                  backgroundColor: tokens.brand,
                 }}
               />
             ) : null}

@@ -3,15 +3,22 @@ import { router } from 'expo-router';
 import { Bell, Search } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import CategoryGridSkeleton, {
   BrandRowSkeleton,
 } from '@/components/screens-components/catalog/category-grid-skeleton';
 import CategoryTile from '@/components/screens-components/catalog/category-tile';
-import FitmentNote from '@/components/screens-components/catalog/fitment-note';
 import VehicleMakeTile from '@/components/screens-components/catalog/vehicle-make-tile';
+import HomeGarageCard from '@/components/screens-components/garage/home-garage-card';
 import { AppButton } from '@/components/shared/app-button';
 import { AppLogo } from '@/components/shared/app-logo';
 import { AppText } from '@/components/shared/app-text';
@@ -27,11 +34,16 @@ import { triggerHaptic } from '@/utils/haptics';
 
 // Soft feather under the header so the frosted panel dissolves into the
 // content instead of ending in a hard seam ("dropline").
-const HEADER_FADE = 24;
+const HEADER_FADE = 12;
 
-// Number of bands in the feather. More = smoother ramp; 14 over 24px (~1.7px
+// Number of bands in the feather. More = smoother ramp; 8 over 12px (~1.5px
 // each) reads as a continuous fade.
-const HEADER_FADE_BANDS = 14;
+const HEADER_FADE_BANDS = 8;
+
+const SCREEN_GUTTER = 16;
+const GRID_GAP = 8;
+/** Category tiles shown before "show all"; every root stays one tap away. */
+const INITIAL_CATEGORY_COUNT = 6;
 
 /**
  * Pure-View replacement for what used to be an SVG linear-gradient. Stacks thin
@@ -61,12 +73,11 @@ function HeaderFade({ color, height }: { color: string; height: number }) {
 }
 
 /**
- * Explore (home) — v2 AutoZone-style **category browser** (not a product
- * list). A frosted sticky header (logo + notifications + pill search)
- * over a scroll of: the inline vehicle selection, a "Shop by vehicle" make row
- * with brand logos, and a "Shop by category" grid with
- * custom part icons. Make tiles route to the Make screen; a category tile
- * opens every part of its system.
+ * Explore (home) — a **category browser** (not a product list). A frosted
+ * sticky header (logo + notifications + search) over a scroll of: the graphite
+ * My Garage card, a "Shop by vehicle" make row with brand logos, and a "Shop by
+ * category" grid with custom part icons. Make tiles route to the Make screen; a
+ * category tile opens every part of its system.
  */
 export default function ExploreScreen() {
   const { t } = useTranslation();
@@ -77,6 +88,10 @@ export default function ExploreScreen() {
   // starts below the frosted panel it scrolls under.
   const [headerHeight, setHeaderHeight] = useState(insets.top + 132);
   const toast = useToast();
+  const { width: windowWidth } = useWindowDimensions();
+  // Three equal columns with exact gaps, whatever the phone's width.
+  const tileWidth = Math.floor((windowWidth - SCREEN_GUTTER * 2 - GRID_GAP * 2) / 3);
+  const [categoriesExpanded, setCategoriesExpanded] = useState(false);
 
   // "Shop by category" grid — the roots of the category tree with their parts
   // counts, live from GET /v1/reference/categories.
@@ -160,7 +175,12 @@ export default function ExploreScreen() {
           </>
         )}
         <AppView
-          style={{ paddingTop: insets.top + 8, paddingHorizontal: 20, paddingBottom: 12, gap: 12 }}
+          style={{
+            paddingTop: insets.top + 8,
+            paddingHorizontal: SCREEN_GUTTER,
+            paddingBottom: 12,
+            gap: 12,
+          }}
         >
           <AppView row align="center" justify="space-between">
             <AppLogo size={26} />
@@ -170,15 +190,15 @@ export default function ExploreScreen() {
               accessibilityLabel={t('explore.notifications')}
               androidRipple={false}
               center
-              style={{ width: 44, height: 44 }}
+              style={{ width: 48, height: 48, marginRight: -12 }}
             >
               <Bell size={21} strokeWidth={2.2} color={tokens.text} />
               {unreadCount > 0 ? (
                 <AppView
                   style={{
                     position: 'absolute',
-                    top: 9,
-                    right: 10,
+                    top: 11,
+                    right: 12,
                     width: 8,
                     height: 8,
                     borderRadius: 999,
@@ -199,20 +219,16 @@ export default function ExploreScreen() {
             androidRipple={false}
             row
             align="center"
-            gap={10}
-            rounded={999}
-            px={18}
-            py={13}
-            colorName="backgroundSecondary"
+            gap={8}
+            rounded={12}
+            px="lg"
+            colorName={dark ? 'backgroundSecondary' : 'surface'}
             borderWidth={1}
-            borderName="border"
+            borderName="controlBorder"
+            style={{ minHeight: 48 }}
           >
             <Search size={20} strokeWidth={2.2} color={tokens.textMuted} />
-            <AppText
-              family="default"
-              numberOfLines={1}
-              style={{ flex: 1, fontSize: 15, color: tokens.textMuted }}
-            >
+            <AppText textVariant="body" colorName="textMuted" style={{ flex: 1 }}>
               {t('explore.searchPlaceholder')}
             </AppText>
           </AppPressableView>
@@ -241,7 +257,7 @@ export default function ExploreScreen() {
             borderBottomColor: tokens.divider,
           }}
         >
-          <WheelLoader size={22} color={tokens.text} />
+          <WheelLoader size={22} color={tokens.brand} />
           <AppText
             family="accent"
             weight="semibold"
@@ -264,45 +280,30 @@ export default function ExploreScreen() {
           />
         }
         contentContainerStyle={{
-          paddingTop: headerHeight + 12,
-          paddingHorizontal: 20,
-          paddingBottom: 28,
-          gap: 16,
+          paddingTop: headerHeight + HEADER_FADE,
+          paddingHorizontal: SCREEN_GUTTER,
+          paddingBottom: 32,
+          gap: 12,
         }}
       >
+        <HomeGarageCard />
+
         {/* ── Shop by vehicle ── */}
-        <AppView gap={4} style={{ marginTop: 2 }}>
-          <AppView row align="center" justify="space-between" gap="sm">
-            <AppText family="heading" weight="bold" style={{ flex: 1, fontSize: 18 }}>
-              {t('explore.shopByVehicle')}
-            </AppText>
-            <AppPressableView
-              onPress={() => router.navigate('/garage')}
-              androidRipple={false}
-              accessibilityRole="button"
-              hitSlop={{ top: 12, bottom: 12, left: 8, right: 0 }}
-            >
-              <AppText
-                family="accent"
-                weight="semibold"
-                style={{ fontSize: 13, color: tokens.textMuted }}
-              >
-                {t('explore.myGarage')}
-              </AppText>
-            </AppPressableView>
-          </AppView>
-          {/* Replaces the fitment banner that used to sit above this section —
-              same job, one line, no box. */}
-          <FitmentNote size={14} />
-        </AppView>
+        <AppText textVariant="h4" weight="bold" style={{ marginTop: 12 }}>
+          {t('explore.shopByVehicle')}
+        </AppText>
         {makesState === 'loading' ? (
           <BrandRowSkeleton />
         ) : (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 12, paddingHorizontal: 20, paddingVertical: 2 }}
-            style={{ marginHorizontal: -20 }}
+            contentContainerStyle={{
+              gap: GRID_GAP,
+              paddingHorizontal: SCREEN_GUTTER,
+              paddingVertical: 2,
+            }}
+            style={{ marginHorizontal: -SCREEN_GUTTER }}
           >
             {makes.map((b) => (
               <VehicleMakeTile
@@ -318,15 +319,11 @@ export default function ExploreScreen() {
         )}
 
         {/* ── Shop by category ── */}
-        <AppText
-          family="heading"
-          weight="bold"
-          style={{ fontSize: 18, color: tokens.text, marginTop: 6 }}
-        >
+        <AppText textVariant="h4" weight="bold" style={{ marginTop: 12 }}>
           {t('explore.shopByCategory')}
         </AppText>
         {categoriesState === 'loading' ? (
-          <CategoryGridSkeleton />
+          <CategoryGridSkeleton count={INITIAL_CATEGORY_COUNT} tileWidth={tileWidth} />
         ) : categoriesState === 'error' ? (
           <AppView align="center" gap={10} style={{ paddingVertical: 12 }}>
             <AppText
@@ -343,18 +340,35 @@ export default function ExploreScreen() {
             />
           </AppView>
         ) : (
-          <AppView row wrap justify="space-between" style={{ rowGap: 12 }}>
-            {categories.map((c) => (
-              <CategoryTile
-                key={c.id}
-                name={c.name}
-                label={c.label}
-                iconKey={c.iconKey}
-                count={c.count}
-                onPress={() => openCategory(c.id, c.label)}
+          <>
+            <AppView row wrap gap={GRID_GAP}>
+              {(categoriesExpanded ? categories : categories.slice(0, INITIAL_CATEGORY_COUNT)).map(
+                (c) => (
+                  <CategoryTile
+                    key={c.id}
+                    name={c.name}
+                    label={c.label}
+                    iconKey={c.iconKey}
+                    count={c.count}
+                    width={tileWidth}
+                    onPress={() => openCategory(c.id, c.label)}
+                  />
+                ),
+              )}
+            </AppView>
+            {categories.length > INITIAL_CATEGORY_COUNT ? (
+              <AppButton
+                testID="explore-toggle-categories"
+                title={t(
+                  categoriesExpanded ? 'explore.showFewerCategories' : 'explore.showAllCategories',
+                )}
+                kind="secondary"
+                size="lg"
+                fullWidth
+                onPress={() => setCategoriesExpanded((v) => !v)}
               />
-            ))}
-          </AppView>
+            ) : null}
+          </>
         )}
       </ScrollView>
     </AppView>

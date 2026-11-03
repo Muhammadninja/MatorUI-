@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
@@ -32,7 +34,7 @@ export type AppPriceProps = {
   numberOfLines?: number;
   /**
    * Typeface override for a surface that is set in its own font (the search
-   * results are in Figtree, not the app's Inter). Pass the EXACT loaded face —
+   * results name their faces explicitly). Pass the EXACT loaded face —
    * a custom family resolves one file per name on Android, so "bold" has to be
    * the bold face, not a `fontWeight` on top of the regular one.
    *
@@ -56,9 +58,13 @@ export function AppPrice({
   numberOfLines = 1,
   fontFamily,
 }: AppPriceProps) {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const c = color ?? tokens.text;
   const { currency, amount, cents } = splitPrice(value);
+  // The som always reads the same: the amount, then the active language's
+  // label. A backend string may say "UZS" or "сум"; another symbol stays put.
+  const isSom = /^(uzs'?|сум|so[ʻ'’‘]?m)$/i.test(currency);
 
   if (!amount) {
     return (
@@ -83,8 +89,8 @@ export function AppPrice({
   const affixTop = Math.max(2, Math.round(size * 0.16));
 
   return (
-    <AppView row align="flex-start">
-      {currency ? (
+    <AppView row align={isSom ? 'baseline' : 'flex-start'}>
+      {currency && !isSom ? (
         <AppText
           family="accent"
           weight="bold"
@@ -117,6 +123,7 @@ export function AppPrice({
           fontSize: size,
           lineHeight: undefined,
           letterSpacing: 0.2,
+          fontVariant: ['tabular-nums'],
           color: c,
           ...(fontFamily ? { fontFamily: fontFamily.amount } : null),
         }}
@@ -136,6 +143,15 @@ export function AppPrice({
           }}
         >
           {cents}
+        </AppText>
+      ) : null}
+      {isSom ? (
+        <AppText
+          family="accent"
+          weight="medium"
+          style={{ fontSize: Math.max(12, affix), lineHeight: undefined, color: c, marginLeft: 4 }}
+        >
+          {t('common.currency')}
         </AppText>
       ) : null}
     </AppView>

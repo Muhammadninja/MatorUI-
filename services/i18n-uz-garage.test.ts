@@ -32,9 +32,9 @@ const get = (bundle: unknown, ns: string, key: string) =>
 const placeholders = (s: string) => [...s.matchAll(/{{\s*(\w+)\s*}}/g)].map((m) => m[1]).sort();
 
 describe('Uzbek garage copy (G-4)', () => {
-  test('the scope is the 41 garage keys plus the two G-5 VIN errors', () => {
-    expect(Object.keys(en.garage)).toHaveLength(41);
-    expect(SCOPE).toHaveLength(43);
+  test('the scope is the 42 garage keys plus the two G-5 VIN errors', () => {
+    expect(Object.keys(en.garage)).toHaveLength(42);
+    expect(SCOPE).toHaveLength(44);
   });
 
   test.each(SCOPE)('%s.%s keeps the same placeholders as English and Russian', (ns, key) => {

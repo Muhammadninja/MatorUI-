@@ -3,13 +3,7 @@ import { Image } from 'react-native';
 
 import { useTranslation } from 'react-i18next';
 import { router, useFocusEffect } from 'expo-router';
-import {
-  Heart,
-  MapPin,
-  ReceiptText,
-  Shield,
-  User,
-} from 'lucide-react-native';
+import { Heart, MapPin, ReceiptText, Shield, User } from 'lucide-react-native';
 
 import ProfileGuestEmpty from '@/components/screens-components/profile/profile-guest-empty';
 import ScreenShell from '@/components/screens-components/screen-shell';
@@ -28,6 +22,17 @@ import { useOrders } from '@/hooks/use-orders';
 import { useUserContext, type UserProfile } from '@/contexts/user.context';
 
 const SECTION_RADIUS = 16;
+/** Teal outline icon on a pale teal square. */
+const ROW_ICON = {
+  size: 40,
+  iconSize: 20,
+  strokeWidth: 2,
+  rounded: 12,
+  backgroundColorName: 'brandSoft',
+  colorName: 'brand',
+} as const;
+/** Row padding + icon + gap, so dividers start at the text column. */
+const ROW_DIVIDER_INSET = 16 + ROW_ICON.size + 12;
 
 // ── Account list row definitions ─────────────────────────────────────────────
 // Defined at module scope so the array is stable across renders.
@@ -53,35 +58,35 @@ function buildAccountItems(t: (key: string) => string): AccountItem[] {
     {
       key: 'edit-profile',
       title: t('profile.editProfileTitle'),
-      leading: <AppIconBox Icon={User} rounded={11} />,
+      leading: <AppIconBox {...ROW_ICON} Icon={User} />,
       rightChevron: true,
       onPress: () => router.push('/edit-profile'),
     },
     {
       key: 'orders',
       title: t('profile.orderHistoryTitle'),
-      leading: <AppIconBox Icon={ReceiptText} rounded={11} />,
+      leading: <AppIconBox {...ROW_ICON} Icon={ReceiptText} />,
       rightChevron: true,
       onPress: () => router.push('/order-history'),
     },
     {
       key: 'addresses',
       title: t('profile.addressesTitle'),
-      leading: <AppIconBox Icon={MapPin} rounded={11} />,
+      leading: <AppIconBox {...ROW_ICON} Icon={MapPin} />,
       rightChevron: true,
       onPress: () => router.push('/shipping-addresses'),
     },
     {
       key: 'liked',
       title: t('profile.likedTitle'),
-      leading: <AppIconBox Icon={Heart} rounded={11} />,
+      leading: <AppIconBox {...ROW_ICON} Icon={Heart} />,
       rightChevron: true,
       onPress: () => router.push('/liked'),
     },
     {
       key: 'settings',
       title: t('profile.settingsTitle'),
-      leading: <AppIconBox Icon={Shield} rounded={11} />,
+      leading: <AppIconBox {...ROW_ICON} Icon={Shield} />,
       rightChevron: true,
       onPress: () => router.push('/settings-security'),
     },
@@ -149,8 +154,8 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 }}
       >
-        <AppView gap="xl" pt="md">
-          {/* Handoff §17: 64px avatar, name 21/700, email, Pro pill */}
+        <AppView gap="lg" pt="md">
+          {/* 64px avatar, name, contact line. */}
           <ProfileHeader profile={profile} />
 
           {/* One card, three columns, hairlines between — real counts (0 = the
@@ -159,9 +164,11 @@ export default function ProfileScreen() {
           <AppView px="lg">
             <AppView
               row
-              rounded={16}
+              rounded={SECTION_RADIUS}
               colorName="card"
-              style={{ overflow: 'hidden', paddingVertical: 14 }}
+              borderWidth={1}
+              borderName="border"
+              style={{ overflow: 'hidden', paddingVertical: 12 }}
             >
               <StatCell label={t('profile.statOrders')} value={String(orderCount)} />
               <StatDivider />
@@ -173,12 +180,21 @@ export default function ProfileScreen() {
 
           {/* Handoff §17 rows, minus the sub-lines (see buildAccountItems). */}
           <AppView gap={10} px="lg">
-            <AppView rounded={SECTION_RADIUS} colorName="card" style={{ overflow: 'hidden' }}>
+            <AppView
+              rounded={SECTION_RADIUS}
+              colorName="card"
+              borderWidth={1}
+              borderName="border"
+              style={{ overflow: 'hidden' }}
+            >
               {accountItems.map(({ key, ...item }, index) => (
                 <AppListItem
                   key={key}
                   {...item}
-                  titleWeight="bold"
+                  titleWeight="medium"
+                  size="md"
+                  style={{ minHeight: 62 }}
+                  dividerInset={ROW_DIVIDER_INSET}
                   _isFirst={index === 0}
                   _isLast={index === accountItems.length - 1}
                   _parentRounded={SECTION_RADIUS}
@@ -189,14 +205,12 @@ export default function ProfileScreen() {
             </AppView>
           </AppView>
 
-          {/* "Sign out" as a plain text button — the default `primary` tint is
-              near-white in light mode (invisible); `kind="text"` uses the theme
-              text color so it reads in both light and dark. */}
+          {/* Separate from the menu and quiet: a ghost button in the error colour. */}
           <AppView px="lg">
             <AppButton
               title={t('profile.signOut')}
               variant="ghost"
-              kind="text"
+              kind="error"
               size="lg"
               fullWidth
               onPress={handleSignOut}
@@ -226,8 +240,8 @@ function ProfileHeader({ profile }: { profile: UserProfile }) {
   const showAvatar = !!avatarUri && !imgFailed;
 
   return (
-    <AppView row align="center" gap={14} px="lg" style={{ paddingTop: 8 }}>
-      {/* 64px avatar with striped monogram per prototype */}
+    <AppView row align="center" gap="md" px="lg" style={{ paddingTop: 8 }}>
+      {/* 64px avatar, or a monogram when it's missing or fails to load. */}
       <AppView
         center
         rounded={999}
@@ -236,7 +250,7 @@ function ProfileHeader({ profile }: { profile: UserProfile }) {
           height: 64,
           flexShrink: 0,
           overflow: 'hidden',
-          backgroundColor: tokens.backgroundSecondary,
+          backgroundColor: tokens.brandSoft,
           borderWidth: 1,
           borderColor: tokens.border,
         }}
@@ -257,26 +271,19 @@ function ProfileHeader({ profile }: { profile: UserProfile }) {
           <AppText
             family="heading"
             weight="bold"
-            style={{ fontSize: 22, lineHeight: 26, color: tokens.text }}
+            style={{ fontSize: 22, lineHeight: 26, color: tokens.brand }}
           >
             {monogram}
           </AppText>
         )}
       </AppView>
 
-      {/* Name (21/700) + email + Pro pill */}
-      <AppView style={{ flex: 1 }}>
-        <AppText
-          family="heading"
-          weight="bold"
-          style={{ fontSize: 21, lineHeight: 26, color: tokens.text }}
-        >
+      {/* Name + contact line; the column wraps long names. */}
+      <AppView style={{ flex: 1, minWidth: 0 }}>
+        <AppText textVariant="h4" weight="bold" style={{ color: tokens.text }}>
           {fullName || t('profile.namePlaceholder')}
         </AppText>
-        <AppText
-          family="default"
-          style={{ fontSize: 13, color: tokens.textMuted, marginTop: 2 }}
-        >
+        <AppText textVariant="bodySm" style={{ color: tokens.textMuted, marginTop: 2 }}>
           {profile.email || profile.phone || ''}
         </AppText>
       </AppView>
@@ -291,16 +298,17 @@ function StatCell({ label, value }: { label: string; value: string }) {
   return (
     <AppView flex={1} align="center" gap={2} style={{ paddingHorizontal: 8 }}>
       <AppText
-        family="heading"
+        textVariant="h4"
         weight="bold"
-        style={{ fontSize: 21, lineHeight: 25, color: tokens.text }}
+        style={{ color: tokens.text, fontVariant: ['tabular-nums'] }}
       >
         {value}
       </AppText>
       <AppText
-        family="default"
-        weight="bold"
-        style={{ fontSize: 11.5, color: tokens.textMuted }}
+        textVariant="bodyXs"
+        weight="medium"
+        align="center"
+        style={{ color: tokens.textMuted }}
       >
         {label}
       </AppText>
@@ -311,7 +319,5 @@ function StatCell({ label, value }: { label: string; value: string }) {
 /** Hairline between two stat columns, inset from the card's edges. */
 function StatDivider() {
   const { tokens } = useThemeContext();
-  return (
-    <AppView style={{ width: 1, marginVertical: 2, backgroundColor: tokens.divider }} />
-  );
+  return <AppView style={{ width: 1, marginVertical: 2, backgroundColor: tokens.divider }} />;
 }

@@ -125,7 +125,7 @@ export function ItemPriceRow({
   return (
     <AppView gap={5}>
       <AppView row align="flex-end" wrap columnGap={10} rowGap={6}>
-        <AppPrice value={price} size={32} color={tokens.text} />
+        <AppPrice value={price} size={28} color={tokens.text} />
         {wasUzs > 0 ? (
           <AppText
             family="default"
@@ -136,17 +136,15 @@ export function ItemPriceRow({
               marginBottom: 4,
             }}
           >
-            {wasLabel
-              ? noBreakDigits(wasLabel)
-              : `${noBreakDigits(wasUzs.toLocaleString('ru-RU'))} ${t('common.currency')}`}
+            {`${noBreakDigits(wasUzs.toLocaleString('ru-RU'))} ${t('common.currency')}`}
           </AppText>
         ) : null}
         {savePct > 0 ? (
           <AppView
-            rounded={999}
+            rounded={8}
             px={8}
             py={3}
-            style={{ marginBottom: 4, backgroundColor: `${tokens.error}1a` }}
+            style={{ marginBottom: 4, backgroundColor: tokens.errorSoft }}
           >
             <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.error }}>
               {t('itemDetail.discountPercent', { percent: savePct })}

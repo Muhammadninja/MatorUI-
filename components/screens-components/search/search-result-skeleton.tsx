@@ -1,19 +1,18 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet } from 'react-native';
+import { Animated, Easing } from 'react-native';
 
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 
 import { RADIUS_MEDIA, RADIUS_PLACEHOLDER, RADIUS_TAG } from './radii';
 
-const THUMB_WIDTH = 150;
-const THUMB_HEIGHT = 150;
-const ROW_GAP = 20;
+const THUMB_WIDTH = 104;
+const THUMB_HEIGHT = 104;
+const ROW_GAP = 12;
 
 /**
  * Shimmer placeholder that mirrors the geometry of `SearchResultRow`:
- * edge-to-edge card (no divider, gap-only separation), 150×150 thumbnail
- * with rounded corners, text column with the signal tag above the title, the
+ * white list row, 104×104 thumbnail with rounded corners, text column with the signal tag above the title, the
  * price line, and the delivery line + AddToCartButton placeholder pinned
  * bottom-right. No rating line — the real row hides its rating when the
  * server hasn't supplied `result.rating`, so the skeleton must match.
@@ -60,8 +59,10 @@ export default function SearchResultSkeleton() {
     <Animated.View
       style={{
         opacity,
-        backgroundColor: isDark ? tokens.card : tokens.white,
-        borderBottomWidth: StyleSheet.hairlineWidth,
+        backgroundColor: tokens.card,
+        paddingVertical: 16,
+        paddingHorizontal: 20,
+        borderBottomWidth: 1,
         borderBottomColor: tokens.divider,
       }}
     >
@@ -74,8 +75,8 @@ export default function SearchResultSkeleton() {
             flexBasis: THUMB_WIDTH,
             flexGrow: 0,
             flexShrink: 0,
-            alignSelf: 'stretch',
-            minHeight: THUMB_HEIGHT,
+            alignSelf: 'flex-start',
+            height: THUMB_HEIGHT,
             borderRadius: RADIUS_MEDIA,
             backgroundColor: highlightColor,
           }}

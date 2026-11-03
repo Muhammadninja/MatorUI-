@@ -55,9 +55,9 @@ describe('round', () => {
 
 describe('formatCurrency', () => {
   test('formats as UZS whole som with thousands separators', () => {
-    expect(formatCurrency(0)).toBe('UZS 0');
-    expect(formatCurrency(1240.5)).toBe('UZS 1,241');
-    expect(formatCurrency(1234567.8)).toBe('UZS 1,234,568');
+    expect(formatCurrency(0)).toBe('0 UZS');
+    expect(formatCurrency(1240.5)).toBe('1\u00A0241 UZS');
+    expect(formatCurrency(1234567.8)).toBe('1\u00A0234\u00A0568 UZS');
   });
 });
 

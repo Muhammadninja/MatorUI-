@@ -38,6 +38,8 @@ function usePulseOpacity() {
 export type CategoryGridSkeletonProps = {
   /** How many placeholder tiles to render (defaults to the home grid's 10 roots). */
   count?: number;
+  /** Exact cell width, for a grid that computes equal columns. */
+  tileWidth?: number;
 };
 
 /**
@@ -47,15 +49,21 @@ export type CategoryGridSkeletonProps = {
  * pulse + radius conventions as `GarageSkeleton` / `SearchCatalogueSkeleton`;
  * native driver throughout so a slow category fetch stays at 60fps.
  */
-export default function CategoryGridSkeleton({ count = 10 }: CategoryGridSkeletonProps) {
+export default function CategoryGridSkeleton({ count = 10, tileWidth }: CategoryGridSkeletonProps) {
   const { tokens, scheme } = useThemeContext();
   const highlightColor = scheme === 'dark' ? tokens.gray300 : tokens.gray200;
   const opacity = usePulseOpacity();
 
   return (
-    <AppView row wrap justify="space-between" style={{ rowGap: 12 }}>
+    <AppView
+      row
+      wrap
+      justify={tileWidth ? undefined : 'space-between'}
+      gap={tileWidth ? 8 : undefined}
+      style={{ rowGap: tileWidth ? 8 : 12 }}
+    >
       {Array.from({ length: count }).map((_, i) => (
-        <AppView key={i} center style={{ width: '31.5%', gap: 10, paddingBottom: 5 }}>
+        <AppView key={i} center style={{ width: tileWidth ?? '31.5%', gap: 10, paddingBottom: 5 }}>
           {/* Icon chip */}
           <Animated.View
             style={{

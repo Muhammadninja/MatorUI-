@@ -1,3 +1,4 @@
+import { Check, CircleAlert, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 
 import { AppButton } from '@/components/shared/app-button';
@@ -17,27 +18,27 @@ export type ItemFitBadgeProps = {
 /**
  * Fit verdict, driven by the real backend compatibility check.
  *
- * The verdict carries in a coloured rule down the left edge and in the colour
- * of the sentence itself — green fits, neutral unknown, red doesn't — rather than
- * a glyph in a circle. The red state keeps the "show alternatives" CTA.
+ * The verdict carries in an icon and the colour of the sentence itself — green
+ * fits, amber unknown, red doesn't. The red state keeps the "show alternatives"
+ * CTA.
  */
 export function ItemFitBadge({ result, subtitle, onShowAlternatives }: ItemFitBadgeProps) {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
 
-  const accent =
+  const { accent, fill, Icon } =
     result.status === 'EXACT_MATCH' || result.status === 'UNIVERSAL'
-      ? tokens.success
+      ? { accent: tokens.success, fill: tokens.successSoft, Icon: Check }
       : result.status === 'NOT_COMPATIBLE'
-        ? tokens.error
-        : tokens.textMuted;
+        ? { accent: tokens.error, fill: tokens.errorSoft, Icon: X }
+        : { accent: tokens.warning, fill: tokens.warningSoft, Icon: CircleAlert };
 
   return (
-    <AppView row gap={13} rounded={18} p={14} style={{ backgroundColor: `${accent}12` }}>
-      <AppView rounded={999} style={{ width: 3, alignSelf: 'stretch', backgroundColor: accent }} />
+    <AppView row gap={12} rounded={16} p={16} style={{ backgroundColor: fill }}>
+      <Icon size={20} strokeWidth={2.4} color={accent} />
       <AppView flex={1} gap={10}>
         <AppView gap={3}>
-          <AppText family="accent" weight="bold" style={{ fontSize: 14.5, color: accent }}>
+          <AppText family="accent" weight="bold" style={{ fontSize: 14, lineHeight: 20, color: accent }}>
             {t(
               result.status === 'EXACT_MATCH' || result.status === 'UNIVERSAL'
                 ? 'itemDetail.fitConfirmed'
@@ -47,7 +48,7 @@ export function ItemFitBadge({ result, subtitle, onShowAlternatives }: ItemFitBa
             )}
           </AppText>
           {subtitle ? (
-            <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted }}>
+            <AppText family="default" style={{ fontSize: 14, lineHeight: 20, color: tokens.textMuted }}>
               {subtitle}
             </AppText>
           ) : null}
@@ -77,11 +78,15 @@ export function ItemUniversalFitBadge() {
 
   return (
     <AppView
-      rounded={999}
+      row
+      align="center"
+      gap={6}
+      rounded={8}
       px={12}
-      py={7}
+      py={8}
       style={{ alignSelf: 'flex-start', backgroundColor: tokens.successSoft }}
     >
+      <Check size={16} strokeWidth={2.6} color={tokens.success} />
       <AppText family="accent" weight="bold" style={{ fontSize: 12.5, color: tokens.success }}>
         {t('itemDetail.universalFitTitle')}
       </AppText>
@@ -137,9 +142,8 @@ export function ItemVehicleCta({ checking, vehicleLabel, onPress }: ItemVehicleC
       androidRipple={false}
       pressedOpacity={0.9}
       gap={6}
-      rounded={18}
-      px={15}
-      py={14}
+      rounded={16}
+      p={16}
       accessibilityRole="button"
       accessibilityLabel={t('itemDetail.confirmFitTitle')}
       style={{ backgroundColor: tokens.brandSoft }}
@@ -153,7 +157,7 @@ export function ItemVehicleCta({ checking, vehicleLabel, onPress }: ItemVehicleC
       <AppText
         family="accent"
         weight="bold"
-        style={{ fontSize: 13, color: tokens.text, marginTop: 2 }}
+        style={{ fontSize: 14, lineHeight: 20, color: tokens.brand, marginTop: 2 }}
       >
         {`${t('itemDetail.addYourCar')} →`}
       </AppText>

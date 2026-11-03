@@ -1,31 +1,27 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
-import {
-  AlertCircle,
-  Check,
-  CheckCheck,
-  Clock,
-  CreditCard,
-  Package,
-  PackageCheck,
-  RotateCcw,
-  Truck,
-  X,
-  XCircle,
-} from 'lucide-react-native';
+import { Bell, Check, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Pressable } from 'react-native';
 
+import {
+  localizedNotificationTime,
+  notificationDayGroup,
+  type NotificationDayGroup,
+} from '@/components/screens-components/notifications/notification-time';
 import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useCartContext } from '@/contexts/cart.context';
+import { useLanguageContext } from '@/contexts/language.context';
 import { useThemeContext } from '@/contexts/theme.context';
+import useGarage from '@/hooks/use-garage';
 import { useNotifications } from '@/hooks/use-notifications';
+import { formatCurrency } from '@/services/cart-math';
 import { debugLog } from '@/services/debug-log';
 import { toastService } from '@/services/toast-service';
 import { ORDER_STATUS_MACHINE_I18N, formatOrderNo } from '@/services/orders-service';
@@ -65,10 +61,10 @@ function buildRejectReasons(t: TFn): { key: SourcingOfferDeclineReason; label: s
   ];
 }
 
-/** 250000 → "250 000 сум". */
+/** 250000 → "250 000 сум", in the active language. */
 function formatSom(price?: number): string | null {
   if (typeof price !== 'number' || !Number.isFinite(price)) return null;
-  return `${price.toLocaleString('ru-RU').replace(/ /g, ' ')} сум`;
+  return formatCurrency(price);
 }
 
 /** Display polish for the part name, which is the raw user query from chat
@@ -88,36 +84,15 @@ function capitalizeWords(s?: string | null): string {
   return v.replace(/\S+/g, (w) => w.charAt(0).toUpperCase() + w.slice(1));
 }
 
-type LucideIcon = typeof Check;
-
-/** A colored icon per order status (from `data.status`) so an order-update row
- *  reads at a glance: green ✓ delivered/paid, red ✕ cancelled, blue in-transit,
- *  amber pending/refunded. Returns null for non-order or unknown statuses. */
-function orderStatusVisual(
-  status: string | undefined,
-  tokens: Tokens,
-): { Icon: LucideIcon; color: string } | null {
-  switch (status) {
-    case 'delivered':
-      return { Icon: PackageCheck, color: tokens.success };
-    case 'paid':
-      return { Icon: CreditCard, color: tokens.success };
-    case 'shipped':
-      return { Icon: Truck, color: tokens.info };
-    case 'processing':
-      return { Icon: Package, color: tokens.info };
-    case 'pending_payment':
-      return { Icon: Clock, color: tokens.warning };
-    case 'refunded':
-      return { Icon: RotateCcw, color: tokens.warning };
-    case 'cancelled':
-      return { Icon: XCircle, color: tokens.error };
-    case 'expired':
-      return { Icon: AlertCircle, color: tokens.textMuted };
-    default:
-      return null;
-  }
+/** The car's name from the backend's "<name> maʼlumotlari yangilandi." sentence,
+ *  the only place it survives once the vehicle has left the garage. */
+function vehicleNameFromBody(body: string): string | null {
+  const name = body.match(/^(.+?)\s+ma[ʼ'’`]lumotlari yangilandi\.?\s*$/)?.[1]?.trim();
+  return name || null;
 }
+
+/** Dividers start at the 16-unit gutter the row's text sits on. */
+const ROW_DIVIDER_INSET = 16;
 
 /**
  * Found-part offer row — a COMPACT product-style row for a `sourcing_offer`.
@@ -153,48 +128,54 @@ function SourcingOfferCard({
   const availabilityLabels = useMemo(() => buildAvailabilityLabels(t), [t]);
   const offer = n.offer ?? {};
   const priceText = formatSom(offer.price);
-  const chips = [conditionLabels[offer.condition ?? ''], availabilityLabels[offer.availability ?? '']].filter(
-    (c): c is string => Boolean(c),
-  );
+  const chips = [
+    conditionLabels[offer.condition ?? ''],
+    availabilityLabels[offer.availability ?? ''],
+  ].filter((c): c is string => Boolean(c));
 
   return (
-    <AppView
-      row
-      align="center"
-      gap={10}
-      style={{
-        paddingVertical: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: tokens.divider,
-      }}
-    >
+    <AppView row align="center" gap="md" style={{ paddingVertical: 12, paddingHorizontal: 16 }}>
       {offer.imageUrl ? (
         <Image
           source={{ uri: offer.imageUrl }}
-          style={{ width: 44, height: 44, borderRadius: 10 }}
+          style={{ width: 48, height: 48, borderRadius: 8 }}
           contentFit="cover"
           transition={150}
         />
       ) : null}
 
       {/* Name + price/condition — left, flexes to fill */}
-      <AppView style={{ flex: 1 }} gap={2}>
-        <AppText family="default" weight="bold" style={{ fontSize: 13.5, color: tokens.text }}>
+      <AppView style={{ flex: 1, minWidth: 0 }} gap={2}>
+        <AppText
+          family="default"
+          weight="medium"
+          style={{ fontSize: 15, lineHeight: 20, color: tokens.text }}
+        >
           {capitalizeFirst(offer.partName) || n.title || t('sourcing.foundPart')}
         </AppText>
         {vehicle ? (
-          <AppText family="default" style={{ fontSize: 11.5, color: tokens.textMuted }}>
+          <AppText
+            family="default"
+            style={{ fontSize: 12, lineHeight: 16, color: tokens.textMuted }}
+          >
             {t('sourcing.forVehicle', { vehicle })}
           </AppText>
         ) : null}
-        <AppView row align="center" gap={6}>
+        <AppView row wrap align="center" gap={6}>
           {priceText ? (
-            <AppText family="accent" weight="bold" style={{ fontSize: 14, color: tokens.brand, flexShrink: 0 }}>
+            <AppText
+              family="accent"
+              weight="bold"
+              style={{ fontSize: 14, lineHeight: 20, color: tokens.text, flexShrink: 0 }}
+            >
               {priceText}
             </AppText>
           ) : null}
           {chips.length ? (
-            <AppText family="default" style={{ fontSize: 11.5, color: tokens.textMuted, flexShrink: 1 }}>
+            <AppText
+              family="default"
+              style={{ fontSize: 12, lineHeight: 16, color: tokens.textMuted, flexShrink: 1 }}
+            >
               {(priceText ? '· ' : '') + chips.join(' · ')}
             </AppText>
           ) : null}
@@ -211,7 +192,7 @@ function SourcingOfferCard({
           </AppText>
         </AppView>
       ) : (
-        <AppView row align="center" gap={8} style={{ flexShrink: 0 }}>
+        <AppView row align="center" gap={4} style={{ flexShrink: 0 }}>
           {/* Decline (✕) — opens the reason picker; hidden once declined/gone */}
           {canDecline ? (
             <AppPressableView
@@ -221,7 +202,7 @@ function SourcingOfferCard({
               accessibilityRole="button"
               accessibilityLabel={t('sourcing.declineOfferA11y')}
               center
-              style={{ width: 34, height: 34, borderRadius: 999, borderWidth: 1, borderColor: tokens.divider }}
+              style={{ width: 48, height: 48 }}
             >
               <X size={16} color={tokens.textMuted} />
             </AppPressableView>
@@ -237,15 +218,19 @@ function SourcingOfferCard({
             row
             align="center"
             gap={5}
-            rounded={999}
-            style={{ paddingHorizontal: 14, paddingVertical: 8, backgroundColor: tokens.text }}
+            rounded={12}
+            style={{ minHeight: 48, paddingHorizontal: 12, backgroundColor: tokens.brand }}
           >
             {busy ? (
-              <WheelLoader size={14} color={tokens.background} />
+              <WheelLoader size={14} color={tokens.onBrand} />
             ) : (
               <>
-                <MaterialIcons name="add-shopping-cart" size={14} color={tokens.background} />
-                <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.background }}>
+                <MaterialIcons name="add-shopping-cart" size={14} color={tokens.onBrand} />
+                <AppText
+                  family="accent"
+                  weight="semibold"
+                  style={{ fontSize: 14, lineHeight: 20, color: tokens.onBrand }}
+                >
                   {t('sourcing.toCart')}
                 </AppText>
               </>
@@ -262,20 +247,24 @@ export default function NotificationsScreen() {
   const { tokens } = useThemeContext();
   const { state, notifications, unreadCount, markRead, markAllRead, refresh } = useNotifications();
 
-  // Two groups, in the order anyone actually reads a feed: what is waiting,
-  // then what has been seen. The backend sends no timestamp — only a
-  // pre-formatted "2h" string — so grouping by day is not available; unread
-  // vs read is the split the data can honestly support.
+  const { language } = useLanguageContext();
+  // Lets "vehicle updated" rows name the car: the notification only carries its id.
+  const { vehicles } = useGarage();
+
+  // Calendar groups from real timestamps, in the backend's order within each.
   const sections = useMemo(() => {
-    const unread = notifications.filter((n) => n.unread);
-    const read = notifications.filter((n) => !n.unread);
-    // Labels appear only when both groups exist. A heading over the entire
-    // list tells the reader nothing they cannot already see.
-    const labelled = unread.length > 0 && read.length > 0;
-    return [
-      { key: 'unread', label: labelled ? t('notifications.sectionNew') : '', items: unread },
-      { key: 'read', label: labelled ? t('notifications.sectionEarlier') : '', items: read },
-    ].filter((s) => s.items.length > 0);
+    const labels: Record<NotificationDayGroup, string> = {
+      today: t('notifications.sectionToday'),
+      yesterday: t('notifications.sectionYesterday'),
+      earlier: t('notifications.sectionEarlier'),
+    };
+    return (['today', 'yesterday', 'earlier'] as const)
+      .map((key) => ({
+        key,
+        label: labels[key],
+        items: notifications.filter((n) => notificationDayGroup(n.createdAt) === key),
+      }))
+      .filter((s) => s.items.length > 0);
   }, [notifications, t]);
   const { refresh: refreshCart } = useCartContext();
   const rejectReasons = useMemo(() => buildRejectReasons(t), [t]);
@@ -305,7 +294,7 @@ export default function NotificationsScreen() {
   // through a ref so the effect only re-runs when the set of offer ids changes,
   // and fetches only ids not yet resolved.
   const offerIds = notifications
-    .map((n) => ((n.type === 'sourcing_offer' || n.offer) ? n.offer?.offerId : undefined))
+    .map((n) => (n.type === 'sourcing_offer' || n.offer ? n.offer?.offerId : undefined))
     .filter((id): id is string => Boolean(id));
   const offerIdsKey = offerIds.join(',');
   const liveStatusRef = useRef(liveStatus);
@@ -348,9 +337,29 @@ export default function NotificationsScreen() {
     toastService.success(t('notifications.allMarkedRead'));
   };
 
+  // The garage row a vehicle notification is about; null once the car is gone.
+  const vehicleFor = useCallback(
+    (n: NotificationItem) => vehicles.find((v) => v.id === n.vehicleId) ?? null,
+    [vehicles],
+  );
+
+  /** A row is tappable only when there is somewhere real for it to go. */
+  const hasDestination = (n: NotificationItem) => {
+    if (n.type === 'vehicle_status_updated') return vehicleFor(n) !== null;
+    if (n.type === 'order_status_changed' && n.orderId) return true;
+    return Boolean(n.deeplinkPath);
+  };
+
   // Regular (non-offer) notifications: mark read + navigate.
   const openNotification = (n: NotificationItem) => {
     if (n.unread) markRead(n.id);
+    // The backend's vehicle deeplink names a route this app doesn't have; the
+    // vehicle screen takes the id as a param.
+    if (n.type === 'vehicle_status_updated') {
+      const vehicle = vehicleFor(n);
+      if (vehicle) router.push({ pathname: '/vehicle-detail', params: { id: vehicle.id } });
+      return;
+    }
     // Order-STATUS-change rows go to the order-status (track-order) screen. The
     // backend's deeplink for these points at the cart's order-confirmation,
     // which is the wrong destination — the order id in `data` is the real
@@ -375,30 +384,35 @@ export default function NotificationsScreen() {
     }
   };
 
-  // Order-status rows: render a LOCALIZED title/body from `data` instead of the
-  // backend copy, which embeds the raw English status word (e.g. "delivered").
   /**
-   * Row copy. Order rows are rebuilt rather than printed as the backend sends
-   * them: the status is lifted OUT of the sentence into a coloured eyebrow, and
-   * the order number takes the headline. "Order status updated / Your order is
-   * now Shipped" said the same thing twice and buried the only two facts that
-   * matter — which order, and what happened to it.
+   * Row copy. Where structured data allows it, the row is built here in the
+   * active language instead of printing the backend's sentence: the order number
+   * and its localized status, or the car's name. Nothing is said about WHAT
+   * changed on a vehicle, because the event doesn't record it. Other types still
+   * print server text, in whatever language the backend wrote it.
    */
   const displayText = useCallback(
-    (n: NotificationItem): { eyebrow: string; title: string; body: string } => {
+    (n: NotificationItem): { title: string; body: string } => {
+      if (n.type === 'vehicle_status_updated') {
+        const vehicle = vehicleFor(n);
+        // A car no longer in the garage is still named in the backend's sentence.
+        const name = vehicle ? `${vehicle.make} ${vehicle.model}` : vehicleNameFromBody(n.body);
+        return name
+          ? { title: t('notifications.vehicleUpdatedTitle', { vehicle: name }), body: '' }
+          : { title: t('notifications.vehicleUpdatedGeneric'), body: '' };
+      }
       if (n.type !== 'order_status_changed') {
-        return { eyebrow: '', title: n.title, body: n.body };
+        return { title: n.title, body: n.body };
       }
       const statusLabel = n.orderStatus
         ? t(ORDER_STATUS_MACHINE_I18N[n.orderStatus] ?? ' ', { defaultValue: n.orderStatus })
         : '';
       return {
-        eyebrow: statusLabel,
         title: n.orderId ? formatOrderNo(n.orderId) : t('notifications.orderStatusTitle'),
-        body: statusLabel ? '' : n.body,
+        body: statusLabel || n.body,
       };
     },
-    [t],
+    [t, vehicleFor],
   );
 
   const addToCart = useCallback(
@@ -462,213 +476,189 @@ export default function NotificationsScreen() {
     [rejectTarget, rejectBusy, t],
   );
 
+  const renderRow = (n: NotificationItem) => {
+    // Found-part offers act inline (add to cart) — no navigation.
+    if (n.type === 'sourcing_offer' || n.offer) {
+      const offerId = n.offer?.offerId ?? '';
+      // Prefer the notification snapshot (instant, for new offers); fall back to
+      // the value resolved from the offer detail (existing offers).
+      const vehicle =
+        capitalizeWords([n.offer?.vehicleBrand, n.offer?.vehicleModel].filter(Boolean).join(' ')) ||
+        (liveVehicle[offerId] ?? '');
+      const status = liveStatus[offerId];
+      return (
+        <SourcingOfferCard
+          n={n}
+          tokens={tokens}
+          busy={busyOffer === offerId}
+          added={status === 'ACCEPTED'}
+          // Decline only applies to a live (SENT / not-yet-resolved) offer — once
+          // declined/expired/gone, the card just re-offers "add to cart".
+          canDecline={status === undefined || status === 'SENT'}
+          vehicle={vehicle}
+          onAdd={() => addToCart(n)}
+          onReject={() => openReject(n)}
+        />
+      );
+    }
+
+    const { title, body } = displayText(n);
+    const time = localizedNotificationTime(n.createdAt, t, language) || n.time;
+    const rowStyle = { paddingVertical: 12, paddingHorizontal: 16 } as const;
+    const content = (
+      <>
+        <AppView flex={1} gap={2} style={{ minWidth: 0 }}>
+          {/* Real unread status: a small teal dot. */}
+          <AppView row align="flex-start" gap="sm">
+            <AppText
+              family="default"
+              weight="medium"
+              style={{ flex: 1, minWidth: 0, fontSize: 15, lineHeight: 20, color: tokens.text }}
+            >
+              {title}
+            </AppText>
+            {n.unread ? (
+              <AppView
+                rounded={999}
+                style={{ width: 8, height: 8, marginTop: 6, backgroundColor: tokens.brand }}
+              />
+            ) : null}
+          </AppView>
+          {body ? (
+            <AppText textVariant="bodySm" style={{ color: tokens.textMuted }}>
+              {body}
+            </AppText>
+          ) : null}
+          {time ? (
+            <AppText textVariant="bodyXs" style={{ color: tokens.textMuted }}>
+              {time}
+            </AppText>
+          ) : null}
+        </AppView>
+      </>
+    );
+    const a11yText = [title, body, time].filter(Boolean).join('. ');
+
+    if (!hasDestination(n)) {
+      return (
+        <AppView
+          accessible
+          accessibilityLabel={
+            n.unread ? `${a11yText}. ${t('notifications.unreadLabel')}` : a11yText
+          }
+          row
+          gap={12}
+          style={rowStyle}
+        >
+          {content}
+        </AppView>
+      );
+    }
+    return (
+      <AppPressableView
+        onPress={() => openNotification(n)}
+        androidRipple={false}
+        pressedOpacity={0.6}
+        accessibilityRole="button"
+        accessibilityLabel={`${a11yText}. ${n.unread ? t('notifications.unreadHint') : t('notifications.readHint')}`}
+        // Without this the inner Pressable shrinks to its content width, so the
+        // flex:1 content column collapses to ~0. fillContainer makes the Pressable
+        // fill the row so the content lays out at full width.
+        fillContainer
+        row
+        gap={12}
+        style={rowStyle}
+      >
+        {content}
+      </AppPressableView>
+    );
+  };
+
   return (
     <AppView flex={1} colorName="background">
-      <AppSettingsHeader
-        title={t('notifications.title')}
-        fallbackHref="/profile"
-        right={
-          unreadCount > 0 ? (
-            // Two checkmarks instead of the label. "Mark all read" runs to 32
-            // characters in Uzbek ("Hammasini oʻqilgan deb belgilash") and ate
-            // the header; the glyph is the same idea at a quarter the width,
-            // with the sentence kept on the a11y layer.
-            <AppPressableView
-              testID="notifications-mark-all"
-              onPress={handleMarkAll}
-              pressedOpacity={0.6}
-              accessibilityRole="button"
-              accessibilityLabel={t('notifications.markAllReadA11y')}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              center
-              rounded={999}
-              colorName="backgroundSecondary"
-              style={{ width: 32, height: 32 }}
+      <AppSettingsHeader title={t('notifications.title')} fallbackHref="/profile" />
+
+      {unreadCount > 0 ? (
+        <AppView row justify="flex-end" px="lg">
+          <AppPressableView
+            testID="notifications-mark-all"
+            onPress={handleMarkAll}
+            androidRipple={false}
+            pressedOpacity={0.6}
+            accessibilityRole="button"
+            accessibilityLabel={t('notifications.markAllReadA11y')}
+            center
+            style={{ minHeight: 48, minWidth: 48 }}
+          >
+            <AppText
+              weight="semibold"
+              style={{ fontSize: 14, lineHeight: 20, color: tokens.brand }}
             >
-              <CheckCheck size={17} strokeWidth={2.4} color={tokens.text} />
-            </AppPressableView>
-          ) : undefined
-        }
-      />
+              {t('notifications.markAllRead')}
+            </AppText>
+          </AppPressableView>
+        </AppView>
+      ) : null}
 
       {state === 'loading' ? (
         <AppView flex={1} center>
-          <WheelLoader size={28} color={tokens.textMuted} />
+          <WheelLoader size={28} color={tokens.brand} />
         </AppView>
       ) : notifications.length === 0 ? (
-        // Sits above the optical centre, not the geometric one: dead-centre
-        // reads as a placeholder screen, a little high reads as composed.
-        <AppView flex={1} center px="xl" style={{ paddingBottom: 72 }}>
-          {/* No glyph. A crossed-out bell is a picture of the thing that did
-           *  not happen; the sentence already says it, and says it better. */}
-          <AppView align="center" gap={6}>
-            <AppText family="heading" weight="bold" style={{ fontSize: 19, color: tokens.text }}>
-              {t('notifications.emptyTitle')}
-            </AppText>
-            <AppText
-              family="default"
-              style={{
-                fontSize: 13.5,
-                lineHeight: 19,
-                color: tokens.textMuted,
-                textAlign: 'center',
-                maxWidth: 250,
-              }}
-            >
-              {t('notifications.emptyBody')}
-            </AppText>
+        // Sits above the optical centre: a little high reads as composed.
+        <AppView flex={1} center px="xl" gap={12} style={{ paddingBottom: 72 }}>
+          <AppView
+            center
+            rounded={999}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={{ width: 72, height: 72, backgroundColor: tokens.brandSoft }}
+          >
+            <Bell size={32} strokeWidth={2} color={tokens.brand} />
           </AppView>
+          <AppText textVariant="h4" weight="bold" align="center" style={{ color: tokens.text }}>
+            {t('notifications.emptyTitle')}
+          </AppText>
+          <AppText
+            textVariant="bodySm"
+            style={{ color: tokens.textMuted, textAlign: 'center', maxWidth: 280 }}
+          >
+            {t('notifications.emptyBody')}
+          </AppText>
         </AppView>
       ) : (
         <AppScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingTop: 8, paddingBottom: 32, paddingHorizontal: 20 }}
+          contentContainerStyle={{ paddingTop: 8, paddingBottom: 32, gap: 16 }}
           padding={0}
         >
           {sections.map(({ key, label, items }) => (
-            <AppView key={key} style={{ marginBottom: 18 }}>
-              {/* The label only earns its place when there is something to tell
-               *  apart: with everything unread (or everything read) it would be
-               *  a heading over the whole list, which says nothing. */}
-              {label ? (
-                <AppText
-                  family="accent"
-                  weight="bold"
-                  transform="uppercase"
-                  style={{
-                    fontSize: 10.5,
-                    letterSpacing: 1.1,
-                    color: tokens.textMuted,
-                    marginBottom: 10,
-                  }}
-                >
-                  {label}
-                </AppText>
-              ) : null}
-              {items.map((n) => {
-            // Found-part offers act inline (add to cart) — no navigation.
-            if (n.type === 'sourcing_offer' || n.offer) {
-              const offerId = n.offer?.offerId ?? '';
-              // Prefer the notification snapshot (instant, for new offers); fall
-              // back to the value resolved from the offer detail (existing offers).
-              const vehicle =
-                capitalizeWords(
-                  [n.offer?.vehicleBrand, n.offer?.vehicleModel].filter(Boolean).join(' '),
-                ) || (liveVehicle[offerId] ?? '');
-              const status = liveStatus[offerId];
-              return (
-                <SourcingOfferCard
-                  key={n.id}
-                  n={n}
-                  tokens={tokens}
-                  busy={busyOffer === offerId}
-                  added={status === 'ACCEPTED'}
-                  // Decline only applies to a live (SENT / not-yet-resolved) offer —
-                  // once declined/expired/gone, the card just re-offers "add to cart".
-                  canDecline={status === undefined || status === 'SENT'}
-                  vehicle={vehicle}
-                  onAdd={() => addToCart(n)}
-                  onReject={() => openReject(n)}
-                />
-              );
-            }
-            const { eyebrow, title: rowTitle, body: rowBody } = displayText(n);
-                // Colour carries the status now — there is no glyph. A tinted
-                // disc with a truck in it was decoration; the word "Shipped"
-                // in the same colour is the information, and it survives being
-                // read aloud.
-                const accent =
-                  n.type === 'order_status_changed'
-                    ? (orderStatusVisual(n.orderStatus, tokens)?.color ?? tokens.textMuted)
-                    : tokens.brand;
-                return (
-                  <AppPressableView
-                    key={n.id}
-                    onPress={() => openNotification(n)}
-                    androidRipple={false}
-                    pressedOpacity={0.6}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${eyebrow ? `${eyebrow}. ` : ''}${rowTitle}. ${n.unread ? t('notifications.unreadHint') : t('notifications.readHint')}`}
-                    row
-                    gap={12}
-                    // Without this the inner Pressable shrinks to its content width, so
-                    // the flex:1 content column collapses to ~0 and the row renders as a
-                    // full-width divider with (near-)invisible text. fillContainer makes
-                    // the Pressable fill the row so the content lays out at full width.
-                    fillContainer
-                    // Unread rows are carried by a filled card; read ones drop to a
-                    // quiet row on a hairline. One state reads as "waiting for you",
-                    // the other as archive, without either needing a badge to say so.
-                    rounded={n.unread ? 16 : 0}
-                    colorName={n.unread ? 'backgroundSecondary' : undefined}
-                    style={{
-                      paddingVertical: 13,
-                      paddingHorizontal: n.unread ? 14 : 0,
-                      marginBottom: n.unread ? 8 : 0,
-                      borderBottomWidth: n.unread ? 0 : 1,
-                      borderBottomColor: tokens.divider,
-                    }}
-                  >
-                    {/* A 3px rail instead of an icon: it marks the row and
-                     *  colours it by status without putting a picture of a
-                     *  lorry next to every delivery. */}
-                    {n.unread ? (
+            <AppView key={key} gap={8}>
+              <AppText
+                textVariant="bodySm"
+                weight="semibold"
+                accessibilityRole="header"
+                style={{ color: tokens.textMuted, paddingHorizontal: 16 }}
+              >
+                {label}
+              </AppText>
+              <AppView colorName="card">
+                {items.map((n, index) => (
+                  <AppView key={n.id}>
+                    {index > 0 ? (
                       <AppView
-                        rounded={999}
-                        style={{ width: 3, alignSelf: 'stretch', backgroundColor: accent }}
+                        style={{
+                          height: 1,
+                          marginLeft: ROW_DIVIDER_INSET,
+                          marginRight: ROW_DIVIDER_INSET,
+                          backgroundColor: tokens.divider,
+                        }}
                       />
                     ) : null}
-
-                    <AppView style={{ flex: 1 }}>
-                      <AppView row align="flex-start" justify="space-between" gap={10}>
-                        <AppView style={{ flex: 1, gap: 3 }}>
-                          {eyebrow ? (
-                            <AppText
-                              family="accent"
-                              weight="bold"
-                              transform="uppercase"
-                              style={{ fontSize: 10.5, letterSpacing: 1, color: accent }}
-                            >
-                              {eyebrow}
-                            </AppText>
-                          ) : null}
-                          <AppText
-                            family="accent"
-                            weight="bold"
-                            style={{ fontSize: 14.5, color: tokens.text }}
-                          >
-                            {rowTitle}
-                          </AppText>
-                        </AppView>
-                        <AppText
-                          family="default"
-                          style={{
-                            fontSize: 11.5,
-                            color: tokens.textMuted,
-                            flexShrink: 0,
-                            marginTop: 1,
-                          }}
-                        >
-                          {n.time}
-                        </AppText>
-                      </AppView>
-                      {rowBody ? (
-                        <AppText
-                          family="default"
-                          style={{
-                            fontSize: 13,
-                            color: tokens.textMuted,
-                            marginTop: 3,
-                            lineHeight: 18,
-                          }}
-                        >
-                          {rowBody}
-                        </AppText>
-                      ) : null}
-                    </AppView>
-                  </AppPressableView>
-                );
-              })}
+                    {renderRow(n)}
+                  </AppView>
+                ))}
+              </AppView>
             </AppView>
           ))}
         </AppScrollView>
@@ -702,7 +692,11 @@ export default function NotificationsScreen() {
               paddingBottom: 6,
             }}
           >
-            <AppText family="heading" weight="bold" style={{ fontSize: 15.5, color: tokens.text, marginBottom: 2 }}>
+            <AppText
+              family="heading"
+              weight="bold"
+              style={{ fontSize: 15.5, color: tokens.text, marginBottom: 2 }}
+            >
               {t('sourcing.declineReasonTitle')}
             </AppText>
             {rejectReasons.map((r, i) => (
@@ -718,7 +712,11 @@ export default function NotificationsScreen() {
                   opacity: rejectBusy ? 0.5 : 1,
                 }}
               >
-                <AppText family="default" weight="semibold" style={{ fontSize: 14.5, color: tokens.text }}>
+                <AppText
+                  family="default"
+                  weight="semibold"
+                  style={{ fontSize: 14.5, color: tokens.text }}
+                >
                   {r.label}
                 </AppText>
               </AppPressableView>

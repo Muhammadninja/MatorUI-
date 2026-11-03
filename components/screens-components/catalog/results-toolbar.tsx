@@ -60,19 +60,21 @@ export function ResultsToolbar({ count, sortBy, onSortChange }: ResultsToolbarPr
               }}
               androidRipple={false}
               pressedOpacity={0.85}
-              rounded={999}
+              rounded={8}
               px={14}
               py={8}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
               style={{
-                backgroundColor: active ? tokens.text : tokens.backgroundSecondary,
+                backgroundColor: active ? tokens.brand : tokens.surface,
+                borderWidth: 1,
+                borderColor: active ? tokens.brand : tokens.border,
               }}
             >
               <AppText
                 family="accent"
                 weight="bold"
-                style={{ fontSize: 12.5, color: active ? tokens.background : tokens.text }}
+                style={{ fontSize: 12.5, color: active ? tokens.onBrand : tokens.text }}
               >
                 {t(s.labelKey)}
               </AppText>

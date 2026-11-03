@@ -33,7 +33,8 @@ vi.mock('@/components/shared/app-view', () => ({
   AppView: host('view'),
   AppPressableView: host('pressable'),
 }));
-vi.mock('@/contexts/language.context', () => ({ useLanguageContext: () => ({ language: 'ru' }) }));
+vi.mock('@/components/shared/app-button', () => ({ AppButton: host('button') }));
+vi.mock('./garage-brand-badge', () => ({ GarageBrandBadge: host('badge') }));
 vi.mock('@/contexts/theme.context', async () => {
   const { darkTokens, lightTokens } = await import('@/themes');
   return {
@@ -65,46 +66,37 @@ function render(scheme: 'light' | 'dark') {
       <GarageActiveHero vehicle={COBALT} onShopParts={() => {}} onOpenDetail={() => {}} />,
     );
   });
-  const card = r.root.find((n) => n.type === 'view' && n.props.rounded === 22);
-  const cta = r.root.find(
-    (n) =>
-      (n.type as string) === 'pressable' &&
-      n.props.accessibilityLabel === 'garage.shopPartsThatFit',
-  );
-  const title = r.root.find((n) => n.type === 'text' && n.children.includes('2020 Chevrolet'));
+  const card = r.root.find((n) => n.type === 'view' && n.props.rounded === 16);
+  const cta = r.root.find((n) => (n.type as string) === 'button');
+  const title = r.root.find((n) => n.type === 'text' && n.children.includes('Chevrolet Cobalt'));
   return { card, cta, title };
 }
 
 describe('GarageActiveHero colours', () => {
-  test('the card surface is the `hero` token, not the CTA fill', () => {
-    expect(render('dark').card.props.colorName).toBe('hero');
+  test('the card surface is the shared vehicle banner', () => {
+    expect(render('dark').card.props.colorName).toBe('vehicleBanner');
+    expect(render('light').card.props.colorName).toBe('vehicleBanner');
   });
 
-  test('dark: a dark card surface — not a white block', () => {
-    expect(darkTokens.hero).not.toBe('#ffffff');
-    expect(darkTokens.hero).toBe(darkTokens.card);
-    expect(darkTokens.hero).not.toBe(darkTokens.brand);
+  test('dark: keeps the elevated card surface — not a white block', () => {
+    expect(darkTokens.vehicleBanner).toBe(darkTokens.card);
+    expect(darkTokens.vehicleBanner).not.toBe(darkTokens.brand);
     // Text on it stays readable.
-    expect(render('dark').title.props.style.color).toBe(darkTokens.onHero);
-    expect(darkTokens.onHero).toBe(darkTokens.text);
+    expect(render('dark').title.props.style.color).toBe(darkTokens.onVehicleBanner);
+    expect(darkTokens.onVehicleBanner).toBe(darkTokens.text);
   });
 
-  test('light: the inverted black hero is unchanged', () => {
-    expect(lightTokens.hero).toBe(lightTokens.brand);
-    expect(lightTokens.onHero).toBe(lightTokens.onBrand);
-    // Exactly the alpha whites the component used to hardcode for light mode.
-    expect(lightTokens.heroMuted).toBe('rgba(255, 255, 255, 0.5)');
-    expect(lightTokens.heroDivider).toBe('rgba(255, 255, 255, 0.18)');
-    expect(lightTokens.heroWash).toBe('rgba(255, 255, 255, 0.16)');
+  test('light: pale teal with graphite text', () => {
+    expect(lightTokens.vehicleBanner).toBe('#E5F4F3');
+    expect(lightTokens.vehicleBannerBorder).toBe('#C5E3E1');
+    expect(render('light').title.props.style.color).toBe(lightTokens.onVehicleBanner);
+    expect(lightTokens.onVehicleBanner).toBe(lightTokens.text);
   });
 
-  test.each(['light', 'dark'] as const)('%s: the CTA stands out from the hero', (scheme) => {
-    const tokens = scheme === 'dark' ? darkTokens : lightTokens;
+  test.each(['light', 'dark'] as const)('%s: the CTA is the brand button', (scheme) => {
     const { cta } = render(scheme);
-    expect(cta.props.colorName).toBe('primaryBg');
-    expect(tokens.primaryBg).not.toBe(tokens.hero);
-    const label = cta.find((n) => n.type === 'text');
-    expect(label.props.colorName).toBe('onPrimary');
+    expect(cta.props.kind).toBe('brand');
+    expect(cta.props.title).toBe('explore.shopParts');
   });
 
   test('no colour is decided in the component', () => {

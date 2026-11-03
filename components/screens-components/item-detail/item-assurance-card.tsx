@@ -1,3 +1,4 @@
+import { Truck } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 
 import { AppText } from '@/components/shared/app-text';
@@ -35,11 +36,7 @@ export type ItemAssuranceCardProps = {
  * When it lands leads, in the same voice a counter clerk would use; shipping
  * and payment follow as quiet supporting copy.
  *
- * It is deliberately UNBOXED. It used to sit in a tinted card, directly under
- * the tinted fit verdict and directly above the grey spec table — three
- * rounded blocks in three tints with nothing ranking them. The page now spends
- * its one coloured card on the fit verdict (the actual decision) and sets
- * everything else as type separated by hairlines.
+ * It sits in the handoff's pale teal delivery panel, with graphite type.
  *
  * Every line is derived, never promised: the arrival window is the backend's
  * `delivery_eta_days_{min,max}` turned into real dates, the shipping line
@@ -82,23 +79,30 @@ export function ItemAssuranceCard({ item, formatCurrency }: ItemAssuranceCardPro
   });
 
   return (
-    <AppView gap={7}>
-      {when ? (
-        <AppText family="accent" weight="semibold" style={{ fontSize: 14.5, color: tokens.text }}>
-          {t('itemDetail.arrivesLead')}{' '}
-          <AppText family="accent" weight="bold" style={{ color: tokens.success }}>
-            {when}
+    <AppView row gap={12} rounded={16} p={16} style={{ backgroundColor: tokens.brandSoft }}>
+      <Truck size={20} strokeWidth={2.2} color={tokens.brand} />
+      <AppView flex={1} gap={4}>
+        {when ? (
+          <AppText
+            family="accent"
+            weight="semibold"
+            style={{ fontSize: 14, lineHeight: 20, color: tokens.text }}
+          >
+            {t('itemDetail.arrivesLead')}{' '}
+            <AppText family="accent" weight="bold" style={{ color: tokens.text }}>
+              {when}
+            </AppText>
           </AppText>
+        ) : null}
+
+        <AppText family="default" style={{ fontSize: 14, lineHeight: 20, color: tokens.text }}>
+          {shippingLine}
         </AppText>
-      ) : null}
 
-      <AppText family="default" style={{ fontSize: 13, lineHeight: 18, color: tokens.textMuted }}>
-        {shippingLine}
-      </AppText>
-
-      <AppText family="default" style={{ fontSize: 12.5, lineHeight: 17, color: tokens.textMuted }}>
-        {t('itemDetail.paymentLine')}
-      </AppText>
+        <AppText family="default" style={{ fontSize: 14, lineHeight: 20, color: tokens.text }}>
+          {t('itemDetail.paymentLine')}
+        </AppText>
+      </AppView>
     </AppView>
   );
 }

@@ -1,11 +1,12 @@
 import AppImage from '@/components/shared/app-image';
 import { AppView } from '@/components/shared/app-view';
 import PartImagePlaceholder from '@/components/shared/part-image-placeholder';
+import { useThemeContext } from '@/contexts/theme.context';
 
 import { RADIUS_MEDIA } from '../radii';
 
-const THUMB_WIDTH = 150;
-const THUMB_HEIGHT = 150;
+const THUMB_SIZE = 104;
+const THUMB_PADDING = 6;
 
 export type ThumbnailProps = {
   /** Accessibility label — the part name. */
@@ -15,42 +16,32 @@ export type ThumbnailProps = {
 };
 
 export default function Thumbnail({ alt, uri }: ThumbnailProps) {
+  const { tokens } = useThemeContext();
   const placeholder = (
     <PartImagePlaceholder label={alt} width="100%" height="100%" backgroundColor="transparent" />
   );
 
   return (
+    // The same white tile and padding for every result, in both themes; `contain`
+    // keeps each product's own proportions inside it, because catalog photos come
+    // in every aspect ratio and cropping would cut the part in half.
     <AppView
       style={{
-        // Lock the WIDTH so flex can't stretch or shrink the box under any
-        // parent — `align="stretch"` on a row stretches vertically, but
-        // some hosts have been observed growing this box horizontally
-        // when sibling content is taller than 150.
-        width: THUMB_WIDTH,
-        minWidth: THUMB_WIDTH,
-        maxWidth: THUMB_WIDTH,
-        flexBasis: THUMB_WIDTH,
-        flexGrow: 0,
+        width: THUMB_SIZE,
+        height: THUMB_SIZE,
         flexShrink: 0,
-        alignSelf: 'stretch',
-        minHeight: THUMB_HEIGHT,
+        padding: THUMB_PADDING,
         overflow: 'hidden',
         borderRadius: RADIUS_MEDIA,
-        // No background, no borders — anything sitting underneath the
-        // image bleeds out the rounded-corner clip as a 1-2px gray
-        // outline (the antialiased boundary mixes the bg color into the
-        // visible edge). Letting the card's own bg show through fixes it.
+        backgroundColor: tokens.white,
       }}
     >
       {uri ? (
-        // `contain` on a transparent tile: catalog photos are shot on white in
-        // every aspect ratio, so cropping to fill would cut the part in half.
         <AppImage
           source={uri}
           width="100%"
           height="100%"
-          rounded={RADIUS_MEDIA}
-          targetWidth={THUMB_WIDTH}
+          targetWidth={THUMB_SIZE}
           contentFit="contain"
           placeholderColor="transparent"
           fallback={placeholder}

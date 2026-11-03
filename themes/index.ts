@@ -49,34 +49,33 @@ export function resolveSpace(value: number | SpacingKey | undefined): number | u
   return SPACING[value];
 }
 
-// Mator v2 uses a single family — Figtree — across every role (weights
-// 400/500/600/700/800). Figtree is a geometric sans with a tall x-height and
-// round bowls: the closest open face to the one Instagram's UI is set in
-// (Instagram Sans is proprietary and not licensable for embedding). It
-// started out as the search-result row's own face and is now the whole app's.
+// Mator uses a single family — Inter — across every role (weights
+// 400/500/600/700). The teal handoff keeps the existing font only if it supports
+// Russian and Uzbek Latin reliably; Figtree has no Cyrillic and no `ʻ`, so Russian
+// fell back to the system face mid-string. Inter covers both.
 // The three "family" names (default/heading/accent) still exist so the ~1k
-// existing `family=` call sites keep working; they now all resolve to a
-// Figtree weight. The MATOR wordmark is the one exception — it uses
+// existing `family=` call sites keep working; they now all resolve to an
+// Inter weight. The MATOR wordmark is the one exception — it uses
 // Raleway 800 (see `app-logo`).
 export const APP_FONTS: Record<FontFamilyName, string | undefined> = {
-  default: 'Figtree_400Regular',
-  heading: 'Figtree_700Bold',
-  accent: 'Figtree_600SemiBold',
+  default: 'Inter_400Regular',
+  heading: 'Inter_700Bold',
+  accent: 'Inter_600SemiBold',
   mono: 'SpaceMono',
 };
 
 export const FONT_PACKAGES = {
   body: {
-    regular: 'Figtree_400Regular',
-    medium: 'Figtree_500Medium',
-    semibold: 'Figtree_600SemiBold',
-    bold: 'Figtree_700Bold',
+    regular: 'Inter_400Regular',
+    medium: 'Inter_500Medium',
+    semibold: 'Inter_600SemiBold',
+    bold: 'Inter_700Bold',
   },
   heading: {
-    bold: 'Figtree_700Bold',
+    bold: 'Inter_700Bold',
   },
   accent: {
-    semibold: 'Figtree_600SemiBold',
+    semibold: 'Inter_600SemiBold',
   },
   mono: {
     regular: 'SpaceMono',
@@ -84,69 +83,76 @@ export const FONT_PACKAGES = {
 } as const;
 
 const textVariants: Record<TextVariant, TextStyle> = {
-  body: { fontSize: 16, lineHeight: 24, fontFamily: 'Figtree_400Regular' },
-  bodySm: { fontSize: 14, lineHeight: 20, fontFamily: 'Figtree_400Regular' },
-  bodyXs: { fontSize: 12, lineHeight: 16, fontFamily: 'Figtree_400Regular' },
-  bodySemibold: { fontSize: 15, lineHeight: 22, fontFamily: 'Figtree_600SemiBold' },
-  h3: { fontSize: 24, lineHeight: 30, fontFamily: 'Figtree_700Bold' },
-  h4: { fontSize: 20, lineHeight: 26, fontFamily: 'Figtree_700Bold' },
-  button: { fontSize: 16, lineHeight: 20, fontFamily: 'Figtree_600SemiBold' },
-  buttonSm: { fontSize: 14, lineHeight: 18, fontFamily: 'Figtree_600SemiBold' },
-  caption: { fontSize: 11, lineHeight: 14, fontFamily: 'Figtree_500Medium' },
-  subtitle: { fontSize: 18, lineHeight: 24, fontFamily: 'Figtree_600SemiBold' },
-  title: { fontSize: 28, lineHeight: 34, fontFamily: 'Figtree_800ExtraBold' },
+  body: { fontSize: 16, lineHeight: 24, fontFamily: 'Inter_400Regular' },
+  bodySm: { fontSize: 14, lineHeight: 20, fontFamily: 'Inter_400Regular' },
+  bodyXs: { fontSize: 12, lineHeight: 16, fontFamily: 'Inter_400Regular' },
+  bodySemibold: { fontSize: 14, lineHeight: 20, fontFamily: 'Inter_600SemiBold' },
+  h3: { fontSize: 24, lineHeight: 30, fontFamily: 'Inter_700Bold' },
+  h4: { fontSize: 20, lineHeight: 26, fontFamily: 'Inter_700Bold' },
+  button: { fontSize: 16, lineHeight: 20, fontFamily: 'Inter_600SemiBold' },
+  buttonSm: { fontSize: 14, lineHeight: 18, fontFamily: 'Inter_600SemiBold' },
+  caption: { fontSize: 12, lineHeight: 16, fontFamily: 'Inter_500Medium' },
+  subtitle: { fontSize: 18, lineHeight: 24, fontFamily: 'Inter_600SemiBold' },
+  title: { fontSize: 28, lineHeight: 34, fontFamily: 'Inter_700Bold' },
 };
 
 const weightStyles: Record<WeightName, TextStyle> = {
-  regular: { fontFamily: 'Figtree_400Regular', fontWeight: '400' },
-  medium: { fontFamily: 'Figtree_500Medium', fontWeight: '500' },
-  semibold: { fontFamily: 'Figtree_600SemiBold', fontWeight: '600' },
-  bold: { fontFamily: 'Figtree_700Bold', fontWeight: '700' },
+  regular: { fontFamily: 'Inter_400Regular', fontWeight: '400' },
+  medium: { fontFamily: 'Inter_500Medium', fontWeight: '500' },
+  semibold: { fontFamily: 'Inter_600SemiBold', fontWeight: '600' },
+  bold: { fontFamily: 'Inter_700Bold', fontWeight: '700' },
 };
 
 export const lightTokens: ThemeTokens = {
-  background: '#ffffff',
-  backgroundSecondary: '#f3f3f3',
-  surface: '#ffffff',
-  card: '#fafafa',
-  onCard: '#050505',
-  text: '#050505',
-  onBackground: '#050505',
-  textMuted: '#707070',
-  border: '#d6d6d6',
-  divider: '#ececec',
-  overlay: 'rgba(5, 5, 5, 0.12)',
-  primary: '#ffffff',
-  primaryBg: '#ffffff',
-  primaryPressed: '#f2f2f2',
-  onPrimary: '#000000',
-  secondary: '#000000',
-  secondaryBg: '#000000',
-  secondaryPressed: '#1a1a1a',
-  onSecondary: '#ffffff',
-  brand: '#000000',
-  brandBg: '#000000',
-  brandPressed: '#1a1a1a',
-  onBrand: '#ffffff',
-  success: '#0f9d58',
-  successPressed: '#0b7e46',
-  warning: '#f4b400',
-  warningPressed: '#d89f00',
-  error: '#db4437',
-  errorPressed: '#b9362b',
-  info: '#4285f4',
-  infoPressed: '#2f6fda',
-  disabledBg: '#eeeeee',
-  disabledFg: '#8f8f8f',
-  outlinePressedOverlay: 'rgba(0, 0, 0, 0.05)',
-  ghostPressedOverlay: 'rgba(0, 0, 0, 0.04)',
-  linkPressedOverlay: 'rgba(0, 0, 0, 0.08)',
+  background: '#F5F6F8',
+  backgroundSecondary: '#EEF0F3',
+  surface: '#FFFFFF',
+  card: '#FFFFFF',
+  onCard: '#18181B',
+  text: '#18181B',
+  onBackground: '#18181B',
+  textMuted: '#61616B',
+  border: '#E2E4E9',
+  controlBorder: '#858591',
+  divider: '#E2E4E9',
+  overlay: 'rgba(24, 24, 27, 0.12)',
+  primary: '#FFFFFF',
+  primaryBg: '#FFFFFF',
+  primaryPressed: '#F5F6F8',
+  onPrimary: '#18181B',
+  secondary: '#18181B',
+  // The `secondary` button: white, graphite label, visible outline. `secondary`
+  // / `onSecondary` stay the graphite pair that badges and ribbons fill with.
+  secondaryBg: '#FFFFFF',
+  secondaryPressed: '#F5F6F8',
+  onSecondary: '#FFFFFF',
+  onSecondaryBg: '#18181B',
+  secondaryBorder: '#858591',
+  brand: '#007F86',
+  brandBg: '#007F86',
+  brandPressed: '#00666C',
+  onBrand: '#FFFFFF',
+  success: '#15803D',
+  successPressed: '#166534',
+  warning: '#92400E',
+  warningPressed: '#78350F',
+  error: '#B91C1C',
+  errorPressed: '#991B1B',
+  // The handoff has no blue: teal is the interaction colour, and links and
+  // informational accents read through this token.
+  info: '#007F86',
+  infoPressed: '#00666C',
+  disabledBg: '#E8E9ED',
+  disabledFg: '#686874',
+  outlinePressedOverlay: 'rgba(24, 24, 27, 0.05)',
+  ghostPressedOverlay: 'rgba(24, 24, 27, 0.04)',
+  linkPressedOverlay: 'rgba(24, 24, 27, 0.08)',
   switchTrackOff: '#d1d1d1',
-  switchTrackOn: '#000000',
-  switchThumbOn: '#ffffff',
-  listPressedOverlay: 'rgba(0, 0, 0, 0.04)',
-  textPressed: '#161616',
-  icon: '#050505',
+  switchTrackOn: '#007F86',
+  switchThumbOn: '#FFFFFF',
+  listPressedOverlay: 'rgba(24, 24, 27, 0.04)',
+  textPressed: '#27272A',
+  icon: '#18181B',
   gray50: '#fafafa',
   gray100: '#f1f1f1',
   gray200: '#e2e2e2',
@@ -160,18 +166,23 @@ export const lightTokens: ThemeTokens = {
   onValue: '#05310f',
   scrim: 'rgba(0, 0, 0, 0.55)',
   scannerAccent: '#00e676',
-  brandSoft: 'rgba(0, 0, 0, 0.12)',
-  // Tints of this theme's own success/info greens & blues (#0f9d58 /
-  // #4285f4) — the fill behind fit chips and status badges.
-  successSoft: 'rgba(15, 157, 88, 0.10)',
-  infoSoft: 'rgba(66, 133, 244, 0.12)',
-  // Garage hero — the inverted black card, exactly as it rendered before
-  // (`brand` surface + the alpha whites the component used to hardcode).
-  hero: '#000000',
-  onHero: '#ffffff',
-  heroMuted: 'rgba(255, 255, 255, 0.5)',
+  brandSoft: '#E5F4F3',
+  successSoft: '#DCFCE7',
+  warningSoft: '#FEF3C7',
+  errorSoft: '#FEE2E2',
+  infoSoft: '#E5F4F3',
+  // Garage card — graphite in light mode, with white type and a white CTA.
+  hero: '#18181B',
+  onHero: '#FFFFFF',
+  heroMuted: 'rgba(255, 255, 255, 0.72)',
   heroDivider: 'rgba(255, 255, 255, 0.18)',
   heroWash: 'rgba(255, 255, 255, 0.16)',
+  // Home's selected-vehicle banner: pale teal in light mode.
+  vehicleBanner: '#E5F4F3',
+  vehicleBannerBorder: '#C5E3E1',
+  onVehicleBanner: '#18181B',
+  vehicleBannerMuted: '#61616B',
+  vehicleBannerAction: '#007F86',
 };
 
 export const darkTokens: ThemeTokens = {
@@ -184,6 +195,7 @@ export const darkTokens: ThemeTokens = {
   onBackground: '#ffffff',
   textMuted: '#8f8f8f',
   border: '#2a2a2a',
+  controlBorder: '#737373',
   divider: '#1c1c1c',
   overlay: 'rgba(255, 255, 255, 0.14)',
   primary: '#ffffff',
@@ -194,6 +206,8 @@ export const darkTokens: ThemeTokens = {
   secondaryBg: '#ffffff',
   secondaryPressed: '#e5e5e5',
   onSecondary: '#000000',
+  onSecondaryBg: '#000000',
+  secondaryBorder: '#ffffff',
   brand: '#ffffff',
   brandBg: '#ffffff',
   brandPressed: '#e5e5e5',
@@ -237,6 +251,8 @@ export const darkTokens: ThemeTokens = {
   // touch stronger so they still read against the near-black card.
   successSoft: 'rgba(34, 197, 94, 0.16)',
   infoSoft: 'rgba(138, 180, 248, 0.18)',
+  warningSoft: 'rgba(251, 188, 5, 0.16)',
+  errorSoft: 'rgba(255, 107, 95, 0.16)',
   // Garage hero — the elevated `card` surface like every other Garage card,
   // not the white CTA fill. Values reuse this theme's card / text /
   // textMuted / border / brandSoft.
@@ -245,6 +261,12 @@ export const darkTokens: ThemeTokens = {
   heroMuted: '#8f8f8f',
   heroDivider: '#2a2a2a',
   heroWash: 'rgba(255, 255, 255, 0.12)',
+  // Home's selected-vehicle banner keeps the hero treatment in dark mode.
+  vehicleBanner: '#111111',
+  vehicleBannerBorder: '#111111',
+  onVehicleBanner: '#ffffff',
+  vehicleBannerMuted: '#8f8f8f',
+  vehicleBannerAction: '#ffffff',
 };
 
 export function createNavigationTheme(scheme: 'light' | 'dark') {
@@ -255,7 +277,7 @@ export function createNavigationTheme(scheme: 'light' | 'dark') {
     ...baseTheme,
     colors: {
       ...baseTheme.colors,
-      primary: tokens.primary,
+      primary: tokens.brand,
       background: tokens.background,
       card: tokens.card,
       text: tokens.text,

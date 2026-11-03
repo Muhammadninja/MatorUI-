@@ -15,6 +15,11 @@ vi.mock('react-i18next', () => ({
     },
   }),
 }));
+vi.mock('lucide-react-native', () => ({
+  Check: () => null,
+  CircleAlert: () => null,
+  X: () => null,
+}));
 vi.mock('@/contexts/theme.context', () => ({
   useThemeContext: () => ({ tokens: { success: '#0f9d58', error: '#db4437', warning: '#f4b400' } }),
 }));

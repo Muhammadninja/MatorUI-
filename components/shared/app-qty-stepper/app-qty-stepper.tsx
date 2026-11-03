@@ -14,7 +14,7 @@ export type QtyStepperProps = {
   min?: number;
   /** Upper bound; the + button disables at this value. */
   max?: number;
-  /** Control size — `md` (42px) on Item Detail, `sm` (30px) in Cart. */
+  /** Control size — `md` (48px) on Item Detail, `sm` (36px) in Cart. */
   size?: 'sm' | 'md';
   disabled?: boolean;
   /** When set, the − / + buttons expose `${testID}-dec` / `${testID}-inc`
@@ -23,8 +23,8 @@ export type QtyStepperProps = {
 };
 
 /**
- * `QtyStepper` — bordered − / value / + control from the Mator handoff.
- * Used on Item Detail (`md`, 42px) and in the Cart line items (`sm`, 30px).
+ * `QtyStepper` — one bordered − / value / + control. Used on Item Detail (`md`,
+ * 48px tall) and in the Cart line items (`sm`, 36px tall with 48px touch areas).
  */
 export default function AppQtyStepper({
   value,
@@ -38,15 +38,17 @@ export default function AppQtyStepper({
 }: QtyStepperProps) {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
-  const box = size === 'md' ? 42 : 30;
-  const iconSize = size === 'md' ? 18 : 15;
+  // One bordered control. `sm` draws slimmer than it responds: hitSlop brings
+  // each button's touch area to 48 × 48 without inflating a cart row.
+  const buttonWidth = size === 'md' ? 48 : 40;
+  const controlHeight = size === 'md' ? 48 : 36;
+  const iconSize = size === 'md' ? 18 : 16;
   const canDec = !disabled && value > min;
   const canInc = !disabled && (max === undefined || value < max);
 
   const button = (kind: 'dec' | 'inc', enabled: boolean, onPress: () => void) => (
     <AppPressableView
       center
-      rounded={size === 'md' ? 12 : 999}
       onPress={() => {
         if (!enabled) return;
         triggerHaptic('selection');
@@ -55,12 +57,16 @@ export default function AppQtyStepper({
       disabled={!enabled}
       androidRipple={false}
       pressedOpacity={0.6}
-      borderWidth={1}
-      borderName="border"
+      hitSlop={{
+        top: (48 - controlHeight) / 2,
+        bottom: (48 - controlHeight) / 2,
+        left: (48 - buttonWidth) / 2,
+        right: (48 - buttonWidth) / 2,
+      }}
       accessibilityRole="button"
       testID={testID ? `${testID}-${kind}` : undefined}
       accessibilityLabel={t(kind === 'dec' ? 'common.decreaseQuantity' : 'common.increaseQuantity')}
-      style={{ width: box, height: box, opacity: enabled ? 1 : 0.4 }}
+      style={{ width: buttonWidth, height: controlHeight, opacity: enabled ? 1 : 0.4 }}
     >
       {kind === 'dec' ? (
         <Minus size={iconSize} strokeWidth={2.4} color={tokens.text} />
@@ -71,13 +77,12 @@ export default function AppQtyStepper({
   );
 
   return (
-    <AppView row align="center" gap={size === 'md' ? 14 : 10}>
+    <AppView row align="center" rounded={12} colorName="card" borderWidth={1} borderName="controlBorder">
       {button('dec', canDec, onDecrement)}
       <AppText
-        family="heading"
-        weight="bold"
-        textVariant={size === 'md' ? 'subtitle' : 'body'}
-        style={{ minWidth: size === 'md' ? 24 : 18, textAlign: 'center' }}
+        weight="semibold"
+        textVariant="body"
+        style={{ minWidth: 24, textAlign: 'center', fontVariant: ['tabular-nums'] }}
       >
         {value}
       </AppText>

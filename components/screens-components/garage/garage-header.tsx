@@ -23,15 +23,9 @@ export function GarageHeader({ title, subtitle, onAddPress }: GarageHeaderProps)
 
   return (
     <AppView>
-      <AppView row align="center" justify="space-between" px={20} py="lg" gap="md">
+      <AppView row align="center" justify="space-between" px={16} py="md" gap="md">
         <AppView flex={1} gap={3}>
-          <AppText
-            family="heading"
-            weight="bold"
-            colorName="text"
-            accessibilityRole="header"
-            style={{ fontSize: 26, lineHeight: 32 }}
-          >
+          <AppText textVariant="h3" weight="bold" colorName="text" accessibilityRole="header">
             {resolvedTitle}
           </AppText>
           {subtitle ? (
@@ -41,33 +35,28 @@ export function GarageHeader({ title, subtitle, onAddPress }: GarageHeaderProps)
           ) : null}
         </AppView>
 
-        {/* Borderless card-fill add button (42×42, radius 13). Icon-only keeps
+        {/* White outlined add button (48×48, radius 12). Icon-only keeps
          *  it language-proof; the label lives on the a11y layer. Hidden in the
          *  empty/guest states (no `onAddPress`), which offer their own add
          *  routes, so a second affordance here would be redundant. */}
         {onAddPress ? (
           <AppPressableView
             center
-            rounded={13}
+            rounded={12}
             colorName="card"
+            borderWidth={1}
+            borderName="border"
             androidRipple
             onPress={onAddPress}
             accessibilityRole="button"
             accessibilityLabel={t('garage.addVehicle')}
             accessibilityHint={t('garage.addVehicleHint')}
-            style={{ width: 42, height: 42, flexShrink: 0 }}
+            style={{ width: 48, height: 48, flexShrink: 0 }}
           >
-            <Plus size={22} strokeWidth={2.4} color={tokens.text} />
+            <Plus size={22} strokeWidth={2.4} color={tokens.brand} />
           </AppPressableView>
         ) : null}
       </AppView>
-
-      {/* Hairline closing the header off from the scrolling content below.
-       *  Inset to the page gutter rather than run edge-to-edge, so it reads as
-       *  the underline of this block instead of a full-bleed divider. */}
-      <AppView
-        style={{ height: 1, marginHorizontal: 20, backgroundColor: tokens.border }}
-      />
     </AppView>
   );
 }

@@ -3,7 +3,10 @@ import { Heart } from 'lucide-react-native';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import ProductRow from '@/components/screens-components/catalog/product-row';
+import ProductRow, {
+  productCellStyle,
+  useProductGridColumns,
+} from '@/components/screens-components/catalog/product-row';
 import AppList from '@/components/shared/app-list';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
@@ -26,6 +29,7 @@ import { openItemDetail } from '@/utils/nav';
  */
 export default function LikedScreen() {
   const { t } = useTranslation();
+  const columns = useProductGridColumns();
   const { tokens } = useThemeContext();
   const { state, items } = useLikedProducts();
   const { addItem } = useCartContext();
@@ -49,10 +53,12 @@ export default function LikedScreen() {
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: CatalogItem }) => (
-      <ProductRow item={item} onOpen={openItem} onAdd={addToCart} />
+    ({ item, index }: { item: CatalogItem; index: number }) => (
+      <AppView style={productCellStyle(index, columns)}>
+        <ProductRow item={item} onOpen={openItem} onAdd={addToCart} />
+      </AppView>
     ),
-    [openItem, addToCart],
+    [openItem, addToCart, columns],
   );
 
   return (
@@ -84,8 +90,8 @@ export default function LikedScreen() {
           data={items}
           keyExtractor={(it) => it.id}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingTop: 4, paddingBottom: 32, paddingHorizontal: 16 }}
-          ItemSeparatorComponent={() => <AppView style={{ height: 14 }} />}
+          numColumns={columns}
+          contentContainerStyle={{ paddingTop: 8, paddingBottom: 32 }}
           renderItem={renderItem}
         />
       )}

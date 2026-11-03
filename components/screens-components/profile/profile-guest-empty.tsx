@@ -16,11 +16,11 @@ import { triggerHaptic } from '@/utils/haptics';
 const CARD_ELEVATION = Platform.select({
   ios: {
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
   },
-  android: { elevation: 6 },
+  android: { elevation: 2 },
 });
 
 export default function ProfileGuestEmpty() {
@@ -65,12 +65,12 @@ export default function ProfileGuestEmpty() {
           style={{
             width: 90,
             height: 90,
-            backgroundColor: tokens.backgroundSecondary,
+            backgroundColor: tokens.brandSoft,
             borderWidth: 1,
             borderColor: tokens.border,
           }}
         >
-          <UserRound size={40} strokeWidth={1.8} color={tokens.textMuted} />
+          <UserRound size={40} strokeWidth={1.8} color={tokens.brand} />
         </AppView>
 
         <AppView align="center" gap={6}>

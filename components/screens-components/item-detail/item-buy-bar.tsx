@@ -81,13 +81,13 @@ export function ItemBuyBar({
   insetBottom,
 }: ItemBuyBarProps) {
   const { t } = useTranslation();
-  const { tokens } = useThemeContext();
+  const { tokens, scheme } = useThemeContext();
 
   return (
     <AppView
       gap={10}
       px="lg"
-      colorName="background"
+      colorName={scheme === 'dark' ? 'background' : 'surface'}
       style={{
         paddingTop: 11,
         paddingBottom: Math.max(insetBottom, 12),
@@ -98,15 +98,15 @@ export function ItemBuyBar({
       <AppView row align="center" justify="space-between" gap={12}>
         <AppView flex={1} gap={2}>
           <AppView row align="center" gap={7}>
-            <AppText family="default" style={{ fontSize: 11, color: tokens.textMuted }}>
+            <AppText family="default" style={{ fontSize: 12, lineHeight: 16, color: tokens.textMuted }}>
               {t('itemDetail.total')}
             </AppText>
             {savingsLabel ? (
-              <AppView rounded={999} px={6} py={2} style={{ backgroundColor: tokens.successSoft }}>
+              <AppView rounded={8} px={6} py={2} style={{ backgroundColor: tokens.successSoft }}>
                 <AppText
                   family="accent"
                   weight="bold"
-                  style={{ fontSize: 10, color: tokens.success }}
+                  style={{ fontSize: 12, lineHeight: 16, color: tokens.success }}
                 >
                   {savingsLabel}
                 </AppText>
@@ -135,8 +135,8 @@ export function ItemBuyBar({
           <Heart
             size={20}
             strokeWidth={2.2}
-            color={isFavorite ? tokens.error : tokens.text}
-            fill={isFavorite ? tokens.error : 'none'}
+            color={isFavorite ? tokens.brand : tokens.text}
+            fill={isFavorite ? tokens.brand : 'none'}
           />
         </IconAction>
         <IconAction onPress={onShare} accessibilityLabel={t('itemDetail.share')}>

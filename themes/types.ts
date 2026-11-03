@@ -12,6 +12,9 @@ export type ThemeTokens = {
    *  (eyebrows, subtitles, captions). */
   textMuted: string;
   border: string;
+  /** Outline for inputs and controls that need it for recognition; `border`
+   *  is decorative and too faint to be a control's only boundary. */
+  controlBorder: string;
   divider: string;
   overlay: string;
   primary: string;
@@ -22,6 +25,11 @@ export type ThemeTokens = {
   secondaryBg: string;
   secondaryPressed: string;
   onSecondary: string;
+  /** Label on `secondaryBg` — the `secondary` button's fill, which is not the
+   *  `secondary` fill that `onSecondary` sits on. */
+  onSecondaryBg: string;
+  /** Outline of the solid `secondary` button. */
+  secondaryBorder: string;
   brand: string;
   brandBg: string;
   brandPressed: string;
@@ -90,6 +98,10 @@ export type ThemeTokens = {
   /** Low-alpha tint of `info`, for the fill behind informational badges
    *  (e.g. the "lowest price" pill). Mirrors `successSoft`. */
   infoSoft: string;
+  /** Fill behind warning badges (unverified fitment). Mirrors `successSoft`. */
+  warningSoft: string;
+  /** Fill behind error badges (incompatible, unavailable). Mirrors `successSoft`. */
+  errorSoft: string;
   /** Surface of the Garage "active vehicle" hero card. Light mode keeps the
    *  inverted black hero; dark mode uses the elevated `card` surface. It used
    *  to be `brand`, the CTA fill — which is `#fff` in dark mode, so the hero
@@ -103,5 +115,12 @@ export type ThemeTokens = {
   heroDivider: string;
   /** Low-alpha fill for the square icon button on `hero`. */
   heroWash: string;
+  /** Surface and hairline of Home's selected-vehicle banner. */
+  vehicleBanner: string;
+  vehicleBannerBorder: string;
+  /** Vehicle name, supporting text and "change" action on `vehicleBanner`. */
+  onVehicleBanner: string;
+  vehicleBannerMuted: string;
+  vehicleBannerAction: string;
   [key: string]: string;
 };

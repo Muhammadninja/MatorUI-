@@ -211,7 +211,7 @@ export default function GarageScreen() {
         // Guest: no garage to load. Same empty state as a signed-in empty
         // garage — every action inside routes to auth first.
         <AppScrollView showsVerticalScrollIndicator={false} padding={0}
-          contentContainerStyle={{ paddingTop: 12, paddingHorizontal: 20, paddingBottom: 40 }}
+          contentContainerStyle={{ paddingTop: 12, paddingHorizontal: 16, paddingBottom: 40 }}
         >
           <GarageEmptyState onAddByVin={openAddByVin} onAddByDetails={startAdd} />
         </AppScrollView>
@@ -220,7 +220,7 @@ export default function GarageScreen() {
         // populated garage also flips `state` to 'loading', and swapping real
         // content for a skeleton mid-pull reads as the screen breaking.
         <AppScrollView showsVerticalScrollIndicator={false} padding={0}
-          contentContainerStyle={{ paddingTop: 12, paddingHorizontal: 20, paddingBottom: 40 }}
+          contentContainerStyle={{ paddingTop: 12, paddingHorizontal: 16, paddingBottom: 40 }}
         >
           <GarageSkeleton />
         </AppScrollView>
@@ -240,7 +240,7 @@ export default function GarageScreen() {
             />
           }
         >
-            <AppView flex={1} center px={20} gap={14}>
+            <AppView flex={1} center px={16} gap={12}>
             <AlertCircle size={34} strokeWidth={2} color={tokens.error} />
             <AppView gap={4} align="center">
               <AppText family="heading" weight="bold" style={{ fontSize: 17, color: tokens.text }}>
@@ -266,7 +266,7 @@ export default function GarageScreen() {
         <AppScrollView
           showsVerticalScrollIndicator={false}
           padding={0}
-          contentContainerStyle={{ paddingTop: 12, paddingHorizontal: 20, paddingBottom: 40 }}
+          contentContainerStyle={{ paddingTop: 12, paddingHorizontal: 16, paddingBottom: 40 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -288,9 +288,9 @@ export default function GarageScreen() {
           padding={0}
           contentContainerStyle={{
             paddingTop: 12,
-            paddingHorizontal: 20,
+            paddingHorizontal: 16,
             paddingBottom: 40,
-            gap: 14,
+            gap: 12,
           }}
           refreshControl={
             <RefreshControl
@@ -323,15 +323,10 @@ export default function GarageScreen() {
 
           {secondaryVehicles.length > 0 ? (
             <>
-              <AppText
-                family="heading"
-                weight="bold"
-                colorName="text"
-                style={{ fontSize: 17, marginTop: 2 }}
-              >
+              <AppText textVariant="h4" weight="bold" colorName="text" style={{ marginTop: 12 }}>
                 {t('garage.otherVehicles')}
               </AppText>
-              <AppView gap={10}>
+              <AppView gap={8}>
                 {secondaryVehicles.map((v) => (
                   <GarageSwitchRow
                     key={v.id}

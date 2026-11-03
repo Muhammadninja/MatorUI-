@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Bookmark, Gauge, Hash, ReceiptText } from 'lucide-react-native';
+import { Gauge, Hash, Heart, ReceiptText } from 'lucide-react-native';
 import type { LucideProps } from 'lucide-react-native';
 
 import { AppText } from '@/components/shared/app-text';
@@ -38,22 +38,29 @@ function Tile({ Icon, label, sub, onPress }: Omit<Action, 'key'>) {
   const { tokens } = useThemeContext();
   return (
     <AppPressableView
-      style={{ flexBasis: '48%', flexGrow: 1 }}
-      rounded={16}
+      style={{ flexBasis: '47%', flexGrow: 1, minHeight: 48 }}
+      rounded={12}
       colorName="card"
+      borderWidth={1}
+      borderName="border"
       androidRipple
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={label}
-      p={14}
+      accessibilityLabel={sub ? `${label}, ${sub}` : label}
+      p="lg"
       gap={8}
     >
-      <Icon size={20} strokeWidth={2} color={tokens.text} />
-      <AppText family="default" weight="semibold" colorName="text" style={{ fontSize: 13.5 }}>
+      <Icon size={24} strokeWidth={2} color={tokens.brand} />
+      <AppText
+        family="default"
+        weight="semibold"
+        colorName="text"
+        style={{ fontSize: 14, lineHeight: 20 }}
+      >
         {label}
       </AppText>
       {sub ? (
-        <AppText family="default" colorName="textMuted" style={{ fontSize: 11.5, lineHeight: 15 }}>
+        <AppText textVariant="bodyXs" colorName="textMuted">
           {sub}
         </AppText>
       ) : null}
@@ -62,7 +69,7 @@ function Tile({ Icon, label, sub, onPress }: Omit<Action, 'key'>) {
 }
 
 /**
- * 2x2 grid of borderless card tiles. Every tile routes to a real destination:
+ * 2x2 grid of white card tiles with teal outline icons. Every tile routes to a real destination:
  * Update mileage (active vehicle edit), Past orders and Saved parts
  * (root-hosted, so `back` returns to the garage), and Add by VIN
  * (the VIN-decoder screen).
@@ -87,11 +94,11 @@ export function GarageQuickActions({
     },
     { key: 'orders', Icon: ReceiptText, label: t('garage.qaPastOrders'), onPress: onPastOrders },
     { key: 'vin', Icon: Hash, label: t('garage.qaAddByVin'), onPress: onAddByVin },
-    { key: 'saved', Icon: Bookmark, label: t('garage.qaSavedParts'), onPress: onSavedParts },
+    { key: 'saved', Icon: Heart, label: t('garage.qaSavedParts'), onPress: onSavedParts },
   ];
 
   return (
-    <AppView row style={{ flexWrap: 'wrap', gap: 10 }}>
+    <AppView row style={{ flexWrap: 'wrap', gap: 8 }}>
       {actions.map(({ key, ...rest }) => (
         <Tile key={key} {...rest} />
       ))}

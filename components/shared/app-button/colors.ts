@@ -29,7 +29,7 @@ export function solidDefaults(tokens: ThemeTokens, kind: ButtonKind) {
   const C = tokens as any;
   if (kind === 'primary') return { bg: C.primaryBg, fg: C.onPrimary, pressed: C.primaryPressed };
   if (kind === 'secondary')
-    return { bg: C.secondaryBg, fg: C.onSecondary, pressed: C.secondaryPressed };
+    return { bg: C.secondaryBg, fg: C.onSecondaryBg, pressed: C.secondaryPressed };
   if (kind === 'brand') return { bg: C.brandBg, fg: C.onBrand, pressed: C.brandPressed };
   const pressedToken =
     kind === 'success'

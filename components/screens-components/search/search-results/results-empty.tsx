@@ -5,8 +5,6 @@ import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 
-import { RADIUS_PILL } from '../radii';
-
 export type ResultsEmptyProps = {
   query: string;
   /** Server-suggested correction ("urbon" → "urban"). Tap to replace query. */
@@ -39,7 +37,7 @@ export default function ResultsEmpty({
   if (didYouMean) {
     return (
       <AppView gap={14} px={16} pt={40} align="center">
-        <Sparkles size={40} strokeWidth={2} color={tokens.text} />
+        <Sparkles size={40} strokeWidth={2} color={tokens.brand} />
         <AppView gap={6} align="center">
           <AppText textVariant="bodySemibold" weight="semibold" align="center">
             {t('search.noMatchesFor', { query: query.trim() })}
@@ -53,11 +51,12 @@ export default function ResultsEmpty({
             androidRipple={false}
             style={{
               marginTop: 6,
-              paddingHorizontal: 14,
-              paddingVertical: 10,
-              borderRadius: RADIUS_PILL,
+              minHeight: 48,
+              justifyContent: 'center',
+              paddingHorizontal: 16,
+              borderRadius: 12,
               borderWidth: 1,
-              borderColor: tokens.text,
+              borderColor: tokens.controlBorder,
             }}
           >
             <AppText weight="semibold" style={{ color: tokens.text }}>
@@ -93,13 +92,14 @@ export default function ResultsEmpty({
             androidRipple={false}
             style={{
               marginTop: 4,
+              minHeight: 48,
+              justifyContent: 'center',
               paddingHorizontal: 16,
-              paddingVertical: 10,
-              borderRadius: RADIUS_PILL,
-              backgroundColor: tokens.text,
+              borderRadius: 12,
+              backgroundColor: tokens.brand,
             }}
           >
-            <AppText weight="semibold" style={{ color: tokens.background }}>
+            <AppText weight="semibold" style={{ color: tokens.onBrand }}>
               {t('search.clearFilters')}
             </AppText>
           </AppPressableView>

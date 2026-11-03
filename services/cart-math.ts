@@ -1,3 +1,5 @@
+import i18next from 'i18next';
+
 /**
  * Cart math primitives — pure functions and types with NO React or
  * React Native dependencies. Keeping this module React-free lets it be
@@ -95,9 +97,14 @@ export function round(value: number): number {
 }
 
 export function formatCurrency(amount: number): string {
-  // UZS is a whole-som currency (no minor unit), thousands separated by comma
-  // to match the catalog's price strings ("UZS 11,008,400").
-  return `UZS ${Math.round(amount).toLocaleString('en-US')}`;
+  // UZS is a whole-som currency (no minor unit). Digit groups are joined with a
+  // non-breaking space so a narrow column can't split the amount, and the label
+  // follows the active language: "369 000 сум", "369 000 soʻm", "369 000 UZS".
+  const grouped = Math.round(amount)
+    .toString()
+    .replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
+  const label = i18next.isInitialized ? i18next.t('common.currency') : 'UZS';
+  return `${grouped} ${label}`;
 }
 
 /**

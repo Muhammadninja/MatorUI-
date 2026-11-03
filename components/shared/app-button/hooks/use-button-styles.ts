@@ -97,7 +97,16 @@ export function useButtonStyles(params: UseButtonStylesParams): UseButtonStylesR
   const linkOverlay = useThemeColor({}, 'linkPressedOverlay');
 
   const variantStyle = useMemo<ViewStyle>(() => {
-    if (variant === 'solid') return { backgroundColor: disabled ? disabledBg : bg } as ViewStyle;
+    if (variant === 'solid') {
+      if (kind === 'secondary' && !disabled) {
+        return {
+          backgroundColor: bg,
+          borderWidth: 1,
+          borderColor: tokens.secondaryBorder,
+        } as ViewStyle;
+      }
+      return { backgroundColor: disabled ? disabledBg : bg } as ViewStyle;
+    }
     if (variant === 'outline')
       return {
         borderWidth: 1,
@@ -105,7 +114,7 @@ export function useButtonStyles(params: UseButtonStylesParams): UseButtonStylesR
         backgroundColor: 'transparent',
       } as ViewStyle;
     return { backgroundColor: 'transparent' } as ViewStyle;
-  }, [variant, bg, disabled, disabledBg, disabledFg, tint]);
+  }, [variant, kind, tokens.secondaryBorder, bg, disabled, disabledBg, disabledFg, tint]);
 
   const contentStyle = useMemo<ViewStyle>(
     () => ({

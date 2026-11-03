@@ -1,7 +1,7 @@
-import { Plus } from 'lucide-react-native';
+import { Check, CircleAlert, Heart, Plus, X } from 'lucide-react-native';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useWindowDimensions, View } from 'react-native';
+import { useWindowDimensions, View, type ViewStyle } from 'react-native';
 
 import ImageBox from '@/components/screens-components/home/image-box';
 import { AppIconButton } from '@/components/shared/app-icon-button';
@@ -11,12 +11,15 @@ import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import WheelLoader from '@/components/shared/wheel-loader/wheel-loader';
 import { useActiveVehicle } from '@/contexts/active-vehicle.context';
+import { useLikesContext } from '@/contexts/likes.context';
 import { useThemeContext } from '@/contexts/theme.context';
+import { useUserContext } from '@/contexts/user.context';
 import { useActiveSales } from '@/hooks/use-sales';
 import { useToast } from '@/hooks/use-toast';
 import type { CatalogItem } from '@/services/catalog-service';
 import { checkCompatibility, type CompatibilityResult } from '@/services/compatibility-service';
 import { resolveItemPricing } from '@/services/sales-service';
+import { triggerHaptic } from '@/utils/haptics';
 
 export type ProductRowProps = {
   item: CatalogItem;
@@ -28,28 +31,32 @@ export type ProductRowProps = {
 
 type FitState = 'idle' | 'checking' | 'answered';
 
-/**
- * Row sizing. The row is sized so that roughly THREE listings fill one
- * screenful — the catalog reads as a stack of real cards you flick through,
- * not a dense price list.
- *
- * The height is derived from the window rather than hard-coded, because
- * "three per screen" is a statement about the scrollable area, not about a
- * pixel count: `LIST_CHROME` is everything that is never list (status bar +
- * screen header, the results toolbar, the tab bar), and what is left over is
- * split three ways, clamped so the row stays sane on a small phone and does
- * not balloon on a tablet.
- */
-const LIST_CHROME = 240;
-const MIN_ROW = 186;
-const MAX_ROW = 264;
-/** Image column width as a share of the row height. The photo stretches to the
- *  row's full inner height, so this ratio is what keeps the picture a generous
- *  portrait block without starving the copy column on a narrow phone. */
-const THUMB_RATIO = 0.64;
+const ADDED_FEEDBACK_MS = 1500;
+const SCREEN_GUTTER = 16;
+const GRID_GAP = 8;
+/** Above this system text scale two columns stop being usable. */
+const ONE_COLUMN_FONT_SCALE = 1.3;
+
+/** Columns of the product grid: two, or one under large accessibility text. */
+export function useProductGridColumns(): number {
+  const { fontScale } = useWindowDimensions();
+  return fontScale >= ONE_COLUMN_FONT_SCALE ? 1 : 2;
+}
+
+/** The padding that puts a grid cell on the screen gutters with an exact gap,
+ *  without insetting the list's full-width header. */
+export function productCellStyle(index: number, columns: number): ViewStyle {
+  const column = index % columns;
+  return {
+    flex: 1,
+    paddingLeft: column === 0 ? SCREEN_GUTTER : GRID_GAP / 2,
+    paddingRight: column === columns - 1 ? SCREEN_GUTTER : GRID_GAP / 2,
+    paddingBottom: GRID_GAP,
+  };
+}
 
 /**
- * Price type size. Every real price gets the SAME one (21) — the steps below
+ * Price type size. Every real price gets the SAME one (18) — the steps below
  * exist only for an amount long enough to crowd the add button out of the row,
  * which in UZS means eight figures and up.
  *
@@ -61,34 +68,28 @@ const THUMB_RATIO = 0.64;
  */
 function priceFontSize(amount: string): number {
   const n = amount.length;
-  if (n <= 10) return 21;
-  if (n <= 12) return 18;
-  return 16;
+  if (n <= 7) return 18;
+  if (n <= 10) return 16;
+  return 14;
 }
 
 /**
  * `ProductRow` — the listing card behind every result screen (category,
- * vehicle parts, catalog directory).
- *
- * Laid out like an Amazon search result: a tall image column on the left, and
- * ONE copy column on the right that runs the whole height — tag, brand, title,
- * stars, fitment, price, delivery, and the add button. Nothing is stacked
- * across the full card width, so the image can be large without pushing the
- * buy affordance off-screen.
- *
- * Fitment is a single line of coloured text under the rating (Amazon's "This
- * fits your 2022 Chevrolet Cobalt"), not a padded chip on its own row — that
- * row is what used to cap the image size.
+ * vehicle parts, catalog directory, favorites), laid out for a two-column grid:
+ * image with the heart on top, then title, brand, fitment, and price + add at
+ * the foot of the card.
  *
  * Everything shown is a backend field. Stars render only when the part really
  * has a rating (`rating_avg` / `review_count`); unreviewed parts show none
- * rather than an invented score. The fitment line runs the REAL compatibility
- * check against the active garage vehicle.
+ * rather than an invented score. The fitment badge runs the REAL compatibility
+ * check against the active garage vehicle and is never inferred.
  */
 function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const { currentActiveVehicle } = useActiveVehicle();
+  const { isLiked, toggleLike } = useLikesContext();
+  const { isAuthenticated } = useUserContext();
   const toast = useToast();
 
   const image = item.images?.[0];
@@ -163,64 +164,84 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
         })
       : null;
 
-  const { height: windowHeight } = useWindowDimensions();
-  const rowHeight = Math.round(
-    Math.max(MIN_ROW, Math.min(MAX_ROW, (windowHeight - LIST_CHROME) / 3)),
-  );
-  const thumb = Math.round(rowHeight * THUMB_RATIO);
-
-  const fitColor =
+  const fitTone =
     fit?.badge.color === 'green'
-      ? tokens.success
+      ? { color: tokens.success, bg: tokens.successSoft, Icon: Check }
       : fit?.badge.color === 'red'
-        ? tokens.error
-        : tokens.warning;
+        ? { color: tokens.error, bg: tokens.errorSoft, Icon: X }
+        : { color: tokens.warning, bg: tokens.warningSoft, Icon: CircleAlert };
+
+  // ── Favorite — the same like state and toast as Item Detail ────────────────
+  const liked = isLiked(item.id);
+  const handleToggleLike = () => {
+    triggerHaptic(liked ? 'selection' : 'success');
+    const nowLiked = toggleLike(item.id);
+    toast.info(t(nowLiked ? 'itemDetail.savedToFavorites' : 'itemDetail.removedFromFavorites'));
+  };
+
+  // ── Add — the cart update is optimistic, so "added" is the feedback and the
+  // pause blocks a duplicate tap. Guests are sent to sign-in by the caller and
+  // never see it. Cart failures surface through the cart context.
+  const [added, setAdded] = useState(false);
+  useEffect(() => {
+    setAdded(false);
+  }, [item.id]);
+  useEffect(() => {
+    if (!added) return;
+    const timer = setTimeout(() => setAdded(false), ADDED_FEEDBACK_MS);
+    return () => clearTimeout(timer);
+  }, [added]);
+  const handleAdd = () => {
+    if (added) return;
+    onAdd(item);
+    if (isAuthenticated) setAdded(true);
+  };
 
   return (
-    // Flat, full-bleed row — no card surface, no corner radius, no outer
-    // margin. The list draws a hairline between rows; the only inset is the
-    // text's own breathing room from the screen edge.
     <AppView
-      row
-      gap={14}
-      style={{ paddingHorizontal: 16, paddingVertical: 15, minHeight: rowHeight }}
+      flex={1}
+      rounded={12}
+      colorName="card"
+      borderWidth={1}
+      borderName="border"
+      gap="sm"
+      style={{ padding: 12 }}
     >
-      {/* ── Image column ── */}
-      {/* The testID lives HERE, not on the card root: E2E taps an element's
-       *  centre, and the card's centre now falls on the copy column (the fit
-       *  link, or the add button) rather than on something that opens detail. */}
-      <AppPressableView
-        testID={`part-card-${item.id}`}
-        onPress={() => onOpen(item)}
-        androidRipple={false}
-        accessibilityRole="button"
-        accessibilityLabel={item.title}
-        style={{ width: thumb, alignSelf: 'stretch' }}
-      >
-        <ImageBox
-          label={item.title}
-          uri={image}
-          height="100%"
-          radius={8}
-          contentFit="contain"
-          backgroundColor={tokens.white}
-        />
+      {/* The testID lives on the image: E2E taps an element's centre, and this
+       *  one always opens detail. */}
+      <AppView style={{ aspectRatio: 1, width: '100%' }}>
+        <AppPressableView
+          testID={`part-card-${item.id}`}
+          onPress={() => onOpen(item)}
+          androidRipple={false}
+          accessibilityRole="button"
+          accessibilityLabel={item.title}
+          style={{ flex: 1 }}
+        >
+          <ImageBox
+            label={item.title}
+            uri={image}
+            height="100%"
+            radius={8}
+            contentFit="contain"
+            backgroundColor={tokens.white}
+          />
+        </AppPressableView>
         {/* GM cross-reference, cornered on the photo. A part carries OEM xor GM
          *  (see `resolvePartNumber`), and the GM number is THE identifier in
-         *  this market — Chevrolet / Ravon / Daewoo are the UZ fleet — so a GM
-         *  part gets a corner tag instead of hiding the number in the meta
-         *  line. Small, but dark-on-photo so it reads at a glance. */}
+         *  this market — Chevrolet / Ravon / Daewoo are the UZ fleet. */}
         {item.gm ? (
           <AppView
+            pointerEvents="none"
             style={{
               position: 'absolute',
               left: 0,
-              top: 0,
-              maxWidth: thumb,
+              bottom: 0,
+              maxWidth: '100%',
               paddingHorizontal: 5,
               paddingVertical: 2,
-              borderTopLeftRadius: 8,
-              borderBottomRightRadius: 7,
+              borderTopRightRadius: 8,
+              borderBottomLeftRadius: 8,
               backgroundColor: tokens.scrim,
             }}
           >
@@ -230,184 +251,153 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.7}
-              style={{ fontSize: 9, letterSpacing: 0.2, color: tokens.white }}
+              style={{ fontSize: 10, letterSpacing: 0.2, color: tokens.white }}
             >
               {`GM ${item.gm}`}
             </AppText>
           </AppView>
         ) : null}
+        <AppPressableView
+          testID={`part-like-${item.id}`}
+          onPress={handleToggleLike}
+          androidRipple={false}
+          pressedOpacity={0.7}
+          center
+          accessibilityRole="button"
+          accessibilityLabel={
+            liked ? t('itemDetail.removeFromFavorites') : t('itemDetail.saveToFavorites')
+          }
+          accessibilityState={{ selected: liked }}
+          style={{ position: 'absolute', top: -8, right: -8, width: 48, height: 48 }}
+        >
+          <Heart
+            size={20}
+            strokeWidth={2.2}
+            color={liked ? tokens.brand : tokens.textMuted}
+            fill={liked ? tokens.brand : 'transparent'}
+          />
+        </AppPressableView>
+      </AppView>
+
+      {/* Tags, the way a storefront flags a listing. */}
+      {item.bestseller || item.certified || item.lowestPrice ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+          {item.bestseller ? (
+            <Tag label={t('catalog.bestseller')} color={tokens.text} bg={tokens.warningSoft} />
+          ) : null}
+          {item.certified ? (
+            <Tag
+              label={t('catalog.matorCertified')}
+              color={tokens.success}
+              bg={tokens.successSoft}
+            />
+          ) : null}
+          {item.lowestPrice ? (
+            <Tag label={t('catalog.lowestPrice')} color={tokens.info} bg={tokens.infoSoft} />
+          ) : null}
+        </View>
+      ) : null}
+
+      <AppPressableView gap={4} onPress={() => onOpen(item)} androidRipple={false}>
+        {/* Two lines, then ellipsis, with the height reserved so one-line names
+         *  keep the row's prices level. The full title is on Item Detail and in
+         *  the image's accessibility label. */}
+        <AppText
+          family="default"
+          weight="semibold"
+          numberOfLines={2}
+          style={{ fontSize: 14, lineHeight: 20, minHeight: 40, color: tokens.text }}
+        >
+          {item.title}
+        </AppText>
+        {brandEyebrow ? (
+          <AppText textVariant="bodyXs" colorName="textMuted">
+            {brandEyebrow}
+          </AppText>
+        ) : null}
+        {/* Qualifiers `normalizePartTitle` lifted out of the raw title (plus an
+         *  oil's viscosity · volume and the OEM number). */}
+        {secondary ? (
+          <AppText textVariant="bodyXs" colorName="textMuted">
+            {secondary}
+          </AppText>
+        ) : null}
       </AppPressableView>
 
-      {/* ── Copy column — runs the full card height ── */}
-      {/* `space-between` (with the gap as the floor) distributes the taller
-       *  row's extra height instead of parking it under the last line: the
-       *  name stays at the top edge, price and add sit at the bottom, level
-       *  with the base of the photo. */}
-      <AppView flex={1} gap={5} justify="space-between">
-        {/* Tags above the title, the way a storefront flags a listing. */}
-        {item.bestseller || item.certified || item.lowestPrice ? (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5 }}>
-            {item.bestseller ? (
-              <Tag label={t('catalog.bestseller')} color={tokens.onValue} bg={tokens.rating} />
-            ) : null}
-            {item.certified ? (
-              <Tag
-                label={t('catalog.matorCertified')}
-                color={tokens.success}
-                bg={tokens.successSoft}
-              />
-            ) : null}
-            {item.lowestPrice ? (
-              <Tag label={t('catalog.lowestPrice')} color={tokens.info} bg={tokens.infoSoft} />
-            ) : null}
-          </View>
-        ) : null}
-
-        <AppPressableView gap={3} onPress={() => onOpen(item)} androidRipple={false}>
-          {brandEyebrow ? (
-            <AppText
-              family="accent"
-              weight="bold"
-              style={{
-                fontSize: 10.5,
-                letterSpacing: 1,
-                color: tokens.textMuted,
-                textTransform: 'uppercase',
-              }}
-            >
-              {brandEyebrow}
+      {/* Real review aggregate. No reviews → no row; never a stand-in. */}
+      {item.rating != null ? (
+        <AppView row align="center" wrap gap={4}>
+          <Stars value={item.rating} />
+          <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.text }}>
+            {item.rating.toFixed(1)}
+          </AppText>
+          {item.reviewCount ? (
+            <AppText textVariant="bodyXs" colorName="textMuted">
+              {t('catalog.reviewCount', { count: item.reviewCount })}
             </AppText>
           ) : null}
+        </AppView>
+      ) : null}
 
+      {/* ── Fitment: a verdict badge, only from real data ── */}
+      {item.isUniversal ? (
+        <FitBadge
+          label={t('catalog.universalFit')}
+          color={tokens.success}
+          bg={tokens.successSoft}
+          Icon={Check}
+        />
+      ) : fitState === 'answered' && fit ? (
+        <FitBadge
+          label={fit.badge.text}
+          color={fitTone.color}
+          bg={fitTone.bg}
+          Icon={fitTone.Icon}
+        />
+      ) : (
+        <AppPressableView
+          onPress={handleCheckFit}
+          disabled={fitState === 'checking'}
+          androidRipple={false}
+          pressedOpacity={0.6}
+          row
+          align="center"
+          gap={4}
+          hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={t('catalog.checkFitAccessibility')}
+          accessibilityState={{ busy: fitState === 'checking' }}
+          style={{ alignSelf: 'flex-start' }}
+        >
+          {fitState === 'checking' ? <WheelLoader size={11} color={tokens.textMuted} /> : null}
           <AppText
-            family="default"
             weight="semibold"
-            style={{ fontSize: 15.5, lineHeight: 20.5, color: tokens.text }}
+            style={{
+              fontSize: 12,
+              lineHeight: 16,
+              color: fitState === 'checking' ? tokens.textMuted : tokens.brand,
+            }}
           >
-            {item.title}
+            {fitState === 'checking'
+              ? t('catalog.checking')
+              : vehicleLabel
+                ? t('catalog.checkFitFor', { vehicle: vehicleLabel })
+                : t('catalog.checkFit')}
           </AppText>
-
-          {/* Qualifiers `normalizePartTitle` lifted out of the raw title (plus
-           *  an oil's viscosity · volume and the OEM number) — the detail that
-           *  was glued to the name. */}
-          {secondary ? (
-            <AppText
-              family="default"
-              style={{ fontSize: 12, lineHeight: 16, color: tokens.textMuted }}
-            >
-              {secondary}
-            </AppText>
-          ) : null}
         </AppPressableView>
+      )}
 
-        {/* Real review aggregate. No reviews → no row; never a stand-in. */}
-        {item.rating != null ? (
-          <AppView row align="center" gap={5}>
-            <Stars value={item.rating} />
-            <AppText family="accent" weight="bold" style={{ fontSize: 11.5, color: tokens.text }}>
-              {item.rating.toFixed(1)}
-            </AppText>
-            {item.reviewCount ? (
-              <AppText family="default" style={{ fontSize: 11, color: tokens.textMuted }}>
-                {t('catalog.reviewCount', { count: item.reviewCount })}
-              </AppText>
-            ) : null}
-          </AppView>
-        ) : null}
-
-        {/* ── Fitment: ONE line of coloured text, no chrome ── */}
-        {item.isUniversal ? (
-          <AppText family="accent" weight="bold" style={{ fontSize: 11.5, color: tokens.success }}>
-            {`✓ ${t('catalog.universalFit')}`}
-          </AppText>
-        ) : fitState === 'answered' && fit ? (
-          <AppText family="accent" weight="bold" style={{ fontSize: 11.5, color: fitColor }}>
-            {`${fit.badge.color === 'green' ? '✓' : fit.badge.color === 'red' ? '✕' : '!'} ${fit.badge.text}`}
-          </AppText>
-        ) : (
-          <AppPressableView
-            onPress={handleCheckFit}
-            disabled={fitState === 'checking'}
-            androidRipple={false}
-            pressedOpacity={0.6}
-            row
-            align="center"
-            gap={6}
-            hitSlop={{ top: 8, bottom: 8, left: 6, right: 8 }}
-            accessibilityRole="button"
-            accessibilityLabel={t('catalog.checkFitAccessibility')}
-            style={{ alignSelf: 'flex-start' }}
-          >
-            {fitState === 'checking' ? <WheelLoader size={11} color={tokens.textMuted} /> : null}
-            <AppText
-              family="accent"
-              weight="bold"
-              style={{
-                fontSize: 11.5,
-                color: fitState === 'checking' ? tokens.textMuted : tokens.info,
-              }}
-            >
-              {fitState === 'checking'
-                ? t('catalog.checking')
-                : vehicleLabel
-                  ? t('catalog.checkFitFor', { vehicle: vehicleLabel })
-                  : t('catalog.checkFit')}
-            </AppText>
-          </AppPressableView>
-        )}
-
-        {/* ── Price, and the add control on the far right ── */}
-        {/* The add affordance is a single `+` pinned to the right edge of this
-         *  row, not a full-width pill: the pill spanned the whole copy column,
-         *  read as the card's primary surface, and pushed the real content
-         *  (title, fitment, price) into the top half of the row. A `+` says
-         *  "add this" in the space a chevron would take. */}
-        <AppView row align="center" gap={10} style={{ marginTop: 3 }}>
-          <AppView flex={1} gap={2}>
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'baseline',
-                flexWrap: 'wrap',
-                columnGap: 7,
-                rowGap: 2,
-              }}
-            >
-              {/* Amount + currency are ONE unbreakable unit: they used to be
-               *  loose children of the wrapping row, so when the amount's text
-               *  box took more width than its glyphs the currency drifted into
-               *  the middle of the card. */}
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', columnGap: 4 }}>
-                {/* One line, always. `priceFontSize` already fits it, so the
-                 *  auto-shrink below is a backstop for an amount nobody has
-                 *  priced yet — and it carries NO explicit `lineHeight`, which
-                 *  is the pair that collapses the text on iOS. */}
-                <AppText
-                  family="heading"
-                  weight="bold"
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.8}
-                  style={{ fontSize: priceSize, letterSpacing: -0.4, color: tokens.text }}
-                >
-                  {priceAmount}
-                </AppText>
-                <AppText
-                  family="accent"
-                  weight="semibold"
-                  style={{ fontSize: 11, color: tokens.textMuted }}
-                >
-                  {t('common.currency')}
-                </AppText>
-              </View>
+      {/* ── Price and add, pinned to the card's foot so they line up across the
+       *  row whatever the copy above them runs to. ── */}
+      <AppView row align="flex-end" gap="sm" style={{ marginTop: 'auto' }}>
+        <AppView flex={1} gap={2} style={{ minWidth: 0 }}>
+          {wasLabel || savePct > 0 ? (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 4 }}>
               {wasLabel ? (
                 <AppText
-                  family="default"
-                  style={{
-                    fontSize: 12,
-                    color: tokens.textMuted,
-                    textDecorationLine: 'line-through',
-                  }}
+                  textVariant="bodyXs"
+                  colorName="textMuted"
+                  style={{ textDecorationLine: 'line-through' }}
                 >
                   {wasLabel}
                 </AppText>
@@ -422,41 +412,94 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
                 </AppText>
               ) : null}
             </View>
-
-            {/* Stock first — it decides whether the delivery promise means
-             *  anything — then the ETA when the part carries one. */}
-            {outOfStock ? (
-              <AppText
-                family="accent"
-                weight="bold"
-                style={{ fontSize: 11.5, color: tokens.textMuted }}
-              >
-                {t('catalog.outOfStock')}
-              </AppText>
-            ) : eta ? (
-              <AppText family="default" style={{ fontSize: 11.5, color: tokens.textMuted }}>
-                {eta}
-              </AppText>
-            ) : null}
-          </AppView>
-
-          <AppIconButton
-            Icon={Plus}
-            onPress={() => onAdd(item)}
-            disabled={outOfStock}
-            size={42}
-            iconSize={22}
-            strokeWidth={2.6}
-            backgroundColor={outOfStock ? tokens.disabledBg : tokens.text}
-            color={outOfStock ? tokens.disabledFg : tokens.background}
-            accessibilityLabel={
-              outOfStock
-                ? t('catalog.outOfStock')
-                : t('catalog.addToCartAccessibility', { title: item.title })
-            }
-          />
+          ) : null}
+          {/* Amount + currency are ONE unit that wraps as a block; the amount
+           *  itself stays on one line. `priceFontSize` already fits it, so the
+           *  auto-shrink is a backstop and carries NO explicit `lineHeight`,
+           *  the pair that collapses the text on iOS. */}
+          <View
+            style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 4 }}
+          >
+            <AppText
+              family="heading"
+              weight="bold"
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+              style={{ fontSize: priceSize, fontVariant: ['tabular-nums'], color: tokens.text }}
+            >
+              {priceAmount}
+            </AppText>
+            <AppText textVariant="bodyXs" weight="medium" colorName="textMuted">
+              {t('common.currency')}
+            </AppText>
+          </View>
+          {/* Stock first — it decides whether the delivery promise means
+           *  anything — then the ETA when the part carries one. */}
+          {outOfStock ? (
+            <AppText
+              family="accent"
+              weight="semibold"
+              style={{ fontSize: 12, lineHeight: 16, color: tokens.error }}
+            >
+              {t('catalog.outOfStock')}
+            </AppText>
+          ) : eta ? (
+            <AppText textVariant="bodyXs" colorName="textMuted">
+              {eta}
+            </AppText>
+          ) : null}
         </AppView>
+
+        <AppIconButton
+          Icon={added ? Check : Plus}
+          onPress={handleAdd}
+          disabled={outOfStock}
+          size={48}
+          rounded={12}
+          iconSize={22}
+          strokeWidth={2.6}
+          backgroundColor={outOfStock ? tokens.disabledBg : tokens.brand}
+          color={outOfStock ? tokens.disabledFg : tokens.onBrand}
+          accessibilityLabel={
+            outOfStock
+              ? t('catalog.outOfStock')
+              : added
+                ? t('catalog.addedToCart')
+                : t('catalog.addToCartAccessibility', { title: item.title })
+          }
+        />
       </AppView>
+    </AppView>
+  );
+}
+
+/** Icon + text, so a verdict never rests on colour alone. */
+function FitBadge({
+  label,
+  color,
+  bg,
+  Icon,
+}: {
+  label: string;
+  color: string;
+  bg: string;
+  Icon: typeof Check;
+}) {
+  return (
+    <AppView
+      row
+      align="flex-start"
+      gap={4}
+      rounded={8}
+      px={6}
+      py={4}
+      style={{ alignSelf: 'flex-start', backgroundColor: bg }}
+    >
+      <Icon size={14} strokeWidth={2.6} color={color} style={{ marginTop: 1 }} />
+      <AppText weight="medium" style={{ flexShrink: 1, fontSize: 12, lineHeight: 16, color }}>
+        {label}
+      </AppText>
     </AppView>
   );
 }
@@ -467,7 +510,7 @@ function Stars({ value }: { value: number }) {
   const { tokens } = useThemeContext();
   const filled = Math.round(value);
   return (
-    <AppText family="accent" weight="bold" style={{ fontSize: 11, letterSpacing: 0.5 }}>
+    <AppText family="accent" weight="bold" style={{ fontSize: 12, letterSpacing: 0.5 }}>
       <AppText style={{ color: tokens.rating }}>{'★'.repeat(Math.min(5, filled))}</AppText>
       <AppText style={{ color: tokens.gray300 }}>{'★'.repeat(Math.max(0, 5 - filled))}</AppText>
     </AppText>
@@ -477,9 +520,9 @@ function Stars({ value }: { value: number }) {
 /** Small filled tag above the title (bestseller, certified, lowest price). */
 function Tag({ label, color, bg }: { label: string; color: string; bg: string }) {
   return (
-    <AppView rounded={4} px={6} py={2} style={{ backgroundColor: bg }}>
-      <AppText family="accent" weight="bold" style={{ fontSize: 9.5, letterSpacing: 0.4, color }}>
-        {label.toUpperCase()}
+    <AppView rounded={8} px={6} py={2} style={{ backgroundColor: bg }}>
+      <AppText weight="medium" style={{ fontSize: 12, lineHeight: 16, color }}>
+        {label}
       </AppText>
     </AppView>
   );

@@ -46,11 +46,10 @@ function Route({
       {...(body ? { accessibilityHint: body } : null)}
       row
       align="center"
-      gap={14}
-      rounded={16}
-      px={16}
-      py={16}
-      colorName={emphasis ? 'brand' : undefined}
+      gap={12}
+      rounded={12}
+      p="lg"
+      colorName={emphasis ? 'brand' : 'card'}
       borderWidth={emphasis ? 0 : 1}
       borderName="border"
       style={{ opacity: disabled ? 0.5 : 1 }}
@@ -67,14 +66,11 @@ function Route({
       </AppText>
 
       <AppView flex={1} gap={3} style={{ minWidth: 0 }}>
-        <AppText family="heading" weight="bold" style={{ fontSize: 16, color: ink }}>
+        <AppText textVariant="button" weight="semibold" style={{ color: ink }}>
           {title}
         </AppText>
         {body ? (
-          <AppText
-            family="default"
-            style={{ fontSize: 12.5, lineHeight: 17, color: sub, opacity: emphasis ? 0.8 : 1 }}
-          >
+          <AppText family="default" style={{ fontSize: 14, lineHeight: 20, color: sub }}>
             {body}
           </AppText>
         ) : null}
@@ -106,17 +102,10 @@ export function GarageEmptyState({ onAddByVin, onAddByDetails, busy }: GarageEmp
   return (
     <AppView gap={24}>
       <AppView gap={9} style={{ paddingTop: 12 }}>
-        <AppText
-          family="heading"
-          weight="bold"
-          style={{ fontSize: 30, lineHeight: 34, color: tokens.text, maxWidth: 280 }}
-        >
+        <AppText textVariant="h3" weight="bold" style={{ color: tokens.text }}>
           {t('garage.emptyHeadline')}
         </AppText>
-        <AppText
-          family="default"
-          style={{ fontSize: 14, lineHeight: 20, color: tokens.textMuted, maxWidth: 300 }}
-        >
+        <AppText family="default" style={{ fontSize: 14, lineHeight: 20, color: tokens.textMuted }}>
           {t('garage.emptyLead')}
         </AppText>
       </AppView>
@@ -125,7 +114,7 @@ export function GarageEmptyState({ onAddByVin, onAddByDetails, busy }: GarageEmp
        *  taps in the platform's own pickers, against walking to the car and
        *  typing 17 characters. VIN keeps its sub-line, which is the honest
        *  reason to choose the slower route. */}
-      <AppView gap={10}>
+      <AppView gap={8}>
         <Route
           index="1"
           emphasis

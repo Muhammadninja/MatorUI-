@@ -97,7 +97,11 @@ vi.mock('@/components/shared/wheel-loader', () => ({
 vi.mock('@/components/screens-components/search/search-results/footer-spinner', () => ({
   default: host('spinner'),
 }));
-vi.mock('@/components/screens-components/catalog/product-row', () => ({ default: host('row') }));
+vi.mock('@/components/screens-components/catalog/product-row', () => ({
+  default: host('row'),
+  productCellStyle: () => ({}),
+  useProductGridColumns: () => 1,
+}));
 vi.mock('@/components/screens-components/catalog/results-toolbar', () => ({
   default: host('toolbar'),
 }));

@@ -71,9 +71,9 @@ export default function TabLayout() {
                     : meta.label;
                 const Icon = meta.icon;
                 const { emphasized } = meta;
-                // Emphasized center button sits on the indigo accent circle in
-                // both themes, so its icon stays white for contrast (not the
-                // theme-inverted on-brand color, which would be black in dark).
+                // Emphasized center button sits on a dark or teal accent circle,
+                // so its icon stays white for contrast (not the theme-inverted
+                // on-brand color, which would be black in dark).
                 const emphasizedIconColor = tokens.white;
 
                 return {
@@ -94,7 +94,7 @@ export default function TabLayout() {
                       <Icon
                         size={18}
                         strokeWidth={isActive ? 2.6 : 2.2}
-                        color={isActive ? tokens.text : tokens.textMuted}
+                        color={isActive ? tokens.brand : tokens.textMuted}
                       />
                     ),
                 };
