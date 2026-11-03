@@ -2,6 +2,10 @@
 
 This is an isolated frontend change set, **not a completed release certification**. Branch: `codex/functionality-audit-2026-11-03`; base: `9a64a98`; fix commit: `250daf6c2f29a44057d087bbc64a95ee9e85ab9f`. Worktree (permanently saved): `/Users/muhammadfotihabdullaev/Desktop/matorui/.local/worktrees/functionality-audit`. No restyling, dependencies, native configuration, account data, backend code, orders or payments were changed. Follow-up fixes add existing-component auth/error/exit paths and two notification messages in RU/UZ/EN. No screenshots were collected, per the latest instruction.
 
+## Combined integration result
+
+Owner released the simulator and authorized selective integration. Current branch: `integration/approved-design-functionality-2026-11-03`, based on approved `44b7d28` (includes `f04772e`, `4f5d05c`). [Current short smoke results, commit mapping, failures and blockers](COMBINED-SMOKE.md) supersede the pending-integration statuses below. Runtime source `63f82d8`; final recording commit adds only tests/docs. Original functionality/design worktrees remain separate; OTP autofill and unrelated dirty work are excluded. Frontend release readiness is **not established**.
+
 ## Latest follow-up
 
 [Claude findings, earlier-fix comparison and queued combined smoke test](FOLLOWUP.md). Functional follow-up commit: `4842c7c`; subsequent account-lock refinement is recorded in Git history. Shared simulator remains reserved for Claude.

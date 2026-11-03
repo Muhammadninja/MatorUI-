@@ -1,3 +1,7 @@
+# Integration completed selectively — short smoke recorded
+
+Current result: [COMBINED-SMOKE.md](COMBINED-SMOKE.md). Branch `integration/approved-design-functionality-2026-11-03`, approved design base `44b7d28`, runtime source `63f82d8`. The owner explicitly released the simulator. Selected commit mapping, resolved overlap, unchanged orders API, OTP exclusion and passed/failed/blocked checks are recorded there. Earlier future-tense handoff below is historical; it does not mean integration is still pending. No release-ready claim.
+
 # Coordination with Claude
 
 Base `9a64a98`, isolated branch `codex/functionality-audit-2026-11-03`. No changes were integrated into the dirty `design/teal-explore-home` worktree.
