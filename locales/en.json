@@ -783,6 +783,8 @@
     "markAllRead": "Mark all read",
     "markAllReadA11y": "Mark all notifications as read",
     "allMarkedRead": "All marked read",
+    "loadError": "Could not load notifications.",
+    "markReadError": "Could not mark notifications as read.",
     "emptyTitle": "No notifications yet",
     "emptyBody": "Order and vehicle updates will appear here.",
     "unreadHint": "Unread. Tap to mark read.",

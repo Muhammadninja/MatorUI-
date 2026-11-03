@@ -33,7 +33,7 @@ export type AuthSession = {
   expiresAt?: number;
 };
 
-type Envelope = AuthSession & { v: number; revision?: number };
+type Envelope = AuthSession & { v: number; revision?: number; writtenAt?: number };
 let lastRevision = 0;
 let storageTail: Promise<unknown> = Promise.resolve();
 
@@ -44,14 +44,22 @@ function serialized<T>(operation: () => Promise<T>): Promise<T> {
   return result;
 }
 
+function isRevision(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
 function parseEnvelope(raw: string | null): Envelope | null {
   if (!raw) return null;
   try {
     const value = JSON.parse(raw) as Partial<Envelope> | null;
     if (!value || value.v !== SCHEMA || typeof value.accessToken !== 'string' ||
         !value.accessToken || typeof value.refreshToken !== 'string' || !value.refreshToken) return null;
-    if (value.revision !== undefined && (!Number.isSafeInteger(value.revision) || value.revision < 0)) return null;
-    return value as Envelope;
+    // eea9b09 used writtenAt for the same monotonic ordering. Read both forms
+    // so upgrading never prefers an older encrypted copy after a failed write.
+    const revision = isRevision(value.revision) ? value.revision
+      : isRevision(value.writtenAt) ? value.writtenAt : undefined;
+    if (revision === undefined && (value.revision !== undefined || value.writtenAt !== undefined)) return null;
+    return { ...value, revision } as Envelope;
   } catch { return null; }
 }
 
@@ -108,7 +116,8 @@ export function saveAuthSession(session: AuthSession): Promise<void> {
   return serialized(async () => {
     await readCopies();
     lastRevision = Math.max(lastRevision + 1, Date.now());
-    const envelope = JSON.stringify({ v: SCHEMA, revision: lastRevision, ...snapshot });
+    // Keep writtenAt in new copies for compatible rollback to eea9b09.
+    const envelope = JSON.stringify({ ...snapshot, v: SCHEMA, revision: lastRevision, writtenAt: lastRevision });
     let saved = false;
     try {
       await AsyncStorage.setItem(ASYNC_KEY, envelope);

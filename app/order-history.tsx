@@ -1,5 +1,7 @@
 import { Stack } from 'expo-router';
 
+import { AuthenticatedRoute } from '@/components/screens-components/auth/authenticated-route';
+
 import OrderHistoryScreen from '@/components/screens/order-history-screen';
 
 /**
@@ -16,7 +18,9 @@ export default function OrderHistoryRoute() {
       <Stack.Screen
         options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }}
       />
-      <OrderHistoryScreen />
+      <AuthenticatedRoute titleKey="orderHistory.title" fallbackHref="/profile">
+        <OrderHistoryScreen />
+      </AuthenticatedRoute>
     </>
   );
 }

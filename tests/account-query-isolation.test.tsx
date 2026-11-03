@@ -149,3 +149,38 @@ test('notification failure after account change rolls back only its originating 
   await screen.close();
 });
 
+
+test('mark all read confirms only after success and rolls back a rejected operation', async () => {
+  let reject!: (error: Error) => void;
+  state.markAllRead.mockImplementationOnce(() => new Promise<void>((_done, fail) => { reject = fail; }));
+  const screen = await mount(useNotifications);
+  await settle(() => screen.current().unreadCount === 1);
+  let pending!: Promise<boolean | null>;
+  await act(async () => { pending = screen.current().markAllRead(); });
+  await settle(() => state.markAllRead.mock.calls.length === 1);
+  await act(async () => { expect(await screen.current().markAllRead()).toBeNull(); });
+  expect(state.markAllRead).toHaveBeenCalledTimes(1);
+  await act(async () => { reject(new Error('Rejected')); expect(await pending).toBe(false); });
+  await settle(() => screen.current().unreadCount === 1);
+  state.markAllRead.mockResolvedValueOnce(undefined);
+  await act(async () => { expect(await screen.current().markAllRead()).toBe(true); });
+  await settle(() => screen.current().unreadCount === 0);
+  await screen.close();
+});
+
+test('tracking without an order ID is not-found and refresh cannot fetch an undefined order', async () => {
+  const screen = await mount(() => useOrder(null));
+  expect(screen.current().state).toBe('not_found');
+  expect(screen.current().order).toBeNull();
+  await act(async () => screen.current().refresh());
+  expect(state.order).not.toHaveBeenCalled();
+  await screen.close();
+});
+
+test('empty checkout preserves the earlier frontend guard and never reaches the transport', async () => {
+  const screen = await mount(useCreateOrder);
+  await act(async () => { expect(await screen.current().placeOrder({ ...input, items: [] })).toBeNull(); });
+  expect(state.createOrder).not.toHaveBeenCalled();
+  expect(screen.current().phase).toBe('idle');
+  await screen.close();
+});

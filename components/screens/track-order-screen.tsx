@@ -41,7 +41,7 @@ export default function TrackOrderScreen() {
     s ? t(ORDER_STATUS_LABEL_I18N[s] ?? '\0', { defaultValue: s }) : s;
 
   const { orderId } = useLocalSearchParams<{ orderId?: string }>();
-  const { state, order, error, refresh } = useOrder(orderId ?? null);
+  const { state, order, refresh } = useOrder(orderId ?? null);
 
   // Pull the latest status every time the screen is focused — navigating here
   // from order history (or returning to a still-mounted track screen) must show
@@ -74,10 +74,10 @@ export default function TrackOrderScreen() {
         <AppView flex={1} center px="xl" gap={12}>
           <AlertCircle size={32} strokeWidth={2} color={tokens.error} />
           <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted, textAlign: 'center', maxWidth: 280 }}>
-            {error ?? t('trackOrder.notFound')}
+            {t(state === 'error' ? 'orderConfirmation.loadErrorTitle' : 'trackOrder.notFound')}
           </AppText>
           <AppView row gap={10}>
-            <AppButton title={t('common.retry')} kind="secondary" size="sm" onPress={refresh} />
+            {state === 'error' ? <AppButton title={t('common.retry')} kind="secondary" size="sm" onPress={refresh} /> : null}
             <AppButton title={t('trackOrder.backToShopping')} kind="brand" size="sm" onPress={goShopping} />
           </AppView>
         </AppView>

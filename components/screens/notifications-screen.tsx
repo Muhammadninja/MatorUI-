@@ -12,6 +12,7 @@ import {
   type NotificationDayGroup,
 } from '@/components/screens-components/notifications/notification-time';
 import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
+import { AppButton } from '@/components/shared/app-button';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
@@ -332,9 +333,10 @@ export default function NotificationsScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offerIdsKey]);
 
-  const handleMarkAll = () => {
-    markAllRead();
-    toastService.success(t('notifications.allMarkedRead'));
+  const handleMarkAll = async () => {
+    const confirmed = await markAllRead();
+    if (confirmed === true) toastService.success(t('notifications.allMarkedRead'));
+    else if (confirmed === false) toastService.danger(t('notifications.markReadError'));
   };
 
   // The garage row a vehicle notification is about; null once the car is gone.
@@ -603,6 +605,13 @@ export default function NotificationsScreen() {
       {state === 'loading' ? (
         <AppView flex={1} center>
           <WheelLoader size={28} color={tokens.brand} />
+        </AppView>
+      ) : state === 'error' ? (
+        <AppView flex={1} center px="xl" gap={12} testID="notifications-error">
+          <AppText textVariant="bodySm" align="center" colorName="textMuted">
+            {t('notifications.loadError')}
+          </AppText>
+          <AppButton title={t('common.retry')} kind="secondary" size="sm" onPress={() => { void refresh(); }} />
         </AppView>
       ) : notifications.length === 0 ? (
         // Sits above the optical centre: a little high reads as composed.

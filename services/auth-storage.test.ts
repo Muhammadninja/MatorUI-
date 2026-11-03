@@ -153,3 +153,47 @@ test('overlapping saves keep the final complete pair in both stores', async () =
   asyncMem.clear();
   expect(await loadAuthSession()).toEqual(ROTATED);
 });
+
+
+test.each([
+  ['writtenAt', 'writtenAt'],
+  ['revision', 'writtenAt'],
+  ['writtenAt', 'revision'],
+] as const)('newer fallback wins across %s encrypted and %s fallback metadata', async (secureField, fallbackField) => {
+  await SecureStore.setItemAsync('auth_v3_session', JSON.stringify({ v: 1, ...SESSION, [secureField]: 100 }));
+  asyncMem.set('auth:v2:session', JSON.stringify({ v: 1, ...ROTATED, [fallbackField]: 200 }));
+  expect(await loadAuthSession()).toEqual(ROTATED);
+});
+
+test.each([
+  ['writtenAt', 'writtenAt'],
+  ['revision', 'writtenAt'],
+  ['writtenAt', 'revision'],
+] as const)('newer encrypted copy wins across %s encrypted and %s fallback metadata', async (secureField, fallbackField) => {
+  await SecureStore.setItemAsync('auth_v3_session', JSON.stringify({ v: 1, ...ROTATED, [secureField]: 200 }));
+  asyncMem.set('auth:v2:session', JSON.stringify({ v: 1, ...SESSION, [fallbackField]: 100 }));
+  expect(await loadAuthSession()).toEqual(ROTATED);
+});
+
+test('equal cross-format timestamps prefer the encrypted complete copy', async () => {
+  await SecureStore.setItemAsync('auth_v3_session', JSON.stringify({ v: 1, ...ROTATED, writtenAt: 200 }));
+  asyncMem.set('auth:v2:session', JSON.stringify({ v: 1, ...SESSION, revision: 200 }));
+  expect(await loadAuthSession()).toEqual(ROTATED);
+});
+
+test('valid writtenAt recovers an envelope with invalid revision metadata', async () => {
+  await SecureStore.setItemAsync('auth_v3_session', JSON.stringify({ v: 1, ...ROTATED, revision: -1, writtenAt: 200 }));
+  asyncMem.set('auth:v2:session', JSON.stringify({ v: 1, ...SESSION, revision: 100 }));
+  expect(await loadAuthSession()).toEqual(ROTATED);
+});
+
+test('new saves emit equal revision and writtenAt fields newer than stored metadata', async () => {
+  const prior = Date.now() + 60_000;
+  await SecureStore.setItemAsync('auth_v3_session', JSON.stringify({ v: 1, ...SESSION, writtenAt: prior }));
+  await saveAuthSession(ROTATED);
+  const raw = await SecureStore.getItemAsync('auth_v3_session');
+  const metadata = JSON.parse(raw!) as { revision: number; writtenAt: number };
+  expect(metadata.revision).toBeGreaterThan(prior);
+  expect(metadata.writtenAt).toBe(metadata.revision);
+  expect(asyncMem.get('auth:v2:session')).toBe(raw);
+});

@@ -68,7 +68,7 @@ export type ActiveVehicleContextValue = {
    * banner, etc.) they can opt out of the backend call by passing
    * `{ skipBackend: true }`.
    */
-  setPrimaryVehicle: (id: string, opts?: { skipBackend?: boolean }) => Promise<void>;
+  setPrimaryVehicle: (id: string, opts?: { skipBackend?: boolean }) => Promise<boolean>;
   /**
    * Override the fitment beyond what the garage row implies — e.g.
    * the user picked "Cobalt Position 2 Premier Turbo" via cascading
@@ -158,10 +158,13 @@ export function ActiveVehicleProvider({ children }: PropsWithChildren) {
 
   const setPrimaryVehicle = useCallback<ActiveVehicleContextValue['setPrimaryVehicle']>(
     async (id, opts) => {
-      if (authHydrating || ownerId === null || ownerRef.current !== ownerId) return;
+      if (authHydrating || ownerId === null || ownerRef.current !== ownerId) return false;
       const vehicle = garageService.getById(id);
-      if (!vehicle) return;
+      if (!vehicle) return false;
       const epoch = ++epochRef.current;
+      // A failed server update must not become the persisted active vehicle.
+      if (!opts?.skipBackend && !vehicle.isPrimary) await garageService.setPrimary(id);
+      if (epoch !== epochRef.current || ownerRef.current !== ownerId) return false;
       setIsHydrating(false);
       const fitment = deriveFitment(vehicle);
       const snapshot: ActiveVehicleSnapshot = {
@@ -175,15 +178,7 @@ export function ActiveVehicleProvider({ children }: PropsWithChildren) {
       await persist(async () => {
         if (epoch === epochRef.current && ownerRef.current === ownerId) await saveActiveVehicle(snapshot);
       });
-      if (epoch !== epochRef.current || ownerRef.current !== ownerId) return;
-      if (!opts?.skipBackend && !vehicle.isPrimary) {
-        try {
-          await garageService.setPrimary(id);
-        } catch {
-          // The optimistic local update stays — the next refetch
-          // will reconcile if the server rejected the flip.
-        }
-      }
+      return epoch === epochRef.current && ownerRef.current === ownerId;
     },
     [ownerId, authHydrating, persist],
   );

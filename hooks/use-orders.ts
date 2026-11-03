@@ -122,7 +122,8 @@ export function useOrder(orderId: string | null | undefined): UseOrderValue {
 
   return useMemo<UseOrderValue>(() => {
     let state: OrderDetailState;
-    if (!ownerId || !orderId) state = 'idle';
+    if (!ownerId) state = 'idle';
+    else if (!orderId) state = 'not_found';
     else if (query.isPending) state = 'loading';
     else if (query.isError) state = 'error';
     else if (!query.data) state = 'not_found';
@@ -133,7 +134,7 @@ export function useOrder(orderId: string | null | undefined): UseOrderValue {
       order: ownerId ? query.data ?? null : null,
       error: query.error instanceof Error ? query.error.message : null,
       refresh: () => {
-        if (canRead()) void query.refetch();
+        if (orderId && canRead()) void query.refetch();
       },
     };
   }, [orderId, query, ownerId, canRead]);
@@ -162,7 +163,7 @@ export function useCreateOrder(): UseCreateOrderValue {
   if (session.current.ownerId !== ownerId) session.current = { ownerId, pending: null, result: null };
 
   const placeOrder = useCallback((input: CreateOrderInput): Promise<CreateOrderResult | null> => {
-    if (!canRead()) return Promise.resolve(null);
+    if (!canRead() || input.items.length === 0) return Promise.resolve(null);
     const attempt = session.current;
     // Only the first caller may continue into hosted payment/navigation.
     if (attempt.pending) return Promise.resolve(null);

@@ -23,7 +23,7 @@ export type UseNotificationsValue = {
   error: string | null;
   refresh: () => Promise<unknown>;
   markRead: (id: string) => void;
-  markAllRead: () => void;
+  markAllRead: () => Promise<boolean | null>;
 };
 
 export const NOTIFICATIONS_QUERY_KEY = ['notifications', 'list'] as const;
@@ -48,6 +48,7 @@ function hasVisibleText(s: string | undefined | null): boolean {
 
 export function useNotifications(): UseNotificationsValue {
   const queryClient = useQueryClient();
+  const markingAllRef = useRef(false);
   const { profile, isAuthenticated, isHydrating } = useUserContext();
   const ownerId = !isHydrating && isAuthenticated ? profile?.id ?? null : null;
   const ownerRef = useRef(ownerId);
@@ -124,7 +125,18 @@ export function useNotifications(): UseNotificationsValue {
       error: query.error instanceof Error ? query.error.message : null,
       refresh: () => canRead() ? query.refetch() : Promise.resolve(undefined),
       markRead: (id: string) => { if (canRead()) markReadMutation.mutate(id); },
-      markAllRead: () => { if (canRead()) markAllMutation.mutate(); },
+      markAllRead: async () => {
+        if (!canRead() || markingAllRef.current) return null;
+        markingAllRef.current = true;
+        try {
+          await markAllMutation.mutateAsync();
+          return canRead() ? true : null;
+        } catch {
+          return canRead() ? false : null;
+        } finally {
+          markingAllRef.current = false;
+        }
+      },
     };
   }, [query, markReadMutation, markAllMutation, ownerId, canRead]);
 }
