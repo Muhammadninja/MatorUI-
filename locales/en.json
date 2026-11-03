@@ -311,8 +311,6 @@
     "maybeLater": "Maybe later"
   },
   "profileCards": {
-    "welcomeTitle": "Welcome to Mator",
-    "welcomeMessage": "Log in to access your garage and orders, or create an account to get started.",
     "guestSession": "Guest session",
     "guestExplanation": "Your ID is only used for support on this device.",
     "logInToAccount": "Log in to your account",
