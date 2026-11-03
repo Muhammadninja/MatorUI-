@@ -149,7 +149,7 @@ export function ActiveVehicleProvider({ children }: PropsWithChildren) {
         if (!target) {
           return null;
         }
-        const fitment = deriveFitment(target, curr?.fitment);
+        const fitment = deriveFitment(target, persistedHit ? curr?.fitment : undefined);
         return { vehicleId: target.id, fitment, vehicle: target };
       });
     });

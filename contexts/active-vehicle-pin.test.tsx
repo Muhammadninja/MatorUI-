@@ -170,6 +170,17 @@ describe('active vehicle pin', () => {
     expect(api.currentActiveVehicle?.vehicleId).toBe('v-cobalt');
   });
 
+  test('replacement vehicle never inherits the removed vehicle engine or trim', async () => {
+    const tree = await mount();
+    await act(async () => { api.setFitment({ generationId: 'cobalt-gen', trimId: 'cobalt-trim', engineId: 'cobalt-engine' }); });
+    await act(async () => { vehicles = [NEXIA]; emit(); });
+    expect(api.currentActiveVehicle?.vehicleId).toBe('v-nexia');
+    expect(api.currentActiveVehicle?.fitment.generationId).toBeUndefined();
+    expect(api.currentActiveVehicle?.fitment.trimId).toBeUndefined();
+    expect(api.currentActiveVehicle?.fitment.engineId).toBeUndefined();
+    await act(async () => tree.unmount());
+  });
+
   test('logout clears the pin and disk; old cache emissions cannot restore it', async () => {
     const tree = await mount();
     await act(async () => { await api.setPrimaryVehicle('v-nexia', { skipBackend: true }); });

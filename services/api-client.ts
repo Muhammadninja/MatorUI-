@@ -267,10 +267,9 @@ async function request<T>(
           isAbort ? 'TIMEOUT' : 'NETWORK_ERROR',
           isAbort ? 'Request timed out.' : 'Network request failed.',
         );
-        // Idempotent OR network error (likely the request never reached
-        // the server) → retry. Non-idempotent timeouts do NOT retry to
-        // avoid double-submits.
-        if ((isIdempotent || isNetwork) && attempt < maxRetries) {
+        // A lost response does not prove a write was rejected by the server.
+        // Retry reads only; replaying a write can create duplicate orders.
+        if (isIdempotent && attempt < maxRetries) {
           lastError = err;
           await backoff(attempt);
           continue;
@@ -297,14 +296,18 @@ function composeSignal(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
+  const onAbort = () => controller.abort();
   if (external) {
     if (external.aborted) controller.abort();
-    else external.addEventListener('abort', () => controller.abort(), { once: true });
+    else external.addEventListener('abort', onAbort, { once: true });
   }
 
   return {
     signal: controller.signal,
-    cleanup: () => clearTimeout(timer),
+    cleanup: () => {
+      clearTimeout(timer);
+      external?.removeEventListener('abort', onAbort);
+    },
   };
 }
 

@@ -1,5 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+import { useUserContext } from '@/contexts/user.context';
 
 import {
   notificationsTransport,
@@ -46,40 +48,53 @@ function hasVisibleText(s: string | undefined | null): boolean {
 
 export function useNotifications(): UseNotificationsValue {
   const queryClient = useQueryClient();
+  const { profile, isAuthenticated, isHydrating } = useUserContext();
+  const ownerId = !isHydrating && isAuthenticated ? profile?.id ?? null : null;
+  const ownerRef = useRef(ownerId);
+  ownerRef.current = ownerId;
+  const canRead = () => ownerId !== null && ownerRef.current === ownerId;
+  const queryKey = [...NOTIFICATIONS_QUERY_KEY, ownerId] as const;
 
   const query = useQuery({
-    queryKey: NOTIFICATIONS_QUERY_KEY,
+    queryKey,
+    enabled: ownerId !== null,
     queryFn: ({ signal }) => notificationsTransport.list(signal),
   });
 
   const setCache = (updater: (items: NotificationItem[]) => NotificationItem[]) =>
-    queryClient.setQueryData<NotificationItem[]>(NOTIFICATIONS_QUERY_KEY, (prev) =>
+    queryClient.setQueryData<NotificationItem[]>(queryKey, (prev) =>
       prev ? updater(prev) : prev,
     );
 
   const markReadMutation = useMutation({
-    mutationFn: (id: string) => notificationsTransport.markRead(id),
+    mutationFn: (id: string) => {
+      if (!canRead()) throw new Error('Notification session changed');
+      return notificationsTransport.markRead(id);
+    },
     onMutate: async (id: string) => {
-      await queryClient.cancelQueries({ queryKey: NOTIFICATIONS_QUERY_KEY });
-      const previous = queryClient.getQueryData<NotificationItem[]>(NOTIFICATIONS_QUERY_KEY);
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<NotificationItem[]>(queryKey);
       setCache((items) => items.map((n) => (n.id === id ? { ...n, unread: false } : n)));
-      return { previous };
+      return { previous, queryKey };
     },
     onError: (_err, _id, ctx) => {
-      if (ctx?.previous) queryClient.setQueryData(NOTIFICATIONS_QUERY_KEY, ctx.previous);
+      if (ctx?.previous) queryClient.setQueryData(ctx.queryKey, ctx.previous);
     },
   });
 
   const markAllMutation = useMutation({
-    mutationFn: () => notificationsTransport.markAllRead(),
+    mutationFn: () => {
+      if (!canRead()) throw new Error('Notification session changed');
+      return notificationsTransport.markAllRead();
+    },
     onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: NOTIFICATIONS_QUERY_KEY });
-      const previous = queryClient.getQueryData<NotificationItem[]>(NOTIFICATIONS_QUERY_KEY);
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<NotificationItem[]>(queryKey);
       setCache((items) => items.map((n) => ({ ...n, unread: false })));
-      return { previous };
+      return { previous, queryKey };
     },
     onError: (_err, _vars, ctx) => {
-      if (ctx?.previous) queryClient.setQueryData(NOTIFICATIONS_QUERY_KEY, ctx.previous);
+      if (ctx?.previous) queryClient.setQueryData(ctx.queryKey, ctx.previous);
     },
   });
 
@@ -93,11 +108,12 @@ export function useNotifications(): UseNotificationsValue {
     // trimming: a title made only of zero-width spaces survives a plain `.trim()`
     // (which removes standard whitespace only) yet paints an empty line — exactly
     // the blank rows seen in the feed between real offer cards.
-    const notifications = (query.data ?? []).filter(
+    const notifications = (ownerId ? query.data ?? [] : []).filter(
       (n) => hasVisibleText(n.title) || hasVisibleText(n.body),
     );
     let state: NotificationsState;
-    if (query.isPending) state = 'loading';
+    if (!ownerId) state = 'success';
+    else if (query.isPending) state = 'loading';
     else if (query.isError) state = 'error';
     else state = 'success';
 
@@ -106,11 +122,11 @@ export function useNotifications(): UseNotificationsValue {
       notifications,
       unreadCount: notifications.filter((n) => n.unread).length,
       error: query.error instanceof Error ? query.error.message : null,
-      refresh: () => query.refetch(),
-      markRead: (id: string) => markReadMutation.mutate(id),
-      markAllRead: () => markAllMutation.mutate(),
+      refresh: () => canRead() ? query.refetch() : Promise.resolve(undefined),
+      markRead: (id: string) => { if (canRead()) markReadMutation.mutate(id); },
+      markAllRead: () => { if (canRead()) markAllMutation.mutate(); },
     };
-  }, [query, markReadMutation, markAllMutation]);
+  }, [query, markReadMutation, markAllMutation, ownerId, canRead]);
 }
 
 export default useNotifications;
