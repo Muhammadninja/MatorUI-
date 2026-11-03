@@ -22,6 +22,8 @@ Remote main на момент подготовки: `c58e38b0ce7f6bcdf1c5c12b644
 
 Реальный сервер ещё не обследован: не предоставлены SSH host/user, каталог текущего backend/release и текущий deployed SHA. SSH config с подходящим alias на этом компьютере отсутствует. Наличие PM2 на production, Node/npm, путь процесса и схема release/symlink должны быть подтверждены read-only до deployment. Не использовать документацию как доказательство фактического состояния сервера.
 
+Повторная проверка 2026-11-02: remote HEAD/main по-прежнему `c58e38b0`; в tracked tree отсутствуют deployment workflows GitHub Actions, GitLab CI, Jenkins и конфигурация другого CI/CD для backend. `Backend/.github` содержит только Copilot instructions. В package scripts deployment-команды нет. GitHub CLI не установлен, SSH config отсутствует, доступный SSH-agent отвечает `The agent has no identities`. Это не доказывает отсутствие CI/CD у владельца вне репозитория, но готового deployment-доступа в текущей сессии не обнаружено. Недостаёт host/user/порта при нестандартном SSH, абсолютного release path и доступа, установленного владельцем через SSH-agent/локальную конфигурацию либо штатную deployment-систему. Приватные ключи, пароли и токены в чат не передавать. Окончательный SHA и состав показываются для подтверждения только после обследования сервера; `0e289aa3` пока не утверждённый релиз.
+
 ## Preflight на production — только после предоставления доступа
 1. Получить текущие SHA, чистоту checkout, путь и status ровно процесса `mator-backend`, Node/npm и свободное место. Из PM2 выводить только имя/status/cwd/script/mode; не печатать env, jlist или содержимое .env.
 2. Проверить `/health/live` и `/health`, сохранить исходные публичные результаты OEM/GM, сортировки, price/rating и страниц.
