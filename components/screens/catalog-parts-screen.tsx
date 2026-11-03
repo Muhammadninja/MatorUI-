@@ -442,6 +442,7 @@ function QuickPill({
   const { tokens } = useThemeContext();
   return (
     <AppPressableView
+      hitSlop={{ top: 13, bottom: 13, left: 14, right: 14 }}
       testID={testID}
       onPress={onPress}
       androidRipple={false}

@@ -70,7 +70,7 @@ export default function VinFinderScreen() {
       testID="vin-finder-screen"
       flex={1}
       colorName="background"
-      style={{ paddingTop: insets.top + 24, paddingHorizontal: 20 }}
+      style={{ paddingTop: insets.top + 24, paddingHorizontal: 16 }}
       gap={16}
     >
       <AppText

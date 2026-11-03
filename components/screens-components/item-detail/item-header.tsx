@@ -51,10 +51,11 @@ export function ItemDetailHeader({ topInset, onBack, onLayout }: ItemDetailHeade
         onPress={onBack}
         androidRipple={false}
         pressedOpacity={0.7}
-        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         accessibilityRole="button"
         accessibilityLabel={t('itemDetail.back')}
-        style={{ alignSelf: 'flex-start' }}
+        center
+        // 48-unit target; the margins keep the 22-unit arrow where it was.
+        style={{ alignSelf: 'flex-start', width: 48, height: 48, margin: -13 }}
       >
         <ArrowLeft size={22} strokeWidth={2.3} color={tokens.text} />
       </AppPressableView>
@@ -160,7 +161,7 @@ export function ItemPriceRow({
       {/* Which campaign the discount comes from — the backend names it, and a
        *  named sale reads as a real offer rather than an arbitrary markdown. */}
       {saleTitle ? (
-        <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted }}>
+        <AppText family="default" style={{ fontSize: 12, color: tokens.textMuted }}>
           {saleTitle}
         </AppText>
       ) : null}

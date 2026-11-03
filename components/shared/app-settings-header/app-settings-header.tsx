@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/shared/app-text';
@@ -43,8 +44,9 @@ export function AppSettingsHeader({
   fallbackHref,
   onBack,
   right,
-  backAccessibilityLabel = 'Go back',
+  backAccessibilityLabel,
 }: AppSettingsHeaderProps) {
+  const { t } = useTranslation();
   const { tokens, scheme } = useThemeContext();
   const insets = useSafeAreaInsets();
 
@@ -89,7 +91,7 @@ export function AppSettingsHeader({
           onPress={handleBack}
           androidRipple
           accessibilityRole="button"
-          accessibilityLabel={backAccessibilityLabel}
+          accessibilityLabel={backAccessibilityLabel ?? t('common.back')}
           style={{
             width: 36,
             height: 36,

@@ -61,7 +61,7 @@ export default function LegalDocumentScreen({
           <AppText
             family="default"
             align="center"
-            style={{ fontSize: 13.5, lineHeight: 20, color: tokens.textMuted }}
+            style={{ fontSize: 14, lineHeight: 20, color: tokens.textMuted }}
           >
             {state === 'error' ? (error ?? t('legal.loadError')) : t('legal.unavailable')}
           </AppText>
@@ -70,14 +70,14 @@ export default function LegalDocumentScreen({
       ) : (
         <AppScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingTop: 12, paddingBottom: 40, paddingHorizontal: 20 }}
+          contentContainerStyle={{ paddingTop: 12, paddingBottom: 40, paddingHorizontal: 16 }}
         >
           <AppView gap={18}>
             <AppView gap={4}>
               <AppText family="heading" weight="bold" style={{ fontSize: 18, color: tokens.text }}>
                 {doc!.title}
               </AppText>
-              <AppText family="default" style={{ fontSize: 11.5, color: tokens.textMuted }}>
+              <AppText family="default" style={{ fontSize: 12, color: tokens.textMuted }}>
                 {t('legal.versionLine', {
                   version: doc!.version,
                   date: formatEffectiveDate(doc!.effective_at),
@@ -94,7 +94,7 @@ export default function LegalDocumentScreen({
             ) : (
               <AppText
                 family="default"
-                style={{ fontSize: 13.5, lineHeight: 20, color: tokens.textMuted }}
+                style={{ fontSize: 14, lineHeight: 20, color: tokens.textMuted }}
               >
                 {doc!.content}
               </AppText>

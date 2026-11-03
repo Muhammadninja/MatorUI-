@@ -96,7 +96,7 @@ export function ItemRatingRow({ rating, reviewCount }: { rating?: number; review
         {rating.toFixed(1)}
       </AppText>
       {reviewCount ? (
-        <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted }}>
+        <AppText family="default" style={{ fontSize: 12, color: tokens.textMuted }}>
           {t('catalog.reviewCount', { count: reviewCount })}
         </AppText>
       ) : null}
@@ -165,7 +165,7 @@ export function ItemFeatureList({ features }: { features: string[] }) {
           />
           <AppText
             family="default"
-            style={{ flex: 1, fontSize: 13.5, lineHeight: 19, color: tokens.text }}
+            style={{ flex: 1, fontSize: 14, lineHeight: 19, color: tokens.text }}
           >
             {f}
           </AppText>

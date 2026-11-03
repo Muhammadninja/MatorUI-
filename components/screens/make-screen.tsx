@@ -49,7 +49,7 @@ export default function MakeScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
-          paddingHorizontal: 20,
+          paddingHorizontal: 16,
           paddingTop: 4,
           paddingBottom: Math.max(insets.bottom + 24, 40),
           gap: 16,

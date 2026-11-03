@@ -25,8 +25,10 @@ Branch `design/teal-explore-home`, uncommitted, base `fe1f0b4`. Screenshots: `te
 | 16 | Search | Rows no longer show article numbers, rating or tags, following the requested card contents. | Decision |
 | 17 | Text | Two-line ellipsis on product titles is a deliberate exception to the earlier no-truncation rule. | Decision |
 | 18 | Item detail | The similar-parts rail still uses the old card style; no gallery thumbnails. | Frontend |
-| 19 | Shared | Toast colours are still hardcoded outside the theme. | Frontend |
+| 19 | Shared | Resolved: toast colours now come from theme tokens. | Done |
 | 20 | Tests | `hooks/use-legal.test.tsx` fails intermittently, including before this work. | Frontend |
+
+Per-screen status and newer findings: `design-finish-checklist-2026-11-03.md`.
 
 ## Not verified
 

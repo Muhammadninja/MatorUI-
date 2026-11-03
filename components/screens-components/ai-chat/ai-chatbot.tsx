@@ -1039,7 +1039,7 @@ function FeedbackButton({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={kind === 'up' ? t('aiChat.goodResponse') : t('aiChat.badResponse')}
-      hitSlop={{ top: 9, bottom: 9, left: 9, right: 9 }}
+      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
       style={{
         width: 26,
         height: 26,

@@ -219,6 +219,15 @@ function RootNavigation() {
           <Stack.Screen name="index" options={{ headerShown: false, gestureEnabled: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false, gestureEnabled: false }} />
           <Stack.Screen
+            name="sourcing/offer/[id]"
+            options={{
+              headerShown: false,
+              animation: 'slide_from_right',
+              gestureEnabled: true,
+              gestureDirection: 'horizontal',
+            }}
+          />
+          <Stack.Screen
             name="vin-finder"
             options={{
               headerShown: false,

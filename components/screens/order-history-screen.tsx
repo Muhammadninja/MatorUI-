@@ -29,7 +29,7 @@ import { triggerHaptic } from '@/utils/haptics';
 export default function OrderHistoryScreen() {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
-  const { state, page, error, refresh } = useOrders();
+  const { state, page, refresh } = useOrders();
 
   return (
     <AppView flex={1} colorName="background" testID="order-history-screen">
@@ -43,7 +43,7 @@ export default function OrderHistoryScreen() {
         <AppView flex={1} center px="xl" gap={12}>
           <AlertCircle size={32} strokeWidth={2} color={tokens.error} />
           <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted, textAlign: 'center', maxWidth: 280 }}>
-            {error ?? t('orderHistory.loadError')}
+            {t('orderHistory.loadError')}
           </AppText>
           <AppButton title={t('common.retry')} kind="secondary" size="sm" onPress={refresh} />
         </AppView>
@@ -153,7 +153,7 @@ const OrderCard = React.memo(function OrderCard({ order }: { order: OrderListRow
       <AppText
         family="default"
         weight="semibold"
-        style={{ fontSize: 13.5, color: tokens.text, marginTop: 8 }}
+        style={{ fontSize: 14, color: tokens.text, marginTop: 8 }}
       >
         {order.summary}
       </AppText>

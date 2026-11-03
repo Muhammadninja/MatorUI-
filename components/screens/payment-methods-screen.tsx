@@ -24,7 +24,7 @@ export default function PaymentMethodsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: 12, paddingBottom: 40, gap: 12, paddingHorizontal: 16 }}
       >
-        <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted, marginBottom: 4 }}>
+        <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted, marginBottom: 4 }}>
           {t('paymentMethods.intro')}
         </AppText>
 
