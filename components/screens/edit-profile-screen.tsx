@@ -69,7 +69,7 @@ export default function EditProfileScreen() {
   const pickPhoto = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      toast.info(t('editProfile.photoPermission'));
+      toast.warning(t('editProfile.photoPermission'));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -127,7 +127,7 @@ export default function EditProfileScreen() {
         avatarUrl,
       });
       if (photoFailed) {
-        toast.info(t('editProfile.savedPhotoFailed'));
+        toast.warning(t('editProfile.savedPhotoFailed'));
       } else {
         toast.success(t('editProfile.profileUpdated'));
       }
@@ -192,7 +192,7 @@ export default function EditProfileScreen() {
                   onPress={pickPhoto}
                   accessibilityRole="button"
                   accessibilityLabel={t('editProfile.changePhoto')}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  hitSlop={{ top: 9, bottom: 9, left: 9, right: 9 }}
                   style={({ pressed }) => ({
                     position: 'absolute',
                     bottom: 0,

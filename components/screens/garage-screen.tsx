@@ -159,7 +159,7 @@ export default function GarageScreen() {
       // accepted, move the pin with `skipBackend` so the flip isn't sent twice.
       await setPrimary(vehicle.id);
       await setPrimaryVehicle(vehicle.id, { skipBackend: true });
-      toast.info(t('garage.nowActive', { vehicle: name }));
+      toast.success(t('garage.nowActive', { vehicle: name }));
     } catch {
       toast.danger(t('garage.setPrimaryFailed'));
     }

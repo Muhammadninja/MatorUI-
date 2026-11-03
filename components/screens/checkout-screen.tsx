@@ -149,7 +149,7 @@ export default function CheckoutScreen() {
     if (paymentType === 'payme') {
       const outcome = await collectPaymePayment(result.orderId);
       if (outcome === 'incomplete') {
-        toast.info(t('checkout.paymentIncomplete'));
+        toast.warning(t('checkout.paymentIncomplete'));
       }
     }
 
@@ -231,10 +231,10 @@ export default function CheckoutScreen() {
           <AppView gap={10}>
             {items.map((item) => (
               <AppView key={item.id} row justify="space-between">
-                <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted, flex: 1 }}>
+                <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted, flex: 1 }}>
                   {item.title} × {item.quantity}
                 </AppText>
-                <AppText family="accent" weight="semibold" style={{ fontSize: 13.5, color: tokens.text }}>
+                <AppText family="accent" weight="semibold" style={{ fontSize: 14, color: tokens.text }}>
                   {formatCurrency(parsePrice(item.price) * item.quantity)}
                 </AppText>
               </AppView>
@@ -259,7 +259,7 @@ export default function CheckoutScreen() {
           {create.error ? (
             <AppView row align="center" gap={8}>
               <AlertCircle size={16} strokeWidth={2} color={tokens.error} />
-              <AppText family="default" style={{ fontSize: 12.5, color: tokens.error, flex: 1 }}>{create.error}</AppText>
+              <AppText family="default" style={{ fontSize: 12, color: tokens.error, flex: 1 }}>{create.error}</AppText>
             </AppView>
           ) : null}
         </AppView>
@@ -340,7 +340,7 @@ function DeliverySection({
         <>
           <AppView row align="center" gap={10}>
             <PhoneCall size={18} strokeWidth={2} color={tokens.text} />
-            <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted, flex: 1 }}>
+            <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted, flex: 1 }}>
               {t('checkout.noAddressCourier')}
             </AppText>
           </AppView>
@@ -348,7 +348,7 @@ function DeliverySection({
         </>
       ) : (
         <>
-          <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted }}>
+          <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted }}>
             {t('checkout.addAddressOrSkip')}
           </AppText>
           <AppView row gap={10}>
@@ -404,7 +404,7 @@ function PaymentRow({
         <Icon size={20} strokeWidth={2} color={tokens.text} />
         <AppView flex={1}>
           <AppText family="default" weight="semibold" style={{ fontSize: 15, color: tokens.text }}>{t(option.labelKey)}</AppText>
-          <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted, marginTop: 1 }}>{t(option.descriptionKey)}</AppText>
+          <AppText family="default" style={{ fontSize: 12, color: tokens.textMuted, marginTop: 1 }}>{t(option.descriptionKey)}</AppText>
         </AppView>
         <AppView
           center
@@ -453,8 +453,8 @@ function SectionCard({ label, main, sub, onChange, tokens }: { label: string; ma
 function SummaryRow({ label, value, tokens }: { label: string; value: string; tokens: Tokens }) {
   return (
     <AppView row justify="space-between">
-      <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted }}>{label}</AppText>
-      <AppText family="accent" weight="semibold" style={{ fontSize: 13.5, color: tokens.text }}>{value}</AppText>
+      <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted }}>{label}</AppText>
+      <AppText family="accent" weight="semibold" style={{ fontSize: 14, color: tokens.text }}>{value}</AppText>
     </AppView>
   );
 }

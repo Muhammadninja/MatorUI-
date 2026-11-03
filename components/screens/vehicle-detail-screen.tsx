@@ -128,7 +128,7 @@ export default function VehicleDetailScreen() {
     if (!vehicleId) return;
     try {
       await removeVehicle(vehicleId);
-      toastService.info(t('vehicleDetail.removedToast', { vehicle: headline }), {
+      toastService.success(t('vehicleDetail.removedToast', { vehicle: headline }), {
         description: t('vehicleDetail.removedToastDesc'),
       });
       router.back();
@@ -209,7 +209,7 @@ export default function VehicleDetailScreen() {
             <AppText
               family="default"
               colorName="textMuted"
-              style={{ fontSize: 13.5, marginTop: 3 }}
+              style={{ fontSize: 14, marginTop: 3 }}
             >
               {subline}
             </AppText>

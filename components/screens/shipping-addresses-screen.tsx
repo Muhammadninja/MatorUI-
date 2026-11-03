@@ -32,7 +32,7 @@ export default function ShippingAddressesScreen() {
   const { tokens } = useThemeContext();
   const toast = useToast();
 
-  const { state, items: addresses, error, refresh } = useAddresses();
+  const { state, items: addresses, refresh } = useAddresses();
   const createAddress = useCreateAddress();
   const updateAddress = useUpdateAddress();
   const removeAddress = useRemoveAddress();
@@ -57,16 +57,16 @@ export default function ShippingAddressesScreen() {
           debugLog('address', `→ update ${editing.id}`, values);
           const updated = await updateAddress.mutateAsync({ id: editing.id, input: values });
           debugLog('address', '← updated (stored)', updated);
-          toast.info(t('addresses.updated'));
+          toast.success(t('addresses.updated'));
         } else {
           debugLog('address', '→ create', values);
           const created = await createAddress.mutateAsync(values);
           debugLog('address', '← created (stored)', created);
-          toast.info(t('addresses.added'));
+          toast.success(t('addresses.added'));
         }
       } catch (err) {
         debugLog('address', '✗ save FAILED', { message: (err as Error)?.message });
-        toast.info(t('addresses.saveFailed'));
+        toast.danger(t('addresses.saveFailed'));
       }
     },
     [editing, updateAddress, createAddress, toast, t],
@@ -76,9 +76,9 @@ export default function ShippingAddressesScreen() {
     async (id: string) => {
       try {
         await removeAddress.mutateAsync(id);
-        toast.info(t('addresses.removed'));
+        toast.success(t('addresses.removed'));
       } catch {
-        toast.info(t('addresses.removeFailed'));
+        toast.danger(t('addresses.removeFailed'));
       }
     },
     [removeAddress, toast, t],
@@ -88,9 +88,9 @@ export default function ShippingAddressesScreen() {
     async (id: string) => {
       try {
         await setDefaultAddress.mutateAsync(id);
-        toast.info(t('addresses.defaultUpdated'));
+        toast.success(t('addresses.defaultUpdated'));
       } catch {
-        toast.info(t('addresses.defaultFailed'));
+        toast.danger(t('addresses.defaultFailed'));
       }
     },
     [setDefaultAddress, toast, t],
@@ -141,7 +141,7 @@ export default function ShippingAddressesScreen() {
               family="default"
               style={{ fontSize: 13, color: tokens.textMuted, textAlign: 'center', maxWidth: 280 }}
             >
-              {error ?? t('addresses.loadErrorBody')}
+              {t('addresses.loadErrorBody')}
             </AppText>
           </AppView>
           <AppButton title={t('common.retry')} kind="secondary" size="sm" onPress={refresh} />

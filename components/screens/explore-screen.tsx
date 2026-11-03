@@ -1,7 +1,7 @@
 import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
-import { Bell, Search } from 'lucide-react-native';
-import { useCallback, useState } from 'react';
+import { Bell, ChevronDown, ChevronUp, Search } from 'lucide-react-native';
+import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Platform,
@@ -44,6 +44,8 @@ const SCREEN_GUTTER = 16;
 const GRID_GAP = 8;
 /** Category tiles shown before "show all"; every root stays one tap away. */
 const INITIAL_CATEGORY_COUNT = 6;
+/** Space left between the frosted header and the category heading after collapsing. */
+const CATEGORY_HEADING_CLEARANCE = 12;
 
 /**
  * Pure-View replacement for what used to be an SVG linear-gradient. Stacks thin
@@ -92,6 +94,36 @@ export default function ExploreScreen() {
   // Three equal columns with exact gaps, whatever the phone's width.
   const tileWidth = Math.floor((windowWidth - SCREEN_GUTTER * 2 - GRID_GAP * 2) / 3);
   const [categoriesExpanded, setCategoriesExpanded] = useState(false);
+  const CategoriesChevron = categoriesExpanded ? ChevronUp : ChevronDown;
+
+  // Collapsing removes content the user may be scrolled past, so the offset is
+  // corrected once the shorter content has been measured.
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollY = useRef(0);
+  const viewportHeight = useRef(0);
+  const categoriesHeadingY = useRef(0);
+  const settleAfterCollapse = useRef(false);
+
+  const toggleCategories = useCallback(() => {
+    settleAfterCollapse.current = categoriesExpanded;
+    setCategoriesExpanded(!categoriesExpanded);
+  }, [categoriesExpanded]);
+
+  const onContentSizeChange = useCallback(
+    (_width: number, contentHeight: number) => {
+      if (!settleAfterCollapse.current) return;
+      settleAfterCollapse.current = false;
+      const headingOffset =
+        categoriesHeadingY.current - headerHeight - HEADER_FADE - CATEGORY_HEADING_CLEARANCE;
+      // The shortened page often can't scroll far enough to pin the heading.
+      const maxOffset = contentHeight - viewportHeight.current;
+      const target = Math.max(0, Math.min(headingOffset, maxOffset));
+      if (scrollY.current > target) {
+        scrollRef.current?.scrollTo({ y: target, animated: true });
+      }
+    },
+    [headerHeight],
+  );
 
   // "Shop by category" grid — the roots of the category tree with their parts
   // counts, live from GET /v1/reference/categories.
@@ -107,9 +139,14 @@ export default function ExploreScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    void refreshCategories().finally(() => {
+    // refetch resolves even when the request fails; the result says which.
+    void refreshCategories().then((result) => {
       setRefreshing(false);
-      toast.success(t('explore.pricesStockUpdated'));
+      if ((result as { isError?: boolean } | undefined)?.isError) {
+        toast.danger(t('search.catalogueLoadError'));
+      } else {
+        toast.success(t('explore.pricesStockUpdated'));
+      }
     });
   }, [refreshCategories, toast, t]);
 
@@ -269,7 +306,16 @@ export default function ExploreScreen() {
       ) : null}
 
       <ScrollView
+        ref={scrollRef}
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={(e) => {
+          scrollY.current = e.nativeEvent.contentOffset.y;
+        }}
+        onLayout={(e) => {
+          viewportHeight.current = e.nativeEvent.layout.height;
+        }}
+        onContentSizeChange={onContentSizeChange}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -319,7 +365,14 @@ export default function ExploreScreen() {
         )}
 
         {/* ── Shop by category ── */}
-        <AppText textVariant="h4" weight="bold" style={{ marginTop: 12 }}>
+        <AppText
+          textVariant="h4"
+          weight="bold"
+          style={{ marginTop: 12 }}
+          onLayout={(e) => {
+            categoriesHeadingY.current = e.nativeEvent.layout.y;
+          }}
+        >
           {t('explore.shopByCategory')}
         </AppText>
         {categoriesState === 'loading' ? (
@@ -357,16 +410,29 @@ export default function ExploreScreen() {
               )}
             </AppView>
             {categories.length > INITIAL_CATEGORY_COUNT ? (
-              <AppButton
+              <AppPressableView
                 testID="explore-toggle-categories"
-                title={t(
+                onPress={toggleCategories}
+                accessibilityRole="button"
+                accessibilityLabel={t(
                   categoriesExpanded ? 'explore.showFewerCategories' : 'explore.showAllCategories',
                 )}
-                kind="secondary"
-                size="lg"
-                fullWidth
-                onPress={() => setCategoriesExpanded((v) => !v)}
-              />
+                accessibilityState={{ expanded: categoriesExpanded }}
+                androidRipple={false}
+                style={{ alignSelf: 'center' }}
+              >
+                {/* minHeight sits inside the Pressable: on the pressable's own
+                 *  style it would reach only the wrapper, not the touch area. */}
+                <AppView row center gap={4} style={{ minHeight: 48, paddingHorizontal: 12 }}>
+                  <AppText
+                    weight="medium"
+                    style={{ fontSize: 15, lineHeight: 20, color: tokens.brand }}
+                  >
+                    {t(categoriesExpanded ? 'explore.collapseCategories' : 'explore.allCategories')}
+                  </AppText>
+                  <CategoriesChevron size={18} strokeWidth={2.2} color={tokens.brand} />
+                </AppView>
+              </AppPressableView>
             ) : null}
           </>
         )}

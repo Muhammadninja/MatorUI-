@@ -187,7 +187,7 @@ function SourcingOfferCard({
       {added ? (
         <AppView row align="center" gap={5} style={{ flexShrink: 0 }}>
           <Check size={15} color={tokens.success} />
-          <AppText family="accent" weight="bold" style={{ fontSize: 12.5, color: tokens.success }}>
+          <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.success }}>
             {t('sourcing.inCart')}
           </AppText>
         </AppView>
@@ -460,7 +460,7 @@ export default function NotificationsScreen() {
       try {
         await rejectSourcingOffer(target, reasonKey);
         setLiveStatus((s) => ({ ...s, [target]: 'DECLINED' }));
-        toastService.info(t('sourcing.offerDeclined'));
+        toastService.success(t('sourcing.offerDeclined'));
       } catch (err) {
         if ((err as { status?: number })?.status === 404) {
           setLiveStatus((s) => ({ ...s, [target]: 'GONE' }));
@@ -695,7 +695,7 @@ export default function NotificationsScreen() {
             <AppText
               family="heading"
               weight="bold"
-              style={{ fontSize: 15.5, color: tokens.text, marginBottom: 2 }}
+              style={{ fontSize: 16, color: tokens.text, marginBottom: 2 }}
             >
               {t('sourcing.declineReasonTitle')}
             </AppText>
@@ -715,7 +715,7 @@ export default function NotificationsScreen() {
                 <AppText
                   family="default"
                   weight="semibold"
-                  style={{ fontSize: 14.5, color: tokens.text }}
+                  style={{ fontSize: 14, color: tokens.text }}
                 >
                   {r.label}
                 </AppText>

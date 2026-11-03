@@ -1,57 +1,72 @@
-import { CheckCircle2, Info, X, XCircle } from 'lucide-react-native';
+import { Check, Info, TriangleAlert, X, XCircle } from 'lucide-react-native';
 import { memo, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Animated, Easing, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/shared/app-text';
-import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import type { Toast, ToastKind } from '@/services/toast-service';
+import type { ThemeTokens } from '@/themes/types';
 
 export type AppToastProps = {
   toast: Toast;
   onDismiss: (id: string) => void;
+  reduceMotion?: boolean;
 };
 
-// Test palette per spec: green / red / yellow
-const PALETTE: Record<ToastKind, { tint: string; tintFg: string; Icon: typeof CheckCircle2 }> = {
-  success: { tint: '#16a34a', tintFg: '#ffffff', Icon: CheckCircle2 },
-  danger: { tint: '#dc2626', tintFg: '#ffffff', Icon: XCircle },
-  info: { tint: '#eab308', tintFg: '#1a1a1a', Icon: Info },
+const KIND_STYLE: Record<ToastKind, { color: keyof ThemeTokens; Icon: typeof Check }> = {
+  success: { color: 'success', Icon: Check },
+  danger: { color: 'error', Icon: XCircle },
+  warning: { color: 'warning', Icon: TriangleAlert },
+  info: { color: 'info', Icon: Info },
 };
 
-function AppToastImpl({ toast, onDismiss }: AppToastProps) {
+function AppToastImpl({ toast, onDismiss, reduceMotion = false }: AppToastProps) {
   const { t } = useTranslation();
-  const { tokens, scheme } = useThemeContext();
-  const isDark = scheme === 'dark';
+  const { tokens } = useThemeContext();
 
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(-16)).current;
 
-  // Enter + auto-dismiss in one effect. Native-driver throughout.
+  // Runs for each new toast. Starting an animation stops any exit in flight,
+  // whose callback then sees `finished: false` and leaves the new toast alone.
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: 220,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(translateY, {
-        toValue: 0,
-        duration: 240,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]).start();
+    if (reduceMotion) {
+      opacity.setValue(1);
+      translateY.setValue(0);
+    } else {
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 220,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 240,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+
+    // Spoken without moving the screen reader's focus off what the user is on.
+    AccessibilityInfo.announceForAccessibility(
+      toast.description ? `${toast.title}. ${toast.description}` : toast.title,
+    );
 
     if (toast.duration <= 0) return;
     const timer = setTimeout(() => handleDismiss(), toast.duration);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toast.id, toast.duration]);
+  }, [toast]);
 
   const handleDismiss = () => {
+    if (reduceMotion) {
+      onDismiss(toast.id);
+      return;
+    }
     Animated.parallel([
       Animated.timing(opacity, {
         toValue: 0,
@@ -73,103 +88,56 @@ function AppToastImpl({ toast, onDismiss }: AppToastProps) {
     handleDismiss();
   };
 
-  const palette = PALETTE[toast.kind];
+  const { color, Icon } = KIND_STYLE[toast.kind];
   const animatedStyle = useMemo(
     () => ({ opacity, transform: [{ translateY }] }),
     [opacity, translateY],
   );
 
   return (
-    <Animated.View style={[styles.shell, animatedStyle]} pointerEvents="box-none">
+    <Animated.View style={animatedStyle} pointerEvents="box-none">
+      {/* Not `accessible`: that would merge the card into one element and hide
+       *  the close and action buttons from screen readers. */}
       <Pressable
+        testID="app-toast"
         onPress={handleDismiss}
-        accessibilityRole="alert"
-        accessibilityLabel={`${toast.kind}: ${toast.title}`}
-        style={({ pressed }) => [
-          styles.card,
-          {
-            backgroundColor: isDark ? tokens.card : tokens.white,
-            borderColor: isDark ? `${tokens.border}80` : tokens.border,
-            transform: [{ scale: pressed ? 0.985 : 1 }],
-            ...Platform.select({
-              ios: {
-                shadowColor: '#000000',
-                shadowOffset: { width: 0, height: 10 },
-                shadowOpacity: isDark ? 0.45 : 0.14,
-                shadowRadius: 20,
-              },
-              android: { elevation: 12 },
-            }),
-          },
-        ]}
+        accessible={false}
+        style={[styles.card, { backgroundColor: tokens.card, borderColor: tokens.border }]}
       >
-        {/* Color rail */}
-        <View style={[styles.rail, { backgroundColor: palette.tint }]} />
+        <View style={styles.icon}>
+          <Icon size={18} strokeWidth={2.4} color={tokens[color]} />
+        </View>
 
-        <AppView row align="center" gap={12} px={14} py={12} style={{ flex: 1 }}>
-          <View
-            style={[
-              styles.iconBubble,
-              { backgroundColor: palette.tint },
-            ]}
-          >
-            <palette.Icon size={16} strokeWidth={2.4} color={palette.tintFg} />
-          </View>
-
-          <AppView gap={2} style={{ flex: 1 }}>
-            <AppText
-              textVariant="bodySm"
-              family="heading"
-              weight="semibold"
-              colorName="text"
-            >
-              {toast.title}
+        <View style={styles.content}>
+          <AppText weight="medium" colorName="text" style={styles.text}>
+            {toast.title}
+          </AppText>
+          {toast.description ? (
+            <AppText colorName="textMuted" style={styles.text}>
+              {toast.description}
             </AppText>
-            {toast.description ? (
-              <AppText textVariant="bodyXs" colorName="gray400">
-                {toast.description}
-              </AppText>
-            ) : null}
-          </AppView>
-
+          ) : null}
           {toast.actionLabel ? (
             <Pressable
               onPress={handleAction}
-              hitSlop={8}
-              style={({ pressed }) => [
-                styles.actionPill,
-                {
-                  borderColor: palette.tint,
-                  opacity: pressed ? 0.7 : 1,
-                },
-              ]}
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.action, { opacity: pressed ? 0.7 : 1 }]}
             >
-              <AppText
-                textVariant="bodyXs"
-                weight="semibold"
-                style={{ color: palette.tint }}
-              >
+              <AppText weight="medium" style={[styles.text, { color: tokens.brand }]}>
                 {toast.actionLabel}
               </AppText>
             </Pressable>
           ) : null}
+        </View>
 
-          {/* Explicit dismiss control. The whole card is also tappable to
-           *  dismiss (outer Pressable), but the X gives users a clear
-           *  affordance — important when toasts stack and tapping the
-           *  card body might feel ambiguous. */}
-          <Pressable
-            onPress={handleDismiss}
-            hitSlop={8}
-            accessibilityLabel={t('common.dismiss')}
-            style={({ pressed }) => [
-              styles.dismissButton,
-              { opacity: pressed ? 0.5 : 1 },
-            ]}
-          >
-            <X size={16} strokeWidth={2.4} color={tokens.gray400} />
-          </Pressable>
-        </AppView>
+        <Pressable
+          onPress={handleDismiss}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.dismiss')}
+          style={({ pressed }) => [styles.close, { opacity: pressed ? 0.5 : 1 }]}
+        >
+          <X size={16} strokeWidth={2.4} color={tokens.textMuted} />
+        </Pressable>
       </Pressable>
     </Animated.View>
   );
@@ -177,35 +145,44 @@ function AppToastImpl({ toast, onDismiss }: AppToastProps) {
 
 export const AppToast = memo(AppToastImpl);
 
+const CONTENT_PADDING_Y = 14;
+
 const styles = StyleSheet.create({
-  shell: {
-    width: '100%',
-  },
   card: {
     flexDirection: 'row',
-    borderRadius: 16,
+    alignItems: 'flex-start',
+    paddingLeft: 14,
+    borderRadius: 12,
     borderWidth: 1,
-    overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
   },
-  rail: {
-    width: 4,
+  // Centres the 18-unit icon on the first 20-unit line of text.
+  icon: {
+    marginTop: CONTENT_PADDING_Y + 1,
+    marginRight: 10,
   },
-  iconBubble: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
+  content: {
+    flex: 1,
+    paddingVertical: CONTENT_PADDING_Y,
+    gap: 2,
+  },
+  text: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  action: {
+    alignSelf: 'flex-start',
     justifyContent: 'center',
+    minHeight: 48,
+    marginBottom: -CONTENT_PADDING_Y,
   },
-  actionPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  dismissButton: {
-    width: 28,
-    height: 28,
+  close: {
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
   },

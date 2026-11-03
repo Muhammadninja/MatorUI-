@@ -177,7 +177,7 @@ export default function ItemDetailScreen() {
 
   const toggleFavorite = () => {
     const nowFav = toggleLike(item.id);
-    toast.info(nowFav ? t('itemDetail.savedToFavorites') : t('itemDetail.removedFromFavorites'));
+    toast.success(nowFav ? t('itemDetail.savedToFavorites') : t('itemDetail.removedFromFavorites'));
   };
 
   const shareCurrentItem = async () => {

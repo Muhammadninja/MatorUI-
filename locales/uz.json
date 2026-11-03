@@ -431,6 +431,8 @@
     "addVehicleBody": "Modelingizga mos ehtiyot qismlarni toping",
     "addVehicleAction": "Avtomobil tanlash",
     "shopParts": "Ehtiyot qism tanlash",
+    "allCategories": "Barcha kategoriyalar",
+    "collapseCategories": "Yigʻish",
     "showAllCategories": "Barcha kategoriyalar",
     "showFewerCategories": "Kategoriyalarni yigʻish"
   },

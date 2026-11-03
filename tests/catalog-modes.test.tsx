@@ -47,7 +47,9 @@ vi.mock('lucide-react-native', () => ({
   AlertCircle: () => null,
   ArrowLeft: () => null,
   Bell: () => null,
+  ChevronDown: () => null,
   ChevronRight: () => null,
+  ChevronUp: () => null,
   PackageOpen: () => null,
   Search: () => null,
   X: () => null,
@@ -135,7 +137,13 @@ vi.mock('@/services/global-modal-service/global-modal.service', () => ({
   modalService: { openModal: () => {} },
 }));
 vi.mock('@/hooks/use-notifications', () => ({ useNotifications: () => ({ unreadCount: 0 }) }));
-vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ success: () => {} }) }));
+const { toastSuccess, toastDanger } = vi.hoisted(() => ({
+  toastSuccess: vi.fn(),
+  toastDanger: vi.fn(),
+}));
+vi.mock('@/hooks/use-toast', () => ({
+  useToast: () => ({ success: toastSuccess, danger: toastDanger }),
+}));
 
 // A car sits in the Garage throughout: it must change neither the home grid's
 // navigation nor what a home-grid listing asks for.
@@ -166,8 +174,13 @@ vi.mock('@/hooks/use-vehicle-catalog', () => ({
 /** Root tiles as the two root hooks hand them over (Russian UI). */
 let homeTiles: unknown[] = [];
 let systemTiles: unknown[] = [];
+let refreshResult: { isError: boolean } = { isError: false };
 vi.mock('@/hooks/use-categories', () => ({
-  useCategories: () => ({ state: 'success', categories: homeTiles, refresh: async () => {} }),
+  useCategories: () => ({
+    state: 'success',
+    categories: homeTiles,
+    refresh: async () => refreshResult,
+  }),
 }));
 vi.mock('@/hooks/use-system-categories', () => ({
   useSystemCategories: () => ({ state: 'success', categories: systemTiles }),
@@ -244,9 +257,12 @@ const is = (n: ReactTestInstance, type: string) => (n.type as unknown) === type;
 const pressable = (r: ReactTestRenderer, label: string) =>
   r.root.find((n) => is(n, 'pressable') && n.props.accessibilityLabel === label);
 
+const categoriesToggle = (r: ReactTestRenderer) =>
+  r.root.find((n) => is(n, 'pressable') && n.props.testID === 'explore-toggle-categories');
+
 /** Explore lists six tiles until asked; these checks cover every root. */
 async function expandCategories(r: ReactTestRenderer) {
-  await press(r.root.find((n) => is(n, 'button') && n.props.testID === 'explore-toggle-categories'));
+  await press(categoriesToggle(r));
 }
 
 const childLookups = () =>
@@ -260,6 +276,99 @@ describe('A. home grid without a picked model', () => {
     expect(r.root.findAll((n) => is(n, 'tile'))).toHaveLength(6);
     await expandCategories(r);
     expect(r.root.findAll((n) => is(n, 'tile'))).toHaveLength(10);
+  });
+
+  test.each([
+    [false, 'explore.pricesStockUpdated', toastSuccess],
+    [true, 'search.catalogueLoadError', toastDanger],
+  ])('pull-to-refresh reports what happened (failed: %s)', async (isError, message, toast) => {
+    toastSuccess.mockClear();
+    toastDanger.mockClear();
+    refreshResult = { isError };
+    const r = await render(<ExploreScreen />);
+    const scroller = r.root.find((n) => is(n, 'scroll') && Boolean(n.props.refreshControl));
+    await act(async () => {
+      scroller.props.refreshControl.props.onRefresh();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(toast).toHaveBeenCalledExactlyOnceWith(message);
+    expect(toastSuccess.mock.calls.length + toastDanger.mock.calls.length).toBe(1);
+    refreshResult = { isError: false };
+  });
+
+  test('the toggle swaps its label and exposes the expanded state', async () => {
+    const r = await render(<ExploreScreen />);
+    const label = () =>
+      categoriesToggle(r).findByProps({ weight: 'medium' }).props.children as string;
+    expect(label()).toBe('explore.allCategories');
+    expect(categoriesToggle(r).props.accessibilityState).toEqual({ expanded: false });
+    await expandCategories(r);
+    expect(label()).toBe('explore.collapseCategories');
+    expect(categoriesToggle(r).props.accessibilityState).toEqual({ expanded: true });
+    await press(categoriesToggle(r));
+    expect(label()).toBe('explore.allCategories');
+    expect(r.root.findAll((n) => is(n, 'tile'))).toHaveLength(6);
+  });
+
+  describe('collapsing while scrolled', () => {
+    const scrollTo = vi.fn();
+
+    /** Lay the screen out, expand the grid, scroll to `y`, collapse to `contentHeight`. */
+    async function collapseFrom(y: number, contentHeight: number) {
+      scrollTo.mockClear();
+      let r!: ReactTestRenderer;
+      await act(async () => {
+        r = create(<ExploreScreen />, {
+          createNodeMock: (el) => (el.type === 'scroll' ? { scrollTo } : null),
+        });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      const scroller = r.root.find((n) => is(n, 'scroll') && Boolean(n.props.onContentSizeChange));
+      const heading = r.root.find(
+        (n) => is(n, 'text') && n.props.children === 'explore.shopByCategory',
+      );
+      await act(async () => {
+        scroller.props.onLayout({ nativeEvent: { layout: { height: 700 } } });
+        heading.props.onLayout({ nativeEvent: { layout: { y: 500 } } });
+      });
+      await expandCategories(r);
+      await act(async () => {
+        scroller.props.onContentSizeChange(390, 1400);
+        scroller.props.onScroll({ nativeEvent: { contentOffset: { y } } });
+      });
+      await press(categoriesToggle(r));
+      await act(async () => {
+        scroller.props.onContentSizeChange(390, contentHeight);
+      });
+      return { r, scroller };
+    }
+
+    // The header measures top inset (0) + 132 until its onLayout fires, so the
+    // heading pins at 500 - 132 - 12 (fade) - 12 (clearance) = 344.
+    test('returns to the category heading', async () => {
+      await collapseFrom(650, 1200);
+      expect(scrollTo).toHaveBeenCalledExactlyOnceWith({ y: 344, animated: true });
+    });
+
+    test('stops at the end of a page too short to pin the heading', async () => {
+      await collapseFrom(650, 900);
+      expect(scrollTo).toHaveBeenCalledExactlyOnceWith({ y: 200, animated: true });
+    });
+
+    test('leaves the scroll alone when the section is already in view', async () => {
+      await collapseFrom(100, 1200);
+      expect(scrollTo).not.toHaveBeenCalled();
+    });
+
+    test('expanding never moves the scroll', async () => {
+      const { r, scroller } = await collapseFrom(100, 1200);
+      await expandCategories(r);
+      await act(async () => {
+        scroller.props.onScroll({ nativeEvent: { contentOffset: { y: 900 } } });
+        scroller.props.onContentSizeChange(390, 1400);
+      });
+      expect(scrollTo).not.toHaveBeenCalled();
+    });
   });
 
   test('shows the 10 systems, "Другое" included', async () => {

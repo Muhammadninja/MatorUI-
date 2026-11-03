@@ -431,6 +431,8 @@
     "addVehicleBody": "Find parts for your model",
     "addVehicleAction": "Choose a car",
     "shopParts": "Find parts",
+    "allCategories": "All categories",
+    "collapseCategories": "Show fewer",
     "showAllCategories": "Show all categories",
     "showFewerCategories": "Show fewer categories"
   },

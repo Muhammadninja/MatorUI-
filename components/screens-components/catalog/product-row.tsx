@@ -132,7 +132,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
       // The check couldn't run (offline, mock transport, server error). Say so
       // and reset — never fall back to a fabricated "fits".
       setFitState('idle');
-      toast.info(t('catalog.fitCheckUnavailable'));
+      toast.warning(t('catalog.fitCheckUnavailable'));
       return;
     }
     setFit(result);
@@ -176,7 +176,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
   const handleToggleLike = () => {
     triggerHaptic(liked ? 'selection' : 'success');
     const nowLiked = toggleLike(item.id);
-    toast.info(t(nowLiked ? 'itemDetail.savedToFavorites' : 'itemDetail.removedFromFavorites'));
+    toast.success(t(nowLiked ? 'itemDetail.savedToFavorites' : 'itemDetail.removedFromFavorites'));
   };
 
   // ── Add — the cart update is optimistic, so "added" is the feedback and the

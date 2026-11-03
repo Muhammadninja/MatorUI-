@@ -1,4 +1,4 @@
-export type ToastKind = 'success' | 'danger' | 'info';
+export type ToastKind = 'success' | 'danger' | 'warning' | 'info';
 
 export type ToastInput = {
   /** Stable ID. Auto-generated if omitted. */
@@ -8,7 +8,8 @@ export type ToastInput = {
   title: string;
   /** Optional second line. */
   description?: string;
-  /** Auto-dismiss delay in ms. Pass 0 to disable. Default 400. */
+  /** Auto-dismiss delay in ms. Pass 0 to disable. Defaults by kind; a toast
+   *  with an action stays until dismissed. */
   duration?: number;
   /** Optional action label rendered on the right. */
   actionLabel?: string;
@@ -21,16 +22,21 @@ export type Toast = Required<Pick<ToastInput, 'id' | 'kind' | 'title' | 'duratio
 
 type ToastListener = (toasts: readonly Toast[]) => void;
 
-const DEFAULT_DURATION = 400;
-/** Hard cap on simultaneous toasts. Beyond this, the oldest is dropped
- *  from the queue when a new one comes in. Prevents a stream of
- *  add-to-cart confirmations from blanketing the screen. */
-const MAX_TOASTS = 3;
+/** Brief confirmations clear quickly; anything the user may need to act on
+ *  stays long enough to read. */
+const DEFAULT_DURATION: Record<ToastKind, number> = {
+  success: 3000,
+  info: 4000,
+  warning: 5000,
+  danger: 6000,
+};
 
 /**
  * Singleton bus for app-wide toasts. Designed to be callable from anywhere
  * — API error handlers, auth guards, services — without React state plumbing.
- * The `<AppToastHost />` subscribes and renders the active stack.
+ * One toast shows at a time: a new one replaces the current one, so rapid
+ * actions (tapping "Add to cart" 20 times) never pile up over the screen.
+ * The `<AppToastHost />` subscribes and renders it.
  */
 class ToastService {
   private toasts: Toast[] = [];
@@ -52,27 +58,12 @@ class ToastService {
       id,
       kind: input.kind,
       title: input.title,
-      duration: input.duration ?? DEFAULT_DURATION,
+      duration: input.duration ?? (input.actionLabel ? 0 : DEFAULT_DURATION[input.kind]),
       description: input.description,
       actionLabel: input.actionLabel,
       onAction: input.onAction,
     };
-    // Replace if the same id already exists — keeps callers idempotent.
-    const existingIdx = this.toasts.findIndex((t) => t.id === id);
-    if (existingIdx >= 0) {
-      this.toasts = [
-        ...this.toasts.slice(0, existingIdx),
-        toast,
-        ...this.toasts.slice(existingIdx + 1),
-      ];
-    } else {
-      this.toasts = [...this.toasts, toast];
-    }
-    // Enforce the visible-stack cap. Without this, rapid-fire callers
-    // (e.g. tapping "Add to cart" 20 times) blanket the screen.
-    if (this.toasts.length > MAX_TOASTS) {
-      this.toasts = this.toasts.slice(-MAX_TOASTS);
-    }
+    this.toasts = [toast];
     this.emit();
     return id;
   }
@@ -83,6 +74,10 @@ class ToastService {
 
   danger(title: string, opts?: Omit<ToastInput, 'kind' | 'title'>): string {
     return this.show({ ...opts, kind: 'danger', title });
+  }
+
+  warning(title: string, opts?: Omit<ToastInput, 'kind' | 'title'>): string {
+    return this.show({ ...opts, kind: 'warning', title });
   }
 
   info(title: string, opts?: Omit<ToastInput, 'kind' | 'title'>): string {

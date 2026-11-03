@@ -161,7 +161,7 @@ function RejectButton({
       }}
     >
       <X size={15} color={tokens.textMuted} />
-      <AppText family="accent" weight="semibold" style={{ fontSize: 14.5, color: tokens.textMuted }}>
+      <AppText family="accent" weight="semibold" style={{ fontSize: 14, color: tokens.textMuted }}>
         {t('sourcing.doesNotFit')}
       </AppText>
     </AppPressableView>
@@ -240,7 +240,7 @@ export default function SourcingOfferScreen() {
       await rejectSourcingOffer(offer.id, reason);
       setStatus('DECLINED');
       setRejectOpen(false);
-      toastService.info(t('sourcing.offerDeclined'));
+      toastService.success(t('sourcing.offerDeclined'));
       router.back();
     } catch {
       toastService.danger(t('sourcing.declineFailed'));
@@ -394,14 +394,14 @@ export default function SourcingOfferScreen() {
             ) : status === 'DECLINED' ? (
               <AppText
                 family="default"
-                style={{ fontSize: 13.5, color: tokens.textMuted, textAlign: 'center', paddingVertical: 8 }}
+                style={{ fontSize: 14, color: tokens.textMuted, textAlign: 'center', paddingVertical: 8 }}
               >
                 {t('sourcing.youDeclined')}
               </AppText>
             ) : (
               <AppText
                 family="default"
-                style={{ fontSize: 13.5, color: tokens.textMuted, textAlign: 'center', paddingVertical: 8 }}
+                style={{ fontSize: 14, color: tokens.textMuted, textAlign: 'center', paddingVertical: 8 }}
               >
                 {t('sourcing.offerNoLongerValid')}
               </AppText>
@@ -465,7 +465,7 @@ export default function SourcingOfferScreen() {
             {busy === 'reject' ? (
               <WheelLoader size={18} color={tokens.background} />
             ) : (
-              <AppText family="accent" weight="bold" style={{ fontSize: 15.5, color: tokens.background }}>
+              <AppText family="accent" weight="bold" style={{ fontSize: 16, color: tokens.background }}>
                 {t('sourcing.decline')}
               </AppText>
             )}

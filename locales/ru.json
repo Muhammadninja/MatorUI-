@@ -439,6 +439,8 @@
     "addVehicleBody": "Находите запчасти для вашей модели",
     "addVehicleAction": "Выбрать автомобиль",
     "shopParts": "Подобрать запчасти",
+    "allCategories": "Все категории",
+    "collapseCategories": "Свернуть",
     "showAllCategories": "Показать все категории",
     "showFewerCategories": "Свернуть категории"
   },

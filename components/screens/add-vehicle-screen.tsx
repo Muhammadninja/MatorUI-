@@ -87,7 +87,7 @@ export default function AddVehicleScreen() {
   const handleSave = useCallback(async () => {
     if (!decoded || !canSave) {
       triggerHaptic('warning');
-      toastService.info(t('addVehicle.decodeFirstToast'), {
+      toastService.warning(t('addVehicle.decodeFirstToast'), {
         description: t('addVehicle.decodeFirstToastDesc'),
       });
       return;
@@ -189,7 +189,7 @@ export default function AddVehicleScreen() {
       });
     } else {
       triggerHaptic('warning');
-      toastService.info(t('addVehicle.partialMatchToast'), {
+      toastService.warning(t('addVehicle.partialMatchToast'), {
         description: t('addVehicle.partialMatchToastDesc'),
       });
     }
@@ -201,7 +201,7 @@ export default function AddVehicleScreen() {
       <AppView
         row
         align="center"
-        px={20}
+        px={16}
         gap={12}
         style={{ paddingTop: insets.top + 12, paddingBottom: 12 }}
       >
@@ -245,7 +245,7 @@ export default function AddVehicleScreen() {
           <AppText
             family="default"
             colorName="textMuted"
-            style={{ fontSize: 13.5, lineHeight: 20 }}
+            style={{ fontSize: 14, lineHeight: 20 }}
           >
             {t('addVehicle.intro')}
           </AppText>
@@ -367,7 +367,7 @@ export default function AddVehicleScreen() {
                   <AppText
                     family="default"
                     weight="semibold"
-                    style={{ fontSize: 12.5, color: tokens.text }}
+                    style={{ fontSize: 12, color: tokens.text }}
                   >
                     {t('addVehicle.unlistedTitle', { make: decoded.make })}
                   </AppText>
@@ -432,7 +432,7 @@ export default function AddVehicleScreen() {
 
         {/* Save button pinned to bottom */}
         <AppView
-          px={20}
+          px={16}
           pb={Math.max(insets.bottom, 16)}
           pt={12}
           colorName="background"
@@ -457,7 +457,7 @@ function SpecChip({ label }: { label: string }) {
   const { tokens } = useThemeContext();
   return (
     <AppView rounded={8} px={10} py={5} colorName="backgroundSecondary" borderWidth={1} borderName="border">
-      <AppText family="default" weight="semibold" style={{ fontSize: 12.5, color: tokens.text }}>
+      <AppText family="default" weight="semibold" style={{ fontSize: 12, color: tokens.text }}>
         {label}
       </AppText>
     </AppView>
@@ -466,7 +466,7 @@ function SpecChip({ label }: { label: string }) {
 
 const styles = StyleSheet.create({
   content: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 24,
     gap: 16,
