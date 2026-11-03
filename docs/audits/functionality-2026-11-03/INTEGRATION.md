@@ -2,7 +2,7 @@
 
 Base `9a64a98`, isolated branch `codex/functionality-audit-2026-11-03`. No changes were integrated into the dirty `design/teal-explore-home` worktree.
 
-At inspection Claude's working changes included `contexts/user.context.tsx`, `components/screens/checkout-screen.tsx`, auth screens/services, garage/detail/explore/notification screens, shared toast, and locales. Those files were not edited here. This candidate changes only functional hooks/services, active-vehicle context, tests and this package. No visual changes or dependencies.
+At inspection Claude's working changes included `contexts/user.context.tsx`, `components/screens/checkout-screen.tsx`, auth screens/services, garage/detail/explore/notification screens, shared toast, and locales. Those files were not edited here. This candidate changes only functional hooks/services, active-vehicle context, tests and this package. No restyling or dependencies; follow-up adds existing-component guest/error/exit paths.
 
 Before cherry-picking, coordinate these touchpoints:
 
@@ -14,3 +14,5 @@ Before cherry-picking, coordinate these touchpoints:
 - Current simulator was being navigated concurrently. Reserve exclusive control before native checks; no new simulators are needed. Do not reload it onto this branch without coordinating the current design session.
 
 Pending native checks must use the existing real API/data. Unit test doubles are used only in tests, never introduced into the application or integration checks. No screenshots needed under the latest instruction.
+
+Latest authoritative integration matrix, overlap inventory, permanent checkout path and smoke queue: [FOLLOWUP.md](FOLLOWUP.md). Do not cherry-pick both historical and current implementations for auth/search/checkout/logging. Simulator reserved for Claude until explicitly released.

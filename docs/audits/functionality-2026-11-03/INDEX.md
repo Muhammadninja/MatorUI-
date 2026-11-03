@@ -1,6 +1,10 @@
 # MATOR functionality review — 2026-11-03
 
-This is an isolated frontend change set, **not a completed release certification**. Branch: `codex/functionality-audit-2026-11-03`; base: `9a64a98`; fix commit: `250daf6c2f29a44057d087bbc64a95ee9e85ab9f`. Worktree: `/private/tmp/mator-functionality-audit`. No design, translations, dependencies, native configuration, account data, backend code, orders or payments were changed. No screenshots were collected, per the latest instruction.
+This is an isolated frontend change set, **not a completed release certification**. Branch: `codex/functionality-audit-2026-11-03`; base: `9a64a98`; fix commit: `250daf6c2f29a44057d087bbc64a95ee9e85ab9f`. Worktree (permanently saved): `/Users/muhammadfotihabdullaev/Desktop/matorui/.local/worktrees/functionality-audit`. No restyling, dependencies, native configuration, account data, backend code, orders or payments were changed. Follow-up fixes add existing-component auth/error/exit paths and two notification messages in RU/UZ/EN. No screenshots were collected, per the latest instruction.
+
+## Latest follow-up
+
+[Claude findings, earlier-fix comparison and queued combined smoke test](FOLLOWUP.md). Functional follow-up commit: `4842c7c`; subsequent account-lock refinement is recorded in Git history. Shared simulator remains reserved for Claude.
 
 ## Evidence and versions
 
@@ -14,13 +18,17 @@ Statuses below describe the stated layer only: `verified`, `error`, `blocked`, `
 
 ## Authentication, session restoration, sign-out and account isolation
 
+- [verified — unit] Eight private route guards prevent guest/hydrating screen mounts and reset private local state across accounts. Auth persistence accepts historical `writtenAt` and current `revision` formats; no duplicate auth implementation applied. See [follow-up evidence](FOLLOWUP.md).
+
 - [verified — unit] Account-specific orders/details, addresses, payment methods, shipping quotes and notifications use owner-scoped cache keys; guest auto/manual reads are gated. A→B→guest→A regression uses the same query cache. Old-account notification rollback updates only its original cache. Evidence: `tests/account-query-isolation.test.tsx`.
 - [verified — unit] Existing user-session isolation regressions pass in the full suite; no changes to Claude's in-progress `contexts/user.context.tsx`.
 - [not-verified — native] Session restoration, token refresh, sign-out and two-account switching against real data in the current app. Concurrent simulator control prevented reliable checking; no real second-account credentials supplied.
-- [verified — unit] `services/auth-storage.ts` now saves an atomic encrypted session envelope and compares monotonic revisions across both stores, preventing partial rotations from restoring older/mixed tokens. Legacy reads/migration are retained. Serialized saves/clears prevent a queued sign-out from being undone by an earlier write. Evidence: `services/auth-storage.test.ts` (12 tests).
+- [verified — unit] `services/auth-storage.ts` now saves an atomic encrypted session envelope and compares monotonic revisions across both stores, preventing partial rotations from restoring older/mixed tokens. Legacy reads/migration are retained. Serialized saves/clears prevent a queued sign-out from being undone by an earlier write. Evidence: `services/auth-storage.test.ts` (21 tests after historical-format reconciliation).
 - [not-verified — native] New-envelope migration and refresh/cold-start behavior on the real device remain unverified. Existing plaintext AsyncStorage fallback is preserved; OS-level deletion failures remain best effort. No session data was migrated on the running app in this pass.
 
 ## Garage persistence and compatibility logic
+
+- [verified — unit] Set-active confirmation/failure behavior is fixed; VIN Finder has Back/Home recovery. See [follow-up evidence](FOLLOWUP.md). Native checks and visible VIN entry placement remain pending.
 
 - [verified — unit] A removed pinned vehicle's generation/trim/engine no longer carries into the replacement vehicle. New test failed before the one-line fix and passes after it. Evidence: `contexts/active-vehicle-pin.test.tsx`.
 - [verified — unit] Search re-runs when vehicle scope changes and rejects the old fitment's late response. Evidence: `tests/search-request-lifecycle.test.tsx`.
@@ -35,6 +43,8 @@ Statuses below describe the stated layer only: `verified`, `error`, `blocked`, `
 - [not-verified — real integration] Category, price/rating filters, OEM search, locale switching and rapid typing in current native app. Earlier reports are historical evidence, not fresh verification.
 
 ## Favorites and cart synchronization, quantities and totals
+
+- [verified — unit] Rapid favorite toggles return the synchronous intended state; [follow-up evidence](FOLLOWUP.md). This does not implement or verify account/server synchronization.
 
 - [verified — unit] Existing cart canonical-response, scoped rollback, mutation ordering, storage isolation and subtotal/checkout regressions passed in the full suite. No cart mutation was sent to production.
 - [error — code review] Current base favorites use device-wide `likes:v1` with no owner (`contexts/likes.context.tsx`, `services/likes-storage.ts`), so account isolation/server synchronization is not implemented in this branch. Historical `codex/favorites-sync` work must be reviewed against the employee's deployed contract before integration; do not auto-import legacy likes to an account.
@@ -55,6 +65,8 @@ Statuses below describe the stated layer only: `verified`, `error`, `blocked`, `
 - [not-verified] Native render counts, frame times, large-list scrolling, memory profile and repeated-calculation costs. No speculative memoization/list rewrite or dependency changes made.
 
 ## Release configuration, logging and errors
+
+- [verified — unit] Notifications now distinguish failure from empty, await mark-all confirmation and show localized errors; missing tracking ID has recovery. See [follow-up evidence](FOLLOWUP.md).
 
 - [verified — unit] Release API payload logging cannot be forced on with the public debug flag. Structured credential/PII values are fully masked; deeply nested/cyclic data is replaced at the depth limit instead of leaking raw subtrees. Evidence: `services/debug-log.test.ts`.
 - [verified — unit] Caller abort listeners are removed on completion; native abort/timeout and account-epoch regressions remain passing.

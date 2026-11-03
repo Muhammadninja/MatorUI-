@@ -48,9 +48,10 @@ function hasVisibleText(s: string | undefined | null): boolean {
 
 export function useNotifications(): UseNotificationsValue {
   const queryClient = useQueryClient();
-  const markingAllRef = useRef(false);
   const { profile, isAuthenticated, isHydrating } = useUserContext();
   const ownerId = !isHydrating && isAuthenticated ? profile?.id ?? null : null;
+  const markingAllRef = useRef({ ownerId, pending: false });
+  if (markingAllRef.current.ownerId !== ownerId) markingAllRef.current = { ownerId, pending: false };
   const ownerRef = useRef(ownerId);
   ownerRef.current = ownerId;
   const canRead = () => ownerId !== null && ownerRef.current === ownerId;
@@ -126,15 +127,16 @@ export function useNotifications(): UseNotificationsValue {
       refresh: () => canRead() ? query.refetch() : Promise.resolve(undefined),
       markRead: (id: string) => { if (canRead()) markReadMutation.mutate(id); },
       markAllRead: async () => {
-        if (!canRead() || markingAllRef.current) return null;
-        markingAllRef.current = true;
+        const attempt = markingAllRef.current;
+        if (!canRead() || attempt.pending) return null;
+        attempt.pending = true;
         try {
           await markAllMutation.mutateAsync();
           return canRead() ? true : null;
         } catch {
           return canRead() ? false : null;
         } finally {
-          markingAllRef.current = false;
+          attempt.pending = false;
         }
       },
     };

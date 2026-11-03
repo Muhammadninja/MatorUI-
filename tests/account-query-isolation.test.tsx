@@ -184,3 +184,23 @@ test('empty checkout preserves the earlier frontend guard and never reaches the 
   expect(screen.current().phase).toBe('idle');
   await screen.close();
 });
+
+test('a pending old-account mark-all neither blocks nor unlocks the new account action', async () => {
+  let finishA!: () => void, finishB!: () => void;
+  state.markAllRead.mockImplementationOnce(() => new Promise<void>((resolve) => { finishA = resolve; }))
+    .mockImplementationOnce(() => new Promise<void>((resolve) => { finishB = resolve; }));
+  const screen = await mount(useNotifications);
+  await settle(() => screen.current().unreadCount === 1);
+  let first!: Promise<boolean | null>, second!: Promise<boolean | null>;
+  await act(async () => { first = screen.current().markAllRead(); });
+  await settle(() => state.markAllRead.mock.calls.length === 1);
+  await screen.update('account-b');
+  await settle(() => screen.current().notifications[0]?.id === 'account-b');
+  await act(async () => { second = screen.current().markAllRead(); });
+  await settle(() => state.markAllRead.mock.calls.length === 2);
+  await act(async () => { finishA(); expect(await first).toBeNull(); });
+  await act(async () => { expect(await screen.current().markAllRead()).toBeNull(); });
+  expect(state.markAllRead).toHaveBeenCalledTimes(2);
+  await act(async () => { finishB(); expect(await second).toBe(true); });
+  await screen.close();
+});
