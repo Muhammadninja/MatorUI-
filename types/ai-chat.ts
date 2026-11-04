@@ -14,6 +14,9 @@ export type AiChatVehicleContext = {
   modelId: string;
   trimId: string;
   selectedCarName: string;
+  /** The garage vehicle, when the car comes from the customer's garage. */
+  vehicleId?: string;
+  vin?: string;
 };
 
 // ── Tool calls ───────────────────────────────────────────────────────
@@ -55,6 +58,31 @@ export type AiChatToolCall = {
 
 // ── Messages ─────────────────────────────────────────────────────────
 
+/** A catalog match the customer can open. */
+export type AiChatPartLink = {
+  id: string;
+  title: string;
+  price: string;
+};
+
+/** Catalog matches for one requested part. */
+export type AiChatPartGroup = {
+  partName: string | null;
+  links: AiChatPartLink[];
+};
+
+/** The parts a reply did handle, when it can't say that was all of them. */
+export type AiChatPartsClarification = { understood: string[] };
+
+/**
+ * Where a sourcing request stands. `received` is only ever set from a ticket id
+ * the server returned. `sign_in_required` means nothing was submitted for this
+ * customer, and `userMessageId` is the message to send after sign-in.
+ */
+export type AiChatSourcingState =
+  | { status: 'received'; parts: string[]; ticketIds: string[] }
+  | { status: 'sign_in_required'; parts: string[]; userMessageId?: string };
+
 export type AiChatMessage = {
   id: string;
   role: AiChatRole;
@@ -67,6 +95,8 @@ export type AiChatMessage = {
   toolCalls?: AiChatToolCall[];
   /** User feedback rating for this assistant message. */
   feedback?: 'up' | 'down' | null;
+  partGroups?: AiChatPartGroup[];
+  sourcing?: AiChatSourcingState;
 };
 
 export type AiChatConversationSummary = {
@@ -109,6 +139,10 @@ export type ChatStreamEvent =
       replyId: string;
       title: string;
       createdAt: string;
+      partGroups?: AiChatPartGroup[];
+      sourcing?: AiChatSourcingState;
+      /** Set when the reply doesn't account for everything the customer asked for. */
+      partsClarification?: AiChatPartsClarification;
     };
 
 // ── Request / response ──────────────────────────────────────────────
@@ -119,6 +153,10 @@ export type AiChatSendMessageRequest = {
   vehicleContext?: AiChatVehicleContext | null;
   /** Prior turns, oldest→newest, so the stateless endpoint keeps context. */
   history?: { role: AiChatRole; content: string }[];
+  /** Stays the same across retries of one message. Only prevents a second ticket
+   *  once the backend consumes it: see docs/backend-sourcing-contract.md. */
+  requestId?: string;
+  isAuthenticated?: boolean;
 };
 
 /**

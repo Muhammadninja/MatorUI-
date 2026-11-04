@@ -342,6 +342,7 @@ export class MockChatTransport implements ChatTransport {
  * `data:` line, terminated by `event: done\ndata: {...}\n\n`.
  */
 import { getApiBaseUrl, getAuthToken, shouldUseHttpTransport } from '@/config/api';
+import { interpretSourcingReply, type SourcingChatResponse } from '@/services/sourcing-chat-reply';
 import { apiClient, ApiError } from '@/services/api-client';
 
 /**
@@ -436,13 +437,10 @@ export class HttpChatTransport implements ChatTransport {
  *  `@Controller('api/ai-chat')` + `@Post('message')`). */
 const SOURCING_CHAT_PATH = '/api/ai-chat/message';
 
-/** Response of POST /api/ai-chat/message. */
-type SourcingChatResponse = {
-  reply_text: string;
-  intent: 'SEARCH_PART' | 'CREATE_SOURCING_TICKET' | 'GENERAL_QUESTION' | 'FOUND_IN_STOCK';
-  extracted_data?: unknown;
-  items?: { id: string; title: string; price: string; category: string | null }[];
-};
+/** Longer than the default, since the reply waits on the model and the catalog.
+ *  This only reduces false failures and is not duplicate protection: the server
+ *  can still finish after the app gives up. */
+const SOURCING_CHAT_TIMEOUT_MS = 45_000;
 
 /**
  * Adapts the LIVE sourcing endpoint to the streaming ChatTransport the UI
@@ -450,8 +448,8 @@ type SourcingChatResponse = {
  * so:
  *   - conversations are local-only (no server history) → list/get return empty;
  *   - the reply is fake-streamed token-by-token for a natural feel;
- *   - FOUND_IN_STOCK `items` are appended to the reply as a plain list (rich
- *     product cards via the tool-call card path are a follow-up).
+ *   - what a reply means is decided by `interpretSourcingReply`, so catalog
+ *     matches arrive as links and a request is confirmed only by a ticket id.
  * The endpoint is public, so no auth token is required.
  */
 export class SourcingChatTransport implements ChatTransport {
@@ -477,10 +475,12 @@ export class SourcingChatTransport implements ChatTransport {
   ): AsyncIterable<ChatStreamEvent> {
     const conversationId = input.conversationId ?? 'chat-active';
     const replyId = makeId('assistant');
-    // The mobile vehicle context carries no VIN; surface the selected car name
-    // as a text hint so the extractor still resolves brand/model.
-    const message = input.vehicleContext?.selectedCarName
-      ? `${input.message}\n\n[Автомобиль: ${input.vehicleContext.selectedCarName}]`
+    // A text hint so the extractor resolves brand/model. It stays in Latin script:
+    // the endpoint detects the reply language from the whole message, so a
+    // Cyrillic hint would answer an Uzbek customer in Russian.
+    const vehicle = input.vehicleContext;
+    const message = vehicle?.selectedCarName
+      ? `${input.message}\n\n[Selected vehicle: ${vehicle.selectedCarName}]`
       : input.message;
     // Prior turns give the stateless endpoint memory (vehicle/part from earlier
     // messages), so it stops re-asking for details already provided. Sanitize to
@@ -514,22 +514,33 @@ export class SourcingChatTransport implements ChatTransport {
         const res = await apiClient.post<SourcingChatResponse>(
           SOURCING_CHAT_PATH,
           // Clamp to the backend's `@MaxLength(2000)` so a long paste can't 400.
-          { message: message.slice(0, 2000), history },
+          // Only fields the endpoint accepts: it rejects unknown ones with a 400.
+          { message: message.slice(0, 2000), history, ...(vehicle?.vin ? { vin: vehicle.vin } : {}) },
           // No `Accept-Language`: this endpoint detects the language from the
           // message text itself, and the reply (including category names) comes
           // back in whatever the buyer wrote. Sending a header here would be
           // claiming a language the user may not have typed in.
-          { signal, skipLanguage: true },
+          {
+            signal,
+            skipLanguage: true,
+            timeoutMs: SOURCING_CHAT_TIMEOUT_MS,
+            // Proposed contract, not yet consumed by the backend: today it ignores
+            // both. Headers, because unknown body fields are rejected with a 400.
+            headers: {
+              ...(input.requestId ? { 'Idempotency-Key': input.requestId } : {}),
+              ...(vehicle?.vehicleId ? { 'X-Selected-Vehicle-Id': vehicle.vehicleId } : {}),
+            },
+          },
         );
 
-        let text = res.reply_text ?? '';
-        if (res.intent === 'FOUND_IN_STOCK' && res.items?.length) {
-          const lines = res.items.map((it) => `• ${it.title} — ${it.price}`).join('\n');
-          text = text ? `${text}\n\n${lines}` : lines;
-        }
+        const reply = interpretSourcingReply(res, {
+          isAuthenticated: input.isAuthenticated ?? false,
+          userMessageId: input.requestId,
+        });
+        const text = reply.text;
 
         // Fake-stream the reply token-by-token to match the streaming UI.
-        const tokens = text.match(/\S+\s*/g) ?? [text];
+        const tokens = text.match(/\S+\s*/g) ?? [];
         for (const token of tokens) {
           if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
           await delay(PER_TOKEN_MS, signal);
@@ -543,6 +554,9 @@ export class SourcingChatTransport implements ChatTransport {
           replyId,
           title: 'Mator AI',
           createdAt: new Date().toISOString(),
+          partGroups: reply.partGroups,
+          sourcing: reply.sourcing,
+          partsClarification: reply.partsClarification,
         };
       },
     };

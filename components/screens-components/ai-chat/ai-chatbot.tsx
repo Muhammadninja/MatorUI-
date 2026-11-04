@@ -24,22 +24,32 @@ import { useTranslation } from 'react-i18next';
 
 import AiChatComposer from '@/components/screens-components/ai-chat/ai-chat-composer';
 import AiChatMessageBubble from '@/components/screens-components/ai-chat/ai-chat-message-bubble';
+import { AiChatPartLinks } from '@/components/screens-components/ai-chat/ai-chat-part-links';
 import AiChatTypingDots from '@/components/screens-components/ai-chat/ai-chat-typing-dots';
 import ComposerBlurWrapper from '@/components/screens-components/ai-chat/composer-blur-wrapper';
 import ScreenShell from '@/components/screens-components/screen-shell';
+import { AppButton } from '@/components/shared/app-button';
 import { AppIconButton } from '@/components/shared/app-icon-button';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useActiveVehicle } from '@/contexts/active-vehicle.context';
 import { useThemeContext } from '@/contexts/theme.context';
+import { useUserContext } from '@/contexts/user.context';
 import { useGlobalModal } from '@/hooks/use-global-modal';
+import { useSourcingSignInGate } from '@/hooks/use-sourcing-sign-in-gate';
 import { chatTransport } from '@/services/chat-api';
+import { composeSourcingBody } from '@/services/sourcing-chat-reply';
 import { clearStoredChat, loadChat, saveChat } from '@/services/chat-storage';
+import type { Vehicle } from '@/services/garage-service';
 import { toastService } from '@/services/toast-service';
 import type {
-    AiChatConversationSummary,
-    AiChatMessage,
-    AiChatToolCall,
+  AiChatConversationSummary,
+  AiChatMessage,
+  AiChatPartGroup,
+  AiChatPartsClarification,
+  AiChatSourcingState,
+  AiChatToolCall,
+  AiChatVehicleContext,
 } from '@/types/ai-chat';
 import { triggerHaptic } from '@/utils/haptics';
 import { router } from 'expo-router';
@@ -94,12 +104,28 @@ function dateBucket(iso: string): string {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
+/** What the endpoint is told about the car selected in the garage. */
+function selectedVehicleContext(
+  vehicle: Vehicle | null | undefined,
+): AiChatVehicleContext | null {
+  if (!vehicle) return null;
+  return {
+    makeId: vehicle.brandId ?? '',
+    modelId: vehicle.modelId ?? '',
+    trimId: '',
+    selectedCarName: [vehicle.make, vehicle.model, vehicle.year].filter(Boolean).join(' '),
+    vehicleId: vehicle.id,
+    vin: vehicle.vin || undefined,
+  };
+}
+
 export default function AiChatbot() {
   const { tokens } = useThemeContext();
   const { t } = useTranslation();
   const suggestionChips = useMemo(() => buildSuggestionChips(t), [t]);
   const { openConfirm, openActionSheet } = useGlobalModal();
   const { currentActiveVehicle } = useActiveVehicle();
+  const { isAuthenticated } = useUserContext();
   const [historyItems, setHistoryItems] = useState<AiChatConversationSummary[]>([]);
 
   // Load conversations from the transport. Real backend pushes the full
@@ -202,18 +228,24 @@ export default function AiChatbot() {
   const sendMessage = useCallback(
     async (
       text: string,
-      options: { retryUserId?: string; replaceLastAssistant?: boolean } = {},
+      options: {
+        retryUserId?: string;
+        replaceLastAssistant?: boolean;
+        removeAssistantId?: string;
+      } = {},
     ) => {
       const trimmed = text.trim();
       // Authoritative synchronous guard — see sendingRef declaration.
       if (!trimmed || sendingRef.current) return;
       sendingRef.current = true;
 
-      const { retryUserId, replaceLastAssistant } = options;
+      const { retryUserId, replaceLastAssistant, removeAssistantId } = options;
       triggerHaptic('selection');
       setDraft('');
 
-      const finalUserId = retryUserId ?? `user-${Date.now()}`;
+      // Doubles as the request id, so it has to stay unique and survive retries.
+      const finalUserId =
+        retryUserId ?? `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       if (!retryUserId) {
         setMessages((current) => [
           ...current,
@@ -235,6 +267,9 @@ export default function AiChatbot() {
         });
       }
 
+      if (removeAssistantId) {
+        setMessages((current) => current.filter((m) => m.id !== removeAssistantId));
+      }
       if (replaceLastAssistant) {
         // Regenerate: drop the previous assistant reply so the new one
         // visually replaces it in place.
@@ -272,12 +307,18 @@ export default function AiChatbot() {
         let createdAt = new Date().toISOString();
         let suggestions: string[] = [];
         let convoId = conversationId;
+        let partGroups: AiChatPartGroup[] | undefined;
+        let sourcing: AiChatSourcingState | undefined;
+        let partsClarification: AiChatPartsClarification | undefined;
         const toolCallMap = new Map<string, AiChatToolCall>();
 
         const stream = chatTransport.streamMessage(
           {
             conversationId,
             message: trimmed,
+            requestId: finalUserId,
+            isAuthenticated,
+            vehicleContext: selectedVehicleContext(currentActiveVehicle?.vehicle),
             // Snapshot the prior turns (pre-append: this fires before the ref
             // effect runs) so the endpoint remembers earlier context.
             history: messagesRef.current
@@ -326,6 +367,9 @@ export default function AiChatbot() {
             replyId = event.replyId;
             title = event.title;
             createdAt = event.createdAt;
+            partGroups = event.partGroups;
+            sourcing = event.sourcing;
+            partsClarification = event.partsClarification;
           }
         }
 
@@ -334,10 +378,12 @@ export default function AiChatbot() {
           id: replyId,
           role: 'assistant',
           title,
-          body,
+          body: composeSourcingBody({ text: body, sourcing, partsClarification }, t),
           caption: t('aiChat.captionNow'),
           createdAt,
           toolCalls: finalToolCalls.length > 0 ? finalToolCalls : undefined,
+          partGroups,
+          sourcing,
         };
         setStreamingReply(null);
         setMessages((current) => [...current, completed]);
@@ -370,8 +416,27 @@ export default function AiChatbot() {
         sendingRef.current = false;
       }
     },
-    [conversationId, isSending, scrollToEnd, t],
+    [conversationId, currentActiveVehicle, isAuthenticated, isSending, scrollToEnd, t],
   );
+
+  const submitHeldRequest = useCallback(
+    (assistantMessageId: string) => {
+      const held = messagesRef.current.find((m) => m.id === assistantMessageId);
+      const userMessageId =
+        held?.sourcing?.status === 'sign_in_required' ? held.sourcing.userMessageId : undefined;
+      const original = messagesRef.current.find((m) => m.id === userMessageId);
+      if (!original) return;
+      void sendMessage(original.body, {
+        retryUserId: original.id,
+        removeAssistantId: assistantMessageId,
+      });
+    },
+    [sendMessage],
+  );
+  const requestHeldSubmit = useSourcingSignInGate({
+    isAuthenticated,
+    submit: submitHeldRequest,
+  });
 
   const stopGenerating = useCallback(() => {
     triggerHaptic('selection');
@@ -596,12 +661,11 @@ export default function AiChatbot() {
   // ── Render ──────────────────────────────────────────────────────────
   const hasMessages = messages.length > 0 || streamingReply !== null;
 
-  // Build the "fits your X" suffix from the real active vehicle.
-  // Only show the model name (not full year+make+model) to keep the
-  // header compact, matching handoff copy "● Online · fits your Camry".
+  // Names the selected car without claiming anything fits it: fitment is only
+  // known per part. Model only, to keep the header compact.
   const activeVehicleModel = currentActiveVehicle?.vehicle?.model ?? null;
   const onlineLabel = activeVehicleModel
-    ? t('aiChat.fitsYourVehicle', { model: activeVehicleModel })
+    ? t('aiChat.selectedVehicle', { model: activeVehicleModel })
     : null;
 
   return (
@@ -815,6 +879,22 @@ export default function AiChatbot() {
                             : handleUserAvatarPress
                         }
                       />
+                      {message.partGroups?.length ? (
+                        <AiChatPartLinks groups={message.partGroups} />
+                      ) : null}
+                      {message.sourcing?.status === 'sign_in_required' ? (
+                        <AppView style={{ paddingLeft: 40 }}>
+                          <AppButton
+                            testID="chat-sourcing-submit"
+                            title={t(isAuthenticated ? 'aiChat.submitRequest' : 'aiChat.signInToSubmit')}
+                            kind="brand"
+                            size="lg"
+                            fullWidth
+                            disabled={isSending}
+                            onPress={() => requestHeldSubmit(message.id)}
+                          />
+                        </AppView>
+                      ) : null}
                       {failed ? (
                         <AppView row justify="flex-end">
                           <Pressable
@@ -847,6 +927,7 @@ export default function AiChatbot() {
                       ) : null}
                       {isLatestAssistant && !streamingReply ? (
                         <AppView row gap={6} style={{ paddingLeft: 40 }}>
+                          {message.sourcing ? null : (
                           <Pressable
                             onPress={regenerateLastReply}
                             accessibilityRole="button"
@@ -874,6 +955,7 @@ export default function AiChatbot() {
                               {t('aiChat.regenerate')}
                             </AppText>
                           </Pressable>
+                          )}
                           <FeedbackButton
                             active={message.feedback === 'up'}
                             kind="up"
