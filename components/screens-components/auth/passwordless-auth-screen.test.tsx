@@ -459,6 +459,31 @@ describe('dismissing once', () => {
     restore();
   });
 
+  // Measured on Android: the screen unmounts 60-250 ms after dismissal, while the
+  // native fade is still on screen, so the guard has to outlive the component.
+  test.each([
+    ['the backdrop', async (s: Awaited<ReturnType<typeof arrivedSheet>>) => {
+      await act(async () => s.backdrop());
+    }],
+    ['Back', async () => {
+      expect(pressHardwareBack()).toBe(false);
+    }],
+  ])('Back during the fade-out after %s is swallowed, even once unmounted', async (_name, leave) => {
+    const sheet = await arrivedSheet();
+    vi.useFakeTimers();
+    try {
+      await leave(sheet);
+      await act(async () => sheet.r.unmount());
+      expect(pressHardwareBack()).toBe(true);
+      // Once it has faded, Back belongs to the screen underneath again.
+      vi.advanceTimersByTime(300);
+      expect(mocks.backHandlers).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+      sheet.restore();
+    }
+  });
+
   test('Back on a legal document above the sheet leaves the sheet usable', async () => {
     const { backdrop, restore } = await arrivedSheet();
     mocks.focused = false;

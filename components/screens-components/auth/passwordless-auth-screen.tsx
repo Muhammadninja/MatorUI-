@@ -82,6 +82,16 @@ function isValidPhone(raw: string): boolean {
  *  it a repeated tap closes the sheet it just opened and the button reads as dead. */
 const BACKDROP_ARM_MS = 700;
 
+/** Covers the sheet's 180 ms fade-out. The screen unmounts before the fade ends,
+ *  so a Back in this window would otherwise pop the screen underneath. */
+const LEAVE_BACK_GUARD_MS = 300;
+
+/** Ignore Back until the sheet has faded. This outlives the unmounting screen. */
+function swallowBackDuringFade() {
+  const subscription = BackHandler.addEventListener('hardwareBackPress', () => true);
+  setTimeout(() => subscription.remove(), LEAVE_BACK_GUARD_MS);
+}
+
 /** Leave the auth sheet, returning to whatever screen pushed it. */
 function leaveSheet() {
   if (router.canGoBack()) router.back();
@@ -124,13 +134,16 @@ export default function PasswordlessAuthScreen() {
   const dismiss = () => {
     if (leaving.current || !navigation.isFocused()) return;
     leaving.current = true;
+    swallowBackDuringFade();
     leaveSheet();
   };
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (leaving.current) return true;
       // Not focused means Back belongs to a legal document above this sheet.
-      if (navigation.isFocused()) leaving.current = true;
+      if (!leaving.current && navigation.isFocused()) {
+        leaving.current = true;
+        swallowBackDuringFade();
+      }
       return false;
     });
     return () => subscription.remove();
