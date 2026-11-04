@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, CarFront, Check, Pencil, Trash2, X } from 'lucide-react-native';
-import { type ReactNode, useCallback, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -59,6 +59,7 @@ export default function VehicleDetailScreen() {
   const { vehicles, primaryVehicle, updateVehicle, removeVehicle, isMutating } = useGarage();
   const { currentActiveVehicle, setPrimaryVehicle } = useActiveVehicle();
   const { language } = useLanguageContext();
+  const settingActiveRef = useRef(false);
 
   const vehicle = vehicles.find((v) => v.id === id) ?? primaryVehicle;
 
@@ -118,10 +119,17 @@ export default function VehicleDetailScreen() {
   }, [form, vehicleId, vehicle, updateVehicle, t, headline]);
 
   const handleSetActive = useCallback(async () => {
-    if (!vehicleId) return;
-    await setPrimaryVehicle(vehicleId);
-    toastService.success(t('vehicleDetail.activeSetToast'), { description: headline });
-    router.back();
+    if (!vehicleId || settingActiveRef.current) return;
+    settingActiveRef.current = true;
+    try {
+      if (!await setPrimaryVehicle(vehicleId)) return;
+      toastService.success(t('vehicleDetail.activeSetToast'), { description: headline });
+      router.back();
+    } catch {
+      toastService.danger(t('garage.setPrimaryFailed'));
+    } finally {
+      settingActiveRef.current = false;
+    }
   }, [vehicleId, setPrimaryVehicle, t, headline]);
 
   const handleRemove = useCallback(async () => {

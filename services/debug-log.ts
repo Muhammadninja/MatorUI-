@@ -6,11 +6,8 @@
  * that decides (a) whether debug logging is on and (b) how request/response
  * payloads get redacted.
  *
- * Enabled when:
- *   - `__DEV__` is true (local / dev-client builds), OR
- *   - `EXPO_PUBLIC_DEBUG_API === '1'` — an explicit override so a TestFlight /
- *     release build can emit the same logs while chasing a bug. Set it to '0'
- *     (or leave unset) to silence logs even in dev.
+ * Enabled only in development builds, unless explicitly disabled.
+ * A public environment flag must never enable payload logging in release.
  *
  * Everything funnels through `debugLog(scope, event, data?)` which prints a
  * single tagged line like:
@@ -19,14 +16,9 @@
  * ever reach the console.
  */
 
-/** Master switch. Explicit '0' wins even in dev; explicit '1' forces logs on in
- *  release; otherwise follows `__DEV__`. */
-export const DEBUG_API_ENABLED: boolean = (() => {
-  const flag = process.env.EXPO_PUBLIC_DEBUG_API;
-  if (flag === '1') return true;
-  if (flag === '0') return false;
-  return typeof __DEV__ !== 'undefined' && __DEV__ === true;
-})();
+/** Release builds never emit API payload logs. Explicit '0' also silences dev. */
+export const DEBUG_API_ENABLED: boolean =
+  typeof __DEV__ !== 'undefined' && __DEV__ === true && process.env.EXPO_PUBLIC_DEBUG_API !== '0';
 
 /** Keys whose values must never be printed in full. Matched case-insensitively
  *  against object keys; the value is replaced with a short masked marker. */
@@ -43,20 +35,23 @@ const SECRET_KEYS = [
   'password',
   'captcha_token',
   'dev_otp_code',
+  'phone', 'phone_e164', 'phonenumber', 'phone_number',
+  'email', 'first_name', 'last_name', 'firstname', 'lastname', 'name',
+  'address', 'address_line', 'address_line1', 'address_line2', 'street',
+  'full_address', 'recipient_name', 'recipient_phone', 'vin',
+  'latitude', 'longitude', 'lat', 'lng', 'avatar_url',
 ];
 
-/** Mask a secret value, keeping just enough to correlate logs (first/last few
- *  chars) without exposing it. */
-function mask(value: unknown): string {
-  if (typeof value !== 'string' || value.length === 0) return '‹redacted›';
-  if (value.length <= 6) return '••••';
-  return `${value.slice(0, 3)}…${value.slice(-2)} (${value.length} chars)`;
+/** Fully remove credentials and PII from structured payloads. */
+function mask(_value: unknown): string {
+  return '‹redacted›';
 }
 
 /** Deep-clone `data` with secret keys redacted. Best-effort: falls back to a
  *  plain string on anything non-serializable so logging never throws. */
 export function redact(data: unknown, depth = 0): unknown {
-  if (data == null || depth > 4) return data;
+  if (data == null) return data;
+  if (depth > 4) return '‹redacted: depth limit›';
   if (Array.isArray(data)) return data.map((v) => redact(v, depth + 1));
   if (typeof data === 'object') {
     const out: Record<string, unknown> = {};

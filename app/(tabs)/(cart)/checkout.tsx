@@ -1,5 +1,7 @@
 import { Stack } from 'expo-router';
 
+import { AuthenticatedRoute } from '@/components/screens-components/auth/authenticated-route';
+
 import CheckoutScreen from '@/components/screens/checkout-screen';
 
 export default function CheckoutRoute() {
@@ -13,7 +15,9 @@ export default function CheckoutRoute() {
           gestureDirection: 'vertical',
         }}
       />
-      <CheckoutScreen />
+      <AuthenticatedRoute titleKey="checkout.title" fallbackHref="/cart">
+        <CheckoutScreen />
+      </AuthenticatedRoute>
     </>
   );
 }

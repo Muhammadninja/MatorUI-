@@ -38,6 +38,7 @@ const LikesContext = createContext<LikesContextValue | undefined>(undefined);
 
 export function LikesProvider({ children }: PropsWithChildren) {
   const [likedIds, setLikedIds] = useState<Set<string>>(() => new Set());
+  const likedIdsRef = useRef(likedIds);
   const [hasEverLiked, setHasEverLiked] = useState(false);
   const [shouldSuggestList, setShouldSuggestList] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
@@ -48,7 +49,9 @@ export function LikesProvider({ children }: PropsWithChildren) {
     loadLikes().then((stored) => {
       if (cancelled) return;
       if (stored) {
-        setLikedIds(new Set(stored.ids));
+        const ids = new Set(stored.ids);
+        likedIdsRef.current = ids;
+        setLikedIds(ids);
         setHasEverLiked(stored.hasEverLiked);
       }
       setIsHydrated(true);
@@ -76,29 +79,17 @@ export function LikesProvider({ children }: PropsWithChildren) {
     [likedIds],
   );
 
-  const toggleLike = useCallback(
-    (id: string): boolean => {
-      let nextLiked = false;
-      setLikedIds((current) => {
-        const next = new Set(current);
-        if (next.has(id)) {
-          next.delete(id);
-          nextLiked = false;
-        } else {
-          next.add(id);
-          nextLiked = true;
-        }
-        return next;
-      });
-      // Record the first-ever like for persistence, but no longer pop the
-      // list-creation suggestion sheet on like (removed per product decision).
-      if (nextLiked && !hasEverLiked) {
-        setHasEverLiked(true);
-      }
-      return nextLiked;
-    },
-    [hasEverLiked],
-  );
+  const toggleLike = useCallback((id: string): boolean => {
+    // Event handlers need the result before React renders or invokes updaters.
+    const next = new Set(likedIdsRef.current);
+    const nextLiked = !next.has(id);
+    if (nextLiked) next.add(id);
+    else next.delete(id);
+    likedIdsRef.current = next;
+    setLikedIds(next);
+    if (nextLiked) setHasEverLiked(true);
+    return nextLiked;
+  }, []);
 
   const acknowledgeListSuggestion = useCallback(() => {
     setShouldSuggestList(false);

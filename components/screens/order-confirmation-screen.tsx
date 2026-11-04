@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/shared/app-button';
 import { AppPrice } from '@/components/shared/app-price';
+import { OrderLinePrice, OrderPriceBreakdown } from '@/components/screens-components/orders/order-price-breakdown';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
@@ -173,7 +174,7 @@ export default function OrderConfirmationScreen() {
           />
 
           {/* Line items */}
-          {order.items.map((line) => (
+          {order.items.map((line, index) => (
             <AppView
               key={line.id}
               row
@@ -184,11 +185,13 @@ export default function OrderConfirmationScreen() {
                 family="default"
                 style={{ fontSize: 13, color: tokens.textMuted, flex: 1 }}
               >
-                {line.title} × {line.quantity}
+                {line.title}{line.quantity > 0 ? ` × ${line.quantity}` : ''}
               </AppText>
-              <AppPrice value={line.price} size={14} color={tokens.text} />
+              <OrderLinePrice line={order.pricing?.lines[index]} />
             </AppView>
           ))}
+          <AppView style={{ height: 1, backgroundColor: tokens.divider, marginVertical: 10 }} />
+          <OrderPriceBreakdown pricing={order.pricing} />
         </AppView>
 
         {/* Buttons */}

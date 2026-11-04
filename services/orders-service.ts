@@ -1,3 +1,5 @@
+import type { OrderPricing } from '@/services/order-pricing';
+
 /**
  * Orders domain — types only. Pure module so it can be imported from
  * service, transport, hooks, screens, and tests without dragging a
@@ -103,7 +105,7 @@ export type OrderItem = {
   id: string;
   title: string;
   quantity: number;
-  /** Display-formatted price string ("$1,240"). Server-issued. */
+  /** Formatted server unit price; confirmed row totals live in OrderDetail.pricing. */
   price: string;
   /** Optional product image URL. */
   imageUrl?: string;
@@ -176,6 +178,8 @@ export type OrderDetail = {
   items: OrderItem[];
   /** Display-formatted grand total ("$2,170.00"). */
   totalLabel: string;
+  /** Source amounts and validation; missing values remain unknown. */
+  pricing?: OrderPricing;
 };
 
 export type PaymentMethod = {

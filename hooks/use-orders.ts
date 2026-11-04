@@ -2,8 +2,10 @@
  * Orders React glue — all read hooks back React Query, mutations stay
  * imperative for now (createOrder side-effects: cart clear, navigation).
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+import { useUserContext } from '@/contexts/user.context';
 
 import {
   ordersTransport,
@@ -33,6 +35,15 @@ export const ordersQueryKeys = {
   shippingQuote: (req: ShippingQuoteRequest) => ['shipping', 'quote', req.addressId] as const,
 };
 
+/** Account suffixes preserve existing prefix invalidation while isolating cached PII. */
+function useAccountScope() {
+  const { profile, isAuthenticated, isHydrating } = useUserContext();
+  const ownerId = !isHydrating && isAuthenticated ? profile?.id ?? null : null;
+  const currentOwner = useRef(ownerId);
+  currentOwner.current = ownerId;
+  return { ownerId, canRead: () => ownerId !== null && currentOwner.current === ownerId };
+}
+
 // ── useOrders (list) ───────────────────────────────────────────────────
 
 export type OrderListState = 'idle' | 'loading' | 'success' | 'empty' | 'error';
@@ -47,27 +58,30 @@ export type UseOrdersValue = {
 const DEFAULT_LIST_REQUEST: OrderListRequest = { page: 1, pageSize: 20 };
 
 export function useOrders(request: OrderListRequest = DEFAULT_LIST_REQUEST): UseOrdersValue {
+  const { ownerId, canRead } = useAccountScope();
   const query = useQuery({
-    queryKey: ordersQueryKeys.list(request),
+    queryKey: [...ordersQueryKeys.list(request), ownerId],
+    enabled: ownerId !== null,
     queryFn: ({ signal }) => ordersTransport.listOrders(request, signal),
   });
 
   return useMemo<UseOrdersValue>(() => {
     let state: OrderListState;
-    if (query.isPending) state = 'loading';
+    if (!ownerId) state = 'idle';
+    else if (query.isPending) state = 'loading';
     else if (query.isError) state = 'error';
     else if ((query.data?.items.length ?? 0) === 0) state = 'empty';
     else state = 'success';
 
     return {
       state,
-      page: query.data ?? null,
+      page: ownerId ? query.data ?? null : null,
       error: query.error instanceof Error ? query.error.message : null,
       refresh: () => {
-        void query.refetch();
+        if (canRead()) void query.refetch();
       },
     };
-  }, [query]);
+  }, [query, ownerId, canRead]);
 }
 
 // ── useOrder (detail) ──────────────────────────────────────────────────
@@ -88,10 +102,11 @@ const ACTIVE_ORDER_POLL_MS = 15_000;
 const TERMINAL_STATUSES: ReadonlySet<OrderDetail['status']> = new Set(['delivered', 'cancelled']);
 
 export function useOrder(orderId: string | null | undefined): UseOrderValue {
+  const { ownerId, canRead } = useAccountScope();
   const query = useQuery({
-    queryKey: orderId ? ordersQueryKeys.detail(orderId) : ['orders', 'detail', 'disabled'],
+    queryKey: [...(orderId ? ordersQueryKeys.detail(orderId) : ['orders', 'detail', 'disabled']), ownerId],
     queryFn: ({ signal }) => ordersTransport.getOrder(orderId as string, signal),
-    enabled: !!orderId,
+    enabled: ownerId !== null && !!orderId,
     // Always refetch when the tracking screen mounts, so an order opened from
     // history never renders a stale cached status before the poll catches up.
     refetchOnMount: 'always',
@@ -107,7 +122,8 @@ export function useOrder(orderId: string | null | undefined): UseOrderValue {
 
   return useMemo<UseOrderValue>(() => {
     let state: OrderDetailState;
-    if (!orderId) state = 'idle';
+    if (!ownerId) state = 'idle';
+    else if (!orderId) state = 'not_found';
     else if (query.isPending) state = 'loading';
     else if (query.isError) state = 'error';
     else if (!query.data) state = 'not_found';
@@ -115,13 +131,13 @@ export function useOrder(orderId: string | null | undefined): UseOrderValue {
 
     return {
       state,
-      order: query.data ?? null,
+      order: ownerId ? query.data ?? null : null,
       error: query.error instanceof Error ? query.error.message : null,
       refresh: () => {
-        void query.refetch();
+        if (orderId && canRead()) void query.refetch();
       },
     };
-  }, [orderId, query]);
+  }, [orderId, query, ownerId, canRead]);
 }
 
 // ── useCreateOrder (mutation) ──────────────────────────────────────────
@@ -137,47 +153,50 @@ export type UseCreateOrderValue = {
 };
 
 export function useCreateOrder(): UseCreateOrderValue {
-  const [result, setResult] = useState<CreateOrderResult | null>(null);
+  const { ownerId, canRead } = useAccountScope();
+  const [snapshot, setSnapshot] = useState<{
+    ownerId: string | null; attempt?: object; phase: CreateOrderPhase; error: string | null; result: CreateOrderResult | null;
+  }>({ ownerId, phase: 'idle', error: null, result: null });
+  const session = useRef<{
+    ownerId: string | null; pending: Promise<CreateOrderResult | null> | null; result: CreateOrderResult | null;
+  }>({ ownerId, pending: null, result: null });
+  if (session.current.ownerId !== ownerId) session.current = { ownerId, pending: null, result: null };
 
-  const mutation = useMutation({
-    mutationFn: (input: CreateOrderInput) => ordersTransport.createOrder(input),
-    onSuccess: (r) => setResult(r),
-  });
-
-  const phase: CreateOrderPhase = mutation.isPending
-    ? 'placing'
-    : mutation.isError
-      ? 'error'
-      : mutation.isSuccess
-        ? 'success'
-        : 'idle';
-
-  const placeOrder = useCallback(
-    async (input: CreateOrderInput): Promise<CreateOrderResult | null> => {
-      try {
-        return await mutation.mutateAsync(input);
-      } catch {
-        return null;
+  const placeOrder = useCallback((input: CreateOrderInput): Promise<CreateOrderResult | null> => {
+    if (!canRead() || input.items.length === 0) return Promise.resolve(null);
+    const attempt = session.current;
+    // Only the first caller may continue into hosted payment/navigation.
+    if (attempt.pending) return Promise.resolve(null);
+    // Keep the successful order while hosted payment/navigation is in progress.
+    if (attempt.result) return Promise.resolve(null);
+    setSnapshot({ ownerId, attempt, phase: 'placing', error: null, result: null });
+    const pending = Promise.resolve().then(() => {
+      if (session.current !== attempt || !canRead()) throw new Error('Order session changed');
+      return ordersTransport.createOrder(input);
+    }).then((result) => {
+      if (session.current !== attempt || !canRead()) return null;
+      attempt.result = result;
+      setSnapshot({ ownerId, attempt, phase: 'success', error: null, result });
+      return result;
+    }, (error: unknown) => {
+      if (session.current === attempt && canRead()) {
+        setSnapshot({ ownerId, attempt, phase: 'error', error: error instanceof Error ? error.message : 'Order failed', result: null });
       }
-    },
-    [mutation],
-  );
+      return null;
+    }).finally(() => { if (attempt.pending === pending) attempt.pending = null; });
+    attempt.pending = pending;
+    return pending;
+  }, [ownerId, canRead]);
 
   const reset = useCallback(() => {
-    mutation.reset();
-    setResult(null);
-  }, [mutation]);
+    // Resetting UI must not unlock an in-flight order submission.
+    if (!canRead() || session.current.pending) return;
+    session.current = { ownerId, pending: null, result: null };
+    setSnapshot({ ownerId, phase: 'idle', error: null, result: null });
+  }, [ownerId, canRead]);
 
-  return useMemo<UseCreateOrderValue>(
-    () => ({
-      phase,
-      error: mutation.error instanceof Error ? mutation.error.message : null,
-      result,
-      placeOrder,
-      reset,
-    }),
-    [phase, mutation.error, result, placeOrder, reset],
-  );
+  const visible = snapshot.ownerId === ownerId && (!snapshot.attempt || snapshot.attempt === session.current) ? snapshot : { phase: 'idle' as const, error: null, result: null };
+  return { phase: visible.phase, error: visible.error, result: visible.result, placeOrder, reset };
 }
 
 // ── useAddresses / usePaymentMethods (read-only collections) ───────────
@@ -192,40 +211,44 @@ export type CollectionValue<T> = {
 };
 
 export function useAddresses(): CollectionValue<Address> {
+  const { ownerId, canRead } = useAccountScope();
   const query = useQuery({
-    queryKey: ordersQueryKeys.addresses(),
+    queryKey: [...ordersQueryKeys.addresses(), ownerId],
+    enabled: ownerId !== null,
     queryFn: ({ signal }) => ordersTransport.listAddresses(signal),
   });
 
   return useMemo<CollectionValue<Address>>(
     () => ({
-      state: query.isPending ? 'loading' : query.isError ? 'error' : 'success',
-      items: query.data ?? [],
+      state: !ownerId ? 'idle' : query.isPending ? 'loading' : query.isError ? 'error' : 'success',
+      items: ownerId ? query.data ?? [] : [],
       error: query.error instanceof Error ? query.error.message : null,
       refresh: () => {
-        void query.refetch();
+        if (canRead()) void query.refetch();
       },
     }),
-    [query],
+    [query, ownerId, canRead],
   );
 }
 
 export function usePaymentMethods(): CollectionValue<PaymentMethod> {
+  const { ownerId, canRead } = useAccountScope();
   const query = useQuery({
-    queryKey: ordersQueryKeys.paymentMethods(),
+    queryKey: [...ordersQueryKeys.paymentMethods(), ownerId],
+    enabled: ownerId !== null,
     queryFn: ({ signal }) => ordersTransport.listPaymentMethods(signal),
   });
 
   return useMemo<CollectionValue<PaymentMethod>>(
     () => ({
-      state: query.isPending ? 'loading' : query.isError ? 'error' : 'success',
-      items: query.data ?? [],
+      state: !ownerId ? 'idle' : query.isPending ? 'loading' : query.isError ? 'error' : 'success',
+      items: ownerId ? query.data ?? [] : [],
       error: query.error instanceof Error ? query.error.message : null,
       refresh: () => {
-        void query.refetch();
+        if (canRead()) void query.refetch();
       },
     }),
-    [query],
+    [query, ownerId, canRead],
   );
 }
 
@@ -328,29 +351,30 @@ export type UseShippingQuoteValue = {
 };
 
 export function useShippingQuote(request: ShippingQuoteRequest | null): UseShippingQuoteValue {
+  const { ownerId, canRead } = useAccountScope();
   const query = useQuery({
-    queryKey: request
+    queryKey: [...(request
       ? ordersQueryKeys.shippingQuote(request)
-      : ['shipping', 'quote', 'disabled'],
+      : ['shipping', 'quote', 'disabled']), ownerId],
     queryFn: ({ signal }) => ordersTransport.getShippingQuote(request as ShippingQuoteRequest, signal),
-    enabled: !!request,
+    enabled: ownerId !== null && !!request,
   });
 
   return useMemo<UseShippingQuoteValue>(
     () => ({
-      state: !request
+      state: !ownerId || !request
         ? 'idle'
         : query.isPending
           ? 'loading'
           : query.isError
             ? 'error'
             : 'success',
-      options: query.data ?? [],
+      options: ownerId ? query.data ?? [] : [],
       error: query.error instanceof Error ? query.error.message : null,
       refresh: () => {
-        void query.refetch();
+        if (canRead()) void query.refetch();
       },
     }),
-    [request, query],
+    [request, query, ownerId, canRead],
   );
 }

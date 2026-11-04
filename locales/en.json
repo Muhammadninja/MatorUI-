@@ -420,6 +420,9 @@
     "dateItems_other": "{{date}} · {{count}} items"
   },
   "trackOrder": {
+    "unitPrice": "Unit price",
+    "breakdownUnavailable": "The server has not provided a complete price breakdown. Only available amounts are shown.",
+    "amountsMismatch": "The amounts supplied by the server do not reconcile. The order total is shown as received.",
     "title": "Track order",
     "notFound": "This order could not be found.",
     "backToShopping": "Back to shopping",
@@ -796,6 +799,8 @@
     "markAllRead": "Mark all read",
     "markAllReadA11y": "Mark all notifications as read",
     "allMarkedRead": "All marked read",
+    "loadError": "Could not load notifications.",
+    "markReadError": "Could not mark notifications as read.",
     "emptyTitle": "No notifications yet",
     "emptyBody": "Order and vehicle updates will appear here.",
     "unreadHint": "Unread. Tap to mark read.",

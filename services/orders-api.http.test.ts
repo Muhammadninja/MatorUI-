@@ -94,7 +94,7 @@ describe('mapOrderToListRow', () => {
 });
 
 describe('mapOrderToDetail', () => {
-  test('synthesizes a coherent detail from the flat backend order', () => {
+  test('maps original server values and flags the historical inconsistent subtotal', () => {
     const d = mapOrderToDetail(RAW);
     expect(d.id).toBe('ord_01KY2DNPSRYPT8C7SDT2N7JJCH');
     expect(d.status).toBe('placed'); // pending_payment → placed
@@ -104,7 +104,27 @@ describe('mapOrderToDetail', () => {
     expect(d.courier).toBeNull();
     expect(d.totalLabel).toBe("280 000 so'm");
     expect(d.items[0]).toMatchObject({ title: 'Motor oil', quantity: 2, price: "250 000 so'm" });
+    expect(d.pricing?.lines[0]).toEqual({ quantity: 2, unitPrice: 250000, lineTotal: 500000 });
+    expect(d.pricing?.checks.items).toBe(false);
+    expect(d.pricing?.status).toBe('inconsistent');
   });
+});
+
+test('detail keeps complete server breakdown and does not mutate timestamps or input', () => {
+  const raw = { ...RAW, subtotal_uzs: 500000, total_uzs: 530000 };
+  const snapshot = JSON.stringify(raw);
+  const detail = mapOrderToDetail(raw);
+  expect(detail.pricing).toMatchObject({ subtotal: 500000, delivery: 25000, serviceFee: 5000, discount: 0, total: 530000, status: 'confirmed' });
+  expect(detail.totalLabel).toBe("530 000 so'm");
+  expect(JSON.stringify(raw)).toBe(snapshot);
+});
+
+test('missing amounts/quantity do not become a zero price or one item in detail', () => {
+  const detail = mapOrderToDetail({ ...RAW, total_uzs: null, delivery_uzs: undefined, service_fee_uzs: null, discount_uzs: undefined, items: [{ title: 'Unknown', price_uzs: null }] });
+  expect(detail.totalLabel).toBe('');
+  expect(detail.items[0]).toMatchObject({ quantity: 0, price: '' });
+  expect(detail.pricing).toMatchObject({ total: null, delivery: null, serviceFee: null, discount: null, status: 'incomplete' });
+  expect(detail.pricing?.lines[0]).toEqual({ quantity: null, unitPrice: null, lineTotal: null });
 });
 
 describe('HttpOrdersTransport', () => {
@@ -166,4 +186,13 @@ describe('HttpOrdersTransport', () => {
     const d = await t.getOrder('ord_missing');
     expect(d).toBeNull();
   });
+});
+
+test('contradictory foreign currency cannot be relabeled UZS in history/detail/create results', async () => {
+  const foreign = { ...RAW, currency: 'USD' };
+  expect(mapOrderToListRow(foreign).total).toBe('');
+  expect(mapOrderToDetail(foreign).totalLabel).toBe('');
+  post.mockResolvedValueOnce(foreign);
+  const result = await new HttpOrdersTransport().createOrder({ items: [], addressId: null, paymentType: 'cash', shippingOptionKey: 'pickup', promoCode: null });
+  expect(result.totalLabel).toBe('');
 });
