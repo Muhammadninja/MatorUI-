@@ -210,7 +210,7 @@
     "useDifferentNumber": "Use a different number"
   },
   "aiChat": {
-    "composerPlaceholder": "Ask a parts question…",
+    "composerPlaceholder": "Ask about parts…",
     "composerA11yLabel": "Message Mator AI",
     "sendMessage": "Send message",
     "stopGenerating": "Stop generating",

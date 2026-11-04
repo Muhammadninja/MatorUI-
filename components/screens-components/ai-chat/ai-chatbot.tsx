@@ -664,6 +664,18 @@ export default function AiChatbot() {
     return () => sub.remove();
   }, [scrollToEnd]);
 
+  const [composerHeight, setComposerHeight] = useState(0);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  useEffect(() => {
+    const show = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hide = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const subs = [
+      Keyboard.addListener(show, (e) => setKeyboardHeight(e.endCoordinates.height)),
+      Keyboard.addListener(hide, () => setKeyboardHeight(0)),
+    ];
+    return () => subs.forEach((sub) => sub.remove());
+  }, []);
+
   // ── Render ──────────────────────────────────────────────────────────
   const hasMessages = messages.length > 0 || streamingReply !== null;
 
@@ -688,7 +700,7 @@ export default function AiChatbot() {
           borderTopWidth={1}
           borderColor={tokens.border}
         >
-          <AppView row align="center" gap={10}>
+          <AppView flex={1} row align="center" gap={10}>
             {/* Mator AI brand monogram avatar */}
             <AppView
               center
@@ -710,7 +722,7 @@ export default function AiChatbot() {
             </AppView>
 
             {/* Title + status row */}
-            <AppView gap={1}>
+            <AppView flex={1} gap={1}>
               <AppText
                 textVariant="bodySemibold"
                 family="heading"
@@ -730,7 +742,7 @@ export default function AiChatbot() {
                   textVariant="caption"
                   family="accent"
                   weight="semibold"
-                  style={{ color: tokens.success, lineHeight: 14 }}
+                  style={{ color: tokens.success, lineHeight: 14, flexShrink: 1 }}
                 >
                   {t('aiChat.online')}{onlineLabel ? ` · ${onlineLabel}` : ''}
                 </AppText>
@@ -755,17 +767,19 @@ export default function AiChatbot() {
             // message hugs the right side.
             paddingHorizontal: 8,
             paddingTop: 24,
-            // Composer is absolutely overlaid via KeyboardStickyView,
-            // so reserve ~120dp here for: composer (50) + disclosure
-            // (18) + safe-area cushion (50). Messages can still scroll
-            // behind the composer so the BlurView has content to blur.
-            paddingBottom: 120,
+            // The composer takes its own space below this list, so only the
+            // keyboard has to be cleared: the sticky view lifts the composer
+            // over the list by exactly the keyboard's height.
+            paddingBottom: keyboardHeight + 16,
           }}
           keyboardShouldPersistTaps="handled"
           onScroll={handleScroll}
           scrollEventThrottle={16}
-          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
           onContentSizeChange={() => {
+            if (isAtBottomRef.current) scrollToEnd(false);
+          }}
+          // The list shrinks as the composer grows, which changes no content size.
+          onLayout={() => {
             if (isAtBottomRef.current) scrollToEnd(false);
           }}
         >
@@ -1041,7 +1055,7 @@ export default function AiChatbot() {
             style={{
               position: 'absolute',
               right: 16,
-              bottom: 96,
+              bottom: keyboardHeight + composerHeight + 12,
             }}
             pointerEvents="box-none"
           >
@@ -1065,14 +1079,10 @@ export default function AiChatbot() {
           </AppView>
         ) : null}
 
-        {/* Composer is absolutely overlaid on the ScrollView's bottom
-         *  via KeyboardStickyView. The ScrollView extends BEHIND it
-         *  (with paddingBottom reserved below), so the BlurView in
-         *  ComposerBlurWrapper actually has something to blur. When the
-         *  keyboard opens, KeyboardStickyView slides the composer up;
-         *  the ScrollView's automaticallyAdjustKeyboardInsets keeps the
-         *  latest message visible above the keyboard. */}
-        <KeyboardStickyView>
+        {/* Sits below the list and grows with its text, which shrinks the list.
+         *  When the keyboard opens, KeyboardStickyView slides it up, and the
+         *  list's bottom padding keeps the latest message above it. */}
+        <KeyboardStickyView onLayout={(e) => setComposerHeight(e.nativeEvent.layout.height)}>
           <ComposerBlurWrapper>
             <AiChatComposer
               value={draft}
@@ -1089,9 +1099,8 @@ export default function AiChatbot() {
             <AppView px="md" pt={2} pb={4}>
               <AppText
                 textVariant="caption"
-                colorName="gray400"
+                colorName="textMuted"
                 align="center"
-                style={{ fontSize: 10, lineHeight: 14 }}
               >
                 {t('aiChat.disclaimerShort')}
               </AppText>
