@@ -1,19 +1,20 @@
 # Sourcing assistant: contract
 
-The agreed behaviour between the app and backend, 2026-11-03. Implemented on both sides and committed locally. **Not pushed, not deployed and not yet tested live.** Status is in `docs/first-release-checklist.md`. Backend release steps are in the backend repo, `Backend/docs/sourcing-first-release.md`.
+The agreed behaviour between the app and backend, 2026-11-03. Backend deployed with tickets switched off. Admin console not pushed, app not released. **Not yet tested live.** Status is in `docs/first-release-checklist.md`. Backend release steps are in the backend repo, `Backend/docs/sourcing-first-release.md`.
 
 ## Release hold
 
 **The sourcing flow stays off for customers until this is done:**
 
-- [ ] Backend deployed, with authentication enforcement and request-ID deduplication verified on production
+- [x] Backend deployed
+- [ ] Authentication enforcement and request-ID deduplication verified on production
 - [ ] Live test passed (see the end of this document)
 - [ ] `SOURCING_TICKETS_ENABLED=true` set on production
 
 Two safeguards hold this in place:
 
-- **The app fails closed.** It sends nothing to the chat until `GET /v1/sourcing/capabilities` confirms `contract_version` 2 or above. Production returns 404 today, so the new app shows "chat temporarily unavailable". Confirmed on the simulator against production.
-- **The backend switch defaults to off.** With `SOURCING_TICKETS_ENABLED` unset, chat and catalogue matches work, and nobody can create a ticket.
+- **The app fails closed.** It sends nothing to the chat until `GET /v1/sourcing/capabilities` confirms `contract_version` 2 or above. Confirmed on the simulator against the old backend, and production now returns version 2.
+- **The backend switch is off.** With `SOURCING_TICKETS_ENABLED` off, chat and catalogue matches work, and nobody can create a ticket.
 
 ## Product rules
 
@@ -142,7 +143,7 @@ These response times are internal targets and aren't shown to customers.
 
 **Blocked. No live requests or dealer notifications until all of this is in place:**
 
-- [ ] Backend deployed with the switch off, and the deployed commit confirmed
+- [x] Backend deployed with the switch off
 - [ ] Date and time agreed between the owner and backend owner
 - [ ] Dealers group told in advance that a test is coming
 - [ ] A named staff member is ready to return an offer
