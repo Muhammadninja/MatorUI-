@@ -204,10 +204,10 @@ export function resolveItemPricing(
   const backendPct = item.salePercent && item.salePercent > 0 ? item.salePercent : 0;
   const clientSale = resolveItemSale(item, sales);
   const savePct = backendPct > 0 ? Math.round(backendPct) : (clientSale?.percent ?? 0);
-  const amountNum = item.priceUzs ?? (parseInt((item.price ?? '').replace(/\D/g, ''), 10) || 0);
+  const amountNum = item.priceUzs ?? (Number((item.price ?? '').replace(/[^0-9.]/g, '')) || 0);
   const wasUzs =
     backendPct > 0 && item.originalPriceUzs
-      ? Math.round(item.originalPriceUzs)
+      ? item.originalPriceUzs
       : savePct > 0 && amountNum > 0
         ? Math.round(amountNum / (1 - savePct / 100))
         : 0;

@@ -5,9 +5,13 @@ import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import { noBreakDigits } from '@/utils/format-price';
 
+/** A backend string may say "UZS" or "сум"; another symbol stays put. */
+const SOM_LABEL = /^(uzs'?|сум|so[ʻ'’‘]?m)$/i;
+
 /**
  * Split a formatted price ("UZS 129 000", "$64.99", "280 000 so'm") into a raised
  * currency, the big whole amount, and optional superscript cents.
+ * Som hundredths stay inside the amount: raised, "95 730 ²⁴" reads as a footnote.
  */
 export function splitPrice(price: string): { currency: string; amount: string; cents?: string } {
   const s = (price ?? '').trim();
@@ -18,6 +22,9 @@ export function splitPrice(price: string): { currency: string; amount: string; c
   // Digit groups are joined with NBSP so a narrow column can never break the
   // amount in half (see `noBreakDigits`).
   const frac = num.match(/^(.*?)[.,](\d{2})$/);
+  if (frac && SOM_LABEL.test(currency)) {
+    return { currency, amount: noBreakDigits(`${frac[1].trim()}.${frac[2]}`) };
+  }
   if (frac) return { currency, amount: noBreakDigits(frac[1].trim()), cents: frac[2] };
   return { currency, amount: noBreakDigits(num) };
 }
@@ -62,9 +69,8 @@ export function AppPrice({
   const { tokens } = useThemeContext();
   const c = color ?? tokens.text;
   const { currency, amount, cents } = splitPrice(value);
-  // The som always reads the same: the amount, then the active language's
-  // label. A backend string may say "UZS" or "сум"; another symbol stays put.
-  const isSom = /^(uzs'?|сум|so[ʻ'’‘]?m)$/i.test(currency);
+  // The som always reads the same: the amount, then the active language's label.
+  const isSom = SOM_LABEL.test(currency);
 
   if (!amount) {
     return (

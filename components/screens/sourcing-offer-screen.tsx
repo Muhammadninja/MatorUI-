@@ -14,6 +14,7 @@ import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useCartContext } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import { toastService } from '@/services/toast-service';
+import { formatSomAmount } from '@/utils/format-price';
 import {
   acceptSourcingOffer,
   fetchSourcingOffer,
@@ -51,7 +52,7 @@ function buildRejectReasons(t: TFn): { key: SourcingOfferDeclineReason; label: s
 /** 250000 → "250 000 сум". */
 function formatSom(price?: number): string | null {
   if (typeof price !== 'number' || !Number.isFinite(price)) return null;
-  return `${price.toLocaleString('ru-RU').replace(/ /g, ' ')} сум`;
+  return `${formatSomAmount(price)} сум`;
 }
 
 type Tokens = ReturnType<typeof useThemeContext>['tokens'];

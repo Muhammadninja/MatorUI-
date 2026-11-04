@@ -7,6 +7,7 @@ import {
   type CatalogRegion,
 } from '@/constants/catalog-regions';
 import { cleanCategoryName } from '@/utils/category-label';
+import { formatSomAmount } from '@/utils/format-price';
 import { normalizePartTitle } from '@/utils/part-title';
 
 export type CatalogItem = {
@@ -675,8 +676,11 @@ function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
     price:
       // `price_label` is the backend's pre-formatted string; the fallback below
       // only fires when it's absent. (It used to emit a stray apostrophe —
-      // "UZS' 38 661".)
-      p.price_label ?? (p.price_uzs != null ? `UZS ${p.price_uzs.toLocaleString('ru-RU')}` : ''),
+      // "UZS' 38 661".) The label rounds to whole som, so a fractional price is
+      // formatted from the amount the order will actually charge.
+      typeof p.price_uzs === 'number' && !Number.isInteger(p.price_uzs)
+        ? `UZS ${formatSomAmount(p.price_uzs)}`
+        : p.price_label ?? (p.price_uzs != null ? `UZS ${p.price_uzs.toLocaleString('ru-RU')}` : ''),
     priceUzs: p.price_uzs ?? undefined,
     priceLabel: '',
     images: p.images ?? [],

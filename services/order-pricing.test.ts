@@ -101,7 +101,7 @@ describe('strict monetary validation', () => {
   );
   test('explicit zero is confirmed and formatted independently of missing values', () => {
     expect(confirmedMoney(0)).toBe(0);
-    expect(formatOrderMoney(0)).toBe("0 so'm");
+    expect(formatOrderMoney(0)).toBe("0 UZS");
     expect(formatOrderMoney(null)).toBe('');
     expect(formatOrderMoney(undefined)).toBe('');
     expect(formatOrderMoney(NaN)).toBe('');
@@ -138,7 +138,7 @@ test('cent precision reconciles totals and quantities without floating-point equ
   expect(confirmedMoney(0.3)).toBe(0.3);
   // Inputs are server-confirmed decimals; client-computed sub-cent values are not accepted.
   expect(confirmedMoney(0.1 + 0.2)).toBeNull();
-  expect(formatOrderMoney(12345.6)).toBe("12 345.60 so'm");
+  expect(formatOrderMoney(12345.6)).toBe("12\u00A0345.60 UZS");
 });
 
 test('unsafe intermediate totals remain unknown rather than passing rounded arithmetic', () => {

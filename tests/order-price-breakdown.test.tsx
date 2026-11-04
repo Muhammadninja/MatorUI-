@@ -15,8 +15,8 @@ const complete = { subtotal_uzs: 100000, delivery_uzs: 25000, service_fee_uzs: 5
 test('complete server breakdown renders fees, explicit zero discount and unchanged total', async () => {
   const tree = await mount(<OrderPriceBreakdown pricing={getOrderPricing(complete)} />);
   for (const key of ['subtotal', 'delivery', 'serviceFee', 'discount', 'total']) expect(tree.root.findAllByProps({ testID: `order-amount-${key}` }).length).toBeGreaterThan(0);
-  expect(tree.root.findAll((node) => node.props['data-price'] === "0 so'm")).toHaveLength(1);
-  expect(JSON.stringify(tree.toJSON())).toContain("130 000 so'm");
+  expect(tree.root.findAll((node) => node.props['data-price'] === "0 UZS")).toHaveLength(1);
+  expect(JSON.stringify(tree.toJSON())).toContain("130\u00A0000 UZS");
   expect(JSON.stringify(tree.toJSON())).not.toContain('breakdownUnavailable');
   await act(async () => tree.unmount());
 });
@@ -27,27 +27,27 @@ test('missing fee fields do not label the unexplained difference as delivery', a
   expect(tree.root.findAllByProps({ testID: 'order-amount-discount' })).toHaveLength(0);
   const output = JSON.stringify(tree.toJSON());
   expect(output).toContain('trackOrder.breakdownUnavailable');
-  expect(tree.root.findAll((node) => node.props['data-price'] === "30 000 so'm")).toHaveLength(0);
-  expect(output).toContain("130 000 so'm");
+  expect(tree.root.findAll((node) => node.props['data-price'] === "30\u00A0000 UZS")).toHaveLength(0);
+  expect(output).toContain("130\u00A0000 UZS");
   await act(async () => tree.unmount());
 });
 test('inconsistent server sums are disclosed without replacing the total', async () => {
   const tree = await mount(<OrderPriceBreakdown pricing={getOrderPricing({ ...complete, total_uzs: 140000 })} />);
   const output = JSON.stringify(tree.toJSON());
   expect(output).toContain('trackOrder.amountsMismatch');
-  expect(output).toContain("140 000 so'm");
-  expect(output).not.toContain("130 000 so'm");
+  expect(output).toContain("140\u00A0000 UZS");
+  expect(output).not.toContain("130\u00A0000 UZS");
   await act(async () => tree.unmount());
 });
 test('line display prefers the server line total and labels a unit-only fallback', async () => {
   const tree = await mount(<OrderLinePrice line={{ quantity: 2, unitPrice: 50000, lineTotal: 100000 }} />);
-  expect(JSON.stringify(tree.toJSON())).toContain("100 000 so'm");
-  expect(JSON.stringify(tree.toJSON())).not.toContain("50 000 so'm");
+  expect(JSON.stringify(tree.toJSON())).toContain("100\u00A0000 UZS");
+  expect(JSON.stringify(tree.toJSON())).not.toContain("50\u00A0000 UZS");
   await act(async () => tree.update(<OrderLinePrice line={{ quantity: 2, unitPrice: 50000, lineTotal: null }} />));
   expect(JSON.stringify(tree.toJSON())).toContain('trackOrder.unitPrice');
-  expect(JSON.stringify(tree.toJSON())).toContain("50 000 so'm");
+  expect(JSON.stringify(tree.toJSON())).toContain("50\u00A0000 UZS");
   await act(async () => tree.update(<OrderLinePrice line={{ quantity: null, unitPrice: null, lineTotal: null }} />));
   expect(JSON.stringify(tree.toJSON())).toContain('—');
-  expect(JSON.stringify(tree.toJSON())).not.toContain("0 so'm");
+  expect(JSON.stringify(tree.toJSON())).not.toContain("0 UZS");
   await act(async () => tree.unmount());
 });

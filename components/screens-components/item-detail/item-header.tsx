@@ -7,7 +7,7 @@ import { AppPrice } from '@/components/shared/app-price';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
-import { noBreakDigits } from '@/utils/format-price';
+import { formatSomAmount } from '@/utils/format-price';
 
 export type ItemDetailHeaderProps = {
   /** Safe-area top inset — the header pads itself out below the status bar. */
@@ -137,7 +137,7 @@ export function ItemPriceRow({
               marginBottom: 4,
             }}
           >
-            {`${noBreakDigits(wasUzs.toLocaleString('ru-RU'))} ${t('common.currency')}`}
+            {`${formatSomAmount(wasUzs)} ${t('common.currency')}`}
           </AppText>
         ) : null}
         {savePct > 0 ? (

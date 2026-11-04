@@ -1,3 +1,5 @@
+import { formatCurrency } from '@/services/cart-math';
+
 /** Confirmed order amounts only. Arithmetic checks never fill missing fields. */
 export type OrderPricingInput = {
   currency?: string | null;
@@ -34,8 +36,7 @@ export function confirmedMoney(value: unknown): number | null {
 export function formatOrderMoney(value: number | null | undefined): string {
   const amount = confirmedMoney(value);
   if (amount === null) return '';
-  const [whole, fraction] = (Number.isInteger(amount) ? String(amount) : amount.toFixed(2)).split('.');
-  return `${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}${fraction ? `.${fraction}` : ''} so'm`;
+  return formatCurrency(amount);
 }
 const cents = (value: number) => Math.round(value * 100);
 function checkedSum(values: number[]): number | null {

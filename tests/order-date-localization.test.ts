@@ -1,7 +1,7 @@
 /** Unit mapper regressions only: synthetic order, no HTTP or account access. */
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
-const language = vi.hoisted(() => ({ isInitialized: true, language: 'en' }));
+const language = vi.hoisted(() => ({ isInitialized: true, language: 'en', t: () => 'UZS' }));
 vi.mock('i18next', () => ({ default: language }));
 vi.mock('@/config/api', () => ({ shouldUseHttpTransport: () => false }));
 vi.mock('@/services/api-client', () => ({ apiClient: {}, ApiError: class extends Error {} }));

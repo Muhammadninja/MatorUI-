@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveItemSale, type Sale } from '@/services/sales-service';
+import { resolveItemPricing, resolveItemSale, type Sale } from '@/services/sales-service';
 
 const sale = (over: Partial<Sale> & Pick<Sale, 'scopeType'>): Sale => ({
   id: 's1',
@@ -58,5 +58,23 @@ describe('resolveItemSale', () => {
       [sale({ scopeType: 'ALL_PRODUCTS', discountType: 'FIXED', discountValue: 25_000 })],
     );
     expect(got).toBeNull();
+  });
+});
+
+describe('resolveItemPricing', () => {
+  it('keeps a fractional struck-through price exact', () => {
+    const { wasUzs } = resolveItemPricing(
+      { id: 'p', priceUzs: 60000.5, originalPriceUzs: 65730.24, salePercent: 9 } as never,
+      [],
+    );
+    expect(wasUzs).toBe(65730.24);
+  });
+
+  it('reads a fractional display price as its real amount when no number is given', () => {
+    const { wasUzs } = resolveItemPricing(
+      { id: 'p', price: 'UZS 100 000.50', salePercent: 50 } as never,
+      [],
+    );
+    expect(wasUzs).toBe(200001);
   });
 });

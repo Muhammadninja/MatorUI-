@@ -6,7 +6,7 @@ import { useWindowDimensions, View, type ViewStyle } from 'react-native';
 import ImageBox from '@/components/screens-components/home/image-box';
 import { AppIconButton } from '@/components/shared/app-icon-button';
 import { splitPrice } from '@/components/shared/app-price';
-import { noBreakDigits } from '@/utils/format-price';
+import { formatSomAmount } from '@/utils/format-price';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import WheelLoader from '@/components/shared/wheel-loader/wheel-loader';
@@ -144,7 +144,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
   const { savePct, wasUzs: wasNum } = resolveItemPricing(item, sales);
   const priceAmount = splitPrice(item.price).amount || item.price;
   const priceSize = priceFontSize(priceAmount);
-  const wasLabel = wasNum > 0 ? noBreakDigits(wasNum.toLocaleString('ru-RU')) : null;
+  const wasLabel = wasNum > 0 ? formatSomAmount(wasNum) : null;
 
   const brandEyebrow = (item.brand ?? item.description?.split('·')[0])?.trim();
   const outOfStock = /out of stock/i.test(item.status ?? '');

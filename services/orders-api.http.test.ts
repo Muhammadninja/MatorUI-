@@ -74,7 +74,7 @@ describe('mapOrderToListRow', () => {
     expect(row.id).toBe('ord_01KY2DNPSRYPT8C7SDT2N7JJCH');
     expect(row.status).toBe('Processing'); // pending_payment → Processing
     expect(row.items).toBe(2); // sum of qty
-    expect(row.total).toBe("280 000 so'm"); // UZS grouped
+    expect(row.total).toBe("280\u00A0000 UZS"); // UZS grouped
     expect(row.date).toBe('Jul 21, 2026');
     expect(row.summary).toBe('Motor oil');
   });
@@ -102,8 +102,8 @@ describe('mapOrderToDetail', () => {
     expect(d.currentStepIndex).toBe(0);
     expect(d.steps).toHaveLength(5);
     expect(d.courier).toBeNull();
-    expect(d.totalLabel).toBe("280 000 so'm");
-    expect(d.items[0]).toMatchObject({ title: 'Motor oil', quantity: 2, price: "250 000 so'm" });
+    expect(d.totalLabel).toBe("280\u00A0000 UZS");
+    expect(d.items[0]).toMatchObject({ title: 'Motor oil', quantity: 2, price: "250\u00A0000 UZS" });
     expect(d.pricing?.lines[0]).toEqual({ quantity: 2, unitPrice: 250000, lineTotal: 500000 });
     expect(d.pricing?.checks.items).toBe(false);
     expect(d.pricing?.status).toBe('inconsistent');
@@ -115,7 +115,7 @@ test('detail keeps complete server breakdown and does not mutate timestamps or i
   const snapshot = JSON.stringify(raw);
   const detail = mapOrderToDetail(raw);
   expect(detail.pricing).toMatchObject({ subtotal: 500000, delivery: 25000, serviceFee: 5000, discount: 0, total: 530000, status: 'confirmed' });
-  expect(detail.totalLabel).toBe("530 000 so'm");
+  expect(detail.totalLabel).toBe("530\u00A0000 UZS");
   expect(JSON.stringify(raw)).toBe(snapshot);
 });
 
@@ -159,7 +159,7 @@ describe('HttpOrdersTransport', () => {
       payment_type: 'cash', // chosen method forwarded so the backend can route the webhook
     });
     expect(res.orderId).toBe(RAW.order_id);
-    expect(res.totalLabel).toBe("280 000 so'm");
+    expect(res.totalLabel).toBe("280\u00A0000 UZS");
   });
 
   test('createOrder omits vehicle/phone when absent (both optional server-side)', async () => {

@@ -54,10 +54,15 @@ describe('round', () => {
 });
 
 describe('formatCurrency', () => {
-  test('formats as UZS whole som with thousands separators', () => {
+  test('groups thousands and shows hundredths only when the amount has them', () => {
     expect(formatCurrency(0)).toBe('0 UZS');
-    expect(formatCurrency(1240.5)).toBe('1\u00A0241 UZS');
-    expect(formatCurrency(1234567.8)).toBe('1\u00A0234\u00A0568 UZS');
+    expect(formatCurrency(1240)).toBe('1\u00A0240 UZS');
+    expect(formatCurrency(1240.5)).toBe('1\u00A0240.50 UZS');
+    expect(formatCurrency(1234567.8)).toBe('1\u00A0234\u00A0567.80 UZS');
+  });
+
+  test('a fractional total is the amount charged, not a rounded one', () => {
+    expect(formatCurrency(65730.24 + 25000 + 5000)).toBe('95\u00A0730.24 UZS');
   });
 });
 
