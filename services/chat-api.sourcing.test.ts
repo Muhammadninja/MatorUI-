@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
-const { post } = vi.hoisted(() => ({ post: vi.fn() }));
-vi.mock('@/services/api-client', () => ({ apiClient: { post } }));
+const { post, get } = vi.hoisted(() => ({ post: vi.fn(), get: vi.fn() }));
+vi.mock('@/services/api-client', () => ({ apiClient: { post, get } }));
 vi.mock('@/config/api', () => ({
   getApiBaseUrl: () => 'https://api.test',
   getAuthToken: async () => null,
@@ -9,6 +9,7 @@ vi.mock('@/config/api', () => ({
 }));
 
 import { SourcingChatTransport } from './chat-api';
+import { resetSourcingCapabilities } from './sourcing-capabilities';
 import type { AiChatSendMessageRequest, ChatStreamEvent } from '@/types/ai-chat';
 
 const VEHICLE = {
@@ -35,14 +36,17 @@ const done = (events: ChatStreamEvent[]) => {
 
 beforeEach(() => {
   post.mockReset().mockResolvedValue({ intent: 'GENERAL_QUESTION', reply_text: 'ok' });
+  get.mockReset().mockResolvedValue({ contract_version: 2, ticket_submission_enabled: true });
+  resetSourcingCapabilities();
 });
 
 describe('what is sent', () => {
-  test('body holds only fields the endpoint accepts, since it rejects unknown ones', async () => {
+  test('only the message and history, with no VIN or text hint', async () => {
     await send({ vehicleContext: VEHICLE, isAuthenticated: true, history: [] });
     const body = post.mock.calls[0]![1] as Record<string, unknown>;
-    expect(Object.keys(body).sort()).toEqual(['history', 'message', 'vin']);
-    expect(body.vin).toBe(VEHICLE.vin);
+    expect(Object.keys(body).sort()).toEqual(['history', 'message']);
+    expect(body.message).toBe('radiator kerak');
+    expect(JSON.stringify(body)).not.toContain(VEHICLE.vin);
   });
 
   test('request id and vehicle id travel as headers', async () => {
@@ -62,22 +66,49 @@ describe('what is sent', () => {
     ]);
   });
 
-  test('the vehicle hint adds no Cyrillic, so an Uzbek message stays Uzbek', async () => {
-    await send({ vehicleContext: VEHICLE });
-    const { message } = post.mock.calls[0]![1] as { message: string };
-    expect(message).toContain('Chevrolet Cobalt 2026');
-    expect(message).not.toMatch(/[Ѐ-ӿ]/);
-  });
-
-  test('without a vehicle nothing is added', async () => {
+  test('without a vehicle no vehicle header is sent', async () => {
     await send({});
-    expect(post.mock.calls[0]![1].message).toBe('radiator kerak');
     expect(post.mock.calls[0]![2].headers).toEqual({ 'Idempotency-Key': 'user-1' });
   });
 
   test('allows the model time to answer', async () => {
     await send({});
     expect(post.mock.calls[0]![2].timeoutMs).toBeGreaterThan(15_000);
+  });
+
+  test('a held request names the message to send after sign-in', async () => {
+    post.mockResolvedValue({ intent: 'SOURCING_AUTH_REQUIRED', all_parts_accounted: true });
+    const events = await send({ userMessageId: 'user-9', requestId: 'user-9:none' });
+    expect(done(events).sourcing).toMatchObject({ userMessageId: 'user-9' });
+  });
+});
+
+describe('until the backend confirms it supports this chat', () => {
+  test.each([
+    ['an old backend with no such endpoint', () => get.mockRejectedValue(new Error('404'))],
+    ['an older contract', () => get.mockResolvedValue({ contract_version: 1 })],
+    ['an empty answer', () => get.mockResolvedValue({})],
+  ])('%s: nothing is sent', async (_name, arrange) => {
+    arrange();
+    const events = await send({ isAuthenticated: true });
+    expect(post).not.toHaveBeenCalled();
+    expect(done(events).chatUnavailable).toBe(true);
+    expect(done(events).sourcing).toBeUndefined();
+  });
+
+  test('a later deploy takes effect on the next message', async () => {
+    get.mockRejectedValueOnce(new Error('404'));
+    await send({});
+    expect(post).not.toHaveBeenCalled();
+    get.mockResolvedValue({ contract_version: 2 });
+    await send({});
+    expect(post).toHaveBeenCalledTimes(1);
+  });
+
+  test('a confirmed backend is not asked again on every message', async () => {
+    await send({});
+    await send({});
+    expect(get).toHaveBeenCalledTimes(1);
   });
 });
 

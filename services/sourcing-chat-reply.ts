@@ -9,16 +9,26 @@ import type {
 /** One requested part in a sourcing reply (`docs/backend-sourcing-contract.md`). */
 export type SourcingReplyPart = {
   part_name?: string | null;
-  status: 'FOUND_IN_STOCK' | 'TICKET_CREATED' | 'AUTH_REQUIRED' | 'NEEDS_CLARIFICATION';
+  status:
+    | 'FOUND_IN_STOCK'
+    | 'TICKET_CREATED'
+    | 'AUTH_REQUIRED'
+    | 'NEEDS_CLARIFICATION'
+    | 'UNAVAILABLE';
   items?: SourcingReplyItem[];
   ticket_id?: string;
 };
 
-type SourcingReplyItem = { id: string; title: string; price: string };
+type SourcingReplyItem = {
+  id: string;
+  title: string;
+  price: string;
+  fit?: 'FITS' | 'UNKNOWN' | null;
+};
 
 /** Response of POST /api/ai-chat/message. `parts` and `SOURCING_AUTH_REQUIRED`
- *  and `all_parts_accounted` are proposed additions the backend doesn't send yet;
- *  the older single-part shape stays valid. */
+ *  and `all_parts_accounted` come with contract version 2; the older single-part
+ *  shape stays valid. */
 export type SourcingChatResponse = {
   reply_text?: string;
   intent?: string;
@@ -75,6 +85,7 @@ export function interpretSourcingReply(
   const received: string[] = [];
   const held: string[] = [];
   const ticketIds: string[] = [];
+  const unavailable: string[] = [];
   let ticketOutcome = false;
   let needsClarification = false;
   const parts = partsOf(res);
@@ -84,7 +95,7 @@ export function interpretSourcingReply(
     if (part.status === 'FOUND_IN_STOCK' && part.items?.length) {
       partGroups.push({
         partName: name,
-        links: part.items.map(({ id, title, price }) => ({ id, title, price })),
+        links: part.items.map(({ id, title, price, fit }) => ({ id, title, price, fit })),
       });
     } else if (part.status === 'TICKET_CREATED') {
       if (!part.ticket_id) throw new SourcingNotConfirmedError();
@@ -98,6 +109,9 @@ export function interpretSourcingReply(
     } else if (part.status === 'AUTH_REQUIRED') {
       ticketOutcome = true;
       if (name) held.push(name);
+    } else if (part.status === 'UNAVAILABLE') {
+      ticketOutcome = true;
+      if (name) unavailable.push(name);
     } else if (part.status === 'NEEDS_CLARIFICATION') {
       needsClarification = true;
     }
@@ -105,10 +119,14 @@ export function interpretSourcingReply(
 
   let sourcing: AiChatSourcingState | undefined;
   if (ticketOutcome) {
-    sourcing =
-      isAuthenticated && ticketIds.length > 0
-        ? { status: 'received', parts: received, ticketIds }
-        : { status: 'sign_in_required', parts: held, userMessageId };
+    const anyHeld = held.length > 0 || parts.some((p) => p.status === 'AUTH_REQUIRED');
+    if (isAuthenticated && ticketIds.length > 0) {
+      sourcing = { status: 'received', parts: received, ticketIds };
+    } else if (unavailable.length > 0 && !anyHeld) {
+      sourcing = { status: 'unavailable', parts: unavailable };
+    } else {
+      sourcing = { status: 'sign_in_required', parts: held, userMessageId };
+    }
   }
 
   return {
@@ -134,6 +152,12 @@ function understoodParts(parts: SourcingReplyPart[]): string[] {
     .filter(Boolean);
 }
 
+const SOURCING_COPY = {
+  received: 'aiChat.requestReceived',
+  sign_in_required: 'aiChat.signInToSubmitBody',
+  unavailable: 'aiChat.requestsUnavailable',
+} as const;
+
 /** The reply body: server text, then the app's own wording for the outcome. */
 export function composeSourcingBody(
   { text, sourcing, partsClarification }: Omit<InterpretedSourcingReply, 'partGroups'>,
@@ -142,7 +166,7 @@ export function composeSourcingBody(
   const understood = partsClarification?.understood ?? [];
   const outcome = sourcing
     ? [
-        t(sourcing.status === 'received' ? 'aiChat.requestReceived' : 'aiChat.signInToSubmitBody'),
+        t(SOURCING_COPY[sourcing.status]),
         // The clarifying question already names these.
         sourcing.parts.length > 0 && understood.length === 0
           ? t('aiChat.requestedParts', { parts: sourcing.parts.join(', ') })

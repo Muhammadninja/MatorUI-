@@ -7,8 +7,8 @@ Inspection of 2026-11-03, for the backend owner. No sourcing request was created
 The results below record what the inspection found. Since then:
 
 - **Decisions:** guests can chat and browse, a sourcing request requires the existing phone OTP sign-in, and the 15-minute promise is being removed.
-- **Contract:** `docs/backend-sourcing-contract.md` is the current proposal, and it replaces the "needed" notes below wherever they differ.
-- **App:** steps 9, 10 and 21 have code changes committed on `design/teal-explore-home`. They aren't released, and steps 9 and 21 still depend on the backend.
+- **Contract:** `docs/backend-sourcing-contract.md` is the current version, and it replaces the "needed" notes below wherever they differ.
+- **Fixes:** the backend and app changes for these findings are implemented on branches, not deployed. Status is in `docs/first-release-checklist.md`. The results below still describe what production does today.
 - **Release:** held until backend authentication enforcement and request-ID deduplication are deployed and verified.
 - **Live test:** blocked. See the end of this report.
 
@@ -129,22 +129,6 @@ The search uses `part_name` only, so the backend can't confirm a part fits. **Ne
 ### I. Confirm with the business
 
 The Telegram card sends the customer's raw message and any VIN to the dealers group. Confirm this is intended and covered by the privacy policy.
-
-## App work (not backend)
-
-Committed on `design/teal-explore-home`, not released, and not yet exercised against a live reply:
-
-- [x] Send the selected vehicle. Header now says "Selected vehicle", not "fits"
-- [x] Show in-stock results as tappable parts
-- [x] Use `intent` and `ticket_id`, so only a server ticket ID produces a confirmation
-- [x] Ask explicitly when a reply doesn't account for every part
-- [x] Keep a stable request ID across retries. **It does nothing until the backend consumes it**
-- [x] Extend the timeout to 45 seconds. **This isn't duplicate protection**, and the timeout and retry cases are unresolved in the contract
-
-Not done:
-
-- [ ] Clear the saved chat on sign-out. `clearStoredChat` only runs from manual clear, and this August conversation was still showing in a guest session
-- [ ] Give customers somewhere to see their requests. Today nothing is visible until an offer arrives
 
 ## Live test: blocked
 

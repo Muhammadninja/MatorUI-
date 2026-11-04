@@ -310,13 +310,16 @@ export default function AiChatbot() {
         let partGroups: AiChatPartGroup[] | undefined;
         let sourcing: AiChatSourcingState | undefined;
         let partsClarification: AiChatPartsClarification | undefined;
+        let chatUnavailable = false;
         const toolCallMap = new Map<string, AiChatToolCall>();
 
         const stream = chatTransport.streamMessage(
           {
             conversationId,
             message: trimmed,
-            requestId: finalUserId,
+            // A different car is a different request, even for the same message.
+            requestId: `${finalUserId}:${currentActiveVehicle?.vehicleId ?? 'none'}`,
+            userMessageId: finalUserId,
             isAuthenticated,
             vehicleContext: selectedVehicleContext(currentActiveVehicle?.vehicle),
             // Snapshot the prior turns (pre-append: this fires before the ref
@@ -370,6 +373,7 @@ export default function AiChatbot() {
             partGroups = event.partGroups;
             sourcing = event.sourcing;
             partsClarification = event.partsClarification;
+            chatUnavailable = event.chatUnavailable ?? false;
           }
         }
 
@@ -378,7 +382,9 @@ export default function AiChatbot() {
           id: replyId,
           role: 'assistant',
           title,
-          body: composeSourcingBody({ text: body, sourcing, partsClarification }, t),
+          body: chatUnavailable
+            ? t('aiChat.temporarilyUnavailable')
+            : composeSourcingBody({ text: body, sourcing, partsClarification }, t),
           caption: t('aiChat.captionNow'),
           createdAt,
           toolCalls: finalToolCalls.length > 0 ? finalToolCalls : undefined,

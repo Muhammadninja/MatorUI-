@@ -63,6 +63,8 @@ export type AiChatPartLink = {
   id: string;
   title: string;
   price: string;
+  /** Fit against the selected vehicle. Null when no vehicle was checked. */
+  fit?: 'FITS' | 'UNKNOWN' | null;
 };
 
 /** Catalog matches for one requested part. */
@@ -81,7 +83,8 @@ export type AiChatPartsClarification = { understood: string[] };
  */
 export type AiChatSourcingState =
   | { status: 'received'; parts: string[]; ticketIds: string[] }
-  | { status: 'sign_in_required'; parts: string[]; userMessageId?: string };
+  | { status: 'sign_in_required'; parts: string[]; userMessageId?: string }
+  | { status: 'unavailable'; parts: string[] };
 
 export type AiChatMessage = {
   id: string;
@@ -143,6 +146,8 @@ export type ChatStreamEvent =
       sourcing?: AiChatSourcingState;
       /** Set when the reply doesn't account for everything the customer asked for. */
       partsClarification?: AiChatPartsClarification;
+      /** The backend hasn't confirmed it supports this chat, so nothing was sent. */
+      chatUnavailable?: boolean;
     };
 
 // ── Request / response ──────────────────────────────────────────────
@@ -153,9 +158,11 @@ export type AiChatSendMessageRequest = {
   vehicleContext?: AiChatVehicleContext | null;
   /** Prior turns, oldest→newest, so the stateless endpoint keeps context. */
   history?: { role: AiChatRole; content: string }[];
-  /** Stays the same across retries of one message. Only prevents a second ticket
-   *  once the backend consumes it: see docs/backend-sourcing-contract.md. */
+  /** Stable across retries of one message on one car, so a retry returns the
+   *  original result. A different car is a different request. */
   requestId?: string;
+  /** The message to send after sign-in, if the request is held. */
+  userMessageId?: string;
   isAuthenticated?: boolean;
 };
 

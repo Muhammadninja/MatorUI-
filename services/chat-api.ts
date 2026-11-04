@@ -342,6 +342,7 @@ export class MockChatTransport implements ChatTransport {
  * `data:` line, terminated by `event: done\ndata: {...}\n\n`.
  */
 import { getApiBaseUrl, getAuthToken, shouldUseHttpTransport } from '@/config/api';
+import { sourcingChatSupported } from '@/services/sourcing-capabilities';
 import { interpretSourcingReply, type SourcingChatResponse } from '@/services/sourcing-chat-reply';
 import { apiClient, ApiError } from '@/services/api-client';
 
@@ -475,13 +476,7 @@ export class SourcingChatTransport implements ChatTransport {
   ): AsyncIterable<ChatStreamEvent> {
     const conversationId = input.conversationId ?? 'chat-active';
     const replyId = makeId('assistant');
-    // A text hint so the extractor resolves brand/model. It stays in Latin script:
-    // the endpoint detects the reply language from the whole message, so a
-    // Cyrillic hint would answer an Uzbek customer in Russian.
     const vehicle = input.vehicleContext;
-    const message = vehicle?.selectedCarName
-      ? `${input.message}\n\n[Selected vehicle: ${vehicle.selectedCarName}]`
-      : input.message;
     // Prior turns give the stateless endpoint memory (vehicle/part from earlier
     // messages), so it stops re-asking for details already provided. Sanitize to
     // the backend's per-item validation (`SendMessageDto.history`): drop empty
@@ -511,11 +506,25 @@ export class SourcingChatTransport implements ChatTransport {
           return;
         }
 
+        // Fail closed: an older backend would create a ticket for any message.
+        if (!(await sourcingChatSupported(signal))) {
+          yield {
+            type: 'done',
+            conversationId,
+            suggestions: [],
+            replyId,
+            title: 'Mator AI',
+            createdAt: new Date().toISOString(),
+            chatUnavailable: true,
+          };
+          return;
+        }
+
         const res = await apiClient.post<SourcingChatResponse>(
           SOURCING_CHAT_PATH,
           // Clamp to the backend's `@MaxLength(2000)` so a long paste can't 400.
-          // Only fields the endpoint accepts: it rejects unknown ones with a 400.
-          { message: message.slice(0, 2000), history, ...(vehicle?.vin ? { vin: vehicle.vin } : {}) },
+          // The backend reads the car from the vehicle id, so no VIN or text hint.
+          { message: input.message.slice(0, 2000), history },
           // No `Accept-Language`: this endpoint detects the language from the
           // message text itself, and the reply (including category names) comes
           // back in whatever the buyer wrote. Sending a header here would be
@@ -524,8 +533,6 @@ export class SourcingChatTransport implements ChatTransport {
             signal,
             skipLanguage: true,
             timeoutMs: SOURCING_CHAT_TIMEOUT_MS,
-            // Proposed contract, not yet consumed by the backend: today it ignores
-            // both. Headers, because unknown body fields are rejected with a 400.
             headers: {
               ...(input.requestId ? { 'Idempotency-Key': input.requestId } : {}),
               ...(vehicle?.vehicleId ? { 'X-Selected-Vehicle-Id': vehicle.vehicleId } : {}),
@@ -535,7 +542,7 @@ export class SourcingChatTransport implements ChatTransport {
 
         const reply = interpretSourcingReply(res, {
           isAuthenticated: input.isAuthenticated ?? false,
-          userMessageId: input.requestId,
+          userMessageId: input.userMessageId,
         });
         const text = reply.text;
 

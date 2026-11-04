@@ -140,6 +140,8 @@ type RawNotificationsResponse =
 /** Map a backend notification `type`/`category` onto a display tone. */
 function toTone(raw: RawNotification): NotificationTone {
   const key = (raw.type ?? raw.category ?? '').toLowerCase();
+  // Includes bad news such as "no offers", so it isn't shown as a success.
+  if (key === 'sourcing_status') return 'info';
   if (/sourc|offer|found/.test(key)) return 'success';
   if (/deliver|order|ship/.test(key)) return 'info';
   if (/price|deal|discount|save/.test(key)) return 'value';

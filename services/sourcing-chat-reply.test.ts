@@ -240,3 +240,41 @@ describe('composeSourcingBody', () => {
     expect(composeSourcingBody({ text: ' Здравствуйте ' }, t)).toBe('Здравствуйте');
   });
 });
+
+describe('real backend replies', () => {
+  test('a switched-off backend is not reported as received or as needing sign-in', () => {
+    const reply = interpretSourcingReply(
+      {
+        intent: 'SOURCING_UNAVAILABLE',
+        reply_text: 'Не можем принять',
+        all_parts_accounted: true,
+        parts: [{ part_name: 'радиатор', status: 'UNAVAILABLE' }],
+      },
+      guest,
+    );
+    expect(reply.sourcing).toEqual({ status: 'unavailable', parts: ['радиатор'] });
+    expect(reply.text).toBe('');
+    expect(reply.partsClarification).toBeUndefined();
+  });
+
+  test('catalog matches keep their fit, including unknown', () => {
+    const reply = interpretSourcingReply(
+      {
+        intent: 'FOUND_IN_STOCK',
+        all_parts_accounted: true,
+        parts: [
+          {
+            part_name: 'фильтр',
+            status: 'FOUND_IN_STOCK',
+            items: [
+              { ...item, id: 'a', fit: 'FITS' },
+              { ...item, id: 'b', fit: 'UNKNOWN' },
+            ],
+          },
+        ],
+      },
+      signedIn,
+    );
+    expect(reply.partGroups?.[0]?.links.map((l) => l.fit)).toEqual(['FITS', 'UNKNOWN']);
+  });
+});

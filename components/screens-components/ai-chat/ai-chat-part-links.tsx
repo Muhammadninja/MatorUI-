@@ -59,6 +59,18 @@ export function AiChatPartLinks({ groups }: { groups: AiChatPartGroup[] }) {
                     {link.title}
                   </AppText>
                   <AppPrice value={link.price} size={14} color={tokens.text} />
+                  {link.fit ? (
+                    <AppText
+                      textVariant="bodyXs"
+                      style={{ color: link.fit === 'FITS' ? tokens.success : tokens.textMuted }}
+                    >
+                      {t(
+                        link.fit === 'FITS'
+                          ? 'aiChat.fitsSelectedVehicle'
+                          : 'aiChat.fitNotConfirmed',
+                      )}
+                    </AppText>
+                  ) : null}
                 </AppView>
                 <ChevronRight size={18} strokeWidth={2.2} color={tokens.textMuted} />
               </AppPressableView>
