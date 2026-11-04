@@ -40,6 +40,10 @@ export type SearchResult = {
    * Wire: `images` (also accepted: `image_url` / `imageUrl` singular).
    */
   images?: string[];
+  /** OEM part number, when the part carries one. */
+  oem?: string;
+  /** GM cross-reference number, when the part carries one. */
+  gm?: string;
   /** Localized category display name — render only, never an identifier. */
   category: string;
   /** Stable category id (wire: `category_id`). Use this for filters, deep

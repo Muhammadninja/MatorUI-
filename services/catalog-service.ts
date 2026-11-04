@@ -624,7 +624,9 @@ type ApiCatalogPartsResponse = {
  * no type we fall back to whichever number array is populated (GM first), so a
  * GM part is never mislabeled "OEM".
  */
-function resolvePartNumber(p: ApiCatalogPart): { oem?: string; gm?: string } {
+export function resolvePartNumber(
+  p: Pick<ApiCatalogPart, 'gm_numbers' | 'oem_numbers' | 'part_number_type'>,
+): { oem?: string; gm?: string } {
   const gm = p.gm_numbers?.[0];
   const oem = p.oem_numbers?.[0];
   const type = (p.part_number_type ?? '').toUpperCase();

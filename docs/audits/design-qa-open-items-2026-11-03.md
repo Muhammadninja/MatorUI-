@@ -22,7 +22,7 @@ Branch `design/teal-explore-home`, uncommitted, base `fe1f0b4`. Screenshots: `te
 | 13 | Home | Transmission tile shows a piston; the clutch artwork is now unused. | Decision |
 | 14 | Home | Header delivery location and vehicle-specific recommendations from the handoff are not built; both need new data flows. | Decision |
 | 15 | Accessibility | "Сменить" (#007F86 on #E5F4F3) is about 4.2:1, under 4.5:1. Colours as specified; underlined semibold text. | Decision |
-| 16 | Search | Rows no longer show article numbers, rating or tags, following the requested card contents. | Decision |
+| 16 | Search | Rows show the GM or OEM number when a part has one (requested 2026-11-03). Rating and tags stay off, following the requested card contents. | Decision |
 | 17 | Text | Two-line ellipsis on product titles is a deliberate exception to the earlier no-truncation rule. | Decision |
 | 18 | Item detail | The similar-parts rail still uses the old card style; no gallery thumbnails. | Frontend |
 | 19 | Shared | Resolved: toast colours now come from theme tokens. | Done |

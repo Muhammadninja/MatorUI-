@@ -1,4 +1,4 @@
-import { getCatalogMockItems, type CatalogItem } from '@/services/catalog-service';
+import { getCatalogMockItems, resolvePartNumber, type CatalogItem } from '@/services/catalog-service';
 import { normalizePartTitle } from '@/utils/part-title';
 import type {
   AccentTagKind,
@@ -72,6 +72,8 @@ function catalogToResult(item: CatalogItem, score: number): SearchResult {
     priceLabel: item.priceLabel,
     priceCents: parsePriceToCents(item.price),
     images: item.images,
+    oem: item.oem,
+    gm: item.gm,
     category: item.category,
     badge: item.badge,
     accentTagKind,
@@ -406,8 +408,11 @@ type RawTypeaheadSuggestion = {
   productId?: string;
 };
 
-/** Catalog rows carry photos; the search envelope does not (yet). */
-type RawCatalogPhotoRow = { id: string; images?: string[] | null };
+/** Catalog rows carry photos and part numbers; the search envelope does not (yet). */
+type RawCatalogPhotoRow = Parameters<typeof resolvePartNumber>[0] & {
+  id: string;
+  images?: string[] | null;
+};
 
 /** How many catalog rows to pull when hydrating photos. 100 is the backend's
  *  cap, and comfortably covers the pages a shopper scrolls through. */
@@ -440,16 +445,20 @@ async function hydratePhotos(
       `/v1/catalog/parts?q=${encodeURIComponent(trimmed)}` +
       `&page=1&page_size=${PHOTO_HYDRATION_PAGE_SIZE}`;
     const raw = await apiClient.get<{ items?: RawCatalogPhotoRow[] }>(path, { signal });
-    const photos = new Map<string, string[]>();
-    for (const row of raw.items ?? []) {
-      const clean = (row.images ?? []).filter(
+    const rows = new Map((raw.items ?? []).map((row) => [row.id, row]));
+    // A part the catalog page didn't cover keeps its honest placeholder.
+    return results.map((r) => {
+      const row = rows.get(r.id);
+      if (!row) return r;
+      const images = (row.images ?? []).filter(
         (u): u is string => typeof u === 'string' && u.trim().length > 0,
       );
-      if (clean.length > 0) photos.set(row.id, clean);
-    }
-    if (photos.size === 0) return results;
-    // A part the catalog page didn't cover keeps its honest placeholder.
-    return results.map((r) => (photos.has(r.id) ? { ...r, images: photos.get(r.id) } : r));
+      return {
+        ...r,
+        images: images.length > 0 ? images : r.images,
+        ...resolvePartNumber(row),
+      };
+    });
   } catch {
     return results;
   }

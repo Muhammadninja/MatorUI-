@@ -156,3 +156,36 @@ describe('HttpSearchTransport — category contract passthrough', () => {
     }
   });
 });
+
+describe('HttpSearchTransport — part numbers from the catalog rows', () => {
+  const part = (id: string) => ({ id, title: id, price: '1 сум' });
+
+  async function search(items: Record<string, unknown>[]) {
+    const originalFetch = globalThis.fetch;
+    const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
+    globalThis.fetch = vi.fn(async (url: RequestInfo | URL) =>
+      String(url).includes('/v1/catalog/parts')
+        ? json({ items })
+        : json({ query: 'x', results: [part('oem'), part('gm'), part('none'), part('missing')] }),
+    ) as typeof fetch;
+    try {
+      const { results } = await new HttpSearchTransport().search({ query: 'x' } as never);
+      return Object.fromEntries(results.map((r) => [r.id, { oem: r.oem, gm: r.gm }]));
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  }
+
+  test('labels each number by its type, and leaves parts without one bare', async () => {
+    const parts = await search([
+      { id: 'oem', part_number_type: 'OEM', oem_numbers: ['A1'], gm_numbers: [] },
+      { id: 'gm', part_number_type: 'GM', oem_numbers: ['B2'], gm_numbers: ['C3'] },
+      { id: 'none', oem_numbers: [], gm_numbers: [] },
+    ]);
+    expect(parts.oem).toEqual({ oem: 'A1', gm: undefined });
+    expect(parts.gm).toEqual({ oem: undefined, gm: 'C3' });
+    expect(parts.none).toEqual({ oem: undefined, gm: undefined });
+    // A part outside the catalog page simply has no number.
+    expect(parts.missing).toEqual({ oem: undefined, gm: undefined });
+  });
+});
