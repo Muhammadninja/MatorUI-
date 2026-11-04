@@ -420,6 +420,10 @@ type RawCatalogRow = Parameters<typeof resolvePartNumber>[0] & {
  *  cap, and comfortably covers the pages a shopper scrolls through. */
 const CATALOG_HYDRATION_PAGE_SIZE = 100;
 
+/** Results wait for this call, so it gets one short attempt rather than the
+ *  client's default retries, which could hold them back for over 45 seconds. */
+const CATALOG_HYDRATION_TIMEOUT_MS = 4_000;
+
 /**
  * Fill in the photos and exact amounts `/v1/search` doesn't return.
  *
@@ -447,7 +451,11 @@ async function hydrateFromCatalog(
     const path =
       `/v1/catalog/parts?q=${encodeURIComponent(trimmed)}` +
       `&page=1&page_size=${CATALOG_HYDRATION_PAGE_SIZE}`;
-    const raw = await apiClient.get<{ items?: RawCatalogRow[] }>(path, { signal });
+    const raw = await apiClient.get<{ items?: RawCatalogRow[] }>(path, {
+      signal,
+      timeoutMs: CATALOG_HYDRATION_TIMEOUT_MS,
+      maxRetries: 0,
+    });
     const rows = new Map((raw.items ?? []).map((row) => [row.id, row]));
     // A part the catalog page didn't cover keeps its honest placeholder.
     return results.map((r) => {

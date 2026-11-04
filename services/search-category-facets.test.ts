@@ -249,6 +249,53 @@ describe('HttpSearchTransport — exact amounts from the catalog rows', () => {
     expect(result.price).toBe('UZS 280 000');
   });
 
+  test('a slow catalog gives up without retrying, so results still appear', async () => {
+    const originalFetch = globalThis.fetch;
+    const calls: string[] = [];
+    const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
+    globalThis.fetch = vi.fn((url: RequestInfo | URL, init?: RequestInit) => {
+      calls.push(String(url));
+      return String(url).includes('/v1/catalog/parts')
+        ? new Promise<Response>((_, reject) => {
+            init?.signal?.addEventListener('abort', () =>
+              reject(new DOMException('Aborted', 'AbortError')),
+            );
+          })
+        : Promise.resolve(json({ query: 'x', results: [rounded] }));
+    }) as typeof fetch;
+    vi.useFakeTimers();
+    try {
+      const pending = new HttpSearchTransport().search({ query: 'x' } as never);
+      await vi.advanceTimersByTimeAsync(4_000);
+      const { results } = await pending;
+      expect(results[0].price).toBe('UZS 65 730');
+      expect(calls.filter((u) => u.includes('/v1/catalog/parts'))).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test('a failing catalog is not retried', async () => {
+    const originalFetch = globalThis.fetch;
+    const calls: string[] = [];
+    const json = (body: unknown, status = 200) =>
+      new Response(JSON.stringify(body), { status });
+    globalThis.fetch = vi.fn(async (url: RequestInfo | URL) => {
+      calls.push(String(url));
+      return String(url).includes('/v1/catalog/parts')
+        ? json({}, 503)
+        : json({ query: 'x', results: [rounded] });
+    }) as typeof fetch;
+    try {
+      const { results } = await new HttpSearchTransport().search({ query: 'x' } as never);
+      expect(results[0].price).toBe('UZS 65 730');
+      expect(calls.filter((u) => u.includes('/v1/catalog/parts'))).toHaveLength(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test.each([
     ['the catalog has no such part', () => new Response(JSON.stringify({ items: [] }), { status: 200 })],
     ['the row has no amount', catalogRow({ price_uzs: null })],
