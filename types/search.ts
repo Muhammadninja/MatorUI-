@@ -25,8 +25,9 @@ export type SearchResult = {
   title: string;
   description: string;
   /**
-   * Display-formatted UZS price ("UZS 369 000"). Live search currently
-   * supplies this string, not a numeric amount.
+   * Display-formatted UZS price ("UZS 369 000"). Live search supplies this
+   * string rounded to whole som, not a numeric amount; the transport replaces
+   * it with the catalog's exact amount when that part is on the catalog page.
    */
   price: string;
   priceLabel: string;

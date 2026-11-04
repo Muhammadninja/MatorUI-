@@ -1,4 +1,5 @@
 import { getCatalogMockItems, resolvePartNumber, type CatalogItem } from '@/services/catalog-service';
+import { formatSomAmount } from '@/utils/format-price';
 import { normalizePartTitle } from '@/utils/part-title';
 import type {
   AccentTagKind,
@@ -408,43 +409,45 @@ type RawTypeaheadSuggestion = {
   productId?: string;
 };
 
-/** Catalog rows carry photos and part numbers; the search envelope does not (yet). */
-type RawCatalogPhotoRow = Parameters<typeof resolvePartNumber>[0] & {
+/** Catalog rows carry photos, part numbers and the exact amount; the search envelope does not (yet). */
+type RawCatalogRow = Parameters<typeof resolvePartNumber>[0] & {
   id: string;
   images?: string[] | null;
+  price_uzs?: number | null;
 };
 
-/** How many catalog rows to pull when hydrating photos. 100 is the backend's
+/** How many catalog rows to pull when hydrating results. 100 is the backend's
  *  cap, and comfortably covers the pages a shopper scrolls through. */
-const PHOTO_HYDRATION_PAGE_SIZE = 100;
+const CATALOG_HYDRATION_PAGE_SIZE = 100;
 
 /**
- * Fill in the photos `/v1/search` doesn't return.
+ * Fill in the photos and exact amounts `/v1/search` doesn't return.
  *
  * The search envelope ships id/title/price/category and nothing else, so every
  * result row drew the "no photo" placeholder even though the part HAS photos —
- * `/v1/catalog/parts` returns them for the very same ids. One extra call on the
- * same query closes the gap until search carries `images` itself, at which
- * point this becomes a no-op (it is skipped the moment any result arrives with
- * a photo).
+ * `/v1/catalog/parts` returns them for the very same ids. Its `price` is also
+ * rounded to whole som (65730.24 arrives as "UZS 65 730"), and only the catalog
+ * row holds the amount an order charges. One extra call on the same query closes
+ * both gaps until search carries them itself.
  *
- * Best-effort by design: a failure here leaves the placeholder in place rather
- * than failing the search.
+ * Best-effort by design: a failure here, or a part outside the catalog page,
+ * leaves the placeholder and the API's own rounded label rather than failing the
+ * search. See "Fractional prices" in docs/first-release-checklist.md.
  */
-async function hydratePhotos(
+async function hydrateFromCatalog(
   results: SearchResult[],
   query: string,
   signal?: AbortSignal,
 ): Promise<SearchResult[]> {
-  if (results.length === 0 || results.some((r) => r.images?.length)) return results;
+  if (results.length === 0) return results;
   const trimmed = query.trim();
   if (!trimmed) return results;
 
   try {
     const path =
       `/v1/catalog/parts?q=${encodeURIComponent(trimmed)}` +
-      `&page=1&page_size=${PHOTO_HYDRATION_PAGE_SIZE}`;
-    const raw = await apiClient.get<{ items?: RawCatalogPhotoRow[] }>(path, { signal });
+      `&page=1&page_size=${CATALOG_HYDRATION_PAGE_SIZE}`;
+    const raw = await apiClient.get<{ items?: RawCatalogRow[] }>(path, { signal });
     const rows = new Map((raw.items ?? []).map((row) => [row.id, row]));
     // A part the catalog page didn't cover keeps its honest placeholder.
     return results.map((r) => {
@@ -453,8 +456,16 @@ async function hydratePhotos(
       const images = (row.images ?? []).filter(
         (u): u is string => typeof u === 'string' && u.trim().length > 0,
       );
+      // Same rule as the catalog mapper: a whole amount keeps the API's label.
+      const exactPrice =
+        typeof row.price_uzs === 'number' && !Number.isInteger(row.price_uzs)
+          ? `UZS ${formatSomAmount(row.price_uzs)}`
+          : r.price;
       return {
         ...r,
+        price: exactPrice,
+        // A label defaulted from the price follows it; a real lead-in stays.
+        priceLabel: r.priceLabel === r.price ? exactPrice : r.priceLabel,
         images: images.length > 0 ? images : r.images,
         ...resolvePartNumber(row),
       };
@@ -471,7 +482,7 @@ export class HttpSearchTransport implements SearchTransport {
       signal,
       headers: requestId ? { 'X-Request-Id': requestId } : undefined,
     });
-    const results = await hydratePhotos(
+    const results = await hydrateFromCatalog(
       (raw.results ?? []).map(normalizeSearchResult),
       raw.query ?? req.query,
       signal,

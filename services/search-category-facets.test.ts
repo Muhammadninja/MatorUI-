@@ -189,3 +189,72 @@ describe('HttpSearchTransport — part numbers from the catalog rows', () => {
     expect(parts.missing).toEqual({ oem: undefined, gm: undefined });
   });
 });
+
+describe('HttpSearchTransport — exact amounts from the catalog rows', () => {
+  /** `/v1/search` only ever sends a label rounded to whole som. */
+  const rounded = { id: 'frac', title: 'Oil', price: 'UZS 65 730' };
+
+  async function searchWith(
+    searchResult: Record<string, unknown>,
+    catalog: () => Response | Promise<Response>,
+  ) {
+    const originalFetch = globalThis.fetch;
+    const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
+    const fetchMock = vi.fn(async (url: RequestInfo | URL) =>
+      String(url).includes('/v1/catalog/parts')
+        ? catalog()
+        : json({ query: 'x', results: [searchResult] }),
+    );
+    globalThis.fetch = fetchMock as typeof fetch;
+    try {
+      const { results } = await new HttpSearchTransport().search({ query: 'x' } as never);
+      return results[0];
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  }
+  const catalogRow = (row: Record<string, unknown>) => () =>
+    new Response(JSON.stringify({ items: [{ id: 'frac', ...row }] }), { status: 200 });
+
+  test('shows the amount the catalog holds, not the rounded search label', async () => {
+    const result = await searchWith(rounded, catalogRow({ price_uzs: 65730.24 }));
+    expect(result.price).toBe('UZS 65 730.24');
+    // A defaulted label follows, or the row would draw the rounded one as a lead-in.
+    expect(result.priceLabel).toBe(result.price);
+  });
+
+  test('keeps a lead-in the API really sent', async () => {
+    const result = await searchWith(
+      { ...rounded, priceLabel: 'Starting at' },
+      catalogRow({ price_uzs: 65730.24 }),
+    );
+    expect(result.price).toBe('UZS 65 730.24');
+    expect(result.priceLabel).toBe('Starting at');
+  });
+
+  test('still reads the amount when search already sends photos', async () => {
+    const result = await searchWith(
+      { ...rounded, images: ['https://cdn.test/a.jpg'] },
+      catalogRow({ price_uzs: 65730.24 }),
+    );
+    expect(result.price).toBe('UZS 65 730.24');
+    expect(result.images).toEqual(['https://cdn.test/a.jpg']);
+  });
+
+  test('a whole amount keeps the API label untouched', async () => {
+    const result = await searchWith(
+      { ...rounded, price: 'UZS 280 000' },
+      catalogRow({ price_uzs: 280000 }),
+    );
+    expect(result.price).toBe('UZS 280 000');
+  });
+
+  test.each([
+    ['the catalog has no such part', () => new Response(JSON.stringify({ items: [] }), { status: 200 })],
+    ['the row has no amount', catalogRow({ price_uzs: null })],
+    ['the catalog call fails', () => new Response('{}', { status: 500 })],
+  ])('never invents precision when %s', async (_name, catalog) => {
+    const result = await searchWith(rounded, catalog);
+    expect(result.price).toBe('UZS 65 730');
+  });
+});

@@ -75,6 +75,10 @@ Amounts from the API are UZS with up to two decimals, and 10 of the 159 live cat
 
 The app now shows the exact amount everywhere through `formatSomAmount`: `95 730.24 сум`, and whole amounts without decimals. Totals and payment amounts are unchanged.
 
+**Search depends on the catalog for this.** `POST /v1/search` sends only a label rounded to whole som (`UZS 65 730`), with no numeric amount. The app replaces it with `price_uzs` from the `/v1/catalog/parts` call it already makes on the same query. All 28 fractional search hits across 24 live queries were covered on 2026-11-04. If that call fails, or a part falls outside its first 100 rows, search shows the rounded API label until the part is opened.
+
+- [ ] **Backend:** add a numeric `price_uzs` to `/v1/search` results, so the app no longer needs the catalog call to show the exact amount. The search release candidate (`codex/search-release-candidate`) still sends only the rounded label
+
 - [ ] **Owner decision:** backend comments say prices are whole som, but the data disagrees. If whole som is intended, round the catalog prices on the backend. The app will then show whole amounts with no change
 - [ ] **Backend:** Click's prepare check compares rounded amounts (`click.service.ts:55`), while Payme compares exact tiyin
 
