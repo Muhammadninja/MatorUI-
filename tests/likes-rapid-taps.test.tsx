@@ -2,7 +2,18 @@
 import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { expect, test, vi } from 'vitest';
-vi.mock('@/services/likes-storage', () => ({ loadLikes: async () => ({ ids: ['saved'], hasEverLiked: true }), saveLikes: vi.fn() }));
+vi.mock('@react-native-async-storage/async-storage', () => ({ default: {} }));
+vi.mock('@/contexts/user.context', () => ({ useUserContext: () => ({ profile: null, isAuthenticated: false, isHydrating: false }) }));
+vi.mock('@/services/api-client', () => ({ getAuthRequestEpoch: () => 0 }));
+vi.mock('@/services/favorites-api', () => ({ createFavoritesTransport: () => undefined }));
+vi.mock('@/services/likes-storage', async (original) => {
+  const actual = await original<typeof import('@/services/likes-storage')>();
+  const values = new Map([['likes:v2', JSON.stringify({ v: 2, owners: { guest: { ids: ['saved'], hasEverLiked: true, version: 0, pending: {} } } })]]);
+  return { ...actual, favoritesStorage: new actual.FavoritesStorage({
+    getItem: async (key) => values.get(key) ?? null,
+    setItem: async (key, value) => { values.set(key, value); },
+  }) };
+});
 import { LikesProvider, useLikesContext } from '@/contexts/likes.context';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 test('rapid taps return the correct message state before rendering and preserve other likes', async () => {

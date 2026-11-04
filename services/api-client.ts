@@ -73,6 +73,9 @@ type UnauthorizedHandler = () => void | Promise<void>;
 let unauthorizedHandler: UnauthorizedHandler | null = null;
 let authRequestEpoch = 0;
 
+/** Capture before delayed owner-scoped work, including local favorites updates. */
+export function getAuthRequestEpoch(): number { return authRequestEpoch; }
+
 /** Invalidate responses and retries belonging to a former login session. */
 export function invalidateAuthRequests(): void {
   authRequestEpoch += 1;
