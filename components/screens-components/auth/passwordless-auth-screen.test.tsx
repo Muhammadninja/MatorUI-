@@ -9,6 +9,7 @@
  *      the phone step used to hardcode Terms + Privacy only.
  *   4. Legal links push the (auth)-stack document route, so Back returns to
  *      this sheet (see tests/legal-integration.test.ts for the router side).
+ *   5. Backdrop: a repeated tap on Log in must not close the sheet it just opened.
  *
  * Renders the real screen with its collaborators stubbed, the same way
  * `vehicle-detail-screen.test.tsx` does.
@@ -356,5 +357,44 @@ describe('legal documents on the registration sheet', () => {
     );
     await act(async () => backToPhone.props.onPress());
     expect(byTestID('auth-phone-field').props.value).toBe('+998 90 123 45 67');
+  });
+});
+
+describe('backdrop', () => {
+  // The button that opens this sheet sits where its backdrop lands, so a repeated
+  // tap on Log in closed the sheet it had just opened and read as a dead button.
+  test('ignores the tap that lands while the sheet is still arriving', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    try {
+      const { r } = await renderSheet();
+      now.mockReturnValue(1_699);
+      await act(async () => r.root.findByType('backdrop' as never).props.onPress());
+      expect(mocks.back).not.toHaveBeenCalled();
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  test('closes the sheet once it has arrived', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    try {
+      const { r } = await renderSheet();
+      now.mockReturnValue(1_700);
+      await act(async () => r.root.findByType('backdrop' as never).props.onPress());
+      expect(mocks.back).toHaveBeenCalledTimes(1);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  test('the close button works straight away', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    try {
+      const { byTestID } = await renderSheet();
+      await act(async () => byTestID('auth-close-btn').props.onPress());
+      expect(mocks.back).toHaveBeenCalledTimes(1);
+    } finally {
+      now.mockRestore();
+    }
   });
 });

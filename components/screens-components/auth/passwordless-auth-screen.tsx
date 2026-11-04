@@ -77,6 +77,11 @@ function isValidPhone(raw: string): boolean {
   return /^\+?\d[\d\s()-]*$/.test(raw.trim()) && digits.length >= 9 && digits.length <= 15;
 }
 
+/** How long the backdrop ignores taps once the sheet opens, about as long as it
+ *  takes to slide in. The Log in button sits where this backdrop lands, so without
+ *  it a repeated tap closes the sheet it just opened and the button reads as dead. */
+const BACKDROP_ARM_MS = 700;
+
 /** Leave the auth sheet, returning to whatever screen pushed it. */
 function dismiss() {
   if (router.canGoBack()) router.back();
@@ -109,6 +114,7 @@ export default function PasswordlessAuthScreen() {
   // Slide the panel up over the (fading) scrim on mount so the screen underneath
   // stays put, matching the app's other bottom sheets.
   const translateY = useRef(new Animated.Value(Dimensions.get('window').height)).current;
+  const openedAt = useRef(Date.now());
   useEffect(() => {
     Animated.spring(translateY, {
       toValue: 0,
@@ -294,6 +300,10 @@ export default function PasswordlessAuthScreen() {
     else dismiss();
   };
 
+  const onBackdropPress = () => {
+    if (Date.now() - openedAt.current >= BACKDROP_ARM_MS) dismiss();
+  };
+
   return (
     <AppView
       flex={1}
@@ -305,7 +315,7 @@ export default function PasswordlessAuthScreen() {
       {/* Backdrop — tap to dismiss. */}
       <Pressable
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-        onPress={dismiss}
+        onPress={onBackdropPress}
         accessibilityLabel={t('auth.dismiss')}
       />
 
