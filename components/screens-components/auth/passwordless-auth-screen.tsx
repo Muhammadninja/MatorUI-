@@ -1,7 +1,7 @@
-import { router } from 'expo-router';
+import { router, useNavigation } from 'expo-router';
 import { ArrowLeft, X } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, Pressable, ScrollView } from 'react-native';
+import { Animated, BackHandler, Dimensions, Pressable, ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
@@ -83,7 +83,7 @@ function isValidPhone(raw: string): boolean {
 const BACKDROP_ARM_MS = 700;
 
 /** Leave the auth sheet, returning to whatever screen pushed it. */
-function dismiss() {
+function leaveSheet() {
   if (router.canGoBack()) router.back();
   else router.replace('/explore');
 }
@@ -115,6 +115,26 @@ export default function PasswordlessAuthScreen() {
   // stays put, matching the app's other bottom sheets.
   const translateY = useRef(new Animated.Value(Dimensions.get('window').height)).current;
   const openedAt = useRef(Date.now());
+
+  // The sheet stays on screen while it fades out, so Back, the backdrop and the
+  // close button can all still fire. Only the first may pop: a second one would
+  // take the customer off the screen underneath.
+  const navigation = useNavigation();
+  const leaving = useRef(false);
+  const dismiss = () => {
+    if (leaving.current || !navigation.isFocused()) return;
+    leaving.current = true;
+    leaveSheet();
+  };
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (leaving.current) return true;
+      // Not focused means Back belongs to a legal document above this sheet.
+      if (navigation.isFocused()) leaving.current = true;
+      return false;
+    });
+    return () => subscription.remove();
+  }, [navigation]);
   useEffect(() => {
     Animated.spring(translateY, {
       toValue: 0,

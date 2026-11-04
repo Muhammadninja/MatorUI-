@@ -10,6 +10,8 @@
  *   4. Legal links push the (auth)-stack document route, so Back returns to
  *      this sheet (see tests/legal-integration.test.ts for the router side).
  *   5. Backdrop: a repeated tap on Log in must not close the sheet it just opened.
+ *   6. Dismissal: Back, backdrop and close can only leave the sheet once, or the
+ *      second one pops the screen underneath.
  *
  * Renders the real screen with its collaborators stubbed, the same way
  * `vehicle-detail-screen.test.tsx` does.
@@ -31,6 +33,8 @@ const mocks = vi.hoisted(() => ({
   language: 'ru' as 'en' | 'ru' | 'uz',
   push: vi.fn(),
   back: vi.fn(),
+  focused: true,
+  backHandlers: [] as (() => boolean)[],
   requestOtp: vi.fn(),
   verifyOtp: vi.fn(),
   documents: [] as unknown[],
@@ -43,6 +47,7 @@ vi.mock('expo-router', () => ({
     replace: vi.fn(),
     canGoBack: () => true,
   },
+  useNavigation: () => ({ isFocused: () => mocks.focused }),
 }));
 vi.mock('react-native', () => ({
   Animated: {
@@ -51,6 +56,16 @@ vi.mock('react-native', () => ({
     },
     spring: () => ({ start: () => {} }),
     View: host('animated-view'),
+  },
+  BackHandler: {
+    addEventListener: (_event: string, handler: () => boolean) => {
+      mocks.backHandlers.push(handler);
+      return {
+        remove: () => {
+          mocks.backHandlers = mocks.backHandlers.filter((h) => h !== handler);
+        },
+      };
+    },
   },
   Dimensions: { get: () => ({ width: 392, height: 762 }) },
   Pressable: host('backdrop'),
@@ -131,6 +146,8 @@ const TYPES: LegalDocumentType[] = ['TERMS_OF_USE', 'PRIVACY_POLICY', 'PERSONAL_
 
 beforeEach(() => {
   mocks.language = 'ru';
+  mocks.focused = true;
+  mocks.backHandlers = [];
   mocks.push.mockReset();
   mocks.back.mockReset();
   mocks.requestOtp.mockReset().mockResolvedValue({ otpToken: 'otp_1', expiresIn: 300 });
@@ -396,5 +413,67 @@ describe('backdrop', () => {
     } finally {
       now.mockRestore();
     }
+  });
+});
+
+describe('dismissing once', () => {
+  const pressHardwareBack = () => mocks.backHandlers[mocks.backHandlers.length - 1]();
+
+  async function arrivedSheet() {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    const sheet = await renderSheet();
+    now.mockReturnValue(5_000);
+    const backdrop = () => sheet.r.root.findByType('backdrop' as never).props.onPress();
+    return { ...sheet, backdrop, restore: () => now.mockRestore() };
+  }
+
+  test('a second backdrop tap during the fade-out does not pop again', async () => {
+    const { backdrop, restore } = await arrivedSheet();
+    await act(async () => backdrop());
+    await act(async () => backdrop());
+    expect(mocks.back).toHaveBeenCalledTimes(1);
+    restore();
+  });
+
+  test('backdrop then close only pops once', async () => {
+    const { backdrop, byTestID, restore } = await arrivedSheet();
+    await act(async () => backdrop());
+    await act(async () => byTestID('auth-close-btn').props.onPress());
+    expect(mocks.back).toHaveBeenCalledTimes(1);
+    restore();
+  });
+
+  test('Back after the backdrop is swallowed, so the screen underneath stays', async () => {
+    const { backdrop, restore } = await arrivedSheet();
+    await act(async () => backdrop());
+    expect(pressHardwareBack()).toBe(true);
+    restore();
+  });
+
+  test('a backdrop tap after Back does not pop again', async () => {
+    const { backdrop, restore } = await arrivedSheet();
+    // Not handled here: the navigator performs this pop itself.
+    expect(pressHardwareBack()).toBe(false);
+    await act(async () => backdrop());
+    expect(mocks.back).not.toHaveBeenCalled();
+    restore();
+  });
+
+  test('Back on a legal document above the sheet leaves the sheet usable', async () => {
+    const { backdrop, restore } = await arrivedSheet();
+    mocks.focused = false;
+    expect(pressHardwareBack()).toBe(false);
+    mocks.focused = true;
+    await act(async () => backdrop());
+    expect(mocks.back).toHaveBeenCalledTimes(1);
+    restore();
+  });
+
+  test('stops listening for Back when the sheet goes away', async () => {
+    const { r, restore } = await arrivedSheet();
+    expect(mocks.backHandlers).toHaveLength(1);
+    await act(async () => r.unmount());
+    expect(mocks.backHandlers).toHaveLength(0);
+    restore();
   });
 });
