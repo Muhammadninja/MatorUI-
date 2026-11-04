@@ -271,6 +271,15 @@ function RootNavigation() {
             }}
           />
           <Stack.Screen
+            name="notification-vehicle"
+            options={{
+              headerShown: false,
+              animation: 'slide_from_right',
+              gestureEnabled: true,
+              gestureDirection: 'horizontal',
+            }}
+          />
+          <Stack.Screen
             name="track-order"
             options={{
               headerShown: false,

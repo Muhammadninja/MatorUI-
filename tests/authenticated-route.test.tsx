@@ -31,6 +31,7 @@ vi.mock('@/components/screens/add-vehicle-screen', () => ({ default: host('priva
 import { AuthenticatedRoute } from '@/components/screens-components/auth/authenticated-route';
 import OrderHistoryRoute from '@/app/order-history';
 import TrackOrderRoute from '@/app/track-order';
+import NotificationVehicleRoute from '@/app/notification-vehicle';
 import ShippingAddressesRoute from '@/app/(tabs)/(profile)/shipping-addresses';
 import EditProfileRoute from '@/app/(tabs)/(profile)/edit-profile';
 import CheckoutRoute from '@/app/(tabs)/(cart)/checkout';
@@ -100,7 +101,7 @@ test.each([
   ['order history', OrderHistoryRoute], ['track order', TrackOrderRoute],
   ['shipping addresses', ShippingAddressesRoute], ['edit profile', EditProfileRoute],
   ['checkout', CheckoutRoute], ['order confirmation', OrderConfirmationRoute],
-  ['vehicle detail', VehicleDetailRoute], ['add vehicle', AddVehicleRoute],
+  ['notification vehicle', NotificationVehicleRoute], ['vehicle detail', VehicleDetailRoute], ['add vehicle', AddVehicleRoute],
 ] as const)('%s route blocks direct guest access and mounts its screen after authentication', async (_name, Route) => {
   const tree = await mount(<Route />);
   expect(tree.root.findAll((node) => String(node.type) === 'private-screen')).toHaveLength(0);

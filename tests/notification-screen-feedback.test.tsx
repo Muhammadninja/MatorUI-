@@ -2,7 +2,7 @@
 import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { beforeEach, expect, test, vi } from 'vitest';
-const state = vi.hoisted(() => ({ status: 'success', unread: 1, markAll: vi.fn(), refresh: vi.fn(), success: vi.fn(), danger: vi.fn() }));
+const state = vi.hoisted(() => ({ notifications: [] as unknown[], vehicles: [] as unknown[], status: 'success', unread: 1, markAll: vi.fn(), refresh: vi.fn(), success: vi.fn(), danger: vi.fn() }));
 vi.mock('expo-router', () => ({ router: { push: vi.fn() }, useFocusEffect: () => {} }));
 vi.mock('@expo/vector-icons', () => ({ MaterialIcons: () => null }));
 vi.mock('expo-image', () => ({ Image: () => null }));
@@ -11,8 +11,8 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => k
 vi.mock('@/contexts/language.context', () => ({ useLanguageContext: () => ({ language: 'ru' }) }));
 vi.mock('@/contexts/theme.context', () => ({ useThemeContext: () => ({ tokens: {} }) }));
 vi.mock('@/contexts/cart.context', () => ({ useCartContext: () => ({ refresh: vi.fn() }) }));
-vi.mock('@/hooks/use-garage', () => ({ default: () => ({ vehicles: [] }) }));
-vi.mock('@/hooks/use-notifications', () => ({ useNotifications: () => ({ state: state.status, notifications: [], unreadCount: state.unread, markAllRead: state.markAll, markRead: vi.fn(), refresh: state.refresh }) }));
+vi.mock('@/hooks/use-garage', () => ({ default: () => ({ vehicles: state.vehicles }) }));
+vi.mock('@/hooks/use-notifications', () => ({ useNotifications: () => ({ state: state.status, notifications: state.notifications, unreadCount: state.unread, markAllRead: state.markAll, markRead: vi.fn(), refresh: state.refresh }) }));
 vi.mock('@/services/toast-service', () => ({ toastService: { success: state.success, danger: state.danger } }));
 vi.mock('@/services/sourcing-service', () => ({ acceptSourcingOffer: vi.fn(), fetchSourcingOffer: vi.fn(), rejectSourcingOffer: vi.fn() }));
 vi.mock('@/services/debug-log', () => ({ debugLog: vi.fn() }));
@@ -22,9 +22,10 @@ vi.mock('@/components/shared/app-view', () => ({ AppView: ({ children, ...props 
 vi.mock('@/components/shared/app-text', () => ({ AppText: ({ children }: any) => <span>{children}</span> }));
 vi.mock('@/components/shared/app-button', () => ({ AppButton: (props: any) => <button {...props}>{props.title}</button> }));
 vi.mock('@/components/shared/wheel-loader', () => ({ WheelLoader: () => null }));
+import { router } from 'expo-router';
 import NotificationsScreen from '@/components/screens/notifications-screen';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-beforeEach(() => { vi.clearAllMocks(); state.status = 'success'; state.unread = 1; });
+beforeEach(() => { vi.clearAllMocks(); state.status = 'success'; state.unread = 1; state.notifications = []; state.vehicles = []; });
 async function mount() { let tree!: ReactTestRenderer; await act(async () => { tree = create(<NotificationsScreen />); }); return tree; }
 test('mark-all feedback waits for confirmation, reports failure, and ignores superseded actions', async () => {
   let finish!: (ok: boolean | null) => void;
@@ -51,5 +52,15 @@ test('failed feed renders retry instead of the empty-notifications message', asy
   expect(JSON.stringify(tree.toJSON())).not.toContain('notifications.emptyTitle');
   await act(async () => { tree.root.findByProps({ title: 'common.retry' }).props.onPress(); });
   expect(state.refresh).toHaveBeenCalledTimes(1);
+  await act(async () => tree.unmount());
+});
+test('tapping a car update pushes the root vehicle screen once', async () => {
+  state.vehicles = [{ id: 'veh1', make: 'Chevrolet', model: 'Cobalt' }];
+  state.notifications = [{ id: 'n1', type: 'vehicle_status_updated', vehicleId: 'veh1', title: 't', body: 'b', unread: false, createdAt: new Date().toISOString(), deeplinkPath: '/(tabs)/(garage)/vehicle/veh1' }];
+  const tree = await mount();
+  const row = tree.root.find((n) => n.props.accessibilityRole === 'button' && typeof n.props.onPress === 'function' && n.props.fillContainer === true);
+  await act(async () => row.props.onPress());
+  expect(router.push).toHaveBeenCalledTimes(1);
+  expect(router.push).toHaveBeenCalledWith('/notification-vehicle?id=veh1');
   await act(async () => tree.unmount());
 });

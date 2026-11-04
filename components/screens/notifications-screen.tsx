@@ -23,6 +23,7 @@ import { useThemeContext } from '@/contexts/theme.context';
 import useGarage from '@/hooks/use-garage';
 import { useNotifications } from '@/hooks/use-notifications';
 import { formatCurrency } from '@/services/cart-math';
+import { notificationDestination } from '@/components/screens-components/notifications/notification-destination';
 import { debugLog } from '@/services/debug-log';
 import { toastService } from '@/services/toast-service';
 import { ORDER_STATUS_MACHINE_I18N, formatOrderNo } from '@/services/orders-service';
@@ -346,43 +347,25 @@ export default function NotificationsScreen() {
   );
 
   /** A row is tappable only when there is somewhere real for it to go. */
-  const hasDestination = (n: NotificationItem) => {
-    if (n.type === 'vehicle_status_updated') return vehicleFor(n) !== null;
-    if (n.type === 'order_status_changed' && n.orderId) return true;
-    return Boolean(n.deeplinkPath);
-  };
+  const destinationFor = (n: NotificationItem) =>
+    notificationDestination(n, vehicleFor(n) !== null);
 
   // Regular (non-offer) notifications: mark read + navigate.
   const openNotification = (n: NotificationItem) => {
     if (n.unread) markRead(n.id);
-    // The backend's vehicle deeplink names a route this app doesn't have; the
-    // vehicle screen takes the id as a param.
-    if (n.type === 'vehicle_status_updated') {
-      const vehicle = vehicleFor(n);
-      if (vehicle) router.push({ pathname: '/vehicle-detail', params: { id: vehicle.id } });
-      return;
-    }
-    // Order-STATUS-change rows go to the order-status (track-order) screen. The
-    // backend's deeplink for these points at the cart's order-confirmation,
-    // which is the wrong destination — the order id in `data` is the real
-    // target. Other order rows (e.g. order_paid) keep their own deeplink.
-    if (n.type === 'order_status_changed' && n.orderId) {
-      router.push(`/track-order?orderId=${encodeURIComponent(n.orderId)}` as never);
-      return;
-    }
-    if (n.deeplinkPath) {
-      try {
-        router.push(n.deeplinkPath as never);
-      } catch (err) {
-        // A bad/renamed backend deeplink can't route — keep the user on the feed,
-        // but LOG the offending path (dev console / EXPO_PUBLIC_DEBUG_API release
-        // logs) so broken deeplinks are detectable instead of a silent dead tap.
-        debugLog('nav', 'notification deeplink failed to route', {
-          path: n.deeplinkPath,
-          type: n.type,
-          message: (err as Error)?.message,
-        });
-      }
+    const destination = destinationFor(n);
+    if (!destination) return;
+    try {
+      router.push(destination as never);
+    } catch (err) {
+      // A bad/renamed backend deeplink can't route — keep the user on the feed,
+      // but LOG the offending path (dev console / EXPO_PUBLIC_DEBUG_API release
+      // logs) so broken deeplinks are detectable instead of a silent dead tap.
+      debugLog('nav', 'notification deeplink failed to route', {
+        path: destination,
+        type: n.type,
+        message: (err as Error)?.message,
+      });
     }
   };
 
@@ -541,7 +524,7 @@ export default function NotificationsScreen() {
     );
     const a11yText = [title, body, time].filter(Boolean).join('. ');
 
-    if (!hasDestination(n)) {
+    if (!destinationFor(n)) {
       return (
         <AppView
           accessible
