@@ -39,7 +39,7 @@ Backend `f935624c` is deployed with `SOURCING_TICKETS_ENABLED` off: `GET /v1/sou
 
 ## App build candidate
 
-Branch `design/teal-explore-home`, including Codex's functional fixes. **Not pushed, built or published.**
+Branch `design/teal-explore-home`, including Codex's functional fixes. Not published.
 
 | Check | Result |
 |---|---|
@@ -55,6 +55,28 @@ eas build --platform all --profile production
 ```
 
 Don't run `eas submit` or `eas update` until the release is approved.
+
+## Upgrade change: old saved chats are deleted
+
+The first launch of this version permanently deletes the AI chat history saved by earlier builds. That history had no owner, so it could have been shown to the wrong account (`ai-chat:v1`, removed in `services/chat-storage.ts`). New chats are saved per account.
+
+| Where a copy might exist | Result |
+|---|---|
+| Backend | None. The chat endpoint is stateless. `ai_messages` belongs to the AI advisor, which the app doesn't call |
+| Sourcing tickets | Only the customer message that created a ticket (`raw_message`), not the conversation |
+| Device backups (iCloud, Finder, Android backup) | May hold a copy from before the upgrade. Restoring one replaces the whole app state, and the next launch deletes the old key again, so this isn't a practical recovery path |
+| Simulators on this machine | None left, checked 2026-11-03 |
+
+**Impact:** customers lose their earlier assistant conversations, with no way to restore them in the app. Orders, garage, favourites and existing tickets aren't touched. Release notes should say so.
+
+## Fractional prices
+
+Amounts from the API are UZS with up to two decimals, and 10 of the 159 live catalog prices have a fraction (for example `65730.24`). Payme charges the exact amount in tiyin, and the Click link sends it unrounded.
+
+The app now shows the exact amount everywhere through `formatSomAmount`: `95 730.24 сум`, and whole amounts without decimals. Totals and payment amounts are unchanged.
+
+- [ ] **Owner decision:** backend comments say prices are whole som, but the data disagrees. If whole som is intended, round the catalog prices on the backend. The app will then show whole amounts with no change
+- [ ] **Backend:** Click's prepare check compares rounded amounts (`click.service.ts:55`), while Payme compares exact tiyin
 
 ## Open before release, from the functional audit
 
