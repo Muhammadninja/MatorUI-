@@ -2,40 +2,44 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef } from 'react';
 
 /**
- * Holds a sourcing request while a guest signs in, then sends it once. It only
- * sends if this guest asked to from the prompt: signing in some other way, or
- * dismissing the sheet and signing in later, leaves the request for them to send.
+ * Holds a sourcing request while a guest signs in, then sends it once. The request
+ * travels in here because signing in clears the guest's conversation: this is the
+ * only thing that crosses over. It only sends if this guest asked to from the
+ * prompt: signing in some other way, or dismissing the sheet and signing in later,
+ * sends nothing. `ready` holds it until the account's chat and vehicle have loaded.
  */
-export function useSourcingSignInGate({
+export function useSourcingSignInGate<THeld>({
   isAuthenticated,
+  ready,
   submit,
 }: {
   isAuthenticated: boolean;
-  submit: (assistantMessageId: string) => void;
+  ready: boolean;
+  submit: (held: THeld) => void;
 }) {
-  const waitingFor = useRef<string | null>(null);
+  const waiting = useRef<{ held: THeld } | null>(null);
 
   useEffect(() => {
-    if (!isAuthenticated || !waitingFor.current) return;
-    const id = waitingFor.current;
-    waitingFor.current = null;
-    submit(id);
-  }, [isAuthenticated, submit]);
+    if (!isAuthenticated || !ready || !waiting.current) return;
+    const { held } = waiting.current;
+    waiting.current = null;
+    submit(held);
+  }, [isAuthenticated, ready, submit]);
 
   // Back on this screen still signed out means the sheet was dismissed.
   useFocusEffect(
     useCallback(() => {
-      if (!isAuthenticated) waitingFor.current = null;
+      if (!isAuthenticated) waiting.current = null;
     }, [isAuthenticated]),
   );
 
   return useCallback(
-    (assistantMessageId: string) => {
+    (held: THeld) => {
       if (isAuthenticated) {
-        submit(assistantMessageId);
+        submit(held);
         return;
       }
-      waitingFor.current = assistantMessageId;
+      waiting.current = { held };
       router.push('/sign-in?gate=1');
     },
     [isAuthenticated, submit],

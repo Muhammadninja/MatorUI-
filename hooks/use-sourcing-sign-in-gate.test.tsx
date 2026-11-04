@@ -20,8 +20,8 @@ import { useSourcingSignInGate } from './use-sourcing-sign-in-gate';
 const submit = vi.fn();
 let request: (id: string) => void;
 
-function Probe({ isAuthenticated }: { isAuthenticated: boolean }) {
-  request = useSourcingSignInGate({ isAuthenticated, submit });
+function Probe({ isAuthenticated, ready = true }: { isAuthenticated: boolean; ready?: boolean }) {
+  request = useSourcingSignInGate<string>({ isAuthenticated, ready, submit });
   return null;
 }
 
@@ -30,9 +30,9 @@ function mount(isAuthenticated: boolean) {
   act(() => {
     r = create(<Probe isAuthenticated={isAuthenticated} />);
   });
-  return (next: boolean) =>
+  return (next: boolean, ready = true) =>
     act(() => {
-      r.update(<Probe isAuthenticated={next} />);
+      r.update(<Probe isAuthenticated={next} ready={ready} />);
     });
 }
 
@@ -56,6 +56,15 @@ describe('sourcing sign-in gate', () => {
     setAuth(true);
     expect(submit).toHaveBeenCalledTimes(1);
     expect(submit).toHaveBeenCalledWith('a1');
+  });
+
+  test('waits until the account has loaded', () => {
+    const setAuth = mount(false);
+    act(() => request('a1'));
+    setAuth(true, false);
+    expect(submit).not.toHaveBeenCalled();
+    setAuth(true, true);
+    expect(submit).toHaveBeenCalledTimes(1);
   });
 
   test('dismissing the sheet and signing in later sends nothing', () => {

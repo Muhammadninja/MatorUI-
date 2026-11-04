@@ -39,7 +39,7 @@ import { useGlobalModal } from '@/hooks/use-global-modal';
 import { useSourcingSignInGate } from '@/hooks/use-sourcing-sign-in-gate';
 import { chatTransport } from '@/services/chat-api';
 import { composeSourcingBody } from '@/services/sourcing-chat-reply';
-import { clearStoredChat, loadChat, saveChat } from '@/services/chat-storage';
+import { clearStoredChat, loadChat, saveChat, type ChatOwner } from '@/services/chat-storage';
 import type { Vehicle } from '@/services/garage-service';
 import { toastService } from '@/services/toast-service';
 import type {
@@ -104,6 +104,9 @@ function dateBucket(iso: string): string {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
+/** A guest's message waiting for sign-in. The only thing that survives it. */
+type HeldRequest = { assistantMessageId: string; userMessageId: string; body: string };
+
 /** What the endpoint is told about the car selected in the garage. */
 function selectedVehicleContext(
   vehicle: Vehicle | null | undefined,
@@ -124,8 +127,10 @@ export default function AiChatbot() {
   const { t } = useTranslation();
   const suggestionChips = useMemo(() => buildSuggestionChips(t), [t]);
   const { openConfirm, openActionSheet } = useGlobalModal();
-  const { currentActiveVehicle } = useActiveVehicle();
-  const { isAuthenticated } = useUserContext();
+  const { currentActiveVehicle, isHydrating: vehicleHydrating } = useActiveVehicle();
+  const { isAuthenticated, profile, isHydrating: authHydrating } = useUserContext();
+  // Undefined until auth has settled, so nothing loads for the wrong person.
+  const chatOwner: ChatOwner | undefined = authHydrating ? undefined : (profile?.id ?? null);
   const [historyItems, setHistoryItems] = useState<AiChatConversationSummary[]>([]);
 
   // Load conversations from the transport. Real backend pushes the full
@@ -160,6 +165,27 @@ export default function AiChatbot() {
   const [systemNotes, setSystemNotes] = useState<SystemNote[]>([]);
   const [showScrollToLatest, setShowScrollToLatest] = useState(false);
 
+  // Bumped when the person changes, so a reply still on its way can tell that it
+  // belongs to a session that's over.
+  const sessionRef = useRef(0);
+  const [sessionOwner, setSessionOwner] = useState(chatOwner);
+  const [hydratedOwner, setHydratedOwner] = useState<ChatOwner | undefined>(undefined);
+  // During render, not in an effect: an effect would commit one frame showing the
+  // previous account's messages to the next person.
+  if (sessionOwner !== chatOwner) {
+    sessionRef.current += 1;
+    setSessionOwner(chatOwner);
+    setHydratedOwner(undefined);
+    setDraft('');
+    setMessages([]);
+    setConversationId(null);
+    setStreamingReply(null);
+    setLastSuggestions([]);
+    setFailedUserMessageIds(new Set());
+    setSystemNotes([]);
+    setShowScrollToLatest(false);
+  }
+
   const abortRef = useRef<AbortController | null>(null);
   // Synchronous in-flight gate. `isSending` is derived from render state
   // (streamingReply !== null) and is captured stale in the sendMessage
@@ -179,30 +205,42 @@ export default function AiChatbot() {
 
   // ── Persist the conversation across refresh/relaunch ────────────────
   // The sourcing endpoint is stateless, so without this the thread is lost on
-  // reload. Hydrate the cached turns once on mount, then debounce-save on change.
-  const chatHydratedRef = useRef(false);
+  // reload. Hydrate each person's own turns when they arrive, then debounce-save.
+  const previousOwnerRef = useRef<ChatOwner | undefined>(undefined);
   useEffect(() => {
+    // Whatever was in flight belonged to the previous person.
+    abortRef.current?.abort();
+    abortRef.current = null;
+    sendingRef.current = false;
+
+    const previousOwner = previousOwnerRef.current;
+    previousOwnerRef.current = chatOwner;
+    if (chatOwner === undefined) return;
+    // A guest's chat ends at sign-in: the next guest on this phone mustn't see it.
+    if (previousOwner === null && chatOwner !== null) void clearStoredChat(null);
+
     let cancelled = false;
     void (async () => {
-      const stored = await loadChat();
-      if (!cancelled && stored && stored.messages.length > 0) {
-        setMessages(stored.messages);
+      const stored = await loadChat(chatOwner);
+      if (cancelled) return;
+      if (stored && stored.messages.length > 0) {
+        setMessages((current) => [...stored.messages, ...current]);
         if (stored.conversationId) setConversationId(stored.conversationId);
       }
-      if (!cancelled) chatHydratedRef.current = true;
+      setHydratedOwner(chatOwner);
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [chatOwner]);
 
   useEffect(() => {
-    if (!chatHydratedRef.current) return;
-    const t = setTimeout(() => {
-      void saveChat({ messages, conversationId });
+    if (chatOwner === undefined || hydratedOwner !== chatOwner) return;
+    const timer = setTimeout(() => {
+      void saveChat(chatOwner, { messages, conversationId });
     }, 400);
-    return () => clearTimeout(t);
-  }, [messages, conversationId]);
+    return () => clearTimeout(timer);
+  }, [chatOwner, hydratedOwner, messages, conversationId]);
   const isSending = streamingReply !== null;
 
   // ── Scroll plumbing ─────────────────────────────────────────────────
@@ -232,20 +270,25 @@ export default function AiChatbot() {
         retryUserId?: string;
         replaceLastAssistant?: boolean;
         removeAssistantId?: string;
+        /** Keeps a held message's id, and so its request id, in a new session. */
+        messageId?: string;
       } = {},
     ) => {
       const trimmed = text.trim();
       // Authoritative synchronous guard — see sendingRef declaration.
-      if (!trimmed || sendingRef.current) return;
+      if (!trimmed || sendingRef.current || chatOwner === undefined) return;
       sendingRef.current = true;
+      const session = sessionRef.current;
 
-      const { retryUserId, replaceLastAssistant, removeAssistantId } = options;
+      const { retryUserId, replaceLastAssistant, removeAssistantId, messageId } = options;
       triggerHaptic('selection');
       setDraft('');
 
       // Doubles as the request id, so it has to stay unique and survive retries.
       const finalUserId =
-        retryUserId ?? `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        retryUserId ??
+        messageId ??
+        `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       if (!retryUserId) {
         setMessages((current) => [
           ...current,
@@ -332,6 +375,7 @@ export default function AiChatbot() {
         );
 
         for await (const event of stream) {
+          if (sessionRef.current !== session) return;
           if (event.type === 'token') {
             body += event.value;
             setStreamingReply({
@@ -377,6 +421,7 @@ export default function AiChatbot() {
           }
         }
 
+        if (sessionRef.current !== session) return;
         const finalToolCalls = Array.from(toolCallMap.values());
         const completed: AiChatMessage = {
           id: replyId,
@@ -397,6 +442,7 @@ export default function AiChatbot() {
         setLastSuggestions(suggestions);
         scrollToEnd();
       } catch (err) {
+        if (sessionRef.current !== session) return;
         const aborted =
           (err instanceof DOMException && err.name === 'AbortError') ||
           (err instanceof Error && err.name === 'AbortError');
@@ -418,31 +464,48 @@ export default function AiChatbot() {
           abortRef.current = null;
         }
         // Release the synchronous gate so the next send is allowed once
-        // this stream completes or aborts.
-        sendingRef.current = false;
+        // this stream completes or aborts. A newer session owns it by then.
+        if (sessionRef.current === session) sendingRef.current = false;
       }
     },
-    [conversationId, currentActiveVehicle, isAuthenticated, isSending, scrollToEnd, t],
+    [chatOwner, conversationId, currentActiveVehicle, isAuthenticated, isSending, scrollToEnd, t],
   );
 
   const submitHeldRequest = useCallback(
-    (assistantMessageId: string) => {
-      const held = messagesRef.current.find((m) => m.id === assistantMessageId);
-      const userMessageId =
-        held?.sourcing?.status === 'sign_in_required' ? held.sourcing.userMessageId : undefined;
-      const original = messagesRef.current.find((m) => m.id === userMessageId);
-      if (!original) return;
-      void sendMessage(original.body, {
-        retryUserId: original.id,
-        removeAssistantId: assistantMessageId,
-      });
+    (held: HeldRequest) => {
+      // Still in the thread if this person was signed in all along. After sign-in
+      // the guest's thread is gone, so this message starts the account's.
+      const inThread = messagesRef.current.some((m) => m.id === held.userMessageId);
+      void sendMessage(
+        held.body,
+        inThread
+          ? { retryUserId: held.userMessageId, removeAssistantId: held.assistantMessageId }
+          : { messageId: held.userMessageId },
+      );
     },
     [sendMessage],
   );
-  const requestHeldSubmit = useSourcingSignInGate({
+  const requestHeldSubmit = useSourcingSignInGate<HeldRequest>({
     isAuthenticated,
+    ready: chatOwner !== undefined && hydratedOwner === chatOwner && !vehicleHydrating,
     submit: submitHeldRequest,
   });
+  const holdRequest = useCallback(
+    (assistant: AiChatMessage) => {
+      const userMessageId =
+        assistant.sourcing?.status === 'sign_in_required'
+          ? assistant.sourcing.userMessageId
+          : undefined;
+      const original = messagesRef.current.find((m) => m.id === userMessageId);
+      if (!original) return;
+      requestHeldSubmit({
+        assistantMessageId: assistant.id,
+        userMessageId: original.id,
+        body: original.body,
+      });
+    },
+    [requestHeldSubmit],
+  );
 
   const stopGenerating = useCallback(() => {
     triggerHaptic('selection');
@@ -557,8 +620,8 @@ export default function AiChatbot() {
     setFailedUserMessageIds(new Set());
     setSystemNotes([]);
     setDraft('');
-    void clearStoredChat();
-  }, []);
+    if (chatOwner !== undefined) void clearStoredChat(chatOwner);
+  }, [chatOwner]);
 
   const requestClear = useCallback(() => {
     if (messages.length === 0 && !streamingReply) return;
@@ -911,7 +974,7 @@ export default function AiChatbot() {
                             size="lg"
                             fullWidth
                             disabled={isSending}
-                            onPress={() => requestHeldSubmit(message.id)}
+                            onPress={() => holdRequest(message)}
                           />
                         </AppView>
                       ) : null}

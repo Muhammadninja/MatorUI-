@@ -34,6 +34,7 @@ import {
   type VerifyOtpInput,
   type UserSummary,
 } from '@/services/auth-api';
+import { clearStoredChat } from '@/services/chat-storage';
 import {
   clearAuthSession,
   loadAuthSession,
@@ -182,14 +183,17 @@ export function UserProvider({ children }: PropsWithChildren) {
     }
   }, [persistSession]);
 
+  const accountId = profile?.id ?? null;
   const deleteAccount = useCallback(async () => {
     // Erase server-side FIRST; only clear the local session if the backend
     // confirms. On failure we rethrow so the caller can surface an error and
     // the user stays signed in (never a fake "deleted").
     const generation = lifecycleRef.current;
     await userTransport.deleteMe();
+    // The account is gone, so its saved chat has no one to come back to.
+    if (accountId) await clearStoredChat(accountId);
     if (generation === lifecycleRef.current) await signOut();
-  }, [signOut]);
+  }, [accountId, signOut]);
 
   const requestOtp = useCallback(async (input: RequestOtpInput) => {
     const generation = lifecycleRef.current;
