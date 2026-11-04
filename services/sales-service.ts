@@ -49,15 +49,6 @@ export interface SalesTransport {
   list(signal?: AbortSignal): Promise<Sale[]>;
 }
 
-// ── Mock transport ─────────────────────────────────────────────────────────
-// No offline sales to seed — an empty list simply renders no discount pills,
-// which is the correct "no active campaigns" state.
-class MockSalesTransport implements SalesTransport {
-  async list(): Promise<Sale[]> {
-    return [];
-  }
-}
-
 // ── HTTP transport — real campaigns via GET /v1/sales ──────────────────────
 type ApiSale = {
   id: string;
@@ -105,9 +96,7 @@ class HttpSalesTransport implements SalesTransport {
 }
 
 // ── Singleton ──────────────────────────────────────────────────────────────
-export const salesTransport: SalesTransport = shouldUseHttpTransport('sales')
-  ? new HttpSalesTransport()
-  : new MockSalesTransport();
+export const salesTransport: SalesTransport = new HttpSalesTransport();
 
 export function fetchSales(signal?: AbortSignal): Promise<Sale[]> {
   return salesTransport.list(signal);

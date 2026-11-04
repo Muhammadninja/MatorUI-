@@ -12,7 +12,8 @@
  */
 import { beforeEach, describe, expect, test } from 'vitest';
 
-import { MockCartTransport, type AddItemInput } from './cart-api';
+import type { AddItemInput } from './cart-api';
+import { MockCartTransport } from '@/tests/support/transports/cart-api';
 import {
   computeSubtotal,
   computeTotals,

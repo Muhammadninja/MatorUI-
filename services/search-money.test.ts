@@ -4,7 +4,7 @@ import { computeSubtotal, computeTotals, parsePrice } from './cart-math';
 
 vi.mock('@/config/api', () => ({ shouldUseHttpTransport: () => false }));
 vi.mock('@/services/api-client', () => ({ apiClient: {} }));
-vi.mock('@/services/catalog-service', () => ({
+vi.mock('@/tests/support/transports/catalog-service', () => ({
   getCatalogMockItems: () =>
     [999, 1000, 10000, 10001].map((amount) => ({
       id: String(amount),
@@ -15,7 +15,7 @@ vi.mock('@/services/catalog-service', () => ({
       priceLabel: '',
     })),
 }));
-import { MockSearchTransport } from './search-service';
+import { MockSearchTransport } from "@/tests/support/transports/search-service";
 
 afterEach(() => vi.useRealTimers());
 describe('UZS stays in whole som across search, cart and payment', () => {

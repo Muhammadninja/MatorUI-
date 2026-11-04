@@ -1,12 +1,12 @@
 /**
  * App-wide API configuration. Read by every transport (garage, catalog,
- * search) so the swap from mock → HTTP is a single env-var
- * flip plus one helper rewrite for auth.
+ * search). Application transports use HTTP; this gate remains for optional
+ * reference/compatibility reads and validates release configuration.
  *
  * Env contract:
  *   - `EXPO_PUBLIC_API_BASE_URL` — when set, every transport switches
  *     to its HTTP implementation. When empty / undefined, every
- *     transport stays on its mock implementation. The `EXPO_PUBLIC_`
+ *     requests fail with a missing-configuration error. The `EXPO_PUBLIC_`
  *     prefix is required for Expo to inline the value in production
  *     builds.
  *
@@ -18,9 +18,22 @@
 import { getCurrentSession } from '@/services/auth-storage';
 import { getAppEnvironment } from '@/config/environment';
 
-/** Returns the configured API base URL, or null when running on mocks. */
+/** Returns the configured API base URL, or null when none is configured. */
 export function getApiBaseUrl(): string | null {
-  const raw = getAppEnvironment().apiBaseUrl;
+  const environment = getAppEnvironment();
+  const raw = environment.apiBaseUrl;
+  if (typeof __DEV__ !== 'undefined' && !__DEV__) {
+    const releaseEndpoints = {
+      production: 'https://api.mator.uz',
+      staging: 'https://api.staging.matorui.com',
+      development: 'https://api.dev.matorui.com',
+    };
+    const expected = environment.name === 'local' ? undefined : releaseEndpoints[environment.name];
+    if (!expected || raw?.replace(/\/+$/, '') !== expected ||
+        environment.httpDomains?.trim() || environment.allowDevOtp) {
+      throw new Error('Release requires the selected official HTTPS API with every HTTP domain enabled.');
+    }
+  }
   if (!raw || raw.trim().length === 0) return null;
   // Strip trailing slash so transports can do `${base}/path` without
   // worrying about double-slash bugs.

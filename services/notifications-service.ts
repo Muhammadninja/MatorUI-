@@ -1,10 +1,8 @@
 /**
  * Notifications transport — the feed on the Notifications screen.
  *
- * Same shape as the other transports: an interface, a Mock impl (the bundled
- * feed), and an HTTP impl that calls the real endpoints through `apiClient`.
- * Gated per-domain by `shouldUseHttpTransport('notifications')`, so it can be
- * brought online independently once the backend + auth are verified.
+ * Calls the real endpoints through `apiClient`. Release code has no other source
+ * for this feed.
  *
  * Backend surface (auth-gated):
  *   GET  /v1/notifications              → { items, next_cursor, unread_count }
@@ -74,44 +72,6 @@ export interface NotificationsTransport {
   list(signal?: AbortSignal): Promise<NotificationItem[]>;
   markRead(id: string): Promise<void>;
   markAllRead(): Promise<void>;
-}
-
-const MOCK_LATENCY_MS = 260;
-
-function delay(ms: number, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(resolve, ms);
-    if (signal) {
-      const onAbort = () => {
-        clearTimeout(t);
-        reject(new DOMException('Aborted', 'AbortError'));
-      };
-      if (signal.aborted) onAbort();
-      else signal.addEventListener('abort', onAbort, { once: true });
-    }
-  });
-}
-
-class MockNotificationsTransport implements NotificationsTransport {
-  // Always empty — offline/mock has no fabricated notifications, so the screen
-  // shows the real "You're all caught up" empty state. Real notifications only
-  // ever come from the backend (HTTP transport).
-  private items: NotificationItem[] = [];
-
-  async list(signal?: AbortSignal): Promise<NotificationItem[]> {
-    await delay(MOCK_LATENCY_MS, signal);
-    return this.items.map((n) => ({ ...n }));
-  }
-
-  async markRead(id: string): Promise<void> {
-    await delay(120);
-    this.items = this.items.map((n) => (n.id === id ? { ...n, unread: false } : n));
-  }
-
-  async markAllRead(): Promise<void> {
-    await delay(120);
-    this.items = this.items.map((n) => ({ ...n, unread: false }));
-  }
 }
 
 // ── HTTP transport (tolerant mapping) ────────────────────────────────────
@@ -230,9 +190,7 @@ class HttpNotificationsTransport implements NotificationsTransport {
 
 // ── Singleton ────────────────────────────────────────────────────────────
 
-export const notificationsTransport: NotificationsTransport = shouldUseHttpTransport('notifications')
-  ? new HttpNotificationsTransport()
-  : new MockNotificationsTransport();
+export const notificationsTransport: NotificationsTransport = new HttpNotificationsTransport();
 
 export function fetchNotifications(signal?: AbortSignal): Promise<NotificationItem[]> {
   return notificationsTransport.list(signal);

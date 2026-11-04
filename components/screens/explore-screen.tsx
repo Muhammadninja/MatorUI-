@@ -128,9 +128,8 @@ export default function ExploreScreen() {
   // "Shop by category" grid — the roots of the category tree with their parts
   // counts, live from GET /v1/reference/categories.
   const { state: categoriesState, categories, refresh: refreshCategories } = useCategories();
-  // "Shop by vehicle" row — live from GET /v1/reference/makes (admin-managed),
-  // falling back to the bundled makes on error so it never renders blank.
-  const { state: makesState, makes } = useMakes();
+  // "Shop by vehicle" row — live from GET /v1/reference/makes (admin-managed).
+  const { state: makesState, makes, refresh: refreshMakes } = useMakes();
   // Unread count drives the red bell indicator — shown only when > 0.
   const { unreadCount } = useNotifications();
 
@@ -340,6 +339,18 @@ export default function ExploreScreen() {
         </AppText>
         {makesState === 'loading' ? (
           <BrandRowSkeleton />
+        ) : makesState === 'error' ? (
+          <AppView gap={12} align="flex-start">
+            <AppText textVariant="bodySm" colorName="textMuted">
+              {t('garage.modelPickerError')}
+            </AppText>
+            <AppButton
+              title={t('common.retry')}
+              kind="secondary"
+              size="sm"
+              onPress={() => void refreshMakes()}
+            />
+          </AppView>
         ) : (
           <ScrollView
             horizontal

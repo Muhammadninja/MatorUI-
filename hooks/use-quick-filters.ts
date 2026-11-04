@@ -3,40 +3,20 @@ import { useQuery } from '@tanstack/react-query';
 
 import {
   fetchQuickFilters,
-  QUICK_FILTERS_SEED,
   type QuickFilterItem,
   type QuickFiltersListRequest,
 } from '@/services/quick-filters-service';
 
-/**
- * Quick-filter chip row hook — same five-state machine as
- * `useCatalogList`, with two integration-mode
- * niceties:
- *
- *   1. `items` is ALWAYS a non-empty array. When the API is still
- *      loading, has errored, or has returned zero items, we fall back
- *      to the seed list bundled with the service so the chip row never
- *      blanks out on first paint or after a network blip.
- *   2. `state` still surfaces the underlying query state so the parent
- *      can opt into a skeleton / error toast / retry button when it
- *      wants. By default the explore landing just renders `items` and
- *      ignores `state`.
- *
- * Cache: takes part in the app-wide React Query cache (5-min stale,
- * 15-min gc — see `services/query-client.ts`). The chip row rarely
- * changes within a session, so this matches the read pattern well.
- */
+/** Only real server data is shown, including cached data after a refetch failure. */
 
 export type QuickFiltersState = 'idle' | 'loading' | 'success' | 'empty' | 'error';
 
 export type UseQuickFiltersValue = {
   state: QuickFiltersState;
   /** Effective list rendered by the UI — API items when available,
-   *  otherwise the seed fallback. Guaranteed non-empty. */
+   *  otherwise an empty array. */
   items: QuickFilterItem[];
-  /** True when the items are the seed fallback (loading / error /
-   *  empty response). Lets a consumer dim the row or skip analytics
-   *  events for fallback taps if it cares. */
+  /** Kept for caller compatibility; synthetic fallback data is never shown. */
   isFallback: boolean;
   error: string | null;
   refresh: () => void;
@@ -64,12 +44,12 @@ export function useQuickFilters(
     else if (apiItems.length === 0) state = 'empty';
     else state = 'success';
 
-    const items = state === 'success' ? apiItems : QUICK_FILTERS_SEED;
+    const items = apiItems;
 
     return {
       state,
       items,
-      isFallback: state !== 'success',
+      isFallback: false,
       error: query.error instanceof Error ? query.error.message : null,
       refresh: () => {
         void query.refetch();
