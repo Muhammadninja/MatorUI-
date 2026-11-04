@@ -2,7 +2,7 @@
 
 Updated 2026-11-03. Covers the sourcing assistant. Other release work is in `docs/RELEASE_STRATEGY.md`.
 
-**Statuses:** Implemented = code committed on a branch, with unit tests. Deployed = live on production. Verified = confirmed against the real API. Blocked = waiting on the named item.
+**Statuses:** Implemented = code committed locally, with unit tests. Deployed = live on production. Verified = confirmed against the real API. Blocked = waiting on the named item.
 
 | Item | Implemented | Deployed | Verified | Note |
 |---|---|---|---|---|
@@ -24,7 +24,7 @@ Updated 2026-11-03. Covers the sourcing assistant. Other release work is in `doc
 | Offer expiry | Yes | No | Blocked | Needs live test |
 | In-app delivery independent of push | Yes | No | Blocked | Needs live test |
 | Dealer card without raw message, contact or full VIN | Yes | No | Blocked | Needs live test |
-| Verified contact for staff in the admin console | Yes | No | Blocked | Admin branch not deployed |
+| Verified contact for staff in the admin console | Yes | No | Blocked | Admin console not deployed |
 | Migration | Yes | No | Blocked | Never run on a database. Needs a backup and deploy |
 | Rollback steps | Yes | Not applicable | Blocked | Written, not rehearsed |
 | App stays closed until capabilities are confirmed | Yes | Not released | **Yes** | Simulator against production: nothing sent, message shown |
@@ -34,7 +34,7 @@ Updated 2026-11-03. Covers the sourcing assistant. Other release work is in `doc
 
 - [ ] Clear the saved chat on sign-out. A guest on the same phone can still see the previous account's conversation
 - [ ] Choose the escalation chat and set `TELEGRAM_SOURCING_ESCALATION_CHAT_ID`
-- [ ] Confirm what production currently runs. The backend branch is based on `origin/main`, so deploying it also ships anything on `main` that isn't live yet
+- [ ] Confirm what production currently runs. The backend work is merged into local `main`, so deploying it also ships anything on `main` that isn't live yet
 - [ ] Native read of the Uzbek wording
 - [ ] Customer view of their requests. None today, and they hear through notifications only
 - [ ] Offer notification text is still Russian only

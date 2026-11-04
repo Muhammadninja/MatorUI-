@@ -1,6 +1,6 @@
 # Sourcing assistant: contract
 
-The agreed behaviour between the app and backend, 2026-11-03. Implemented on both sides on branches. **Not deployed and not yet tested live.** Status is in `docs/first-release-checklist.md`. Backend release steps are in the backend repo, `Backend/docs/sourcing-first-release.md`.
+The agreed behaviour between the app and backend, 2026-11-03. Implemented on both sides and committed locally. **Not pushed, not deployed and not yet tested live.** Status is in `docs/first-release-checklist.md`. Backend release steps are in the backend repo, `Backend/docs/sourcing-first-release.md`.
 
 ## Release hold
 
