@@ -1,0 +1,58 @@
+{
+  "captured_at_utc": "2026-11-04T00:04:24.759688+00:00",
+  "source": "https://api.mator.uz",
+  "mode": "read-only GET; no chat POST or notification/action sent",
+  "stored_chat": {
+    "source": "existing device-local ai-chat:v1, not server receipt",
+    "message_count": 6,
+    "exact_canonical_ru_matches": 1,
+    "exact_canonical_uz_matches": 1,
+    "messages_with_ticket_receipt": 0,
+    "body_texts_and_identifiers_saved": false
+  },
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/docs-json",
+      "http_status": 401
+    },
+    {
+      "method": "GET",
+      "path": "/v1/catalog/parts?q=%D1%84%D0%B8%D0%BB%D1%8C%D1%82%D1%80&page=1&page_size=100",
+      "http_status": 200,
+      "total": 19,
+      "returned_count": 19,
+      "proves": "current public catalog availability only; not LLM extraction or RAG correctness for a prior request"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/notifications?limit=100",
+      "http_status": 401,
+      "returned_count": null,
+      "sourcing_offer_count": null,
+      "has_more": null,
+      "counts_by_type": null,
+      "notification_content_saved": false,
+      "access_result": "not inspected: credential was rejected; no refresh or mutation attempted"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/chatbot/conversations",
+      "http_status": 404,
+      "returned_count": null,
+      "content_saved": false
+    }
+  ],
+  "backend_source_snapshot": {
+    "deployment_match": "unverified; this is a source snapshot, not a separate Git checkout or proof of running backend SHA",
+    "files_sha256": {
+      "src/common/i18n.util.ts": "728ae35f51f55ddf6f442ce9f589c5c417b574a624ec7034e793256c9ee63d33",
+      "src/ai-chat/ai-chat.service.ts": "dfc5e48a760f6ff85463e2b5fc084536a08aa6a33fab931a2b8f01932349f3be",
+      "src/ai-chat/rag-search.service.ts": "dc01764dc3e46995e632b19851fc942e58b65b534e1eedbfb7e75a4bd8300811",
+      "src/sourcing/sourcing.service.ts": "0c4f28a0525ca54369ead80b3b91bc1aac7cd14b50a745ea071759e0fe72ee33",
+      "src/telegram/telegram-notifier.service.ts": "aebaae37b26f6b26928ec6666a39725935758f005c8b25b25c55de5b494dcb38",
+      "src/sourcing/sourcing-offer.service.ts": "aec9bc3720a606da92f99187ad38dba11fd6a0a80f42618b7a9002420067ceb4"
+    }
+  },
+  "offer_detail_probe": "not performed: authenticated inbox was inaccessible; no existing offer ID obtained"
+}
