@@ -26,6 +26,13 @@ import {
   type LegalRegistrationVersions,
 } from '@/types/legal';
 import { triggerHaptic } from '@/utils/haptics';
+import {
+  DEFAULT_OTP_LENGTH,
+  normalizeOtpInput,
+  otpAutofillProps,
+  otpPlaceholder,
+  resolveOtpLength,
+} from '@/utils/otp-input';
 
 /** Turn a request/verify failure into a user-facing description. A 429
  *  (global rate limit) gets an explicit "too many attempts" message that
@@ -116,6 +123,7 @@ export default function PasswordlessAuthScreen() {
   // mock prefills the demo phone so the offline suite stays buttons-only.
   const [phone, setPhone] = useState(IS_DEMO_AUTH ? DEMO_PHONE : '');
   const [code, setCode] = useState('');
+  const [otpLength, setOtpLength] = useState(DEFAULT_OTP_LENGTH);
   const [otpToken, setOtpToken] = useState<string | null>(null);
 
   // ── Legal consent ────────────────────────────────────────────────────
@@ -193,7 +201,7 @@ export default function PasswordlessAuthScreen() {
       return;
     }
     try {
-      const { otpToken: token, devCode } = await requestOtp({
+      const { otpToken: token, otpLength: length, devCode } = await requestOtp({
         channel: 'phone',
         identifier,
         // Unified flow: the backend upserts by phone. See file header.
@@ -202,6 +210,7 @@ export default function PasswordlessAuthScreen() {
       });
       triggerHaptic('success');
       setOtpToken(token);
+      setOtpLength(resolveOtpLength(length));
       // Remember this number so a reload prefills it next time.
       AsyncStorage.setItem(LAST_PHONE_KEY, identifier).catch(() => undefined);
       // DEMO/E2E: auto-fill the code the mock handed back. Real backends omit it.
@@ -264,13 +273,14 @@ export default function PasswordlessAuthScreen() {
   const resend = async () => {
     if (isLoading) return;
     try {
-      const { otpToken: token, devCode } = await requestOtp({
+      const { otpToken: token, otpLength: length, devCode } = await requestOtp({
         channel: 'phone',
         identifier: phone.trim(),
         purpose: 'sign-in',
         lang: language,
       });
       setOtpToken(token);
+      setOtpLength(resolveOtpLength(length));
       setCode(devCode ?? '');
       toast.info(t('auth.newCodeSent'));
     } catch (err) {
@@ -444,18 +454,19 @@ export default function PasswordlessAuthScreen() {
               <AppTextField
                 testID="auth-otp-field"
                 label={t('auth.verificationCodeLabel')}
-                placeholder="123456"
+                placeholder={otpPlaceholder(otpLength)}
                 value={code}
-                onChangeText={(v: string) => setCode(v.replace(/\D/g, '').slice(0, 6))}
+                onChangeText={(v: string) =>
+                  setCode((previous) => normalizeOtpInput(v, otpLength, previous))
+                }
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="number-pad"
-                // Surfaces the SMS code as a one-tap suggestion above the
-                // keyboard: `oneTimeCode` = iOS QuickType "From Messages",
-                // `sms-otp` = Android SMS Retriever / autofill.
-                textContentType="oneTimeCode"
-                autoComplete="sms-otp"
-                importantForAutofill="yes"
+                // Autofill only fills this field. It never submits: the button
+                // below is also the legal consent, so that tap stays the user's.
+                // Focused on arrival because the OS offers the code on focus.
+                autoFocus
+                {...otpAutofillProps()}
                 {...field}
               />
 
@@ -485,7 +496,7 @@ export default function PasswordlessAuthScreen() {
                 kind="brand"
                 size="lg"
                 fullWidth
-                disabled={isLoading || code.length < 6}
+                disabled={isLoading || code.length < otpLength}
                 onPress={verify}
               />
 

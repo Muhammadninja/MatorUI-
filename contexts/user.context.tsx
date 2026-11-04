@@ -66,7 +66,9 @@ type UserContextValue = {
   updateProfile: (patch: Partial<Omit<UserProfile, 'id' | 'memberSince'>>) => Promise<void>;
   /** Change the login phone: send an OTP to the new number. Returns a dev code on
    *  dev builds so the verify step can prefill it. */
-  requestPhoneChange: (phone: string) => Promise<{ expiresIn: number; devCode?: string }>;
+  requestPhoneChange: (
+    phone: string,
+  ) => Promise<{ expiresIn: number; otpLength?: number; devCode?: string }>;
   /** Verify the OTP; rebinds the account to the new number and swaps the session. */
   confirmPhoneChange: (phone: string, otp: string) => Promise<void>;
   /** Passwordless: send a one-time code to the phone/email. Returns a handle for `verifyOtp`. */

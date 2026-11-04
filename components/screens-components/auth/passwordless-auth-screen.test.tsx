@@ -226,6 +226,77 @@ describe('language → phone → OTP', () => {
   });
 });
 
+describe('OTP field', () => {
+  async function openOtp(otpLength?: number) {
+    mocks.requestOtp.mockResolvedValue({ otpToken: 'otp_1', expiresIn: 300, otpLength });
+    const sheet = await renderSheet();
+    await sheet.typePhone('+998 90 123 45 67');
+    await sheet.sendCode();
+    const enter = async (value: string) => {
+      await act(async () => sheet.byTestID('auth-otp-field').props.onChangeText(value));
+    };
+    return { ...sheet, enter };
+  }
+
+  test('asks for autofill with this platform\'s hint only, and is focused', async () => {
+    const { byTestID } = await openOtp();
+    const field = byTestID('auth-otp-field').props;
+    expect(field.autoComplete).toBe('sms-otp');
+    expect(field.importantForAutofill).toBe('yes');
+    expect(field.textContentType).toBeUndefined();
+    expect(field.autoFocus).toBe(true);
+    // A native maxLength would cut a pasted "483 917" before it can be cleaned.
+    expect(field.maxLength).toBeUndefined();
+  });
+
+  test('a filled code waits for the tap that is also the consent', async () => {
+    const { byTestID, enter } = await openOtp();
+    await enter('483917');
+    expect(byTestID('auth-otp-field').props.value).toBe('483917');
+    expect(byTestID('auth-verify-btn').props.disabled).toBe(false);
+    expect(mocks.verifyOtp).not.toHaveBeenCalled();
+  });
+
+  test('a filled code verifies the same way as a typed one', async () => {
+    mocks.verifyOtp.mockResolvedValue(undefined);
+    const { byTestID, enter } = await openOtp();
+    await enter('483 917');
+    await act(async () => {
+      await byTestID('auth-verify-btn').props.onPress();
+    });
+    expect(mocks.verifyOtp).toHaveBeenCalledTimes(1);
+    expect(mocks.verifyOtp.mock.calls[0]![0]).toMatchObject({ otpToken: 'otp_1', code: '483917' });
+  });
+
+  test('backspace disarms the button and correction re-arms it', async () => {
+    const { byTestID, enter } = await openOtp();
+    await enter('483917');
+    await enter('48391');
+    expect(byTestID('auth-verify-btn').props.disabled).toBe(true);
+    await enter('483910');
+    expect(byTestID('auth-otp-field').props.value).toBe('483910');
+    expect(byTestID('auth-verify-btn').props.disabled).toBe(false);
+  });
+
+  test('follows the length the backend reports', async () => {
+    const { byTestID, enter } = await openOtp(4);
+    expect(byTestID('auth-otp-field').props.placeholder).toBe('1234');
+    await enter('123');
+    expect(byTestID('auth-verify-btn').props.disabled).toBe(true);
+    await enter('12345');
+    expect(byTestID('auth-otp-field').props.value).toBe('1234');
+    expect(byTestID('auth-verify-btn').props.disabled).toBe(false);
+  });
+
+  test('assumes 6 digits when the backend reports no usable length', async () => {
+    const { byTestID, enter } = await openOtp(99);
+    await enter('12345');
+    expect(byTestID('auth-verify-btn').props.disabled).toBe(true);
+    await enter('123456');
+    expect(byTestID('auth-verify-btn').props.disabled).toBe(false);
+  });
+});
+
 describe('legal documents on the registration sheet', () => {
   test('phone step lists all three documents from the Legal API', async () => {
     const { linksWithPrefix } = await renderSheet();

@@ -115,7 +115,7 @@ describe('screen wiring', () => {
     const idx = source.indexOf('testID="auth-verify-btn"');
     expect(idx).toBeGreaterThan(-1);
     const button = source.slice(idx, source.indexOf('/>', idx));
-    expect(button).toContain('disabled={isLoading || code.length < 6}');
+    expect(button).toContain('disabled={isLoading || code.length < otpLength}');
     expect(button).not.toContain('legalGateSatisfied');
   });
 

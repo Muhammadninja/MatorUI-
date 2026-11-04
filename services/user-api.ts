@@ -30,6 +30,8 @@ export type UserPatch = Partial<Omit<UserSummary, 'id' | 'memberSince'>>;
 export type PhoneChangeRequest = {
   /** Seconds until the code expires. */
   expiresIn: number;
+  /** Digits in the code, when the backend reports it. */
+  otpLength?: number;
   /** DEV/DEMO only — the code, so dev builds can prefill it. Prod omits it. */
   devCode?: string;
 };
@@ -178,6 +180,7 @@ class HttpUserTransport implements UserTransport {
     const r = await apiClient.post<{
       expires_at?: string;
       resend_after_seconds?: number;
+      otp_length?: number;
       dev_otp_code?: string;
     }>('/v1/me/phone/request', { phone: toE164(phone) }, { signal });
     const expiresAt = epochFromIso(r.expires_at);
@@ -185,7 +188,7 @@ class HttpUserTransport implements UserTransport {
       ? Math.max(0, expiresAt - Math.floor(Date.now() / 1000))
       : (r.resend_after_seconds ?? 300);
     debugLog('profile', 'requestPhoneChange → OTP sent', { expiresIn });
-    return { expiresIn, devCode: r.dev_otp_code };
+    return { expiresIn, otpLength: r.otp_length, devCode: r.dev_otp_code };
   }
 
   async confirmPhoneChange(

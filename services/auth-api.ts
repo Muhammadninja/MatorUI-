@@ -70,6 +70,8 @@ export type RequestOtpResult = {
   otpToken: string;
   /** Seconds until the code expires. */
   expiresIn: number;
+  /** Digits in the code, when the backend reports it. */
+  otpLength?: number;
   /** DEV/DEMO ONLY — the code, so mock builds can auto-fill it. Real backends omit this. */
   devCode?: string;
 };
@@ -343,6 +345,7 @@ class HttpAuthTransport implements AuthTransport {
       expiresIn: expiresAt
         ? Math.max(0, expiresAt - Math.floor(Date.now() / 1000))
         : (r.resend_after_seconds ?? 300),
+      otpLength: r.otp_length,
       devCode: allowLocalDevOtp() ? r.dev_otp_code : undefined,
     };
   }

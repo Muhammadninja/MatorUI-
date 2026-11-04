@@ -10,6 +10,13 @@ import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import { useToast } from '@/hooks/use-toast';
 import { useUserContext } from '@/contexts/user.context';
+import {
+  DEFAULT_OTP_LENGTH,
+  normalizeOtpInput,
+  otpAutofillProps,
+  otpPlaceholder,
+  resolveOtpLength,
+} from '@/utils/otp-input';
 
 /** Loose E.164 check — "+" then 9–15 digits after normalizing. */
 function isValidPhone(raw: string): boolean {
@@ -37,6 +44,7 @@ export function PhoneChangeSheet({
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [phone, setPhone] = useState(currentPhone ?? '+998');
   const [code, setCode] = useState('');
+  const [otpLength, setOtpLength] = useState(DEFAULT_OTP_LENGTH);
   const [busy, setBusy] = useState(false);
 
   // Reset each time the sheet (re)opens.
@@ -45,6 +53,7 @@ export function PhoneChangeSheet({
       setStep('phone');
       setPhone(currentPhone ?? '+998');
       setCode('');
+      setOtpLength(DEFAULT_OTP_LENGTH);
       setBusy(false);
     }
   }, [visible, currentPhone]);
@@ -56,7 +65,8 @@ export function PhoneChangeSheet({
     }
     setBusy(true);
     try {
-      const { devCode } = await requestPhoneChange(phone);
+      const { devCode, otpLength: length } = await requestPhoneChange(phone);
+      setOtpLength(resolveOtpLength(length));
       if (devCode) setCode(devCode); // dev/demo convenience
       setStep('otp');
       toast.info(t('account.codeSent', { phone }));
@@ -120,23 +130,19 @@ export function PhoneChangeSheet({
             </AppText>
             <AppTextField
               label={t('account.verificationCode')}
-              placeholder="123456"
+              placeholder={otpPlaceholder(otpLength)}
               value={code}
-              onChangeText={(v) => setCode(v.replace(/\D/g, '').slice(0, 6))}
+              onChangeText={(v) => setCode((previous) => normalizeOtpInput(v, otpLength, previous))}
               keyboardType="number-pad"
               autoCorrect={false}
-              // One-tap SMS-code suggestion above the keyboard (iOS QuickType
-              // "From Messages" + Android SMS autofill).
-              textContentType="oneTimeCode"
-              autoComplete="sms-otp"
-              importantForAutofill="yes"
+              {...otpAutofillProps()}
             />
             <AppButton
               title={busy ? t('account.verifying') : t('account.verifyUpdate')}
               kind="brand"
               size="lg"
               fullWidth
-              disabled={busy || code.length < 6}
+              disabled={busy || code.length < otpLength}
               onPress={verify}
             />
             <Pressable onPress={() => setStep('phone')} disabled={busy} accessibilityRole="button">
