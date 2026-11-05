@@ -39,7 +39,7 @@ describe('UZS stays in whole som across search, cart and payment', () => {
     const subtotal = computeSubtotal([{ price: 'UZS 369 000', quantity: 2 }]);
     expect(subtotal).toBe(738000);
     const total = computeTotals(subtotal, null).total;
-    expect(total).toBe(768000);
-    expect(toTiyin(asUzs(total))).toBe(76800000);
+    expect(total).toBe(738000);
+    expect(toTiyin(asUzs(total))).toBe(73800000);
   });
 });

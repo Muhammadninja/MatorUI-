@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
-import { STANDARD_DELIVERY_UZS } from '@/services/cart-math';
 import type { CatalogItem } from '@/services/catalog-service';
 
 /** BCP-47 tag per app language, for the arrival-date formatting. */
@@ -28,7 +27,6 @@ function addDays(days: number): Date {
 
 export type ItemAssuranceCardProps = {
   item: CatalogItem;
-  formatCurrency: (amount: number) => string;
 };
 
 /**
@@ -39,11 +37,10 @@ export type ItemAssuranceCardProps = {
  * It sits in the handoff's pale teal delivery panel, with graphite type.
  *
  * Every line is derived, never promised: the arrival window is the backend's
- * `delivery_eta_days_{min,max}` turned into real dates, the shipping line
- * states the SAME flat courier fee the backend actually charges
- * (`STANDARD_DELIVERY_UZS`, mirroring `orders.service.ts`), and the payment
- * line lists the three methods checkout actually offers. Lines with no data
- * behind them don't render.
+ * `delivery_eta_days_{min,max}` turned into real dates, the shipping line says
+ * only that delivery is priced at checkout (the price depends on the buyer's
+ * address, which this screen does not know), and the payment line lists the three
+ * methods checkout actually offers. Lines with no data behind them don't render.
  *
  * The seller's storefront name is deliberately NOT here. Mator is the shop the
  * customer is buying from; naming the dealer behind the listing ("Sold by
@@ -52,7 +49,7 @@ export type ItemAssuranceCardProps = {
  * and lowest-price are claims about the listing, not an introduction to
  * someone else's storefront.
  */
-export function ItemAssuranceCard({ item, formatCurrency }: ItemAssuranceCardProps) {
+export function ItemAssuranceCard({ item }: ItemAssuranceCardProps) {
   const { t, i18n } = useTranslation();
   const { tokens } = useThemeContext();
 
@@ -74,10 +71,6 @@ export function ItemAssuranceCard({ item, formatCurrency }: ItemAssuranceCardPro
     else when = t('itemDetail.deliveryDays', { days: min ?? max });
   }
 
-  const shippingLine = t('itemDetail.deliveryFeeLine', {
-    amount: formatCurrency(STANDARD_DELIVERY_UZS),
-  });
-
   return (
     <AppView row gap={12} rounded={16} p={16} style={{ backgroundColor: tokens.brandSoft }}>
       <Truck size={20} strokeWidth={2.2} color={tokens.brand} />
@@ -96,7 +89,7 @@ export function ItemAssuranceCard({ item, formatCurrency }: ItemAssuranceCardPro
         ) : null}
 
         <AppText family="default" style={{ fontSize: 14, lineHeight: 20, color: tokens.text }}>
-          {shippingLine}
+          {t('itemDetail.deliveryCostAtCheckout')}
         </AppText>
 
         <AppText family="default" style={{ fontSize: 14, lineHeight: 20, color: tokens.text }}>

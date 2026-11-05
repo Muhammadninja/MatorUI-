@@ -29,7 +29,6 @@ import { CartMutationQueue } from '@/services/cart-mutation-queue';
 
 // Re-export types and constants so existing imports keep working without churn.
 export type { CartItem, CartTotals, PromoCode, PromoResult };
-export { STANDARD_DELIVERY_UZS, SERVICE_FEE_UZS } from '@/services/cart-math';
 
 type AddCartItemInput = Omit<CartItem, 'quantity'>;
 
@@ -50,6 +49,9 @@ type CartContextValue = {
   addItem: (item: AddCartItemInput) => void;
   removeItem: (itemId: string) => void;
   clearCart: () => void;
+  /** Puts these lines back on the server after an order took them and went unpaid, and
+   *  resolves with the cart as it then stands. Safe to repeat: adds only what is missing. */
+  restoreCart: () => Promise<CartItem[]>;
   incrementItem: (itemId: string) => void;
   decrementItem: (itemId: string) => void;
   applyPromoCode: (code: string) => PromoResult;
@@ -380,6 +382,62 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
     );
   }, [withOptimistic]);
 
+  // The backend empties its cart in the same transaction that creates an order, and a fresh
+  // fetch treats the server as the truth. So leaving the local lines alone after a failed
+  // payment would only last until the next launch, and a quantity change before then would
+  // hit a line that no longer exists. This puts them back for real. A line that cannot go
+  // back (a sourced offer, a service, a part no longer sold) stays out and drops from the
+  // cart on the final read: it is still on the unpaid order, which can still be paid.
+  const restoreCart = useCallback(async (): Promise<CartItem[]> => {
+    const { items: wanted, appliedPromo: promo } = snapshotRef.current;
+    if (!authedRef.current) return wanted;
+    const ticket = mutations.begin('cart');
+    const version = mutations.readVersion();
+    setPendingIds(new Set());
+    markPending('cart');
+    try {
+      const remote = await mutations.enqueue(ticket, async () => {
+        const current = await cartTransport.fetch();
+        for (const line of wanted) {
+          const have = current.items.find((item) => item.id === line.id)?.quantity ?? 0;
+          if (line.sourced || have >= line.quantity) continue;
+          try {
+            await cartTransport.addItem({
+              productId: line.id,
+              title: line.title,
+              description: line.description,
+              price: line.price,
+              priceLabel: line.priceLabel,
+              badge: line.badge,
+              status: line.status,
+              imageUrl: line.imageUrl,
+              quantity: line.quantity - have,
+            });
+          } catch {
+            // No longer sold. The final read below is what the cart then holds.
+          }
+        }
+        if (promo && current.appliedPromoCode !== promo.code) {
+          try {
+            await cartTransport.applyPromo(promo.code, computeSubtotal(wanted));
+          } catch {
+            // The promo was on the order. Without it the buyer sees the price they'd pay.
+          }
+        }
+        return cartTransport.fetch();
+      });
+      if (remote && version === mutations.readVersion()) {
+        setItems(remote.items);
+        setAppliedPromo(remote.appliedPromoCode ? PROMO_CODES[remote.appliedPromoCode] ?? null : null);
+      }
+    } catch {
+      // Offline: the local lines stay for now, and the unpaid order is safe either way.
+    } finally {
+      if (mutations.finish(ticket)) clearPending('cart');
+    }
+    return snapshotRef.current.items;
+  }, [mutations, markPending, clearPending, setItems, setAppliedPromo]);
+
   const removePromoCode = useCallback(() => {
     void withOptimistic(
       PROMO_PENDING_ID,
@@ -453,6 +511,7 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
       addItem,
       removeItem,
       clearCart,
+      restoreCart,
       incrementItem,
       decrementItem,
       applyPromoCode,
@@ -471,6 +530,7 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
       addItem,
       removeItem,
       clearCart,
+      restoreCart,
       incrementItem,
       decrementItem,
       applyPromoCode,

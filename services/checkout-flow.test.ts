@@ -18,18 +18,10 @@ import {
   computeTotals,
   evaluatePromoCode,
   formatCurrency,
-  PROMO_CODES,
-  SERVICE_FEE_UZS,
-  STANDARD_DELIVERY_UZS,
 } from './cart-math';
 
-// Mirrors the real backend's shipping quote (shipping.service.ts) — kept
-// local so this test breaks loudly if that flat-fee model changes without
-// updating the corresponding expectation.
-const DELIVERY_FEES = {
-  pickup: 0,
-  courier: STANDARD_DELIVERY_UZS,
-} as const;
+// What a courier quote might come back with. Per address and seller in reality.
+const QUOTED_COURIER_UZS = 32_500;
 
 const TURBO: AddItemInput = {
   productId: 'p-turbo',
@@ -81,10 +73,9 @@ describe('Full checkout flow — happy path', () => {
     const subtotal = computeSubtotal(snapshot.items);
     expect(subtotal).toBe(2 * 1240 + 760);
 
-    // ── 6. Pre-promo totals: flat delivery + service fee, no discount ──
+    // ── 6. Pre-promo totals: the goods alone, no discount ───────────
     const preTotals = computeTotals(subtotal, null);
-    expect(preTotals.shipping).toBe(STANDARD_DELIVERY_UZS);
-    expect(preTotals.serviceFee).toBe(SERVICE_FEE_UZS);
+    expect(preTotals.total).toBe(subtotal);
     expect(preTotals.discount).toBe(0);
 
     // ── 7. Apply WELCOME10 — valid because subtotal > MIN ───────────
@@ -100,13 +91,10 @@ describe('Full checkout flow — happy path', () => {
     expect(postTotals.discount).toBe(subtotal * 0.1);
     expect(postTotals.total).toBeLessThan(preTotals.total);
 
-    // ── 9. User picks courier delivery — grandTotal mirrors the
-    //      checkout screen's `subtotal - discount + deliveryFee +
-    //      serviceFee` calc (the real quote REPLACES totals.shipping,
-    //      it is not added on top of it) ─────────────────────────────
-    const deliveryFee = DELIVERY_FEES.courier;
-    const grandTotal = postTotals.subtotal - postTotals.discount + deliveryFee + postTotals.serviceFee;
-    expect(grandTotal).toBe(postTotals.subtotal - postTotals.discount + STANDARD_DELIVERY_UZS + SERVICE_FEE_UZS);
+    // ── 9. The courier quote arrives — grandTotal mirrors the checkout
+    //      screen's `subtotal - discount + delivery fee` calc ─────────
+    const grandTotal = postTotals.subtotal - postTotals.discount + QUOTED_COURIER_UZS;
+    expect(grandTotal).toBe(postTotals.total + QUOTED_COURIER_UZS);
 
     // ── 10. Place order — UI calls clearCart() in the success cb ────
     await transport.clear();
@@ -132,7 +120,7 @@ describe('Full checkout flow — guarded edges', () => {
     // surface does (it doesn't optimistically apply a rejected promo).
     const totals = computeTotals(subtotal, null);
     expect(totals.discount).toBe(0);
-    expect(totals.shipping).toBe(STANDARD_DELIVERY_UZS);
+    expect(totals.total).toBe(subtotal);
   });
 
   test('decrement to zero removes the item from the transport', async () => {
@@ -167,16 +155,5 @@ describe('Full checkout flow — guarded edges', () => {
     const snapshot = await transport.fetch();
     expect(snapshot.items).toEqual([]);
     expect(snapshot.appliedPromoCode).toBeNull();
-  });
-
-  test('FREESHIP promo waives the flat delivery fee', () => {
-    const subtotal = 200;
-    const noPromo = computeTotals(subtotal, null);
-    expect(noPromo.shipping).toBe(STANDARD_DELIVERY_UZS);
-
-    const withFreeShip = computeTotals(subtotal, PROMO_CODES.FREESHIP);
-    expect(withFreeShip.shipping).toBe(0);
-    expect(withFreeShip.discount).toBe(0);
-    expect(withFreeShip.total).toBeLessThan(noPromo.total);
   });
 });

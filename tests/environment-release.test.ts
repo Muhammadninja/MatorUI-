@@ -47,6 +47,39 @@ describe('release environment boundary', () => {
       EXPO_PUBLIC_ALLOW_DEV_OTP: 'true' }, false)).toThrow();
   });
 
+  describe('the Android map key', () => {
+    const configWith = (key: string | undefined) => {
+      const before = process.env.GOOGLE_MAPS_ANDROID_API_KEY;
+      if (key === undefined) delete process.env.GOOGLE_MAPS_ANDROID_API_KEY;
+      else process.env.GOOGLE_MAPS_ANDROID_API_KEY = key;
+      try {
+        return appConfig({ config: { extra: {}, plugins: ['expo-router'] } });
+      } finally {
+        if (before === undefined) delete process.env.GOOGLE_MAPS_ANDROID_API_KEY;
+        else process.env.GOOGLE_MAPS_ANDROID_API_KEY = before;
+      }
+    };
+    const mapsPlugin = (config: { plugins: unknown[] }) =>
+      config.plugins.find((p) => Array.isArray(p) && p[0] === 'react-native-maps') as [string, object];
+
+    test('goes to the native build, and the app learns only that it is there', () => {
+      const config = configWith(' a-key ');
+      expect(mapsPlugin(config)[1]).toEqual({ androidGoogleMapsApiKey: 'a-key' });
+      expect(config.extra.googleMapsConfigured).toBe(true);
+      expect(JSON.stringify(config.extra)).not.toContain('a-key');
+    });
+
+    test.each([undefined, '', '   '])('absent (%j), the app knows not to draw the map', (key) => {
+      const config = configWith(key);
+      expect(mapsPlugin(config)[1]).toEqual({});
+      expect(config.extra.googleMapsConfigured).toBe(false);
+    });
+
+    test('the other plugins stay', () => {
+      expect(configWith('a-key').plugins).toContain('expo-router');
+    });
+  });
+
   test('app config snapshots only the public environment shape', () => {
     const before = { ...process.env };
     try {

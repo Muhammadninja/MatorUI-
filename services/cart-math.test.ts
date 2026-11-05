@@ -9,15 +9,10 @@ import {
   PROMO_CODES,
   PROMO_MIN_SUBTOTAL,
   round,
-  SERVICE_FEE_UZS,
-  STANDARD_DELIVERY_UZS,
   type PromoCode,
 } from './cart-math';
 
 const SUBTOTAL = 200;
-
-const expectedTotal = (base: number, shipping: number) =>
-  round(base + shipping + SERVICE_FEE_UZS);
 
 describe('parsePrice', () => {
   test('strips currency formatting', () => {
@@ -90,49 +85,33 @@ describe('computeTotals — no promo', () => {
     expect(computeTotals(0, null)).toEqual({
       subtotal: 0,
       discount: 0,
-      shipping: 0,
-      serviceFee: 0,
       total: 0,
     });
   });
 
-  test('charges the flat delivery fee + service fee on any non-empty cart', () => {
-    const totals = computeTotals(SUBTOTAL, null);
-    expect(totals.subtotal).toBe(SUBTOTAL);
-    expect(totals.discount).toBe(0);
-    expect(totals.shipping).toBe(STANDARD_DELIVERY_UZS);
-    expect(totals.serviceFee).toBe(SERVICE_FEE_UZS);
-    expect(totals.total).toBe(expectedTotal(SUBTOTAL, STANDARD_DELIVERY_UZS));
-  });
-
-  test('the flat fees do not change with subtotal size (no free-shipping threshold)', () => {
-    const small = computeTotals(SUBTOTAL, null);
-    const large = computeTotals(SUBTOTAL * 1000, null);
-    expect(large.shipping).toBe(small.shipping);
-    expect(large.serviceFee).toBe(small.serviceFee);
+  test('is the goods alone: delivery is priced at checkout, and there is no service fee', () => {
+    expect(computeTotals(SUBTOTAL, null)).toEqual({
+      subtotal: SUBTOTAL,
+      discount: 0,
+      total: SUBTOTAL,
+    });
   });
 });
 
 describe('computeTotals — percent promo (WELCOME10)', () => {
   const promo = PROMO_CODES.WELCOME10;
 
-  test('applies 10% off the subtotal; shipping/service fee are untouched', () => {
+  test('applies 10% off the subtotal', () => {
     const totals = computeTotals(SUBTOTAL, promo);
     const expectedDiscount = round(SUBTOTAL * 0.1);
     expect(totals.discount).toBe(expectedDiscount);
-    expect(totals.shipping).toBe(STANDARD_DELIVERY_UZS);
-    expect(totals.serviceFee).toBe(SERVICE_FEE_UZS);
-    expect(totals.total).toBe(
-      round(SUBTOTAL - expectedDiscount + STANDARD_DELIVERY_UZS + SERVICE_FEE_UZS),
-    );
+    expect(totals.total).toBe(round(SUBTOTAL - expectedDiscount));
   });
 
   test('no-op on empty cart', () => {
     expect(computeTotals(0, promo)).toEqual({
       subtotal: 0,
       discount: 0,
-      shipping: 0,
-      serviceFee: 0,
       total: 0,
     });
   });
@@ -145,9 +124,7 @@ describe('computeTotals — capped percent promo (RIDE25, max 200)', () => {
     // 25% of 1,000 = 250 → clamped to 200
     const totals = computeTotals(1000, promo);
     expect(totals.discount).toBe(200);
-    expect(totals.total).toBe(
-      round(1000 - 200 + STANDARD_DELIVERY_UZS + SERVICE_FEE_UZS),
-    );
+    expect(totals.total).toBe(800);
   });
 
   test('does NOT cap when raw percent is below the cap', () => {
@@ -158,14 +135,12 @@ describe('computeTotals — capped percent promo (RIDE25, max 200)', () => {
 });
 
 describe('computeTotals — free_shipping promo (FREESHIP)', () => {
-  const promo = PROMO_CODES.FREESHIP;
-
-  test('zeros shipping, leaves discount and the service fee untouched', () => {
-    const totals = computeTotals(SUBTOTAL, promo);
-    expect(totals.discount).toBe(0);
-    expect(totals.shipping).toBe(0);
-    expect(totals.serviceFee).toBe(SERVICE_FEE_UZS);
-    expect(totals.total).toBe(round(SUBTOTAL + SERVICE_FEE_UZS));
+  test('takes nothing off the goods, and cannot touch a delivery price it does not hold', () => {
+    expect(computeTotals(SUBTOTAL, PROMO_CODES.FREESHIP)).toEqual({
+      subtotal: SUBTOTAL,
+      discount: 0,
+      total: SUBTOTAL,
+    });
   });
 });
 
@@ -180,17 +155,14 @@ describe('computeTotals — fixed promo (synthetic)', () => {
   test('subtracts the fixed amount', () => {
     const totals = computeTotals(200, promo);
     expect(totals.discount).toBe(50);
-    expect(totals.total).toBe(
-      round(200 - 50 + STANDARD_DELIVERY_UZS + SERVICE_FEE_UZS),
-    );
+    expect(totals.total).toBe(150);
   });
 
   test('does not let discount exceed subtotal', () => {
-    // Promo value > subtotal: discount caps at subtotal, so the discounted
-    // base is 0 but the flat fees still apply.
+    // Promo value > subtotal: discount caps at subtotal, so the total is 0.
     const totals = computeTotals(30, promo);
     expect(totals.discount).toBe(30);
-    expect(totals.total).toBe(round(STANDARD_DELIVERY_UZS + SERVICE_FEE_UZS));
+    expect(totals.total).toBe(0);
   });
 });
 
@@ -232,8 +204,6 @@ describe('rounding behavior — totals never produce >2-decimal noise', () => {
     const totals = computeTotals(19640, PROMO_CODES.WELCOME10);
     expect(totals.subtotal).toBe(19640);
     expect(totals.discount).toBe(1964);
-    expect(totals.shipping).toBe(STANDARD_DELIVERY_UZS);
-    expect(totals.serviceFee).toBe(SERVICE_FEE_UZS);
-    expect(totals.total).toBe(round(19640 - 1964 + STANDARD_DELIVERY_UZS + SERVICE_FEE_UZS));
+    expect(totals.total).toBe(round(19640 - 1964));
   });
 });

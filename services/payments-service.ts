@@ -6,9 +6,8 @@
  * then for `paymentType: 'payme'` the client calls `startPayment()` to get a
  * hosted checkout URL, opens it in an auth-session browser, and lets the user
  * pay. The BACKEND webhook (Payme → server) is the source of truth for whether
- * the order is actually paid; the client only reflects the browser outcome and
- * always lands the user on the order-confirmation screen, which renders the real
- * status from `GET /v1/orders/:id`.
+ * the order is actually paid: see `services/order-payment.ts`, which reads the
+ * order's status back before anything is called paid.
  *
  * Backend contract (LIVE — mator.uz `PaymentsController('v1/payments')`):
  *   POST /v1/payments/payme/invoices   (also /click/invoices) — auth'd bearer
@@ -20,12 +19,13 @@
  *       expires_at
  *     }
  *   GET /v1/payments/:paymentId → { status, order: { status, next_screen } }
- * Auth'd (bearer). If the endpoint 404s (older backend) or the order can't be
- * charged online (400 — e.g. dealer fiscal data missing), `startPayment` returns
- * `{ status: 'unsupported' }` (FAIL-OPEN), so checkout completes exactly as it
- * does for cash/terminal (order stays pending_payment; pay on delivery /
- * reconcile later). Gated per-domain by `shouldUseHttpTransport('orders')` —
- * payment is order-scoped (there is no separate `payments` HTTP domain flag).
+ *
+ * Any refusal surfaces as a rejected promise carrying the server's code, among
+ * them 400 FISCAL_DATA_INCOMPLETE and 409 PART_UNAVAILABLE. None of them is
+ * treated as "nothing to pay": the order is still unpaid, and saying otherwise
+ * is how a buyer ends up on a confirmation screen for an order that expires.
+ * Gated per-domain by `shouldUseHttpTransport('orders')` — payment is
+ * order-scoped (there is no separate `payments` HTTP domain flag).
  */
 
 import { shouldUseHttpTransport } from '@/config/api';
@@ -46,7 +46,8 @@ export type StartPaymentInput = {
 
 /** `ready` → open `checkoutUrl` (poll the order for the webhook-confirmed
  *  status; `paymentId` allows GET /v1/payments/:id if a finer check is needed).
- *  `unsupported` → no online step available, proceed as pay-on-delivery. */
+ *  `unsupported` → this transport has no gateway at all, which only the mock says:
+ *  a real backend either gives a link or refuses, and a refusal rejects. */
 export type StartPaymentResult =
   | { status: 'ready'; checkoutUrl: string; paymentId?: string }
   | { status: 'unsupported' };
@@ -88,41 +89,21 @@ class HttpPaymentsTransport implements PaymentsTransport {
     input: StartPaymentInput,
     signal?: AbortSignal,
   ): Promise<StartPaymentResult> {
-    try {
-      const r = await apiClient.post<RawInvoice>(
-        `/v1/payments/${input.provider}/invoices`,
-        { order_id: input.orderId, return_url: input.returnUrl },
-        { signal },
-      );
-      // Prefer the deep link (hands off to the installed Payme/Click app),
-      // fall back to the https page, then any legacy checkout_url field.
-      const checkoutUrl =
-        r.deep_link ?? r.https_fallback ?? r.checkout_url ?? r.checkoutUrl ?? null;
-      if (!checkoutUrl) {
-        // 2xx without a URL — treat as not-live rather than opening nothing.
-        debugLog('payment', 'startPayment: no checkout url in response — unsupported');
-        return { status: 'unsupported' };
-      }
-      debugLog('payment', 'startPayment → checkout url ready', { orderId: input.orderId });
-      return { status: 'ready', checkoutUrl, paymentId: r.payment_id ?? undefined };
-    } catch (err) {
-      // Fail OPEN so the placed order still completes as pay-on-delivery when an
-      // online charge can't start:
-      //   404/501 → endpoint not live on this backend
-      //   400     → order not chargeable online (e.g. dealer fiscal data missing)
-      // Other errors (network / 5xx / 401) rethrow so the caller can tell the
-      // user payment couldn't start.
-      if (
-        err instanceof ApiError &&
-        (err.status === 404 || err.status === 501 || err.status === 400)
-      ) {
-        debugLog('payment', 'startPayment: cannot charge online — unsupported (fail open)', {
-          status: err.status,
-        });
-        return { status: 'unsupported' };
-      }
-      throw err;
+    const r = await apiClient.post<RawInvoice>(
+      `/v1/payments/${input.provider}/invoices`,
+      { order_id: input.orderId, return_url: input.returnUrl },
+      { signal },
+    );
+    // Prefer the deep link (hands off to the installed Payme/Click app),
+    // fall back to the https page, then any legacy checkout_url field.
+    const checkoutUrl =
+      r.deep_link ?? r.https_fallback ?? r.checkout_url ?? r.checkoutUrl ?? null;
+    if (!checkoutUrl) {
+      // There is nothing to open, so the buyer cannot pay: a failure, not a free pass.
+      throw new ApiError(502, 'PAYMENT_LINK_MISSING', 'The payment provider gave no link.');
     }
+    debugLog('payment', 'startPayment → checkout url ready', { orderId: input.orderId });
+    return { status: 'ready', checkoutUrl, paymentId: r.payment_id ?? undefined };
   }
 }
 

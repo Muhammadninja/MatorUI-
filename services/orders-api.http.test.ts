@@ -160,6 +160,278 @@ describe('HttpOrdersTransport', () => {
     expect(body).not.toHaveProperty('contact_phone_e164');
   });
 
+  test('createOrder states the courier price the buyer was shown', async () => {
+    post.mockResolvedValueOnce(RAW);
+    await t.createOrder({
+      items: [],
+      addressId: 'addr_1',
+      paymentType: 'cash',
+      shippingOptionKey: 'courier',
+      confirmedDeliveryUzs: 32500,
+      deliveryQuoteId: 'quote_1',
+      promoCode: null,
+    });
+    const [, body] = post.mock.calls[0]!;
+    expect(body).toMatchObject({
+      cart_snapshot: { delivery_method: 'courier', delivery_address_id: 'addr_1' },
+      confirmed_delivery_uzs: 32500,
+      delivery_quote_id: 'quote_1',
+    });
+  });
+
+  test('createOrder states no price for pickup', async () => {
+    post.mockResolvedValueOnce(RAW);
+    await t.createOrder({
+      items: [],
+      addressId: null,
+      paymentType: 'cash',
+      shippingOptionKey: 'pickup',
+      confirmedDeliveryUzs: null,
+      promoCode: null,
+    });
+    const [, body] = post.mock.calls[0]!;
+    expect(body).not.toHaveProperty('confirmed_delivery_uzs');
+    expect(body).not.toHaveProperty('delivery_quote_id');
+    expect((body as any).cart_snapshot.delivery_method).toBe('pickup');
+  });
+
+  test('getShippingQuote asks for the courier price of the saved address, stating no coordinates', async () => {
+    post.mockResolvedValueOnce({
+      options: [{ type: 'courier', label: 'Kuryer', price_uzs: 32500, quote_id: 'quote_1' }],
+      currency: 'UZS',
+    });
+    const options = await t.getShippingQuote({
+      addressId: 'addr_1',
+      location: '41.3,69.2',
+      cartKey: 'part_1',
+    });
+    const [url, body] = post.mock.calls[0]!;
+    expect(url).toBe('/v1/shipping/quote');
+    expect(body).toEqual({ delivery_address_id: 'addr_1', delivery_method: 'courier' });
+    expect(options).toEqual([{ key: 'courier', label: 'Kuryer', price: 32500, quoteId: 'quote_1' }]);
+  });
+
+  test('a price with no quote behind it could only be refused, so it is no quote at all', async () => {
+    post.mockResolvedValueOnce({
+      options: [{ type: 'courier', label: 'Kuryer', price_uzs: 32500 }],
+    });
+    await expect(t.getShippingQuote({ addressId: 'addr_1' })).resolves.toEqual([]);
+  });
+
+  test('nothing to deliver is free, with nothing to bind', async () => {
+    post.mockResolvedValueOnce({
+      options: [{ type: 'courier', label: 'Kuryer', price_uzs: 0, quote_id: null }],
+    });
+    await expect(t.getShippingQuote({ addressId: 'addr_1' })).resolves.toEqual([
+      { key: 'courier', label: 'Kuryer', price: 0, quoteId: null },
+    ]);
+  });
+
+  test.each([
+    ['no price', { type: 'courier', label: 'Kuryer' }],
+    ['a null price', { type: 'courier', label: 'Kuryer', price_uzs: null }],
+    ['a negative price', { type: 'courier', label: 'Kuryer', price_uzs: -1 }],
+    ['a price in words', { type: 'courier', label: 'Kuryer', price_uzs: '32500' }],
+  ])('getShippingQuote never reads %s as free', async (_, option) => {
+    post.mockResolvedValueOnce({ options: [option], currency: 'UZS' });
+    await expect(t.getShippingQuote({ addressId: 'addr_1' })).resolves.toEqual([]);
+  });
+
+  test('address writes carry a stated location, and only a stated one', async () => {
+    const patch = vi.fn();
+    const { apiClient } = await import('@/services/api-client');
+    (apiClient as any).patch = patch;
+    const raw = { id: 'addr_1', street: 'Navoi 1', district: 'Toshkent', lat: 41.3, lng: 69.2 };
+    patch.mockResolvedValue(raw);
+    const text = { label: 'Home', name: '', line1: 'Navoi 1', city: 'Toshkent' };
+
+    const saved = await t.updateAddress('addr_1', { ...text, lat: 41.3, lng: 69.2 });
+    expect(patch.mock.calls[0]![1]).toMatchObject({ lat: 41.3, lng: 69.2 });
+    expect(saved).toMatchObject({ lat: 41.3, lng: 69.2 });
+
+    await t.updateAddress('addr_1', text);
+    expect(patch.mock.calls[1]![1]).not.toHaveProperty('lat');
+    expect(patch.mock.calls[1]![1]).not.toHaveProperty('lng');
+  });
+
+  test('a hint for the courier goes with the address, and an empty one clears it', async () => {
+    post.mockResolvedValue({ id: 'addr_1', street: 'Navoi 1', landmark: 'Blue gate' });
+    const text = { label: 'Home', name: '', line1: 'Navoi 1', city: 'Toshkent' };
+
+    const saved = await t.createAddress({ ...text, landmark: ' Blue gate ' });
+    expect(post.mock.lastCall![1]).toMatchObject({ landmark: 'Blue gate' });
+    expect(saved.landmark).toBe('Blue gate');
+
+    await t.createAddress({ ...text, landmark: '  ' });
+    expect(post.mock.lastCall![1]).toMatchObject({ landmark: null });
+
+    await t.createAddress(text);
+    expect(post.mock.lastCall![1]).not.toHaveProperty('landmark');
+  });
+
+  test('a point with no words sends no text, for the server to describe', async () => {
+    post.mockResolvedValueOnce({ id: 'addr_1', full_text: '41.3, 69.2', lat: 41.3, lng: 69.2 });
+
+    const saved = await t.createAddress({
+      label: 'Выбранная точка',
+      name: '',
+      line1: '',
+      city: '',
+      lat: 41.3,
+      lng: 69.2,
+    });
+
+    expect(post.mock.calls[0]![1]).toEqual({ label: 'Выбранная точка', lat: 41.3, lng: 69.2 });
+    // Its stored description is for the courier: not a street to show the buyer.
+    expect(saved).toMatchObject({ line1: '', city: '', lat: 41.3, lng: 69.2 });
+  });
+
+  test('searches through the backend, encoding what was typed, and maps the matches', async () => {
+    get.mockResolvedValueOnce({
+      items: [
+        {
+          id: 77,
+          title: 'Амира Темура 12',
+          subtitle: 'Ташкент',
+          city: 'Ташкент',
+          district: 'Юнусабад',
+          street: 'Амира Темура',
+          house_number: '12',
+          lat: 41.31,
+          lng: 69.28,
+        },
+      ],
+      attribution: '© OpenStreetMap contributors',
+    });
+
+    const found = await t.searchAddresses({
+      street: 'Амира Темура',
+      house: '12',
+      city: 'Ташкент',
+      lang: 'ru',
+    });
+
+    expect(get.mock.calls[0]![0]).toBe(
+      `/v1/addresses/suggestions?street=${encodeURIComponent('Амира Темура')}&house=12&city=${encodeURIComponent('Ташкент')}&lang=ru`,
+    );
+    expect(found).toEqual({
+      items: [
+        {
+          id: '77',
+          title: 'Амира Темура 12',
+          subtitle: 'Ташкент',
+          city: 'Ташкент',
+          district: 'Юнусабад',
+          street: 'Амира Темура',
+          houseNumber: '12',
+          lat: 41.31,
+          lng: 69.28,
+        },
+      ],
+      attribution: '© OpenStreetMap contributors',
+    });
+  });
+
+  test('a search states only what was typed', async () => {
+    get.mockResolvedValueOnce({ items: [] });
+    await t.searchAddresses({ street: 'Navoi', lang: 'uz' });
+    expect(get.mock.calls[0]![0]).toBe('/v1/addresses/suggestions?street=Navoi&lang=uz');
+  });
+
+  test('a submitted search says so, and carries where the map is looking', async () => {
+    get.mockResolvedValueOnce({ items: [] });
+    await t.searchAddresses({
+      street: 'Navoi',
+      lang: 'uz',
+      mode: 'search',
+      nearLat: 41.31,
+      nearLng: 69.24,
+    });
+    expect(get.mock.calls[0]![0]).toBe(
+      '/v1/addresses/suggestions?street=Navoi&lang=uz&mode=search&near_lat=41.31&near_lng=69.24',
+    );
+  });
+
+  test('asks what is at a confirmed point, by its exact coordinates', async () => {
+    get.mockResolvedValueOnce({
+      address: { city: 'Toshkent', district: null, street: 'Seul', house_number: '5' },
+      within_coverage: true,
+      attribution: 'Map data © OpenStreetMap contributors, licensed under the ODbL.',
+    });
+
+    const found = await t.describePoint({ lat: 41.311081234, lng: 69.240562987 }, 'ru');
+
+    expect(get.mock.calls[0]![0]).toBe(
+      '/v1/addresses/reverse?lat=41.311081234&lng=69.240562987&lang=ru',
+    );
+    expect(found).toEqual({
+      address: { city: 'Toshkent', district: null, street: 'Seul', houseNumber: '5' },
+      withinCoverage: true,
+      attribution: 'Map data © OpenStreetMap contributors, licensed under the ODbL.',
+    });
+  });
+
+  test('a point nothing is known about is an answer too', async () => {
+    get.mockResolvedValueOnce({ address: null, within_coverage: null, attribution: null });
+    await expect(t.describePoint({ lat: 41.3, lng: 69.2 }, 'ru')).resolves.toEqual({
+      address: null,
+      withinCoverage: null,
+      attribution: null,
+    });
+  });
+
+  test.each([
+    [
+      'an area',
+      {
+        configured: true,
+        bounds: { min_lat: 41, min_lng: 69, max_lat: 42, max_lng: 70 },
+        geometry: { type: 'MultiPolygon', coordinates: [[[[69, 41], [70, 41], [70, 42], [69, 41]]]] },
+      },
+      {
+        configured: true,
+        bounds: { minLat: 41, minLng: 69, maxLat: 42, maxLng: 70 },
+        polygons: [[[[69, 41], [70, 41], [70, 42], [69, 41]]]],
+      },
+    ],
+    [
+      'no area',
+      { configured: false, bounds: null, geometry: null },
+      { configured: false, bounds: null, polygons: null },
+    ],
+    ['nothing useful', {}, { configured: false, bounds: null, polygons: null }],
+  ])('reads the delivery coverage: %s', async (_, raw, read) => {
+    get.mockResolvedValueOnce(raw);
+    await expect(t.getDeliveryCoverage()).resolves.toEqual(read);
+    expect(get.mock.lastCall![0]).toBe('/v1/shipping/coverage');
+  });
+
+  test.each([
+    ['no point', { id: 1, title: 'A' }],
+    ['half a point', { id: 1, title: 'A', lat: 41.3 }],
+    ['a point in words', { id: 1, title: 'A', lat: '41.3', lng: '69.2' }],
+    ['no title', { id: 1, lat: 41.3, lng: 69.2 }],
+  ])('never offers a match with %s: picking it could not be priced', async (_, item) => {
+    get.mockResolvedValueOnce({ items: [item] });
+    await expect(t.searchAddresses({ street: 'A', lang: 'uz' })).resolves.toEqual({
+      items: [],
+      attribution: null,
+    });
+  });
+
+  test.each([
+    ['payme', 'payme'],
+    ['cash', 'cash'],
+    ['terminal', 'terminal'],
+    [null, null],
+    [undefined, null],
+    ['barter', null],
+  ])('an order paid by %s reads as %s, keeping the status word as sent', (sent, read) => {
+    const detail = mapOrderToDetail({ ...RAW, payment_type: sent } as never);
+    expect(detail.paymentType).toBe(read);
+    expect(detail.serverStatus).toBe('pending_payment');
+  });
+
   test('getOrder returns null on 404', async () => {
     const { ApiError } = await import('@/services/api-client');
     get.mockRejectedValueOnce(new (ApiError as any)(404));

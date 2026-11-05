@@ -9,11 +9,15 @@
  * mutations" stance (an aborted mutation may already be committed
  * server-side; silent local cancel would mask that).
  */
-import { STANDARD_DELIVERY_UZS } from '@/services/cart-math';
 import type {
   Address,
   AddressInput,
+  AddressSearchQuery,
+  AddressSuggestion,
+  AddressSuggestions,
   CreateOrderInput,
+  DeliveryCoverageInfo,
+  DeliveryPoint,
   CreateOrderResult,
   OrderDetail,
   OrderListPage,
@@ -22,6 +26,8 @@ import type {
   OrderStatus,
   PaymentMethod,
   PaymentMethodInput,
+  PaymentType,
+  PointDescription,
   ShippingOption,
 } from '@/services/orders-service';
 
@@ -34,6 +40,10 @@ export type OrderListRequest = {
 
 export type ShippingQuoteRequest = {
   addressId: string;
+  /** Neither is sent, since the server reads its own saved address and cart. They are
+   *  here so that a change to the address's location or to the cart's lines asks again. */
+  location?: string;
+  cartKey?: string;
 };
 
 export interface OrdersTransport {
@@ -41,6 +51,10 @@ export interface OrdersTransport {
   getOrder(orderId: string, signal?: AbortSignal): Promise<OrderDetail | null>;
   createOrder(input: CreateOrderInput, signal?: AbortSignal): Promise<CreateOrderResult>;
   listAddresses(signal?: AbortSignal): Promise<Address[]>;
+  searchAddresses(query: AddressSearchQuery, signal?: AbortSignal): Promise<AddressSuggestions>;
+  /** Asked once for a point the buyer has confirmed, never while the map moves. */
+  describePoint(point: DeliveryPoint, lang: string, signal?: AbortSignal): Promise<PointDescription>;
+  getDeliveryCoverage(signal?: AbortSignal): Promise<DeliveryCoverageInfo>;
   createAddress(input: AddressInput): Promise<Address>;
   updateAddress(id: string, input: AddressInput): Promise<Address>;
   removeAddress(id: string): Promise<void>;
@@ -83,6 +97,8 @@ const SEED_ADDRESSES: Address[] = [
     line1: '128 Marrakesh Rd, Suite 4',
     city: 'Brooklyn, NY 11211',
     isDefault: true,
+    lat: 41.3111,
+    lng: 69.2797,
   },
   {
     id: 'addr_shop',
@@ -91,6 +107,8 @@ const SEED_ADDRESSES: Address[] = [
     line1: '2210 W Industrial Blvd',
     city: 'Long Island City, NY 11101',
     isDefault: false,
+    lat: 41.3385,
+    lng: 69.3345,
   },
 ];
 
@@ -99,11 +117,33 @@ const SEED_PAYMENT_METHODS: PaymentMethod[] = [
   { id: 'pm_visa_1881', brand: 'Visa', last4: '1881', exp: '03/26', isDefault: false },
 ];
 
-// Mirrors the real backend quote (`shipping.service.ts`): pickup is free,
-// courier is the flat `DELIVERY_COURIER_UZS` fee (default 25,000).
-const BASE_SHIPPING_OPTIONS: ShippingOption[] = [
-  { key: 'pickup', label: 'Pickup', eta: 'Today', price: 0 },
-  { key: 'courier', label: 'Courier', eta: '1-3 days', price: STANDARD_DELIVERY_UZS },
+// Mock only: the real price comes from the backend's quote, per address and seller.
+const MOCK_COURIER_PRICE_UZS = 15_000;
+
+// Mock only: the real matches come from the backend's address search.
+const MOCK_ADDRESS_SUGGESTIONS: AddressSuggestion[] = [
+  {
+    id: 'mock_1',
+    title: 'Amir Temur 12',
+    subtitle: 'Yunusobod, Toshkent',
+    city: 'Toshkent',
+    district: 'Yunusobod',
+    street: 'Amir Temur',
+    houseNumber: '12',
+    lat: 41.3111,
+    lng: 69.2797,
+  },
+  {
+    id: 'mock_2',
+    title: 'Navoiy 5',
+    subtitle: 'Shayxontohur, Toshkent',
+    city: 'Toshkent',
+    district: 'Shayxontohur',
+    street: 'Navoiy',
+    houseNumber: '5',
+    lat: 41.3225,
+    lng: 69.2391,
+  },
 ];
 
 function detailFor(row: { id: string; total: string }, statusKey: 'in_transit' | 'delivered' | 'cancelled'): OrderDetail {
@@ -210,8 +250,7 @@ export class MockOrdersTransport implements OrdersTransport {
       throw new Error('Cart is empty');
     }
     const orderId = `M-${Math.floor(40000 + Math.random() * 60000)}`;
-    const shipping = BASE_SHIPPING_OPTIONS.find((o) => o.key === input.shippingOptionKey);
-    const eta = shipping?.eta ?? '1-3 days';
+    const eta = input.shippingOptionKey === 'pickup' ? 'Today' : '1-3 days';
     // Real server calculates this authoritatively; the mock echoes the
     // client's optimistic grand-total hint so the just-placed order's
     // confirmation + track screens show a real total instead of a blank.
@@ -229,6 +268,32 @@ export class MockOrdersTransport implements OrdersTransport {
   async listAddresses(signal?: AbortSignal): Promise<Address[]> {
     await delay(MOCK_LATENCY_MS, signal);
     return this.addresses.map((a) => ({ ...a }));
+  }
+
+  async searchAddresses(
+    query: AddressSearchQuery,
+    signal?: AbortSignal,
+  ): Promise<AddressSuggestions> {
+    await delay(MOCK_LATENCY_MS, signal);
+    const typed = query.street.trim().toLowerCase();
+    return {
+      items: MOCK_ADDRESS_SUGGESTIONS.filter((s) => s.title.toLowerCase().includes(typed)),
+      attribution: null,
+    };
+  }
+
+  async describePoint(
+    _point: DeliveryPoint,
+    _lang: string,
+    signal?: AbortSignal,
+  ): Promise<PointDescription> {
+    await delay(MOCK_LATENCY_MS, signal);
+    return { address: null, withinCoverage: true, attribution: null };
+  }
+
+  async getDeliveryCoverage(signal?: AbortSignal): Promise<DeliveryCoverageInfo> {
+    await delay(MOCK_LATENCY_MS, signal);
+    return { configured: true, bounds: null, polygons: null };
   }
 
   async createAddress(input: AddressInput): Promise<Address> {
@@ -313,13 +378,27 @@ export class MockOrdersTransport implements OrdersTransport {
   }
 
   async getShippingQuote(
-    _request: ShippingQuoteRequest,
+    request: ShippingQuoteRequest,
     signal?: AbortSignal,
   ): Promise<ShippingOption[]> {
     await delay(MOCK_LATENCY_MS, signal);
-    // Mirrors the real backend's flat quote (shipping.service.ts): pickup is
-    // free, courier is a flat fee — no subtotal-based threshold exists there.
-    return BASE_SHIPPING_OPTIONS;
+    // Refuses like the real backend does, so the screen's error state can be exercised.
+    const address = this.addresses.find((a) => a.id === request.addressId);
+    if (address?.lat == null || address.lng == null) {
+      throw new ApiError(
+        422,
+        'DELIVERY_ADDRESS_COORDINATES_MISSING',
+        'This delivery address has no location.',
+      );
+    }
+    return [
+      {
+        key: 'courier',
+        label: 'Courier',
+        price: MOCK_COURIER_PRICE_UZS,
+        quoteId: `mock_quote_${request.addressId}`,
+      },
+    ];
   }
 }
 
@@ -333,6 +412,10 @@ export class MockOrdersTransport implements OrdersTransport {
  *   GET    /v1/orders/:orderId                    → OrderDetail
  *   POST   /v1/orders                              → CreateOrderResult
  *   GET    /v1/account/addresses                   → Address[]
+ *   GET    /v1/addresses/suggestions?street=&house=&city=&lang=&mode=&near_lat=&near_lng=
+ *                                                  → { items, attribution }
+ *   GET    /v1/addresses/reverse?lat=&lng=&lang=   → { address, within_coverage, attribution }
+ *   GET    /v1/shipping/coverage                   → { configured, bounds, geometry }
  *   POST   /v1/addresses                            → Address
  *   PATCH  /v1/addresses/:id                        → Address
  *   DELETE /v1/addresses/:id                        → 204
@@ -343,13 +426,14 @@ export class MockOrdersTransport implements OrdersTransport {
  *   DELETE /v1/payment-methods/:id                  → 204
  *   POST   /v1/payment-methods/:id/default          → 204
  *   POST   /v1/shipping/quote                      → { options: [{ type, label,
- *          price_uzs, eta_days_min, eta_days_max }], currency }  — NOT a bare
- *          array, and the request body is `{ delivery_address_id }`
- *          (snake_case), not `{ addressId }`.
+ *          price_uzs, quote_id }], currency }  — NOT a bare array, and the request body is
+ *          `{ delivery_address_id, delivery_method: 'courier' }` (snake_case). Refusals
+ *          carry a `code` the checkout words itself (checkout-presentation.ts).
  */
 import { shouldUseHttpTransport } from '@/config/api';
 import { apiClient, ApiError } from '@/services/api-client';
 import { debugLog } from '@/services/debug-log';
+import { parseCoverageGeometry } from '@/services/delivery-coverage';
 
 /** Strip spaces / dashes / parens so "+998 90 123 45 67" → "+998901234567". */
 function toE164(raw: string): string {
@@ -359,9 +443,9 @@ function toE164(raw: string): string {
 /**
  * Backend address shape (from the live OpenAPI `/docs-json` → CreateAddressDto /
  * address entity, verified 2026-07-23). The wire model is UZ-centric and totally
- * different from the app's `{ label, line1, city }`: `full_text` is the only
- * REQUIRED field; `line1`/`city`/`name` do not exist (sending them → 400
- * "property X should not exist" on the strict `forbidNonWhitelisted` DTO).
+ * different from the app's `{ label, line1, city }`: an address needs `full_text` or
+ * `lat`+`lng`; `line1`/`city`/`name` do not exist (sending them → 400 "property X
+ * should not exist" on the strict `forbidNonWhitelisted` DTO).
  */
 type RawAddress = {
   id: string;
@@ -370,41 +454,95 @@ type RawAddress = {
   district?: string | null;
   street?: string | null;
   full_text?: string | null;
+  landmark?: string | null;
   lat?: number | null;
   lng?: number | null;
   is_default?: boolean | null;
 };
 
 /**
- * Map the app's 2-field form (`line1` = street, `city` = city/state line) onto
- * the backend `CreateAddressDto`. `full_text` is required, so compose it from the
- * two fields; `street`/`district` carry the parts so a read round-trips back to
- * line1/city. `name` is dropped (no backend field). Accepted keys only:
- * full_text, label, region_code, district, street, lat, lng, is_default.
+ * Map the app's address (`line1` = street and house, `city` = city line) onto the
+ * backend `CreateAddressDto`. `full_text` is composed from those; `street`/`district`
+ * carry the parts so a read round-trips back to line1/city. `name` is dropped (no
+ * backend field). A point with no words sends no text at all, and the server describes
+ * it itself. Accepted keys only: full_text, label, region_code, district, street, lat,
+ * lng, is_default.
  */
 function toAddressBody(input: AddressInput): Record<string, unknown> {
   const line1 = input.line1.trim();
   const city = input.city.trim();
   const fullText = [line1, city].filter(Boolean).join(', ');
-  const body: Record<string, unknown> = {
-    full_text: fullText || input.label.trim() || line1 || city,
-    label: input.label.trim() || line1,
-    street: line1,
-    district: city,
-  };
+  const label = input.label.trim() || line1;
+  const body: Record<string, unknown> = {};
+  if (fullText) body.full_text = fullText;
+  if (label) body.label = label;
+  if (line1) body.street = line1;
+  if (city) body.district = city;
+  if (input.landmark !== undefined) body.landmark = input.landmark.trim() || null;
+  if (input.lat !== undefined && input.lng !== undefined) {
+    body.lat = input.lat;
+    body.lng = input.lng;
+  }
   debugLog('address', '→ wire body (mapped to backend DTO)', body);
   return body;
 }
 
+/** A point saved with no words is stored under its own coordinates, for the operator and
+ *  the courier. That is not a street to show the buyer. */
+const COORDINATES_TEXT = /^-?\d+(\.\d+)?, -?\d+(\.\d+)?$/;
+
 /** Map a backend `RawAddress` back onto the app's `Address`. */
 function mapRawAddress(raw: RawAddress): Address {
+  const written = raw.full_text && !COORDINATES_TEXT.test(raw.full_text) ? raw.full_text : null;
   return {
     id: raw.id,
-    label: raw.label ?? raw.street ?? raw.full_text ?? 'Address',
-    line1: raw.street ?? raw.full_text ?? '',
+    label: raw.label ?? raw.street ?? written ?? 'Address',
+    line1: raw.street ?? written ?? '',
     city: raw.district ?? raw.region_code ?? '',
+    landmark: raw.landmark ?? null,
     isDefault: raw.is_default ?? false,
+    lat: raw.lat ?? null,
+    lng: raw.lng ?? null,
   };
+}
+
+type RawAddressSuggestion = {
+  id?: string | number | null;
+  title?: string | null;
+  subtitle?: string | null;
+  city?: string | null;
+  district?: string | null;
+  street?: string | null;
+  house_number?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+};
+
+/** One suggestion, or nothing when it has no real point to save: picking it could not
+ *  be priced, so it must not be offered. */
+function mapRawSuggestion(raw: RawAddressSuggestion): AddressSuggestion[] {
+  if (
+    !raw.title ||
+    typeof raw.lat !== 'number' ||
+    !Number.isFinite(raw.lat) ||
+    typeof raw.lng !== 'number' ||
+    !Number.isFinite(raw.lng)
+  ) {
+    return [];
+  }
+  return [
+    {
+      id: String(raw.id ?? `${raw.lat},${raw.lng}`),
+      title: raw.title,
+      subtitle: raw.subtitle ?? null,
+      city: raw.city ?? null,
+      district: raw.district ?? null,
+      street: raw.street ?? null,
+      houseNumber: raw.house_number ?? null,
+      lat: raw.lat,
+      lng: raw.lng,
+    },
+  ];
 }
 
 /**
@@ -447,6 +585,7 @@ export type RawBackendOrder = {
   vehicle_id?: string | null;
   delivery_address_id?: string | null;
   delivery_method?: string | null;
+  payment_type?: string | null;
   items?: Array<{
     part_id?: string | null;
     service_id?: string | null;
@@ -572,6 +711,10 @@ export function mapOrderToListRow(o: RawBackendOrder): OrderListRow {
   };
 }
 
+function asPaymentType(value: string | null | undefined): PaymentType | null {
+  return value === 'payme' || value === 'terminal' || value === 'cash' ? value : null;
+}
+
 /** Raw backend order → the richer detail shape the track screen renders. The
  *  backend has no per-step timeline / courier / embedded address, so the step
  *  captions beyond "placed" are blank and courier is null. */
@@ -605,6 +748,8 @@ export function mapOrderToDetail(o: RawBackendOrder): OrderDetail {
       price: formatUzs(it.price_uzs),
     })),
     totalLabel: formatUzs(o.total_uzs),
+    serverStatus: o.status,
+    paymentType: asPaymentType(o.payment_type),
   };
 }
 
@@ -655,6 +800,11 @@ export class HttpOrdersTransport implements OrdersTransport {
     // cash = cash on delivery). The backend persists it so it can route the
     // Payme/Click webhook and report by method.
     if (input.paymentType) body.payment_type = input.paymentType;
+    // The courier price the buyer was shown. The server compares, and never charges from it.
+    if (typeof input.confirmedDeliveryUzs === 'number') {
+      body.confirmed_delivery_uzs = input.confirmedDeliveryUzs;
+    }
+    if (input.deliveryQuoteId) body.delivery_quote_id = input.deliveryQuoteId;
 
     const r = await apiClient.post<RawBackendOrder>('/v1/orders', body, { signal });
     return {
@@ -667,6 +817,85 @@ export class HttpOrdersTransport implements OrdersTransport {
   async listAddresses(signal?: AbortSignal): Promise<Address[]> {
     const raw = asList<RawAddress>(await apiClient.get<unknown>('/v1/account/addresses', { signal }));
     return raw.map(mapRawAddress);
+  }
+
+  async searchAddresses(
+    query: AddressSearchQuery,
+    signal?: AbortSignal,
+  ): Promise<AddressSuggestions> {
+    // What was typed and where the map is looking, which is all a search needs.
+    const params = Object.entries({
+      street: query.street,
+      house: query.house,
+      city: query.city,
+      lang: query.lang,
+      ...(query.mode === 'search' ? { mode: 'search' } : {}),
+      ...(query.nearLat !== undefined && query.nearLng !== undefined
+        ? { near_lat: String(query.nearLat), near_lng: String(query.nearLng) }
+        : {}),
+    })
+      .filter((entry): entry is [string, string] => !!entry[1])
+      .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+      .join('&');
+    const raw = await apiClient.get<{ items?: unknown; attribution?: string | null }>(
+      `/v1/addresses/suggestions?${params}`,
+      { signal },
+    );
+    return {
+      items: asList<RawAddressSuggestion>(raw?.items).flatMap(mapRawSuggestion),
+      attribution: raw?.attribution ?? null,
+    };
+  }
+
+  async describePoint(
+    point: DeliveryPoint,
+    lang: string,
+    signal?: AbortSignal,
+  ): Promise<PointDescription> {
+    const raw = await apiClient.get<{
+      address?: {
+        city?: string | null;
+        district?: string | null;
+        street?: string | null;
+        house_number?: string | null;
+      } | null;
+      within_coverage?: boolean | null;
+      attribution?: string | null;
+    }>(`/v1/addresses/reverse?lat=${point.lat}&lng=${point.lng}&lang=${encodeURIComponent(lang)}`, {
+      signal,
+    });
+    return {
+      address: raw?.address
+        ? {
+            city: raw.address.city ?? null,
+            district: raw.address.district ?? null,
+            street: raw.address.street ?? null,
+            houseNumber: raw.address.house_number ?? null,
+          }
+        : null,
+      withinCoverage: raw?.within_coverage ?? null,
+      attribution: raw?.attribution ?? null,
+    };
+  }
+
+  async getDeliveryCoverage(signal?: AbortSignal): Promise<DeliveryCoverageInfo> {
+    const raw = await apiClient.get<{
+      configured?: boolean;
+      bounds?: { min_lat: number; min_lng: number; max_lat: number; max_lng: number } | null;
+      geometry?: unknown;
+    }>('/v1/shipping/coverage', { signal });
+    return {
+      configured: raw?.configured === true,
+      bounds: raw?.bounds
+        ? {
+            minLat: raw.bounds.min_lat,
+            minLng: raw.bounds.min_lng,
+            maxLat: raw.bounds.max_lat,
+            maxLng: raw.bounds.max_lng,
+          }
+        : null,
+      polygons: parseCoverageGeometry(raw?.geometry),
+    };
   }
 
   async createAddress(input: AddressInput): Promise<Address> {
@@ -724,23 +953,22 @@ export class HttpOrdersTransport implements OrdersTransport {
         type?: string;
         label?: string;
         price_uzs?: number;
-        eta_days_min?: number;
-        eta_days_max?: number;
+        quote_id?: string | null;
       }[];
     }>(
       '/v1/shipping/quote',
-      { delivery_address_id: req.addressId },
+      { delivery_address_id: req.addressId, delivery_method: 'courier' },
       { signal },
     );
-    return (raw?.options ?? []).map((o) => {
-      const min = o.eta_days_min ?? 0;
-      const max = o.eta_days_max ?? min;
-      return {
-        key: o.type ?? 'courier',
-        label: o.label ?? '',
-        eta: min === 0 && max === 0 ? 'Today' : min === max ? `${min}d` : `${min}-${max}d`,
-        price: o.price_uzs ?? 0,
-      };
+    // An option with no real price is dropped rather than read as free, so the checkout
+    // treats it as no quote at all. So is a price with no quote behind it: the order would
+    // only be refused. Zero has none, because there is nothing to deliver.
+    return (raw?.options ?? []).flatMap((o) => {
+      const price = o.price_uzs;
+      if (typeof price !== 'number' || !Number.isFinite(price) || price < 0) return [];
+      const quoteId = o.quote_id || null;
+      if (price > 0 && !quoteId) return [];
+      return [{ key: o.type ?? 'courier', label: o.label ?? '', price, quoteId }];
     });
   }
 }

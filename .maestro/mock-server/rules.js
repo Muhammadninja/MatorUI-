@@ -204,19 +204,14 @@ router.get('/v1/catalog/parts/:id', (req, res) => {
 // HTTP, so checkout hits these — they MUST be arrays (the orders hooks call
 // .findIndex on them); the generic catch-all object would crash the screen.
 const ADDRESSES = [
-  { id: 'addr_home', label: 'Home', name: 'Alex Marino', line1: '128 Marrakesh Rd, Suite 4', city: 'Brooklyn, NY 11211', isDefault: true },
-  { id: 'addr_shop', label: 'Shop', name: 'Alex Marino', line1: '2210 W Industrial Blvd', city: 'Long Island City, NY 11101', isDefault: false },
+  { id: 'addr_home', label: 'Home', name: 'Alex Marino', line1: '128 Marrakesh Rd, Suite 4', city: 'Brooklyn, NY 11211', isDefault: true, is_default: true, lat: 41.3111, lng: 69.2797 },
+  { id: 'addr_shop', label: 'Shop', name: 'Alex Marino', line1: '2210 W Industrial Blvd', city: 'Long Island City, NY 11101', isDefault: false, is_default: false, lat: 41.3385, lng: 69.3345 },
 ];
 const PAYMENT_METHODS = [
   { id: 'pm_mc_4242', brand: 'Mastercard', last4: '4242', exp: '09/27', isDefault: true },
   { id: 'pm_visa_1881', brand: 'Visa', last4: '1881', exp: '03/26', isDefault: false },
 ];
-const SHIPPING_OPTIONS = [
-  { key: 'standard', label: 'Standard', eta: '3-5 business days', price: 0 },
-  { key: 'express', label: 'Express', eta: '1-2 business days', price: 9.99 },
-  { key: 'same_day', label: 'Same day', eta: 'By 9 PM today', price: 19.99 },
-];
-const createdOrders = {}; // orderId → OrderDetail (stateful across requests)
+const createdOrders = {}; // orderId → raw backend order (stateful across requests)
 
 router.get('/v1/account/addresses', (_req, res) => {
   res.status = 200; res.headers = { 'Content-Type': 'application/json' }; res.body = ADDRESSES;
@@ -224,33 +219,50 @@ router.get('/v1/account/addresses', (_req, res) => {
 router.get('/v1/account/payment-methods', (_req, res) => {
   res.status = 200; res.headers = { 'Content-Type': 'application/json' }; res.body = PAYMENT_METHODS;
 });
-router.post('/v1/shipping/quote', (req, res) => {
-  const subtotal = Number(req.body && req.body.subtotal) || 0;
+router.post('/v1/shipping/quote', (_req, res) => {
   res.status = 200; res.headers = { 'Content-Type': 'application/json' };
-  res.body = SHIPPING_OPTIONS.map((o) => (o.key === 'standard' && subtotal >= 500 ? { ...o, price: 0 } : o));
+  res.body = {
+    options: [{ type: 'courier', label: 'Kuryer', price_uzs: 15000, quote_id: 'mock_quote' }],
+    currency: 'UZS',
+  };
 });
+// The backend's real order shape, since the app reads its status and payment type.
 router.post('/v1/orders', (req, res) => {
   const body = req.body || {};
-  const orderId = `M-${40000 + Math.floor(Math.random() * 60000)}`;
-  const shipping = SHIPPING_OPTIONS.find((o) => o.key === body.shippingOptionKey);
-  const eta = shipping ? shipping.eta : '3-5 business days';
-  const totalLabel = body.totalLabel || '$—.—';
+  const orderId = `ord_${40000 + Math.floor(Math.random() * 60000)}`;
   createdOrders[orderId] = {
-    id: orderId, status: 'placed', statusLabel: 'Processing', etaWindow: '3-5 business days',
-    placedAt: 'Jul 13, 2026', currentStepIndex: 0,
-    steps: [
-      { key: 'placed', label: 'Order placed', caption: 'Just now' },
-      { key: 'packed', label: 'Packed', caption: '—' },
-      { key: 'shipped', label: 'Shipped', caption: '—' },
-      { key: 'out_for_delivery', label: 'Out for delivery', caption: '—' },
-      { key: 'delivered', label: 'Delivered', caption: '—' },
-    ],
-    destination: ADDRESSES[0], courier: null,
-    items: [{ id: 'brembo-fp', title: 'Brembo Front Brake Pads', quantity: 1, price: '$89.00' }],
-    totalLabel,
+    order_id: orderId,
+    status: 'pending_payment',
+    payment_type: body.payment_type || null,
+    delivery_method: body.cart_snapshot ? body.cart_snapshot.delivery_method : null,
+    delivery_address_id: body.cart_snapshot ? body.cart_snapshot.delivery_address_id : null,
+    subtotal_uzs: 89000,
+    delivery_uzs: 15000,
+    total_uzs: 104000,
+    currency: 'UZS',
+    items: [{ part_id: 'brembo-fp', title: 'Brembo Front Brake Pads', qty: 1, price_uzs: 89000, line_total_uzs: 89000 }],
+    created_at: '2026-07-13T10:00:00.000Z',
   };
+  res.status = 201; res.headers = { 'Content-Type': 'application/json' };
+  res.body = createdOrders[orderId];
+});
+router.get('/v1/shipping/coverage', (_req, res) => {
   res.status = 200; res.headers = { 'Content-Type': 'application/json' };
-  res.body = { orderId, eta, totalLabel };
+  res.body = { configured: true, bounds: { min_lat: 41.2, min_lng: 69.1, max_lat: 41.4, max_lng: 69.4 } };
+});
+router.get('/v1/addresses/reverse', (_req, res) => {
+  res.status = 200; res.headers = { 'Content-Type': 'application/json' };
+  res.body = { address: null, within_coverage: true, attribution: null };
+});
+// What the app searches through while a buyer types an address.
+router.get('/v1/addresses/suggestions', (_req, res) => {
+  res.status = 200; res.headers = { 'Content-Type': 'application/json' };
+  res.body = {
+    items: [
+      { id: '1', title: 'Amir Temur 12', subtitle: 'Yunusobod, Toshkent', city: 'Toshkent', district: 'Yunusobod', street: 'Amir Temur', house_number: '12', lat: 41.3111, lng: 69.2797 },
+    ],
+    attribution: 'Map data © OpenStreetMap contributors, licensed under the ODbL.',
+  };
 });
 router.get('/v1/orders', (_req, res) => {
   res.status = 200;
@@ -269,7 +281,7 @@ router.get('/v1/orders', (_req, res) => {
 router.get('/v1/orders/:id', (req, res) => {
   const detail = createdOrders[req.params.id];
   res.headers = { 'Content-Type': 'application/json' };
-  if (!detail) { res.status = 404; res.body = { error: { code: 'NOT_FOUND', message: `No order ${req.params.id}` } }; return; }
+  if (!detail) { res.status = 404; res.body = { code: 'NOT_FOUND', message: `No order ${req.params.id}` }; return; }
   res.status = 200; res.body = detail;
 });
 
