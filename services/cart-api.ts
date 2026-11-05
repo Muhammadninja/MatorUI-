@@ -25,6 +25,8 @@ export type AddItemInput = {
   badge?: string;
   status?: string;
   imageUrl?: string;
+  /** How many to add. One unless stated. */
+  quantity?: number;
 };
 
 export interface CartTransport {
@@ -86,7 +88,7 @@ export class MockCartTransport implements CartTransport {
     maybeFail('addItem');
     const existing = this.items.find((i) => i.id === input.productId);
     if (existing) {
-      existing.quantity += 1;
+      existing.quantity += input.quantity ?? 1;
       return { ...existing };
     }
     const created: CartItem = {
@@ -98,7 +100,7 @@ export class MockCartTransport implements CartTransport {
       badge: input.badge,
       status: input.status,
       imageUrl: input.imageUrl,
-      quantity: 1,
+      quantity: input.quantity ?? 1,
     };
     this.items.push(created);
     return { ...created };
@@ -271,7 +273,7 @@ export class HttpCartTransport implements CartTransport {
     const epoch = this.epoch;
     const cart = await apiClient.post<ApiCart>('/v1/cart/items', {
       part_id: input.productId,
-      quantity: 1,
+      quantity: input.quantity ?? 1,
     });
     const snap = this.ingest(cart, epoch);
     // Return the reconciled server line; fall back to the optimistic input
@@ -286,7 +288,7 @@ export class HttpCartTransport implements CartTransport {
         badge: input.badge,
         status: input.status,
         imageUrl: input.imageUrl,
-        quantity: 1,
+        quantity: input.quantity ?? 1,
       }
     );
   }

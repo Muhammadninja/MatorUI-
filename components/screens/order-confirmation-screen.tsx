@@ -12,6 +12,7 @@ import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useOrder } from '@/hooks/use-orders';
+import { isAwaitingOnlinePayment, orderPaymentState } from '@/services/checkout-presentation';
 import { formatOrderNo } from '@/services/orders-service';
 import { triggerHaptic } from '@/utils/haptics';
 
@@ -20,6 +21,9 @@ import { triggerHaptic } from '@/utils/haptics';
  * now reading the freshly-created order from the orders layer. Checkout
  * navigates here with an `orderId` route param; `useOrder(id)` fetches the
  * `OrderDetail`, whose `totalLabel` + line items populate the receipt.
+ *
+ * It says what the backend says. An order still waiting for online payment, or closed
+ * without payment, is not shown as a success, however the buyer got here.
  */
 export default function OrderConfirmationScreen() {
   const { t } = useTranslation();
@@ -71,6 +75,10 @@ export default function OrderConfirmationScreen() {
     );
   }
 
+  const awaitingPayment = isAwaitingOnlinePayment(order);
+  const closed = orderPaymentState(order.serverStatus) === 'closed';
+  const unpaid = awaitingPayment || closed;
+
   return (
     <AppView flex={1} colorName="background" testID="order-confirmation-screen">
       <ScrollView
@@ -86,9 +94,13 @@ export default function OrderConfirmationScreen() {
         <AppView
           center
           rounded={999}
-          style={{ width: 88, height: 88, backgroundColor: tokens.success }}
+          style={{ width: 88, height: 88, backgroundColor: unpaid ? tokens.error : tokens.success }}
         >
-          <Check size={46} strokeWidth={2.5} color={tokens.white} />
+          {unpaid ? (
+            <AlertCircle size={46} strokeWidth={2.5} color={tokens.white} />
+          ) : (
+            <Check size={46} strokeWidth={2.5} color={tokens.white} />
+          )}
         </AppView>
 
         {/* Heading */}
@@ -97,7 +109,11 @@ export default function OrderConfirmationScreen() {
           weight="bold"
           style={{ fontSize: 26, lineHeight: 32, color: tokens.text, marginTop: 22, textAlign: 'center' }}
         >
-          {t('orderConfirmation.orderPlaced')}
+          {awaitingPayment
+            ? t('orderConfirmation.awaitingPaymentTitle')
+            : closed
+              ? t('orderConfirmation.closedTitle')
+              : t('orderConfirmation.orderPlaced')}
         </AppText>
 
         {/* Sub-copy */}
@@ -112,7 +128,11 @@ export default function OrderConfirmationScreen() {
             textAlign: 'center',
           }}
         >
-          {t('orderConfirmation.subtitle')}
+          {awaitingPayment
+            ? t('orderConfirmation.awaitingPaymentSubtitle')
+            : closed
+              ? t('orderConfirmation.closedSubtitle')
+              : t('orderConfirmation.subtitle')}
         </AppText>
 
         {/* Receipt card */}
@@ -201,7 +221,7 @@ export default function OrderConfirmationScreen() {
         <AppView style={{ width: '100%', gap: 12, marginTop: 24 }}>
           <AppButton
             testID="confirmation-track-btn"
-            title={t('orderConfirmation.trackOrder')}
+            title={awaitingPayment ? t('orderConfirmation.payNow') : t('orderConfirmation.trackOrder')}
             kind="brand"
             size="lg"
             fullWidth

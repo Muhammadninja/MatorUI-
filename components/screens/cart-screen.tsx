@@ -298,12 +298,7 @@ export default function CartScreen() {
           ) : null}
           <SummaryRow
             label={t('cart.shipping')}
-            value={totals.shipping > 0 ? formatCurrency(totals.shipping) : t('cart.free')}
-            tokens={tokens}
-          />
-          <SummaryRow
-            label={t('cart.serviceFee')}
-            value={formatCurrency(totals.serviceFee)}
+            value={t('cart.deliveryAtCheckout')}
             tokens={tokens}
           />
         </AppView>

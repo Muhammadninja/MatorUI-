@@ -165,3 +165,16 @@
  - Run from a real Terminal, in the project folder.
  - Commit your changes before building (EAS builds from git).
 ==============================================================================
+
+==============================================================================
+ ANDROID MAP KEY (delivery location picker)
+==============================================================================
+ The Android map needs a Google Maps key at build time. iOS uses Apple Maps and
+ needs none. Set it as an EAS environment variable, for each profile that builds
+ Android:
+
+   eas env:create --name GOOGLE_MAPS_ANDROID_API_KEY --value <key> --visibility sensitive
+
+ The key is baked into the build, so treat it as public: restrict it in Google
+ Cloud to the package com.mator.myapp and the app's signing certificate, and set
+ a quota. Without it the Android build offers address search instead of the map.

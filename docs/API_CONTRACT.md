@@ -548,3 +548,32 @@ Also mock seed only (demo screens, not contract): `MATOR_PRODUCTS`, `MATOR_ADDRE
 9. **(Optional) VIN proxy** — Add-Vehicle depends on the external NHTSA decoder (§15). If we
    want server-side/offline decode, caching, or a UZ VIN DB, expose **`GET /v1/vin/{vin}`**
    and repoint `VinDecodeTransport`.
+
+---
+
+## Delivery destination, address search and the map
+
+The buyer chooses where the courier goes: any point in the delivery area, wherever they are
+themselves. `lat`/`lng` on a saved address are that point, and with them an address needs no
+words at all. Delivery is priced by the backend and shown as a price alone.
+
+| Call | Purpose |
+|---|---|
+| `GET /v1/shipping/coverage` | `{ configured, bounds, geometry }`. `bounds` says where the map opens. `geometry` is the MultiPolygon the backend enforces, so the map can refuse a point outside it at once; the backend still decides. |
+| `GET /v1/addresses/suggestions?street=&house=&city=&lang=&mode=&near_lat=&near_lng=` | `{ items, attribution }`. Debounced `autocomplete` while typing, `search` when submitted. Only what was typed and the rough map centre are sent. |
+| `GET /v1/addresses/reverse?lat=&lng=&lang=` | `{ address, within_coverage, attribution }`. Once per confirmed point, never while the map moves. Never fails for lack of an address. |
+| `POST` / `PATCH /v1/addresses` | `lat`, `lng`, `landmark` as well as the existing fields. `full_text` may be left out with a point. |
+| `POST /v1/shipping/quote` | With `delivery_method: 'courier'`: `{ options: [{ type, label, price_uzs, quote_id }], currency }`. |
+| `POST /v1/orders` | `confirmed_delivery_uzs` and `delivery_quote_id` from that answer. `409 DELIVERY_QUOTE_STALE` when the pin, a pickup point or the rates have changed; `409 DELIVERY_PRICE_CHANGED` when the price has. Fetch a new quote and confirm again. |
+
+Other refusals, with `code`: `422 COURIER_DELIVERY_UNAVAILABLE` (no area configured; pickup
+works), `422 DELIVERY_OUTSIDE_COVERAGE`, `400 DELIVERY_ADDRESS_COORDINATES_INVALID`,
+`503 ADDRESS_SEARCH_UNAVAILABLE` (the map still works).
+
+**The map.** `AppMap` over `react-native-maps`: Apple Maps on iOS, which needs no key; Google
+Maps on Android, which needs `GOOGLE_MAPS_ANDROID_API_KEY` set at build time (EAS environment
+variable). That key is baked into the build, so it is public: restrict it in Google Cloud to
+the package `com.mator.myapp` and the app's signing certificate, with a quota. A build without
+it offers address search in place of the Android map, since the native map would crash. The
+app holds no UzMaps key: it uses no UzMaps tiles, and UzMaps cannot restrict a key to a native
+app. Search and reverse geocoding go through the backend.

@@ -21,7 +21,7 @@
         "UIViewControllerBasedStatusBarAppearance": true,
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "Mator needs access to your photos so you can set a profile picture and attach images.",
-        "NSLocationWhenInUseUsageDescription": "Mator uses your location to find nearby parts providers and mechanics.",
+        "NSLocationWhenInUseUsageDescription": "Mator uses your location to find nearby parts providers and mechanics, and to set where your order is delivered when you choose to.",
         "NSFaceIDUsageDescription": "Mator uses Face ID to securely sign you in to your account."
       },
       "appleTeamId": "DXP9AG6TPN"

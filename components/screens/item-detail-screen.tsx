@@ -332,7 +332,7 @@ export default function ItemDetailScreen() {
 
           {/* ZONE 3 — when it lands and how you pay. Plain sentences, no box. */}
           <ItemRule />
-          <ItemAssuranceCard item={item} formatCurrency={formatCurrency} />
+          <ItemAssuranceCard item={item} />
 
           {/* ZONE 4 — the details, for the shopper who wants them. One rule
               above the group, headed sections inside it. */}

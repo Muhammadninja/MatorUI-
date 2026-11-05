@@ -8,7 +8,6 @@
 import { describe, expect, test } from 'vitest';
 
 import { MockOrdersTransport, MOCK_SEED, asList } from './orders-api';
-import { STANDARD_DELIVERY_UZS } from './cart-math';
 import type { CreateOrderInput } from './orders-service';
 
 const BASE_INPUT: CreateOrderInput = {
@@ -126,13 +125,46 @@ describe('MockOrdersTransport — account collections', () => {
 });
 
 describe('MockOrdersTransport — shipping quote', () => {
-  test('mirrors the real backend: pickup free, courier a flat fee, no threshold', async () => {
-    const transport = new MockOrdersTransport();
+  test('prices a courier to an address that has a location, and says nothing else', async () => {
+    const transport = new MockOrdersTransport(MOCK_SEED);
     const quote = await transport.getShippingQuote({ addressId: 'addr_home' });
-    const pickup = quote.find((o) => o.key === 'pickup');
-    const courier = quote.find((o) => o.key === 'courier');
-    expect(pickup?.price).toBe(0);
-    expect(courier?.price).toBe(STANDARD_DELIVERY_UZS);
+    expect(quote).toEqual([
+      { key: 'courier', label: 'Courier', price: expect.any(Number), quoteId: expect.any(String) },
+    ]);
+    expect(quote[0]!.price).toBeGreaterThan(0);
+  });
+
+  test('refuses an address with no location the way the backend does', async () => {
+    const transport = new MockOrdersTransport();
+    const created = await transport.createAddress({
+      label: 'New',
+      name: '',
+      line1: 'Amir Temur 1',
+      city: 'Toshkent',
+    });
+    await expect(transport.getShippingQuote({ addressId: created.id })).rejects.toMatchObject({
+      status: 422,
+      code: 'DELIVERY_ADDRESS_COORDINATES_MISSING',
+    });
+  });
+
+  test('stating a location on an address makes it priceable', async () => {
+    const transport = new MockOrdersTransport();
+    const created = await transport.createAddress({
+      label: 'New',
+      name: '',
+      line1: 'Amir Temur 1',
+      city: 'Toshkent',
+    });
+    await transport.updateAddress(created.id, {
+      label: 'New',
+      name: '',
+      line1: 'Amir Temur 1',
+      city: 'Toshkent',
+      lat: 41.31,
+      lng: 69.28,
+    });
+    await expect(transport.getShippingQuote({ addressId: created.id })).resolves.toHaveLength(1);
   });
 });
 

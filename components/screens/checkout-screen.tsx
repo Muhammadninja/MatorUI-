@@ -1,8 +1,6 @@
-import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
-import { AlertCircle, ArrowLeft, Check, MapPin, PhoneCall, Plus } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { AlertCircle, ArrowLeft } from 'lucide-react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,73 +8,84 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AddressFormSheet, {
   type AddressFormValues,
 } from '@/components/screens-components/account/address-form-sheet';
+import {
+  DeliveryPriceCard,
+  DeliverySection,
+  PaymentRetryCard,
+  PaymentRow,
+  SectionLabel,
+  SummaryRow,
+} from '@/components/screens-components/checkout/checkout-sections';
 import { AppButton } from '@/components/shared/app-button';
 import { AppPrice } from '@/components/shared/app-price';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { WheelLoader } from '@/components/shared/wheel-loader';
-import { DEFAULT_PAYMENT_TYPE, PAYMENT_OPTIONS, type PaymentOption } from '@/constants/payment-options';
+import { DEFAULT_PAYMENT_TYPE, PAYMENT_OPTIONS } from '@/constants/payment-options';
 import { useCartContext } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useUserContext } from '@/contexts/user.context';
-import { useToast } from '@/hooks/use-toast';
-import { useAddresses, useCreateAddress, useCreateOrder, useShippingQuote } from '@/hooks/use-orders';
+import { cartKeyOf, useCheckoutPayment } from '@/hooks/use-order-payment';
+import {
+  useAddresses,
+  useCreateAddress,
+  useCreateOrder,
+  useShippingQuote,
+  useUpdateAddress,
+} from '@/hooks/use-orders';
 import { parsePrice } from '@/services/cart-math';
-import { localizeShipping } from '@/services/checkout-presentation';
+import {
+  deliveryRefusalKey,
+  resolveCheckoutDelivery,
+  type DeliveryMethod,
+} from '@/services/checkout-presentation';
 import garageService from '@/services/garage-service';
 import type { Address, PaymentType } from '@/services/orders-service';
-import { paymentsTransport } from '@/services/payments-service';
 import { triggerHaptic } from '@/utils/haptics';
 
-type Tokens = ReturnType<typeof useThemeContext>['tokens'];
+/** Shown in place of a figure that is not known yet. Never zero. */
+const NO_PRICE_YET = '—';
 
 /**
- * Drives online Payme payment for a just-created (`pending_payment`) order:
- * requests a hosted checkout URL, opens it in an auth-session browser, and
- * reports whether the user completed the redirect back. The backend webhook is
- * the source of truth for actual payment — the confirmation screen shows the
- * real order status; this only steers the post-checkout toast.
- *   'skip'       → gateway not live yet → behave exactly as today (no online step)
- *   'paid'       → user completed the hosted flow (redirected back to returnUrl)
- *   'incomplete' → user cancelled / dismissed / it errored
- */
-async function collectPaymePayment(orderId: string): Promise<'skip' | 'paid' | 'incomplete'> {
-  const returnUrl = Linking.createURL('payment-return');
-  try {
-    const start = await paymentsTransport.startPayment({ orderId, provider: 'payme', returnUrl });
-    if (start.status === 'unsupported') return 'skip';
-    const res = await WebBrowser.openAuthSessionAsync(start.checkoutUrl, returnUrl);
-    return res.type === 'success' ? 'paid' : 'incomplete';
-  } catch {
-    return 'incomplete';
-  }
-}
-
-/**
- * Checkout — the Uzbek-market flow. Delivery address is OPTIONAL (the courier
- * calls to confirm the drop-off, so the buyer can skip it), and payment is a
- * fixed choice of Payme / Terminal / Cash rather than a stored card. Addresses
- * can be added inline via a bottom-sheet. "Place order" builds a
- * `CreateOrderInput` (addressId may be null) and hands the created order id to
- * the confirmation screen.
+ * Checkout — the Uzbek-market flow. A courier needs a delivery address, because
+ * the backend prices the delivery from it; a buyer who skips the address collects
+ * the order themselves. Payment is a fixed choice of Payme / Terminal / Cash
+ * rather than a stored card. Addresses can be added inline via a bottom-sheet.
+ * "Place order" builds a `CreateOrderInput` (addressId may be null) and hands the
+ * created order id to the confirmation screen.
+ *
+ * The delivery price is the only thing the buyer learns about the delivery: no
+ * map, distance, route or arrival time is shown here, and the app never talks to a
+ * routing provider. Every figure comes from the backend's quote.
+ *
+ * Payme is paid after the order exists. A payment that does not go through leaves that order
+ * unpaid and this screen open on it, with the cart intact: the button then pays that same
+ * order again, and nothing here can place a second one by accident. The confirmation screen
+ * is reached only once the backend says the order is paid. See `useCheckoutPayment`.
  */
 export default function CheckoutScreen() {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
-  const { items, totals, appliedPromo, formatCurrency, clearCart } = useCartContext();
+  const { items, totals, appliedPromo, pendingIds, formatCurrency, clearCart } = useCartContext();
   const { profile } = useUserContext();
 
-  const toast = useToast();
   const addresses = useAddresses();
   const createAddress = useCreateAddress();
+  const updateAddress = useUpdateAddress();
   const create = useCreateOrder();
+
+  const goToConfirmation = useCallback((orderId: string) => {
+    router.replace({ pathname: '/order-confirmation', params: { orderId } });
+  }, []);
+  const payment = useCheckoutPayment(goToConfirmation);
 
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [addressSkipped, setAddressSkipped] = useState(false);
   const [paymentType, setPaymentType] = useState<PaymentType>(DEFAULT_PAYMENT_TYPE);
-  const [shipIdx, setShipIdx] = useState(0);
+  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('courier');
   const [sheetVisible, setSheetVisible] = useState(false);
+  const [editingAddress, setEditingAddress] = useState<Address | null>(null);
 
   const addrItems = addresses.items;
   const defaultAddr = useMemo(
@@ -89,48 +98,79 @@ export default function CheckoutScreen() {
   // Effective delivery address: null when skipped or none available.
   const addr: Address | null = addressSkipped ? null : chosenAddr ?? defaultAddr ?? null;
 
-  // Shipping quote only makes sense with a concrete address; without one the
-  // selector stays hidden and we fall back to `totals.shipping` (the same
-  // flat courier fee the quote would return anyway — see cart-math.ts).
-  const shippingRequest = useMemo(() => (addr ? { addressId: addr.id } : null), [addr]);
+  // The server prices its own copy of the cart and address, so this asks again when
+  // either changes, and waits for cart changes still on their way to the server. Nothing
+  // is asked for pickup, which costs nothing, or while paying an order already priced.
+  const cartKey = useMemo(() => items.map((i) => i.id).sort().join(','), [items]);
+  const shippingRequest = useMemo(
+    () =>
+      addr && deliveryMethod === 'courier' && pendingIds.size === 0 && !payment.pending
+        ? { addressId: addr.id, location: `${addr.lat ?? ''},${addr.lng ?? ''}`, cartKey }
+        : null,
+    [addr, deliveryMethod, pendingIds.size, cartKey, payment.pending],
+  );
   const shipping = useShippingQuote(shippingRequest);
-  const shipOption = addr ? shipping.options[shipIdx] ?? shipping.options[0] : undefined;
-  const shipCopy = shipOption ? localizeShipping(shipOption, t) : undefined;
+  const delivery = resolveCheckoutDelivery({
+    hasAddress: !!addr,
+    addressSkipped,
+    method: deliveryMethod,
+    quoteState: shipping.state,
+    options: shipping.options,
+  });
+  const grandTotal =
+    delivery.fee === null ? null : totals.subtotal - totals.discount + delivery.fee;
 
-  // `shipOption` (when present) is the real per-method quote from the
-  // backend and REPLACES totals.shipping — it must not be added on top of
-  // it, or delivery gets charged twice in the preview.
-  const deliveryFee = shipOption?.price ?? totals.shipping;
-  const grandTotal = totals.subtotal - totals.discount + deliveryFee + totals.serviceFee;
+  // The server refused the price on placing the order, so what is on screen is out of
+  // date: fetch what it would charge now, and the buyer confirms that or nothing.
+  const orderRefusalKey = deliveryRefusalKey(create.errorCode);
+  useEffect(() => {
+    if (orderRefusalKey) shipping.refresh();
+    // Only on a new refusal: `shipping` is a new object every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderRefusalKey]);
+
+  const chooseAddress = (id: string) => {
+    setSelectedAddressId(id);
+    setAddressSkipped(false);
+    setDeliveryMethod('courier');
+    create.reset();
+  };
 
   const cycleAddress = () => {
     if (addrItems.length === 0) return;
     const curIdx = Math.max(0, addrItems.findIndex((a) => a.id === addr?.id));
-    const next = addrItems[(curIdx + 1) % addrItems.length]!;
-    setSelectedAddressId(next.id);
-    setAddressSkipped(false);
-    setShipIdx(0);
+    chooseAddress(addrItems[(curIdx + 1) % addrItems.length]!.id);
   };
 
-  const handleAddAddress = async (values: AddressFormValues) => {
-    try {
+  const openAddressForm = (address: Address | null) => {
+    setEditingAddress(address);
+    setSheetVisible(true);
+  };
+
+  // Rejecting keeps the form open, saying why. A new address is used by the id the server
+  // gave it, and a changed one asks for a new quote through its changed point.
+  const saveAddress = async (values: AddressFormValues) => {
+    if (editingAddress) {
+      await updateAddress.mutateAsync({ id: editingAddress.id, input: values });
+      create.reset();
+    } else {
       const created = await createAddress.mutateAsync(values);
-      setSelectedAddressId(created.id);
-      setAddressSkipped(false);
-      setShipIdx(0);
-    } catch {
-      // The address query stays as-is on failure; the buyer can retry or skip.
+      chooseAddress(created.id);
     }
   };
 
   const placeOrder = async () => {
-    if (items.length === 0) return;
+    if (items.length === 0 || !delivery.ready || grandTotal === null || payment.phase !== 'idle') {
+      return;
+    }
     triggerHaptic('success');
     const result = await create.placeOrder({
       items: items.map((i) => ({ productId: i.id, quantity: i.quantity })),
       addressId: addr?.id ?? null,
       paymentType,
-      shippingOptionKey: shipOption?.key ?? 'standard',
+      shippingOptionKey: delivery.method,
+      confirmedDeliveryUzs: delivery.method === 'courier' ? delivery.fee : null,
+      deliveryQuoteId: delivery.method === 'courier' ? delivery.quoteId : null,
       promoCode: appliedPromo?.code ?? null,
       totalLabel: formatCurrency(grandTotal),
       // Backend order is built from the server cart; these tag it with the
@@ -140,24 +180,23 @@ export default function CheckoutScreen() {
     });
     if (!result) return; // hook surfaced the error; stay on the screen.
 
-    // Payme is paid online: hand the just-created (pending_payment) order to the
-    // hosted checkout before finishing. Terminal/Cash are pay-on-delivery, so
-    // they skip this entirely. The order exists regardless of payment outcome
-    // (backend models it as pending_payment); an incomplete online payment just
-    // means the buyer can still pay — surface a note and land them on the
-    // confirmation screen, which shows the real status.
+    // Payme is paid online, against the order that now exists. Terminal and cash are paid on
+    // delivery, so the order is all there is to do.
     if (paymentType === 'payme') {
-      const outcome = await collectPaymePayment(result.orderId);
-      if (outcome === 'incomplete') {
-        toast.info(t('checkout.paymentIncomplete'));
-      }
+      await payment.collect({
+        orderId: result.orderId,
+        totalLabel: result.totalLabel,
+        cartKey: cartKeyOf(items),
+      });
+      return;
     }
-
     clearCart();
-    router.replace({
-      pathname: '/order-confirmation',
-      params: { orderId: result.orderId },
-    });
+    goToConfirmation(result.orderId);
+  };
+
+  const startOver = async () => {
+    await payment.startOver();
+    create.reset();
   };
 
   if (addresses.state === 'loading') {
@@ -183,83 +222,143 @@ export default function CheckoutScreen() {
         </AppView>
 
         <AppView px="lg" gap={16}>
-          {/* Delivery address (optional — courier calls to confirm) */}
-          <DeliverySection
-            tokens={tokens}
-            addr={addr}
-            skipped={addressSkipped}
-            canChange={addrItems.length > 1}
-            onChange={cycleAddress}
-            onAdd={() => setSheetVisible(true)}
-            onSkip={() => {
-              setAddressSkipped(true);
-              setSelectedAddressId(null);
-            }}
-          />
-
-          {/* Payment method — Payme / Terminal / Cash */}
-          <AppView gap={10}>
-            <SectionLabel tokens={tokens}>{t('checkout.payment')}</SectionLabel>
-            {PAYMENT_OPTIONS.map((opt) => (
-              <PaymentRow
-                key={opt.id}
-                option={opt}
-                selected={paymentType === opt.id}
-                onPress={() => setPaymentType(opt.id)}
-                tokens={tokens}
-              />
-            ))}
-          </AppView>
-
-          {/* Shipping option — only when a concrete address is selected */}
-          {addr && shipOption ? (
-            <SectionCard
-              label={t('checkout.shipping')}
-              main={`${shipCopy?.label} · ${shipOption.price === 0 ? t('checkout.free') : formatCurrency(shipOption.price)}`}
-              sub={shipCopy?.eta ?? ''}
-              onChange={
-                shipping.options.length > 1
-                  ? () => setShipIdx((i) => (i + 1) % shipping.options.length)
-                  : undefined
-              }
-              tokens={tokens}
-            />
+          {payment.orderClosed ? (
+            <AppView testID="checkout-order-closed" row align="center" gap={8}>
+              <AlertCircle size={16} strokeWidth={2} color={tokens.error} />
+              <AppText family="default" style={{ fontSize: 12.5, color: tokens.error, flex: 1 }}>
+                {t('checkout.paymentOrderClosed')}
+              </AppText>
+            </AppView>
           ) : null}
 
-          {/* Order summary */}
-          <AppText family="heading" weight="bold" style={{ fontSize: 16, color: tokens.text, marginTop: 4 }}>{t('checkout.orderSummary')}</AppText>
-          <AppView gap={10}>
-            {items.map((item) => (
-              <AppView key={item.id} row justify="space-between">
-                <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted, flex: 1 }}>
-                  {item.title} × {item.quantity}
-                </AppText>
-                <AppText family="accent" weight="semibold" style={{ fontSize: 13.5, color: tokens.text }}>
-                  {formatCurrency(parsePrice(item.price) * item.quantity)}
-                </AppText>
-              </AppView>
-            ))}
-            <AppView style={{ height: 1, backgroundColor: tokens.divider, marginVertical: 4 }} />
-            <SummaryRow label={t('checkout.subtotal')} value={formatCurrency(totals.subtotal)} tokens={tokens} />
-            {totals.discount > 0 ? (
-              <SummaryRow label={t('checkout.discount')} value={`−${formatCurrency(totals.discount)}`} tokens={tokens} />
-            ) : null}
-            <SummaryRow
-              label={t('checkout.shipping')}
-              value={deliveryFee > 0 ? formatCurrency(deliveryFee) : t('checkout.free')}
+          {payment.pending ? (
+            <PaymentRetryCard
               tokens={tokens}
+              orderId={payment.pending.orderId}
+              failure={payment.failure}
+              onViewOrder={() =>
+                router.push({ pathname: '/track-order', params: { orderId: payment.pending!.orderId } })
+              }
+              onStartOver={startOver}
             />
-            <SummaryRow label={t('checkout.serviceFee')} value={formatCurrency(totals.serviceFee)} tokens={tokens} />
-            <AppView row justify="space-between">
-              <AppText family="accent" weight="bold" style={{ fontSize: 16, color: tokens.text }}>{t('checkout.total')}</AppText>
-              <AppPrice value={formatCurrency(grandTotal)} size={18} color={tokens.text} />
+          ) : (
+            <>
+              {/* Delivery address (skipping it means collecting the order) */}
+              <DeliverySection
+                tokens={tokens}
+                addr={addr}
+                skipped={addressSkipped}
+                canChange={addrItems.length > 1}
+                onChange={cycleAddress}
+                onAdd={() => openAddressForm(null)}
+                onSkip={() => {
+                  setAddressSkipped(true);
+                  setSelectedAddressId(null);
+                  create.reset();
+                }}
+              />
+
+              {/* Payment method — Payme / Terminal / Cash */}
+              <AppView gap={10}>
+                <SectionLabel tokens={tokens}>{t('checkout.payment')}</SectionLabel>
+                {PAYMENT_OPTIONS.map((opt) => (
+                  <PaymentRow
+                    key={opt.id}
+                    option={opt}
+                    selected={paymentType === opt.id}
+                    onPress={() => setPaymentType(opt.id)}
+                    tokens={tokens}
+                  />
+                ))}
+              </AppView>
+
+              {/* Delivery — the price and nothing else about the trip */}
+              {addr || addressSkipped ? (
+                <DeliveryPriceCard
+                  tokens={tokens}
+                  delivery={delivery}
+                  canChooseMethod={!!addr}
+                  onToggleMethod={() => {
+                    setDeliveryMethod((m) => (m === 'courier' ? 'pickup' : 'courier'));
+                    create.reset();
+                  }}
+                  quoteFailed={
+                    shipping.state === 'error' ||
+                    (shipping.state === 'success' && delivery.fee === null)
+                  }
+                  quoteErrorCode={shipping.errorCode}
+                  onRetry={shipping.refresh}
+                  onEditAddress={() => openAddressForm(addr)}
+                  formatCurrency={formatCurrency}
+                />
+              ) : null}
+            </>
+          )}
+
+          {/* Order summary: what the unpaid order holds, or what this order would */}
+          <AppText family="heading" weight="bold" style={{ fontSize: 16, color: tokens.text, marginTop: 4 }}>{t('checkout.orderSummary')}</AppText>
+          {payment.pending ? (
+            <AppView gap={10}>
+              {(payment.order?.items ?? []).map((line) => (
+                <AppView key={line.id} row justify="space-between">
+                  <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted, flex: 1 }}>
+                    {line.title} × {line.quantity}
+                  </AppText>
+                  <AppText family="accent" weight="semibold" style={{ fontSize: 13.5, color: tokens.text }}>
+                    {line.price}
+                  </AppText>
+                </AppView>
+              ))}
+              <AppView row justify="space-between">
+                <AppText family="accent" weight="bold" style={{ fontSize: 16, color: tokens.text }}>{t('checkout.total')}</AppText>
+                <AppPrice value={payment.order?.totalLabel ?? payment.pending.totalLabel} size={18} color={tokens.text} />
+              </AppView>
             </AppView>
-          </AppView>
+          ) : (
+            <AppView gap={10}>
+              {items.map((item) => (
+                <AppView key={item.id} row justify="space-between">
+                  <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted, flex: 1 }}>
+                    {item.title} × {item.quantity}
+                  </AppText>
+                  <AppText family="accent" weight="semibold" style={{ fontSize: 13.5, color: tokens.text }}>
+                    {formatCurrency(parsePrice(item.price) * item.quantity)}
+                  </AppText>
+                </AppView>
+              ))}
+              <AppView style={{ height: 1, backgroundColor: tokens.divider, marginVertical: 4 }} />
+              <SummaryRow label={t('checkout.subtotal')} value={formatCurrency(totals.subtotal)} tokens={tokens} />
+              {totals.discount > 0 ? (
+                <SummaryRow label={t('checkout.discount')} value={`−${formatCurrency(totals.discount)}`} tokens={tokens} />
+              ) : null}
+              <SummaryRow
+                label={t('checkout.deliveryPriceLabel')}
+                value={
+                  delivery.fee === null
+                    ? NO_PRICE_YET
+                    : delivery.fee > 0
+                      ? formatCurrency(delivery.fee)
+                      : t('checkout.free')
+                }
+                tokens={tokens}
+              />
+              <AppView row justify="space-between">
+                <AppText family="accent" weight="bold" style={{ fontSize: 16, color: tokens.text }}>{t('checkout.total')}</AppText>
+                <AppPrice
+                  value={grandTotal === null ? NO_PRICE_YET : formatCurrency(grandTotal)}
+                  size={18}
+                  color={tokens.text}
+                />
+              </AppView>
+            </AppView>
+          )}
 
           {create.error ? (
             <AppView row align="center" gap={8}>
               <AlertCircle size={16} strokeWidth={2} color={tokens.error} />
-              <AppText family="default" style={{ fontSize: 12.5, color: tokens.error, flex: 1 }}>{create.error}</AppText>
+              <AppText family="default" style={{ fontSize: 12.5, color: tokens.error, flex: 1 }}>
+                {orderRefusalKey ? t(orderRefusalKey) : create.error}
+              </AppText>
             </AppView>
           ) : null}
         </AppView>
@@ -269,192 +368,37 @@ export default function CheckoutScreen() {
       <AppView colorName="background" px="lg" style={{ paddingTop: 14, paddingBottom: Math.max(insets.bottom, 20), borderTopWidth: 1, borderTopColor: tokens.divider }}>
         <AppButton
           testID="checkout-place-order-btn"
-          title={create.phase === 'placing' ? t('checkout.placingOrder') : t('checkout.placeOrder', { total: formatCurrency(grandTotal) })}
+          title={
+            payment.phase === 'paying'
+              ? t('checkout.payingOrder')
+              : payment.pending
+                ? t('checkout.retryPayment', {
+                    total: payment.order?.totalLabel ?? payment.pending.totalLabel,
+                  })
+                : create.phase === 'placing'
+                  ? t('checkout.placingOrder')
+                  : grandTotal === null
+                    ? t('checkout.placeOrderNoTotal')
+                    : t('checkout.placeOrder', { total: formatCurrency(grandTotal) })
+          }
           kind="brand"
           size="lg"
           fullWidth
-          disabled={items.length === 0 || create.phase === 'placing'}
-          onPress={placeOrder}
+          disabled={
+            payment.phase !== 'idle' ||
+            (!payment.pending &&
+              (items.length === 0 || create.phase === 'placing' || !delivery.ready))
+          }
+          onPress={payment.pending ? payment.retry : placeOrder}
         />
       </AppView>
 
       <AddressFormSheet
         visible={sheetVisible}
+        initial={editingAddress}
         onClose={() => setSheetVisible(false)}
-        onSubmit={handleAddAddress}
+        onSubmit={saveAddress}
       />
-    </AppView>
-  );
-}
-
-// ── Delivery address section ───────────────────────────────────────────
-// Three shapes: a chosen address (with change/skip), the skipped state
-// (courier calls), or the empty prompt (add / skip).
-
-function DeliverySection({
-  tokens,
-  addr,
-  skipped,
-  canChange,
-  onChange,
-  onAdd,
-  onSkip,
-}: {
-  tokens: Tokens;
-  addr: Address | null;
-  skipped: boolean;
-  canChange: boolean;
-  onChange: () => void;
-  onAdd: () => void;
-  onSkip: () => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <AppView rounded={16} p={16} colorName="card" borderWidth={1} borderName="border" gap={10}>
-      <AppView row align="center" justify="space-between">
-        <SectionLabel tokens={tokens}>{t('checkout.deliveryAddress')}</SectionLabel>
-        {addr && canChange ? (
-          <AppPressableView onPress={onChange} accessibilityRole="button" accessibilityLabel={t('checkout.changeAddress')}>
-            <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.text }}>{t('checkout.change')}</AppText>
-          </AppPressableView>
-        ) : null}
-      </AppView>
-
-      {addr ? (
-        <>
-          <AppView row align="center" gap={10}>
-            <MapPin size={18} strokeWidth={2} color={tokens.text} />
-            <AppView flex={1}>
-              <AppText family="default" weight="semibold" style={{ fontSize: 15, color: tokens.text }}>{addr.label}</AppText>
-              <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted, marginTop: 2 }}>
-                {`${addr.line1}, ${addr.city}`}
-              </AppText>
-            </AppView>
-          </AppView>
-          <AppView row gap={18} style={{ marginTop: 2 }}>
-            <LinkAction label={t('checkout.addNew')} onPress={onAdd} color={tokens.text} />
-            <LinkAction label={t('checkout.skipForNow')} onPress={onSkip} color={tokens.textMuted} />
-          </AppView>
-        </>
-      ) : skipped ? (
-        <>
-          <AppView row align="center" gap={10}>
-            <PhoneCall size={18} strokeWidth={2} color={tokens.text} />
-            <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted, flex: 1 }}>
-              {t('checkout.noAddressCourier')}
-            </AppText>
-          </AppView>
-          <LinkAction label={t('checkout.addAnAddress')} onPress={onAdd} color={tokens.text} />
-        </>
-      ) : (
-        <>
-          <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted }}>
-            {t('checkout.addAddressOrSkip')}
-          </AppText>
-          <AppView row gap={10}>
-            <AppButton title={t('checkout.addAddress')} kind="secondary" size="sm" onPress={onAdd} />
-            {/* variant="ghost" → transparent bg + `tokens.text` label. Without it
-                the default solid text-kind button is white-on-white (invisible)
-                in dark mode. */}
-            <AppButton title={t('checkout.skip')} kind="text" variant="ghost" size="sm" onPress={onSkip} />
-          </AppView>
-        </>
-      )}
-    </AppView>
-  );
-}
-
-function LinkAction({ label, onPress, color }: { label: string; onPress: () => void; color: string }) {
-  return (
-    <AppPressableView onPress={onPress} accessibilityRole="button" accessibilityLabel={label} hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}>
-      <AppText family="accent" weight="bold" style={{ fontSize: 13, color }}>{label}</AppText>
-    </AppPressableView>
-  );
-}
-
-// ── Payment row (selectable) ───────────────────────────────────────────
-
-function PaymentRow({
-  option,
-  selected,
-  onPress,
-  tokens,
-}: {
-  option: PaymentOption;
-  selected: boolean;
-  onPress: () => void;
-  tokens: Tokens;
-}) {
-  const Icon = option.icon;
-  const { t } = useTranslation();
-  return (
-    <AppPressableView
-      onPress={onPress}
-      accessibilityRole="radio"
-      accessibilityState={{ selected }}
-      accessibilityLabel={t(option.labelKey)}
-      rounded={16}
-      p={14}
-      colorName="card"
-      borderWidth={1}
-      borderName={selected ? undefined : 'border'}
-      style={selected ? { borderWidth: 1.5, borderColor: tokens.text } : undefined}
-    >
-      <AppView row align="center" gap={12}>
-        <Icon size={20} strokeWidth={2} color={tokens.text} />
-        <AppView flex={1}>
-          <AppText family="default" weight="semibold" style={{ fontSize: 15, color: tokens.text }}>{t(option.labelKey)}</AppText>
-          <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted, marginTop: 1 }}>{t(option.descriptionKey)}</AppText>
-        </AppView>
-        <AppView
-          center
-          rounded={999}
-          style={{
-            width: 22,
-            height: 22,
-            borderWidth: selected ? 0 : 1.5,
-            borderColor: tokens.border,
-            backgroundColor: selected ? tokens.text : 'transparent',
-          }}
-        >
-          {selected ? <Check size={14} strokeWidth={3} color={tokens.background} /> : null}
-        </AppView>
-      </AppView>
-    </AppPressableView>
-  );
-}
-
-function SectionLabel({ tokens, children }: { tokens: Tokens; children: string }) {
-  return (
-    <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.7 }}>
-      {children}
-    </AppText>
-  );
-}
-
-function SectionCard({ label, main, sub, onChange, tokens }: { label: string; main: string; sub: string; onChange?: () => void; tokens: Tokens }) {
-  const { t } = useTranslation();
-  return (
-    <AppView rounded={16} p={16} colorName="card" borderWidth={1} borderName="border">
-      <AppView row align="center" justify="space-between" style={{ marginBottom: 8 }}>
-        <SectionLabel tokens={tokens}>{label}</SectionLabel>
-        {onChange ? (
-          <AppPressableView onPress={onChange} accessibilityRole="button" accessibilityLabel={t('checkout.changeLabel', { label })}>
-            <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.text }}>{t('checkout.change')}</AppText>
-          </AppPressableView>
-        ) : null}
-      </AppView>
-      <AppText family="default" weight="semibold" style={{ fontSize: 15, color: tokens.text }}>{main}</AppText>
-      <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted, marginTop: 2 }}>{sub}</AppText>
-    </AppView>
-  );
-}
-
-function SummaryRow({ label, value, tokens }: { label: string; value: string; tokens: Tokens }) {
-  return (
-    <AppView row justify="space-between">
-      <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted }}>{label}</AppText>
-      <AppText family="accent" weight="semibold" style={{ fontSize: 13.5, color: tokens.text }}>{value}</AppText>
     </AppView>
   );
 }

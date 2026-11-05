@@ -30,8 +30,15 @@ export const ordersQueryKeys = {
   detail: (id: string) => ['orders', 'detail', id] as const,
   addresses: () => ['account', 'addresses'] as const,
   paymentMethods: () => ['account', 'payment-methods'] as const,
-  shippingQuote: (req: ShippingQuoteRequest) => ['shipping', 'quote', req.addressId] as const,
+  shippingQuote: (req: ShippingQuoteRequest) =>
+    ['shipping', 'quote', req.addressId, req.location ?? null, req.cartKey ?? null] as const,
 };
+
+/** The machine-readable code of a failed request, when the server stated one. */
+function errorCodeOf(error: unknown): string | null {
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === 'string' ? code : null;
+}
 
 // ── useOrders (list) ───────────────────────────────────────────────────
 
@@ -131,6 +138,7 @@ export type CreateOrderPhase = 'idle' | 'placing' | 'success' | 'error';
 export type UseCreateOrderValue = {
   phase: CreateOrderPhase;
   error: string | null;
+  errorCode: string | null;
   result: CreateOrderResult | null;
   placeOrder: (input: CreateOrderInput) => Promise<CreateOrderResult | null>;
   reset: () => void;
@@ -172,6 +180,7 @@ export function useCreateOrder(): UseCreateOrderValue {
     () => ({
       phase,
       error: mutation.error instanceof Error ? mutation.error.message : null,
+      errorCode: errorCodeOf(mutation.error),
       result,
       placeOrder,
       reset,
@@ -238,7 +247,13 @@ export function useCreateAddress() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: AddressInput) => ordersTransport.createAddress(input),
-    onSuccess: () => {
+    onSuccess: (created) => {
+      // In the list at once: the checkout quotes and orders against this id as soon as the
+      // save returns, and must not fall back on another address until the refetch lands.
+      queryClient.setQueryData<Address[]>(ordersQueryKeys.addresses(), (current) => [
+        ...(current ?? []).filter((address) => address.id !== created.id),
+        created,
+      ]);
       void queryClient.invalidateQueries({ queryKey: ordersQueryKeys.addresses() });
     },
   });
@@ -249,7 +264,11 @@ export function useUpdateAddress() {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: AddressInput }) =>
       ordersTransport.updateAddress(id, input),
-    onSuccess: () => {
+    onSuccess: (updated) => {
+      // As above: a moved point has to change the quote straight away.
+      queryClient.setQueryData<Address[]>(ordersQueryKeys.addresses(), (current) =>
+        current?.map((address) => (address.id === updated.id ? updated : address)),
+      );
       void queryClient.invalidateQueries({ queryKey: ordersQueryKeys.addresses() });
     },
   });
@@ -324,6 +343,7 @@ export type UseShippingQuoteValue = {
   state: CollectionState;
   options: ShippingOption[];
   error: string | null;
+  errorCode: string | null;
   refresh: () => void;
 };
 
@@ -334,21 +354,29 @@ export function useShippingQuote(request: ShippingQuoteRequest | null): UseShipp
       : ['shipping', 'quote', 'disabled'],
     queryFn: ({ signal }) => ordersTransport.getShippingQuote(request as ShippingQuoteRequest, signal),
     enabled: !!request,
+    // A price the buyer is about to agree to: always asked for afresh on opening the
+    // screen (the server caches the costly part), and a refresh that is under way counts
+    // as loading, so an old price cannot be confirmed in the meantime. Retrying is the
+    // buyer's call: most refusals only change when they change something.
+    staleTime: 0,
+    refetchOnMount: 'always',
+    retry: false,
   });
 
   return useMemo<UseShippingQuoteValue>(
     () => ({
       state: !request
         ? 'idle'
-        : query.isPending
+        : query.isFetching
           ? 'loading'
           : query.isError
             ? 'error'
             : 'success',
-      options: query.data ?? [],
+      options: query.isError ? [] : query.data ?? [],
       error: query.error instanceof Error ? query.error.message : null,
+      errorCode: errorCodeOf(query.error),
       refresh: () => {
-        void query.refetch();
+        if (request) void query.refetch();
       },
     }),
     [request, query],
