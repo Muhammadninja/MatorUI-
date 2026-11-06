@@ -51,7 +51,10 @@ describe('formatOrderNo', () => {
   });
 });
 
-// The exact object api.mator.uz returned for a freshly-created order.
+// The exact object api.mator.uz returned for a freshly-created order. It was placed on
+// 2026-07-21 under the old flat fee of 5 000; today's tariff (tariff A) would charge 10 000 on
+// 250 000 of parts. That is the point: an order keeps what it was charged, and the app shows
+// the backend's stored figures, never a fee it works out itself.
 const RAW: RawBackendOrder = {
   order_id: 'ord_01KY2DNPSRYPT8C7SDT2N7JJCH',
   status: 'pending_payment',
