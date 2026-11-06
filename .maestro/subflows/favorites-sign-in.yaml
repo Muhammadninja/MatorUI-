@@ -9,14 +9,13 @@ appId: com.mator.e2e
 - copyTextFrom:
     id: auth-phone-field
 - assertTrue: ${maestro.copiedText === '' || maestro.copiedText === '+998 90 123 45 67'}
-- hideKeyboard
-- assertVisible:
-    id: auth-send-code-btn
-    enabled: false
 - tapOn:
     id: auth-phone-field
 - inputText: ${PHONE}
-- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: auth-send-code-btn
+    direction: DOWN
 - tapOn:
     id: auth-send-code-btn
 - extendedWaitUntil:
@@ -26,7 +25,10 @@ appId: com.mator.e2e
 - tapOn:
     id: auth-otp-field
 - inputText: '123456'
-- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: auth-verify-btn
+    direction: DOWN
 - tapOn:
     id: auth-verify-btn
 - extendedWaitUntil:
