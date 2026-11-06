@@ -21,8 +21,18 @@ tags:
     visible:
       id: item-detail-screen
     timeout: 15000
-- tapOn: Save to favorites
+- extendedWaitUntil:
+    visible:
+      text: '.*BREMBO P59049.*'
+    timeout: 15000
+- tapOn:
+    text: Save to favorites
+    retryTapIfNoChange: false
 - openLink: mator-e2e://liked
+- extendedWaitUntil:
+    visible:
+      id: liked-screen
+    timeout: 15000
 - extendedWaitUntil:
     visible:
       id: part-card-brembo-fp
@@ -34,6 +44,10 @@ tags:
     env:
       PHONE: '+998900000002'
 - openLink: mator-e2e://liked
+- extendedWaitUntil:
+    visible:
+      id: liked-screen
+    timeout: 15000
 - assertVisible:
     id: liked-empty
 - assertNotVisible:
@@ -43,8 +57,18 @@ tags:
     visible:
       id: item-detail-screen
     timeout: 15000
-- tapOn: Save to favorites
+- extendedWaitUntil:
+    visible:
+      text: '.*BOSCH 0986479R89.*'
+    timeout: 15000
+- tapOn:
+    text: Save to favorites
+    retryTapIfNoChange: false
 - openLink: mator-e2e://liked
+- extendedWaitUntil:
+    visible:
+      id: liked-screen
+    timeout: 15000
 - extendedWaitUntil:
     visible:
       id: part-card-bosch-rotor
@@ -57,6 +81,10 @@ tags:
 - openLink: mator-e2e://liked
 - extendedWaitUntil:
     visible:
+      id: liked-screen
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
       id: part-card-brembo-fp
     timeout: 15000
 - assertNotVisible:
@@ -65,6 +93,10 @@ tags:
 - stopApp
 - launchApp
 - openLink: mator-e2e://liked
+- extendedWaitUntil:
+    visible:
+      id: liked-screen
+    timeout: 15000
 - extendedWaitUntil:
     visible:
       id: part-card-brembo-fp
@@ -80,6 +112,10 @@ tags:
 - assertVisible:
     id: profile-sign-out
 - openLink: mator-e2e://liked
+- extendedWaitUntil:
+    visible:
+      id: liked-screen
+    timeout: 15000
 - assertVisible:
     id: part-card-brembo-fp
 - assertNotVisible:
