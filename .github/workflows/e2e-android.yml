@@ -95,9 +95,18 @@ jobs:
           key: gradle-${{ runner.os }}-${{ hashFiles('android/**/*.gradle*', 'android/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: gradle-${{ runner.os }}-
 
+      # Expo's default 512 MB Metaspace exhausted during AGP release lint and
+      # left the daemon emitting OOMs instead of exiting. This disposable test
+      # APK skips publishing lint; production builds retain their normal checks.
       - name: Build release APK (JS bundled, debug-signed)
+        timeout-minutes: 30
         working-directory: android
-        run: ./gradlew :app:assembleRelease --no-daemon -x lint -PreactNativeArchitectures=x86_64
+        run: >-
+          ./gradlew :app:assembleRelease --no-daemon --console=plain --max-workers=2
+          '-Dorg.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=1536m -XX:+ExitOnOutOfMemoryError'
+          -Dorg.gradle.parallel=false -Pkotlin.compiler.execution.strategy=in-process
+          -x lint -x lintVitalAnalyzeRelease -x lintVitalReportRelease
+          -PreactNativeArchitectures=x86_64
 
       # The APK is all we need from here on. Gradle's daemon/build dirs and the
       # transform caches are several GB that would otherwise still be resident

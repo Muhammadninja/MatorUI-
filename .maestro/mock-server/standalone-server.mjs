@@ -69,9 +69,9 @@ function orderDetail(id, totalLabel) {
 }
 
 // ── AUTH: passwordless phone OTP (backend.json wire shape) ───────────────────
-// request-otp stores the pending request by request_id; verify-otp accepts any
-// 6-digit code and returns { user, tokens }. `dev_otp_code` lets demo/E2E builds
-// auto-fill the code so the suite stays buttons-only.
+// Challenges bind the exact mock OTP to one synthetic account and expire after
+// five minutes. Bundled E2E enters the code explicitly; no production auth path
+// imports this server.
 const pendingOtps = new Map();
 const OTP_DEV_CODE = '123456';
 // Synthetic accounts; accepted only by this loopback-bound mock process.
@@ -223,7 +223,7 @@ const server = http.createServer(async (req, res) => {
     });
   }
 
-  // AUTH — POST /v1/auth/phone/verify-otp → { user, tokens } (any 6-digit code).
+  // AUTH — POST /v1/auth/phone/verify-otp → { user, tokens } (mock OTP only).
   if (req.method === 'POST' && pathname === '/v1/auth/phone/verify-otp') {
     const body = await readBody(req);
     const code = typeof body.otp_code === 'string' ? body.otp_code.trim() : '';

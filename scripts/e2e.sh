@@ -4,16 +4,10 @@
 # Boots the standalone mock (.maestro/mock-server/standalone-server.mjs), waits
 # for it to answer, runs `maestro test`, then tears the mock down — pass or fail.
 #
-# PREREQUISITE: a simulator/emulator must already be running the app, BUILT with
-#   EXPO_PUBLIC_API_BASE_URL=http://localhost:<port>
-# (Expo inlines EXPO_PUBLIC_* at bundle time — this script can't inject it). See
-# .maestro/README.md § "Wiring the app to the mock server".
-#
-# Usage:
-#   ./scripts/e2e.sh                                  # whole suite
-#   ./scripts/e2e.sh .maestro/flows/flow-01-vin-lookup.yaml   # one flow
-#   ./scripts/e2e.sh --include-tags=smoke             # any maestro test flag
-#   MOCK_PORT=9090 ./scripts/e2e.sh                   # override mock port
+# Prerequisite: an emulator with the dedicated test app installed (see README).
+# The app's endpoint is fixed at build time; this script cannot change it.
+# Favorites: bash scripts/e2e.sh .maestro/flows/flow-12-favorites-isolation.yaml
+# Legacy iOS flows can still be passed explicitly or run with no arguments.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
