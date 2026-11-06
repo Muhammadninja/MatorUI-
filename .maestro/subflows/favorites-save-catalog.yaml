@@ -1,0 +1,20 @@
+appId: com.mator.e2e
+---
+- openLink: mator-e2e://catalog/parts?categoryId=brakes
+- extendedWaitUntil:
+    visible:
+      id: parts-directory-screen
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: part-like-${PART_ID}
+    direction: DOWN
+- assertVisible:
+    id: part-like-${PART_ID}
+    selected: false
+- tapOn:
+    id: part-like-${PART_ID}
+    retryTapIfNoChange: false
+- assertVisible:
+    id: part-like-${PART_ID}
+    selected: true

@@ -16,18 +16,10 @@ tags:
     file: ../subflows/favorites-sign-in.yaml
     env:
       PHONE: '+998900000001'
-- openLink: mator-e2e://item-detail/brembo-fp
-- extendedWaitUntil:
-    visible:
-      id: item-detail-screen
-    timeout: 15000
-- extendedWaitUntil:
-    visible:
-      text: '.*BREMBO P59049.*'
-    timeout: 15000
-- tapOn:
-    text: Save to favorites
-    retryTapIfNoChange: false
+- runFlow:
+    file: ../subflows/favorites-save-catalog.yaml
+    env:
+      PART_ID: brembo-fp
 - openLink: mator-e2e://liked
 - extendedWaitUntil:
     visible:
@@ -52,18 +44,10 @@ tags:
     id: liked-empty
 - assertNotVisible:
     id: part-card-brembo-fp
-- openLink: mator-e2e://item-detail/bosch-rotor
-- extendedWaitUntil:
-    visible:
-      id: item-detail-screen
-    timeout: 15000
-- extendedWaitUntil:
-    visible:
-      text: '.*BOSCH 0986479R89.*'
-    timeout: 15000
-- tapOn:
-    text: Save to favorites
-    retryTapIfNoChange: false
+- runFlow:
+    file: ../subflows/favorites-save-catalog.yaml
+    env:
+      PART_ID: bosch-rotor
 - openLink: mator-e2e://liked
 - extendedWaitUntil:
     visible:
