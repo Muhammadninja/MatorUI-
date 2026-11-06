@@ -82,6 +82,7 @@ describe('dedicated E2E app boundary', () => {
     expect(config.android.package).toBe('com.mator.e2e');
     expect(config.scheme).toBe('mator-e2e');
     expect(config.updates.enabled).toBe(false);
+    expect(config.plugins).toContain('./plugins/with-e2e-loopback');
     expect(config.extra.appEnvironment.allowDevOtp).toBe(false);
   });
   test.each(['production', 'internal', 'preview', 'development'])('rejects test switch in %s', (profile) => {

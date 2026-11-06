@@ -18,7 +18,8 @@ module.exports = ({ config }) => {
     ...config,
     ...(e2e ? {
       name: 'Mator E2E', scheme: 'mator-e2e',
-      android: { ...config.android, package: 'com.mator.e2e', usesCleartextTraffic: true },
+      android: { ...config.android, package: 'com.mator.e2e' },
+      plugins: [...(config.plugins || []), './plugins/with-e2e-loopback'],
       ios: { ...config.ios, bundleIdentifier: 'com.mator.e2e' },
       updates: { enabled: false },
     } : {}),

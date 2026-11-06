@@ -75,6 +75,17 @@ jobs:
       - name: Run Expo Prebuild for dedicated test app
         run: npx expo prebuild --platform android --clean --no-install
 
+      - name: Verify generated test identity and HTTP manifest
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const gradle = fs.readFileSync('android/app/build.gradle', 'utf8');
+          const manifest = fs.readFileSync('android/app/src/main/AndroidManifest.xml', 'utf8');
+          if (!gradle.includes("applicationId 'com.mator.e2e'")) throw Error('Wrong test application ID');
+          if (!manifest.includes('android:usesCleartextTraffic="true"')) throw Error('Mock HTTP unavailable');
+          if (!manifest.includes('android:scheme="mator-e2e"')) throw Error('Wrong test scheme');
+          NODE
+
       - name: Gradle cache
         uses: actions/cache@v4
         with:
