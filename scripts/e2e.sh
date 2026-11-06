@@ -58,4 +58,11 @@ done
 curl --fail --silent --request POST "http://127.0.0.1:$PORT/__e2e/reset" >/dev/null
 
 echo "• running: maestro test $*"
-maestro test "$@"
+set +e
+MAESTRO_CLI_NO_ANALYTICS=1 maestro test "$@"
+MAESTRO_RESULT=$?
+set -e
+if [[ "$MAESTRO_RESULT" -ne 0 ]] && command -v adb >/dev/null 2>&1; then
+  node scripts/e2e-ui-diagnostic.mjs
+fi
+exit "$MAESTRO_RESULT"
