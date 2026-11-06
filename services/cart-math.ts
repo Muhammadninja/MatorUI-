@@ -45,6 +45,21 @@ export type CartTotals = {
   total: number;
 };
 
+/**
+ * What the backend says the cart costs, from its own copy of the cart. The service fee is
+ * only ever known from here: the app holds no tariff, so it never works one out itself.
+ */
+export type CartCharges = {
+  /** The cost of the parts, at their current prices. */
+  subtotal: number;
+  /** A promo discount on the goods. */
+  discount: number;
+  /** Mator's service fee for the whole order. 0 when there is none. */
+  serviceFee: number;
+  /** Everything but delivery: the goods after discount, and the fee. */
+  total: number;
+};
+
 export type PromoResult =
   | { ok: true; promo: PromoCode }
   | { ok: false; reason: 'invalid' | 'min_subtotal'; minSubtotal?: number };
@@ -86,6 +101,11 @@ export function round(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+/** Sums of money to the tiyin, so a float can never add a stray fraction to a total. */
+export function addUzs(...amounts: number[]): number {
+  return amounts.reduce((sum, amount) => sum + Math.round(amount * 100), 0) / 100;
+}
+
 export function formatCurrency(amount: number): string {
   // UZS is a whole-som currency (no minor unit). Digit groups are joined with a
   // non-breaking space so a narrow column can't split the amount, and the label
@@ -98,8 +118,9 @@ export function formatCurrency(amount: number): string {
 }
 
 /**
- * The totals breakdown for a subtotal and an optional promo. There is no tax line, no
- * service fee and no flat delivery fee, because the backend charges none of them.
+ * The goods-only totals for a subtotal and an optional promo, for what the app can show
+ * before the backend has answered: a guest's cart, or a change on its way. The service fee
+ * and delivery are not in here. Only the backend states them (see CartCharges).
  *
  * Rules:
  *  - 'percent' promos apply to subtotal and respect maxDiscount cap.

@@ -138,6 +138,33 @@ describe('Screens showing an order', () => {
       expect(allText()).toContain('Заказ ждёт оплаты');
     });
 
+    test('shows what the order was placed at, the service fee on its own line', async () => {
+      getOrder.mockResolvedValue(
+        order({
+          serverStatus: 'paid',
+          charges: { subtotal: 600_000, discount: 0, serviceFee: 20_000, delivery: 25_000, total: 645_000 },
+        }),
+      );
+      await mount(<OrderConfirmationScreen />);
+
+      expect(allText()).toContain('Стоимость запчастей | 600 000 сум');
+      expect(allText()).toContain('Сервисный сбор | 20 000 сум');
+      expect(allText()).toContain('Стоимость доставки | 25 000 сум');
+    });
+
+    test('an order with no fee shows no line for one', async () => {
+      getOrder.mockResolvedValue(
+        order({
+          serverStatus: 'paid',
+          charges: { subtotal: 90_000, discount: 0, serviceFee: 0, delivery: 0, total: 90_000 },
+        }),
+      );
+      await mount(<OrderConfirmationScreen />);
+
+      expect(allText()).toContain('Стоимость запчастей | 90 000 сум');
+      expect(allText()).not.toContain('Сервисный сбор');
+    });
+
     test.each(['expired', 'cancelled'])('a %s order is not called a success', async (serverStatus) => {
       getOrder.mockResolvedValue(order({ serverStatus }));
       await mount(<OrderConfirmationScreen />);
@@ -148,6 +175,18 @@ describe('Screens showing an order', () => {
   });
 
   describe('tracking an order', () => {
+    test('shows the fee the order was placed with, apart from the parts and delivery', async () => {
+      getOrder.mockResolvedValue(
+        order({
+          charges: { subtotal: 600_000, discount: 0, serviceFee: 20_000, delivery: 25_000, total: 645_000 },
+        }),
+      );
+      await mount(<TrackOrderScreen />);
+
+      expect(allText()).toContain('Сервисный сбор | 20 000 сум');
+      expect(allText()).toContain('Стоимость доставки | 25 000 сум');
+    });
+
     test('an order waiting for online payment can be paid from here', async () => {
       getOrder.mockResolvedValue(order());
       await mount(<TrackOrderScreen />);

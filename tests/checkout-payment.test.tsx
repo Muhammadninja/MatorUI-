@@ -90,11 +90,16 @@ vi.mock('@/contexts/cart.context', async () => {
       return {
         items: cart.items,
         totals: math.computeTotals(subtotal, null),
+        // What the server says the cart costs. No fee here: what a fee does is pinned in
+        // checkout-service-fee.test.tsx.
+        charges: { subtotal, discount: 0, serviceFee: 0, total: subtotal },
         appliedPromo: null,
         pendingIds: new Set<string>(),
+        error: null,
         formatCurrency: math.formatCurrency,
         clearCart: cart.clearCart,
         restoreCart: cart.restoreCart,
+        refresh: vi.fn(async () => undefined),
       };
     },
   };

@@ -311,13 +311,25 @@ type PromoCode = { code; label; kind: 'percent'|'fixed'|'free_shipping'; value: 
 > Promo codes live **client-side** (`WELCOME10` 10%, `RIDE25` 25% cap $200, `FREESHIP`).
 > The server's rules must mirror this table exactly or the two diverge.
 
-### Cart math (client; backend must mirror) — `services/cart-math.ts`
+### Cart money and the service fee — the backend's figures, never the app's
 
-- `TAX_RATE = 0.085`, `FLAT_SHIPPING = 49`, `FREE_SHIPPING_THRESHOLD = 500`, `PROMO_MIN_SUBTOTAL = 100`.
-- `shipping = subtotal>0 ? (subtotal>=500 ? 0 : 49) : 0`
-- promo `percent → min(subtotal*value, maxDiscount?)`; `fixed → min(subtotal, value)`; `free_shipping → shipping=0`
-- `taxedBase = max(0, subtotal − discount)`; **`tax = taxedBase * 0.085`**; `total = taxedBase + shipping + tax`
-- `subtotal = Σ parsePrice(price) * quantity`.
+Every cart answer (`GET /v1/cart` and each mutation, which returns the whole cart) carries the
+backend's own figures for that cart, worked out again on every change:
+
+| Field | Meaning |
+|---|---|
+| `subtotal_uzs` | The cost of the parts at their current prices. |
+| `discount_uzs` | A promo discount on the goods. |
+| `service_fee_uzs` | Mator's service fee for the whole order. 0 when there is none. |
+| `total_uzs` | Everything but delivery: `subtotal − discount + service fee`. |
+
+The tariff lives in the backend alone (`src/orders/service-fee.util.ts`): the app holds no copy
+and works out no fee. `parseCartCharges` reads these into `CartCharges`, and the cart context
+exposes them as `charges`, null while the server has not stated them (a guest's cart, a failed
+read). An answer that names no `service_fee_uzs` is not taken to mean "no fee".
+
+What the app still works out from the lines (`computeTotals`, goods only) is only for showing a
+guest's cart, or a change on its way; the cart screen then says the fee is stated at checkout.
 
 ---
 
@@ -335,6 +347,17 @@ type CreateOrderResult = { orderId; eta; totalLabel };
 | Method & path | Request | Response |
 |---|---|---|
 | `POST /v1/orders` | `CreateOrderInput` | `CreateOrderResult` (server re-validates pricing; empty items → error) |
+
+**The service fee at checkout.** The checkout shows the parts, the fee and delivery apart, and
+its total is `charges.total` (parts after discount and the fee) plus the quoted delivery, shown
+only while no change to the cart is on its way. Placing the order sends that total as
+`confirmed_total_uzs`. The server computes every amount itself, never charges a client figure,
+and answers `409 ORDER_TOTAL_CHANGED` when the total it computes is not the one confirmed; the
+app then fetches the cart and the quote again and shows `checkout.orderTotalChanged`. A body
+stating a fee or a total of its own (`service_fee_uzs`, `total_uzs`) is refused as an unknown
+field. An order's response states `subtotal_uzs`, `discount_uzs`, `service_fee_uzs`,
+`delivery_uzs` and `total_uzs` as stored when it was placed, which the confirmation, tracking
+and unpaid-order views show (`OrderDetail.charges`).
 | `GET /v1/orders?page&pageSize&status` | query (all optional) | `OrderListPage` |
 | `GET /v1/orders/:orderId` | — | `OrderDetail` (404 → not-found) |
 

@@ -11,10 +11,12 @@ import AddressFormSheet, {
 import {
   DeliveryPriceCard,
   DeliverySection,
+  LinkAction,
+  NO_PRICE_YET,
+  OrderChargeRows,
   PaymentRetryCard,
   PaymentRow,
   SectionLabel,
-  SummaryRow,
 } from '@/components/screens-components/checkout/checkout-sections';
 import { AppButton } from '@/components/shared/app-button';
 import { AppPrice } from '@/components/shared/app-price';
@@ -35,16 +37,14 @@ import {
 } from '@/hooks/use-orders';
 import { parsePrice } from '@/services/cart-math';
 import {
-  deliveryRefusalKey,
+  checkoutTotal,
+  orderRefusalKey,
   resolveCheckoutDelivery,
   type DeliveryMethod,
 } from '@/services/checkout-presentation';
 import garageService from '@/services/garage-service';
 import type { Address, PaymentType } from '@/services/orders-service';
 import { triggerHaptic } from '@/utils/haptics';
-
-/** Shown in place of a figure that is not known yet. Never zero. */
-const NO_PRICE_YET = '—';
 
 /**
  * Checkout — the Uzbek-market flow. A courier needs a delivery address, because
@@ -58,6 +58,11 @@ const NO_PRICE_YET = '—';
  * map, distance, route or arrival time is shown here, and the app never talks to a
  * routing provider. Every figure comes from the backend's quote.
  *
+ * So do the cost of the parts and Mator's service fee: the backend's cart states them, and
+ * the app works none of it out. The total is shown and the order placed only while those
+ * figures match the cart on screen, and the server refuses an order whose total moved since
+ * (`ORDER_TOTAL_CHANGED`), after which the figures are fetched again.
+ *
  * Payme is paid after the order exists. A payment that does not go through leaves that order
  * unpaid and this screen open on it, with the cart intact: the button then pays that same
  * order again, and nothing here can place a second one by accident. The confirmation screen
@@ -67,7 +72,17 @@ export default function CheckoutScreen() {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
-  const { items, totals, appliedPromo, pendingIds, formatCurrency, clearCart } = useCartContext();
+  const {
+    items,
+    totals,
+    charges,
+    appliedPromo,
+    pendingIds,
+    error: cartError,
+    formatCurrency,
+    clearCart,
+    refresh: refreshCart,
+  } = useCartContext();
   const { profile } = useUserContext();
 
   const addresses = useAddresses();
@@ -117,17 +132,29 @@ export default function CheckoutScreen() {
     quoteState: shipping.state,
     options: shipping.options,
   });
-  const grandTotal =
-    delivery.fee === null ? null : totals.subtotal - totals.discount + delivery.fee;
-
-  // The server refused the price on placing the order, so what is on screen is out of
-  // date: fetch what it would charge now, and the buyer confirms that or nothing.
-  const orderRefusalKey = deliveryRefusalKey(create.errorCode);
+  // The server's own figures for this cart: a sale may have started or ended, or the cart
+  // changed on another device, since it was last read.
   useEffect(() => {
-    if (orderRefusalKey) shipping.refresh();
+    void refreshCart();
+    // Once, on opening the checkout.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Only while no change to the cart is on its way: until then the server's figures are for
+  // the cart as it was.
+  const cartSettled = pendingIds.size === 0;
+  const settledCharges = cartSettled ? charges : null;
+  const grandTotal = checkoutTotal(charges, delivery.fee, cartSettled);
+
+  // The server refused the price or the total on placing the order, so what is on screen is
+  // out of date: fetch what it would charge now, and the buyer confirms that or nothing.
+  const refusalKey = orderRefusalKey(create.errorCode);
+  useEffect(() => {
+    if (!refusalKey) return;
+    shipping.refresh();
+    void refreshCart();
     // Only on a new refusal: `shipping` is a new object every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderRefusalKey]);
+  }, [refusalKey]);
 
   const chooseAddress = (id: string) => {
     setSelectedAddressId(id);
@@ -171,6 +198,7 @@ export default function CheckoutScreen() {
       shippingOptionKey: delivery.method,
       confirmedDeliveryUzs: delivery.method === 'courier' ? delivery.fee : null,
       deliveryQuoteId: delivery.method === 'courier' ? delivery.quoteId : null,
+      confirmedTotalUzs: grandTotal,
       promoCode: appliedPromo?.code ?? null,
       totalLabel: formatCurrency(grandTotal),
       // Backend order is built from the server cart; these tag it with the
@@ -309,6 +337,13 @@ export default function CheckoutScreen() {
                   </AppText>
                 </AppView>
               ))}
+              {/* What the order was placed at: fixed, whatever the cart says now. */}
+              {payment.order?.charges ? (
+                <>
+                  <AppView style={{ height: 1, backgroundColor: tokens.divider, marginVertical: 4 }} />
+                  <OrderChargeRows tokens={tokens} charges={payment.order.charges} formatCurrency={formatCurrency} />
+                </>
+              ) : null}
               <AppView row justify="space-between">
                 <AppText family="accent" weight="bold" style={{ fontSize: 16, color: tokens.text }}>{t('checkout.total')}</AppText>
                 <AppPrice value={payment.order?.totalLabel ?? payment.pending.totalLabel} size={18} color={tokens.text} />
@@ -327,21 +362,25 @@ export default function CheckoutScreen() {
                 </AppView>
               ))}
               <AppView style={{ height: 1, backgroundColor: tokens.divider, marginVertical: 4 }} />
-              <SummaryRow label={t('checkout.subtotal')} value={formatCurrency(totals.subtotal)} tokens={tokens} />
-              {totals.discount > 0 ? (
-                <SummaryRow label={t('checkout.discount')} value={`−${formatCurrency(totals.discount)}`} tokens={tokens} />
-              ) : null}
-              <SummaryRow
-                label={t('checkout.deliveryPriceLabel')}
-                value={
-                  delivery.fee === null
-                    ? NO_PRICE_YET
-                    : delivery.fee > 0
-                      ? formatCurrency(delivery.fee)
-                      : t('checkout.free')
-                }
+              <OrderChargeRows
                 tokens={tokens}
+                formatCurrency={formatCurrency}
+                charges={{
+                  subtotal: settledCharges?.subtotal ?? totals.subtotal,
+                  discount: settledCharges?.discount ?? totals.discount,
+                  serviceFee: settledCharges ? settledCharges.serviceFee : null,
+                  delivery: delivery.fee,
+                }}
               />
+              {!charges && cartSettled && cartError ? (
+                <AppView testID="checkout-charges-unavailable" row align="center" gap={8}>
+                  <AlertCircle size={16} strokeWidth={2} color={tokens.error} />
+                  <AppText family="default" style={{ fontSize: 12.5, color: tokens.error, flex: 1 }}>
+                    {t('checkout.totalsUnavailable')}
+                  </AppText>
+                  <LinkAction label={t('common.retry')} onPress={() => void refreshCart()} color={tokens.text} />
+                </AppView>
+              ) : null}
               <AppView row justify="space-between">
                 <AppText family="accent" weight="bold" style={{ fontSize: 16, color: tokens.text }}>{t('checkout.total')}</AppText>
                 <AppPrice
@@ -357,7 +396,7 @@ export default function CheckoutScreen() {
             <AppView row align="center" gap={8}>
               <AlertCircle size={16} strokeWidth={2} color={tokens.error} />
               <AppText family="default" style={{ fontSize: 12.5, color: tokens.error, flex: 1 }}>
-                {orderRefusalKey ? t(orderRefusalKey) : create.error}
+                {refusalKey ? t(refusalKey) : create.error}
               </AppText>
             </AppView>
           ) : null}
@@ -387,7 +426,10 @@ export default function CheckoutScreen() {
           disabled={
             payment.phase !== 'idle' ||
             (!payment.pending &&
-              (items.length === 0 || create.phase === 'placing' || !delivery.ready))
+              (items.length === 0 ||
+                create.phase === 'placing' ||
+                !delivery.ready ||
+                grandTotal === null))
           }
           onPress={payment.pending ? payment.retry : placeOrder}
         />

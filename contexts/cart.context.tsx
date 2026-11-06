@@ -17,6 +17,7 @@ import {
   evaluatePromoCode,
   formatCurrency,
   PROMO_CODES,
+  type CartCharges,
   type CartItem,
   type CartTotals,
   type PromoCode,
@@ -28,14 +29,19 @@ import { useUserContext } from '@/contexts/user.context';
 import { CartMutationQueue } from '@/services/cart-mutation-queue';
 
 // Re-export types and constants so existing imports keep working without churn.
-export type { CartItem, CartTotals, PromoCode, PromoResult };
+export type { CartCharges, CartItem, CartTotals, PromoCode, PromoResult };
 
 type AddCartItemInput = Omit<CartItem, 'quantity'>;
 
 type CartContextValue = {
   items: CartItem[];
   itemCount: number;
+  /** Worked out here from the lines, for showing before the server has answered. Goods only. */
   totals: CartTotals;
+  /** What the server last said the cart costs, service fee included, or null when it has not
+   *  said: a guest, a cart never fetched, a failed read. While `pendingIds` is not empty a
+   *  change is on its way, so these can be one step behind the lines. */
+  charges: CartCharges | null;
   appliedPromo: PromoCode | null;
   /** True once the persisted cart has been read from storage. */
   isHydrated: boolean;
@@ -72,6 +78,7 @@ export function CartProvider({ children }: PropsWithChildren) {
 function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren<{ ownerId: string | null; hydrating: boolean }>) {
   const [items, setItemsState] = useState<CartItem[]>([]);
   const [appliedPromo, setAppliedPromoState] = useState<PromoCode | null>(null);
+  const [charges, setCharges] = useState<CartCharges | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [pendingIds, setPendingIds] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
@@ -91,9 +98,16 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
     if (authedRef.current !== isAuthenticated) {
       mutations.invalidate(true);
       setPendingIds(new Set());
+      setCharges(null);
     }
     authedRef.current = isAuthenticated;
   }, [isAuthenticated, mutations]);
+
+  // Every server answer carries the whole cart's figures, so after any call that reached the
+  // server this is what it now says. A guest's cart never reaches it, and has none.
+  const syncCharges = useCallback(() => {
+    setCharges(authedRef.current ? (cartTransport.charges?.() ?? null) : null);
+  }, []);
 
   // Always-current snapshot for rollback during optimistic mutations.
   // We can't rely on closure values inside async callbacks because they
@@ -169,6 +183,7 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
         // empty cart. Cached lines must not survive only in the UI and inflate
         // checkout totals. Failed fetches still retain the offline cache.
         setItems(remote.items);
+        syncCharges();
         const promo = remote.appliedPromoCode ? PROMO_CODES[remote.appliedPromoCode] : null;
         setAppliedPromo(promo ?? null);
       } catch {
@@ -220,6 +235,7 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
         // Guests: local-only cart. Skip the server call (it requires auth and
         // would 401 → rollback). The optimistic update still persists to storage.
         const result = authedRef.current ? await mutations.enqueue(ticket, apiCall) : undefined;
+        syncCharges();
         if (mutations.isLatest(ticket)) {
           if (result !== undefined) reconcile?.(result);
           setError(null);
@@ -260,6 +276,7 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
           if (remote && version === mutations.readVersion()) {
             setItems(remote.items);
             setAppliedPromo(remote.appliedPromoCode ? PROMO_CODES[remote.appliedPromoCode] ?? null : null);
+            syncCharges();
           }
         } catch { /* Offline: retain the scoped rollback. */ }
         return null;
@@ -267,7 +284,7 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
         if (mutations.finish(ticket)) clearPending(pendingId);
       }
     },
-    [markPending, clearPending, mutations],
+    [markPending, clearPending, mutations, syncCharges],
   );
 
   const reconcileItem = useCallback((id: string, canonical: CartItem | null) => {
@@ -429,6 +446,7 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
       if (remote && version === mutations.readVersion()) {
         setItems(remote.items);
         setAppliedPromo(remote.appliedPromoCode ? PROMO_CODES[remote.appliedPromoCode] ?? null : null);
+        syncCharges();
       }
     } catch {
       // Offline: the local lines stay for now, and the unpaid order is safe either way.
@@ -436,7 +454,7 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
       if (mutations.finish(ticket)) clearPending('cart');
     }
     return snapshotRef.current.items;
-  }, [mutations, markPending, clearPending, setItems, setAppliedPromo]);
+  }, [mutations, markPending, clearPending, setItems, setAppliedPromo, syncCharges]);
 
   const removePromoCode = useCallback(() => {
     void withOptimistic(
@@ -478,6 +496,7 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
       setItems(remote.items);
       const promo = remote.appliedPromoCode ? PROMO_CODES[remote.appliedPromoCode] : null;
       setAppliedPromo(promo ?? null);
+      syncCharges();
       setError(null);
     } catch (err) {
       if (version !== mutations.readVersion()) return;
@@ -485,7 +504,7 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
       setError(message);
       toastService.danger('Could not refresh cart', { description: message });
     }
-  }, [mutations, setItems, setAppliedPromo]);
+  }, [mutations, setItems, setAppliedPromo, syncCharges]);
 
   // ── Derived ───────────────────────────────────────────────────────
   const itemCount = useMemo(
@@ -503,6 +522,7 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
       items,
       itemCount,
       totals,
+      charges,
       appliedPromo,
       isHydrated,
       pendingIds,
@@ -522,6 +542,7 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
       items,
       itemCount,
       totals,
+      charges,
       appliedPromo,
       isHydrated,
       pendingIds,

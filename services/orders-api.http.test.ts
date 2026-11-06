@@ -27,7 +27,15 @@ vi.mock('@/services/api-client', () => ({
   },
 }));
 
-import { HttpOrdersTransport, mapOrderToListRow, mapOrderToDetail, type RawBackendOrder } from './orders-api';
+import { formatCurrency } from './cart-math';
+import i18n from './i18n';
+import {
+  HttpOrdersTransport,
+  mapOrderCharges,
+  mapOrderToListRow,
+  mapOrderToDetail,
+  type RawBackendOrder,
+} from './orders-api';
 import { formatOrderNo } from './orders-service';
 
 describe('formatOrderNo', () => {
@@ -74,7 +82,7 @@ describe('mapOrderToListRow', () => {
     expect(row.id).toBe('ord_01KY2DNPSRYPT8C7SDT2N7JJCH');
     expect(row.status).toBe('Processing'); // pending_payment → Processing
     expect(row.items).toBe(2); // sum of qty
-    expect(row.total).toBe("280 000 so'm"); // UZS grouped
+    expect(row.total).toBe(formatCurrency(280000)); // UZS grouped, in the app's language
     expect(row.date).toBe('Jul 21, 2026');
     expect(row.summary).toBe('Motor oil');
   });
@@ -102,8 +110,43 @@ describe('mapOrderToDetail', () => {
     expect(d.currentStepIndex).toBe(0);
     expect(d.steps).toHaveLength(5);
     expect(d.courier).toBeNull();
-    expect(d.totalLabel).toBe("280 000 so'm");
-    expect(d.items[0]).toMatchObject({ title: 'Motor oil', quantity: 2, price: "250 000 so'm" });
+    expect(d.totalLabel).toBe(formatCurrency(280000));
+    expect(d.items[0]).toMatchObject({ title: 'Motor oil', quantity: 2, price: formatCurrency(250000) });
+  });
+
+  test('keeps each part of what the order charges, as the backend stored it', () => {
+    expect(mapOrderToDetail(RAW).charges).toEqual({
+      subtotal: 250000,
+      discount: 0,
+      serviceFee: 5000,
+      delivery: 25000,
+      total: 280000,
+    });
+  });
+});
+
+describe('mapOrderCharges', () => {
+  test('an order with no fee carries a fee of 0, not an unknown one', () => {
+    expect(mapOrderCharges({ ...RAW, service_fee_uzs: 0, total_uzs: 275000 })).toMatchObject({
+      serviceFee: 0,
+      total: 275000,
+    });
+  });
+
+  test('nothing is made up when the backend states no total or no parts', () => {
+    expect(mapOrderCharges({ ...RAW, total_uzs: undefined })).toBeNull();
+    expect(mapOrderCharges({ ...RAW, subtotal_uzs: undefined })).toBeNull();
+  });
+});
+
+describe('amounts in the app’s language', () => {
+  test.each([
+    ['ru', '280\u00A0000 сум'],
+    ['uz', '280\u00A0000 soʻm'],
+    ['en', '280\u00A0000 UZS'],
+  ])('%s', async (lang, expected) => {
+    await i18n.changeLanguage(lang);
+    expect(mapOrderToDetail(RAW).totalLabel).toBe(expected);
   });
 });
 
@@ -139,7 +182,7 @@ describe('HttpOrdersTransport', () => {
       payment_type: 'cash', // chosen method forwarded so the backend can route the webhook
     });
     expect(res.orderId).toBe(RAW.order_id);
-    expect(res.totalLabel).toBe("280 000 so'm");
+    expect(res.totalLabel).toBe(formatCurrency(280000));
   });
 
   test('createOrder omits vehicle/phone when absent (both optional server-side)', async () => {
@@ -177,6 +220,35 @@ describe('HttpOrdersTransport', () => {
       confirmed_delivery_uzs: 32500,
       delivery_quote_id: 'quote_1',
     });
+  });
+
+  test('createOrder states the total the buyer was shown, fee included, and nothing else of money', async () => {
+    post.mockResolvedValueOnce(RAW);
+    await t.createOrder({
+      items: [],
+      addressId: null,
+      paymentType: 'payme',
+      shippingOptionKey: 'pickup',
+      confirmedTotalUzs: 620000,
+      promoCode: null,
+    });
+    const [, body] = post.mock.calls[0]!;
+    expect(body).toMatchObject({ confirmed_total_uzs: 620000 });
+    expect(body).not.toHaveProperty('service_fee_uzs');
+    expect(body).not.toHaveProperty('total_uzs');
+  });
+
+  test('createOrder states no total when none was shown', async () => {
+    post.mockResolvedValueOnce(RAW);
+    await t.createOrder({
+      items: [],
+      addressId: null,
+      paymentType: 'cash',
+      shippingOptionKey: 'pickup',
+      confirmedTotalUzs: null,
+      promoCode: null,
+    });
+    expect(post.mock.calls[0]![1]).not.toHaveProperty('confirmed_total_uzs');
   });
 
   test('createOrder states no price for pickup', async () => {
