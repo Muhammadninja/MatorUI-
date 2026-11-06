@@ -1,0 +1,32 @@
+appId: com.mator.e2e
+---
+- openLink: mator-e2e://sign-in
+- extendedWaitUntil:
+    visible:
+      id: auth-phone-field
+    timeout: 15000
+- assertVisible:
+    id: auth-phone-field
+    # Android exposes the placeholder as text when the value is empty.
+    text: '^([+]998 90 123 45 67)?$'
+- assertVisible:
+    id: auth-send-code-btn
+    enabled: false
+- tapOn:
+    id: auth-phone-field
+- inputText: ${PHONE}
+- tapOn:
+    id: auth-send-code-btn
+- extendedWaitUntil:
+    visible:
+      id: auth-otp-field
+    timeout: 15000
+- tapOn:
+    id: auth-otp-field
+- inputText: '123456'
+- tapOn:
+    id: auth-verify-btn
+- extendedWaitUntil:
+    notVisible:
+      id: sign-in-screen
+    timeout: 15000

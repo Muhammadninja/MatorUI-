@@ -208,6 +208,17 @@ describe('keyboard', () => {
 });
 
 describe('language → phone → OTP', () => {
+  test('each new auth sheet starts empty after an earlier account used it', async () => {
+    const first = await renderSheet();
+    expect(first.byTestID('auth-phone-field').props.value).toBe('');
+    await first.typePhone('+998900000001');
+    await first.sendCode();
+    await act(async () => first.r.unmount());
+    const next = await renderSheet();
+    expect(next.byTestID('auth-phone-field').props.value).toBe('');
+    expect(next.byTestID('auth-send-code-btn').props.disabled).toBe(true);
+  });
+
   test.each(['ru', 'uz', 'en'] as const)(
     'language %s is sent as lang on request-otp',
     async (lang) => {

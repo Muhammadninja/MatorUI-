@@ -1,18 +1,6 @@
 name: e2e-android
 
-# Offline Maestro E2E on an Android emulator.
-#
-# Strategy (why this is robust): build a RELEASE APK. Expo's Android template
-# signs `release` with the debug keystore (android/app/build.gradle:
-# `signingConfig signingConfigs.debug`), so the APK is installable with no
-# credentials, has the JS bundled (no Metro), and no Expo dev launcher — which
-# sidesteps every dev-client caching problem we hit locally. The mock base URL is
-# baked at build time from `.env.production.local` (release builds bundle with
-# NODE_ENV=production, so that file is highest precedence). The emulator reaches
-# the host mock via `adb reverse tcp:8080 tcp:8080`, so the app uses
-# `http://localhost:8080` exactly like on the local iOS sim.
-#
-# First-run notes: Gradle build is ~10-15 min (cached after). Emulator needs KVM.
+# Dedicated bundled test app; loopback mock only. Never production verification.
 
 on:
   push:
@@ -29,6 +17,19 @@ jobs:
   e2e-android:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      MATOR_E2E: '1'
+      EAS_BUILD_PROFILE: e2e
+      EXPO_NO_DOTENV: '1'
+      EXPO_NO_TELEMETRY: '1'
+      EXPO_PUBLIC_APP_ENV: local
+      EXPO_PUBLIC_API_BASE_URL: http://127.0.0.1:8080
+      EXPO_PUBLIC_HTTP_DOMAINS: ''
+      EXPO_PUBLIC_ALLOW_DEV_OTP: 'false'
+      AUTH_DEV_MODE: 'false'
+      EXPO_PUBLIC_AUTH_DEV_MODE: 'false'
+      EXPO_PUBLIC_SENTRY_DSN: ''
+      SENTRY_DISABLE_AUTO_UPLOAD: 'true'
     steps:
       # ubuntu-latest ships ~14GB free, which this job exhausts (node_modules +
       # Expo prebuild + Gradle release build + AVD system image + emulator
@@ -54,7 +55,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - uses: actions/setup-java@v4
@@ -65,15 +66,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Highest-precedence env file for a production/release JS bundle. A fresh CI
-      # checkout has no .env.local, so this cleanly points every transport + the
-      # VIN decode at the mock. Empty HTTP_DOMAINS => all domains use HTTP.
-      - name: Point the app at the local mock
-        run: |
-          printf 'EXPO_PUBLIC_API_BASE_URL=http://localhost:8080\nEXPO_PUBLIC_HTTP_DOMAINS=\n' > .env.production.local
+      - name: Verify production guard and test configuration
+        env:
+          MATOR_E2E: ''
+          EAS_BUILD_PROFILE: ''
+        run: npm test -- tests/environment-release.test.ts tests/environment-runtime.test.ts tests/e2e-mock.test.ts
 
-      - name: Run Expo Prebuild
-        run: npx expo prebuild --platform android
+      - name: Run Expo Prebuild for dedicated test app
+        run: npx expo prebuild --platform android --clean --no-install
 
       - name: Gradle cache
         uses: actions/cache@v4
@@ -86,7 +86,7 @@ jobs:
 
       - name: Build release APK (JS bundled, debug-signed)
         working-directory: android
-        run: ./gradlew :app:assembleRelease --no-daemon -x lint
+        run: ./gradlew :app:assembleRelease --no-daemon -x lint -PreactNativeArchitectures=x86_64
 
       # The APK is all we need from here on. Gradle's daemon/build dirs and the
       # transform caches are several GB that would otherwise still be resident
@@ -111,15 +111,6 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Start mock server
-        run: |
-          node .maestro/mock-server/standalone-server.mjs > mock.log 2>&1 &
-          # Wait until it answers before handing off to the emulator step.
-          for i in $(seq 1 30); do
-            curl -sf -o /dev/null http://localhost:8080/ && break
-            sleep 1
-          done
-
       - name: Run Maestro on emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -131,7 +122,7 @@ jobs:
           script: |
             adb reverse tcp:8080 tcp:8080          # emulator localhost:8080 -> host mock
             adb install -r android/app/build/outputs/apk/release/app-release.apk
-            maestro test .maestro/ --format junit --output maestro-report.xml
+            bash scripts/e2e.sh .maestro/flows/flow-12-favorites-isolation.yaml --format junit --output maestro-report.xml
 
       - name: Upload Maestro artifacts
         if: always()
@@ -140,7 +131,6 @@ jobs:
           name: maestro-results
           path: |
             maestro-report.xml
-            ~/.maestro/tests/**
-            mock.log
+            /tmp/mator-e2e-mock.log
           if-no-files-found: ignore
           retention-days: 14

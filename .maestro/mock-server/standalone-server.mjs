@@ -1,92 +1,10 @@
-/**
- * ─────────────────────────────────────────────────────────────────────────────
- * Standalone offline mock server — zero dependencies, plain Node http.
- *
- * Why this exists alongside rules.js:
- *   Expo INLINES `EXPO_PUBLIC_*` at bundle time, so on a real device/build the
- *   app's traffic goes to whatever host you compiled in — it does NOT route
- *   through Maestro's proxy automatically. The most reliable offline setup is
- *   therefore: run this tiny server, and build/start the app with
- *   EXPO_PUBLIC_API_BASE_URL pointing straight at it. Same contract as
- *   rules.js, but self-hosted and CI-friendly (no Maestro Cloud needed).
- *
- * Run:   node .maestro/mock-server/standalone-server.mjs           # :8080
- *        PORT=9090 node .maestro/mock-server/standalone-server.mjs
- *
- * Start it BEFORE `maestro test .maestro/`. It logs every request so you can
- * confirm the app is actually hitting the mock (and see which VIN/system it
- * asked for) while debugging a flaky flow.
- * ─────────────────────────────────────────────────────────────────────────────
- */
+/** Disposable loopback mock for Maestro. Never use production accounts. */
 import http from 'node:http';
 
 const PORT = Number(process.env.PORT || 8080);
 const SEEDED_CAR = { make: 'CHEVROLET', model: 'Cobalt', year: 2022 };
 
-// Backend `ApiCatalogPart` shape (nested brand/category, snake_case fields) so
-// HttpCatalogTransport maps it correctly — `brand.name` drives the filter chip.
-// `units_sold` powers the vehicle-bestsellers ranking (see the parts handler).
-// Every seeded part fits the demo Chevrolet Cobalt (UZ market), so the garage
-// "Shop parts that fit" screen renders a populated bestsellers list.
-const BRAKE_PARTS = [
-  { id: 'brembo-fp', title: 'Brembo Front Brake Pads',
-    brand: { id: 'brembo', name: 'Brembo' }, category: { id: 'brakes', name: 'Brake System' },
-    oem_numbers: ['BREMBO P59049'], price_label: '$89.00', in_stock: true, region: 'europe', units_sold: 1240,
-    images: ['https://cdn.mator.local/parts/brembo-fp.png'],
-    specs: [{ label: 'Position', value: 'Front axle' }], features: ['Low-dust compound', 'OE-spec fitment'] },
-  { id: 'bosch-rotor', title: 'Bosch Brake Rotor',
-    brand: { id: 'bosch', name: 'Bosch' }, category: { id: 'brakes', name: 'Brake System' },
-    oem_numbers: ['BOSCH 0986479R89'], price_label: '$54.50', in_stock: true, region: 'europe', units_sold: 870,
-    images: ['https://cdn.mator.local/parts/bosch-rotor.png'],
-    specs: [{ label: 'Diameter', value: '256 mm' }], features: ['Vented', 'Anti-corrosion coating'] },
-];
-
-const FILTER_PARTS = [
-  { id: 'mann-oil-filter', title: 'MANN Oil Filter W 71/2',
-    brand: { id: 'mann', name: 'MANN-FILTER' }, category: { id: 'filters', name: 'Filters' },
-    oem_numbers: ['MANN W712'], price_label: '$8.90', in_stock: true, region: 'europe', units_sold: 2100,
-    images: ['https://cdn.mator.local/parts/mann-oil-filter.png'],
-    specs: [{ label: 'Type', value: 'Spin-on' }], features: ['OE-spec media', 'Anti-drain valve'] },
-  { id: 'mann-air-filter', title: 'MANN Air Filter C 26 168',
-    brand: { id: 'mann', name: 'MANN-FILTER' }, category: { id: 'filters', name: 'Filters' },
-    oem_numbers: ['MANN C26168'], price_label: '$12.40', in_stock: true, region: 'europe', units_sold: 1580,
-    images: ['https://cdn.mator.local/parts/mann-air-filter.png'],
-    specs: [{ label: 'Shape', value: 'Panel' }], features: ['High dust capacity'] },
-];
-
-const IGNITION_PARTS = [
-  { id: 'ngk-spark-plugs', title: 'NGK Spark Plugs (set of 4)',
-    brand: { id: 'ngk', name: 'NGK' }, category: { id: 'ignition', name: 'Ignition' },
-    oem_numbers: ['NGK BKR6E'], price_label: '$18.00', in_stock: true, region: 'korea', units_sold: 1960,
-    images: ['https://cdn.mator.local/parts/ngk-spark-plugs.png'],
-    specs: [{ label: 'Gap', value: '1.0 mm' }], features: ['Nickel electrode', 'Set of 4'] },
-];
-
-const SERVICE_PARTS = [
-  { id: 'varta-battery', title: 'Varta Blue Dynamic 60Ah Battery',
-    brand: { id: 'varta', name: 'Varta' }, category: { id: 'batteries', name: 'Batteries' },
-    oem_numbers: ['VARTA D59'], price_label: '$96.00', in_stock: true, region: 'europe', units_sold: 640,
-    images: ['https://cdn.mator.local/parts/varta-battery.png'],
-    specs: [{ label: 'Capacity', value: '60 Ah' }], features: ['540A cold-crank'] },
-  { id: 'bosch-wiper', title: 'Bosch Aerotwin Wiper Blades',
-    brand: { id: 'bosch', name: 'Bosch' }, category: { id: 'wipers', name: 'Wipers' },
-    oem_numbers: ['BOSCH A designation'], price_label: '$22.50', in_stock: true, region: 'europe', units_sold: 1120,
-    images: ['https://cdn.mator.local/parts/bosch-wiper.png'],
-    specs: [{ label: 'Length', value: '600/400 mm' }], features: ['Beam design', 'All-season rubber'] },
-];
-
-const CATALOG = {
-  brakes: BRAKE_PARTS,
-  filters: FILTER_PARTS,
-  ignition: IGNITION_PARTS,
-  batteries: [SERVICE_PARTS[0]],
-  wipers: [SERVICE_PARTS[1]],
-};
-
-// Flat list / id lookup. `ALL_PARTS` is every seeded part (used for search and
-// the vehicle-fit / bestsellers list); `PARTS_BY_ID` backs the detail endpoint.
-const ALL_PARTS = Object.values(CATALOG).flat();
-const PARTS_BY_ID = Object.fromEntries(ALL_PARTS.map((p) => [p.id, p]));
+import { ALL_PARTS, PARTS_BY_ID, CATALOG } from './catalog-fixtures.mjs';
 
 // ── BUY PATH: checkout + orders ──────────────────────────────────────────────
 // Ported verbatim from services/orders-api.ts' seed data so the response shapes
@@ -156,6 +74,8 @@ function orderDetail(id, totalLabel) {
 // auto-fill the code so the suite stays buttons-only.
 const pendingOtps = new Map();
 const OTP_DEV_CODE = '123456';
+// Synthetic accounts; accepted only by this loopback-bound mock process.
+const TEST_ACCOUNTS = new Map([['+998900000001', 'e2e_a'], ['+998900000002', 'e2e_b']]);
 
 function authTokens(id) {
   return {
@@ -168,8 +88,8 @@ function authTokens(id) {
 }
 
 function authUser(pending) {
-  const id = `usr_${Math.random().toString(36).slice(2, 10)}`;
   const p = pending || {};
+  const id = TEST_ACCOUNTS.get(p.phone_e164);
   return {
     id,
     phone_e164: p.phone_e164 || '+998901234567',
@@ -260,9 +180,19 @@ function readBody(req) {
 }
 
 const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, `http://localhost:${PORT}`);
+  const url = new URL(req.url, `http://localhost:${server.address().port}`);
   const { pathname } = url;
   console.log(`[mock] ${req.method} ${req.url}`);
+
+  if (req.method === 'POST' && pathname === '/__e2e/reset') {
+    pendingOtps.clear(); createdOrders.clear();
+    return send(res, 200, { reset: true });
+  }
+  if (req.method === 'GET' && pathname === '/v1/me') {
+    const account = [...TEST_ACCOUNTS].find(([, id]) => req.headers.authorization === `Bearer srv_access_${id}`);
+    if (!account) return send(res, 401, { error: { code: 'UNAUTHORIZED' } });
+    return send(res, 200, authUser({ phone_e164: account[0] }));
+  }
 
   // FLOW 1 — POST /v1/auth/decode-vin
   if (req.method === 'POST' && pathname === '/v1/auth/decode-vin') {
@@ -278,7 +208,8 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && pathname === '/v1/auth/phone/request-otp') {
     const body = await readBody(req);
     const requestId = `otp_${Math.random().toString(36).slice(2, 12)}`;
-    pendingOtps.set(requestId, { phone_e164: body.phone_e164 });
+    if (!TEST_ACCOUNTS.has(body.phone_e164)) return send(res, 422, { error: { code: 'TEST_ACCOUNT_REQUIRED' } });
+    pendingOtps.set(requestId, { phone_e164: body.phone_e164, expiresAt: Date.now() + 300000 });
     return send(res, 200, {
       request_id: requestId,
       phone_e164: body.phone_e164 || '+998901234567',
@@ -296,10 +227,10 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && pathname === '/v1/auth/phone/verify-otp') {
     const body = await readBody(req);
     const code = typeof body.otp_code === 'string' ? body.otp_code.trim() : '';
-    if (!/^\d{6}$/.test(code)) {
+    const pending = pendingOtps.get(body.request_id);
+    if (code !== OTP_DEV_CODE || !pending || pending.expiresAt < Date.now() || pending.phone_e164 !== body.phone_e164) {
       return send(res, 422, { error: { code: 'INVALID_CODE', message: 'Enter the 6-digit code.' } });
     }
-    const pending = pendingOtps.get(body.request_id);
     pendingOtps.delete(body.request_id);
     const user = authUser(pending);
     return send(res, 200, {
@@ -312,7 +243,9 @@ const server = http.createServer(async (req, res) => {
 
   // AUTH — POST /v1/auth/token/refresh → { tokens }
   if (req.method === 'POST' && pathname === '/v1/auth/token/refresh') {
-    const id = `usr_${Math.random().toString(36).slice(2, 10)}`;
+    const body = await readBody(req);
+    const id = [...TEST_ACCOUNTS.values()].find((id) => body.refresh_token === `srv_refresh_${id}`);
+    if (!id) return send(res, 401, { error: { code: 'UNAUTHORIZED' } });
     return send(res, 200, { tokens: authTokens(id) });
   }
 
@@ -550,8 +483,8 @@ const server = http.createServer(async (req, res) => {
   return send(res, 200, { items: [], total: 0, page: 1, pageSize: 50 });
 });
 
-server.listen(PORT, () => {
-  console.log(`Mator mock server → http://localhost:${PORT}`);
+server.listen(PORT, '127.0.0.1', () => {
+  console.log(`Mator mock server → http://localhost:${server.address().port}`);
   console.log('  POST /v1/auth/decode-vin');
   console.log('  GET  /v1/catalog/parts?systemId=brakes | ?q=<term>  (browse | search)');
   console.log('  GET  /v1/catalog/parts/:id           (item detail)');

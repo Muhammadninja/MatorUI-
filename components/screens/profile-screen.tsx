@@ -208,6 +208,7 @@ export default function ProfileScreen() {
           {/* Separate from the menu and quiet: a ghost button in the error colour. */}
           <AppView px="lg">
             <AppButton
+              testID="profile-sign-out"
               title={t('profile.signOut')}
               variant="ghost"
               kind="error"

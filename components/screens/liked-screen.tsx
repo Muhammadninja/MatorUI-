@@ -62,7 +62,7 @@ export default function LikedScreen() {
   );
 
   return (
-    <AppView flex={1} colorName="background">
+    <AppView flex={1} colorName="background" testID="liked-screen">
       <AppSettingsHeader title={t('liked.title')} fallbackHref="/profile" />
 
       {state === 'loading' ? (
@@ -70,7 +70,7 @@ export default function LikedScreen() {
           <WheelLoader size={26} color={tokens.textMuted} />
         </AppView>
       ) : state === 'empty' || state === 'error' ? (
-        <AppView flex={1} center px="xl" gap={12} style={{ paddingBottom: 72 }}>
+        <AppView testID={state === 'empty' ? 'liked-empty' : 'liked-error'} flex={1} center px="xl" gap={12} style={{ paddingBottom: 72 }}>
           <AppView
             center
             rounded={999}

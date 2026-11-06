@@ -1,0 +1,20 @@
+appId: com.mator.e2e
+---
+- openLink: mator-e2e://profile
+- scrollUntilVisible:
+    element:
+      id: profile-sign-out
+    direction: DOWN
+- tapOn:
+    id: profile-sign-out
+- extendedWaitUntil:
+    notVisible:
+      id: profile-sign-out
+    timeout: 15000
+- openLink: mator-e2e://liked
+- assertVisible:
+    id: liked-empty
+- assertNotVisible:
+    id: part-card-brembo-fp
+- assertNotVisible:
+    id: part-card-bosch-rotor

@@ -60,5 +60,8 @@ for i in $(seq 1 50); do
   sleep 0.2
 done
 
+# Reset server-side test state as well as the flow's app storage on every run.
+curl --fail --silent --request POST "http://127.0.0.1:$PORT/__e2e/reset" >/dev/null
+
 echo "• running: maestro test $*"
 maestro test "$@"

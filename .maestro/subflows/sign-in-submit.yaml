@@ -24,7 +24,11 @@ appId: com.fotih12.mator
 # Let the sheet transition settle so the button is hittable.
 - waitForAnimationToEnd:
     timeout: 2000
-# Phase 1 — send the code (phone pre-filled).
+# Phase 1 — enter the mock's deterministic account (the app never seeds a phone).
+- tapOn:
+    id: "auth-phone-field"
+- inputText: "+998900000001"
+# Send the code.
 - tapOn:
     id: "auth-send-code-btn"
 # Phase 2 — wait for the OTP phase, then verify (code auto-filled from devCode).
@@ -32,6 +36,10 @@ appId: com.fotih12.mator
     visible:
       id: "auth-verify-btn"
     timeout: 8000
+- tapOn:
+    id: "auth-otp-field"
+- eraseText
+- inputText: "123456"
 - tapOn:
     id: "auth-verify-btn"
 # Auth done → the sheet dismisses. Wait for it to be gone before returning.

@@ -2,7 +2,6 @@ import { router, useNavigation } from 'expo-router';
 import { ArrowLeft, X } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, BackHandler, Dimensions, Pressable, ScrollView } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,7 +16,6 @@ import { useThemeContext } from '@/contexts/theme.context';
 import { useUserContext } from '@/contexts/user.context';
 import { useToast } from '@/hooks/use-toast';
 import { useAcceptLegal, useLegalDocuments } from '@/hooks/use-legal';
-import { getApiBaseUrl } from '@/config/api';
 import { ApiError } from '@/services/api-client';
 import {
   LEGAL_ACCEPTANCE_REQUIRED,
@@ -49,24 +47,6 @@ function describeAuthError(
   }
   return err instanceof Error ? err.message : undefined;
 }
-
-/** DEMO/E2E prefill so the offline Maestro suite stays buttons-only (no typing).
- *  Only used against a demo backend — a real remote backend starts on an empty
- *  field so users type their own number (no seeded demo phone in production). */
-const DEMO_PHONE = '+998 90 123 45 67';
-
-/** Remembers the last phone typed so a simulator reload doesn't wipe it. */
-const LAST_PHONE_KEY = 'mator.last_phone';
-
-/** True only for a DEMO backend: the pure offline mock (no base URL) or the
- *  local E2E mock server (localhost). A real remote backend — dev, staging, or
- *  prod (api.mator.uz) — is NOT demo, so the phone field starts empty. Evaluated
- *  once at module load (env-driven, never changes at runtime). */
-const IS_DEMO_AUTH: boolean = (() => {
-  const base = getApiBaseUrl();
-  if (base === null) return true; // pure offline mock
-  return /\/\/(localhost|127\.0\.0\.1|10\.0\.2\.2)(:|\/|$)/i.test(base); // E2E mock server
-})();
 
 /** Minimal sanity check: E.164-ish — an optional leading '+' then 9–15 digits
  *  (an Uzbek MSISDN is +998 + 9 digits = 12). We keep this loose on purpose; the
@@ -160,7 +140,7 @@ export default function PasswordlessAuthScreen() {
   const [phase, setPhase] = useState<'phone' | 'otp'>('phone');
   // Real remote backends start empty (users type their number); the demo/E2E
   // mock prefills the demo phone so the offline suite stays buttons-only.
-  const [phone, setPhone] = useState(IS_DEMO_AUTH ? DEMO_PHONE : '');
+  const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [otpLength, setOtpLength] = useState(DEFAULT_OTP_LENGTH);
   const [otpToken, setOtpToken] = useState<string | null>(null);
@@ -212,17 +192,6 @@ export default function PasswordlessAuthScreen() {
     router.push({ pathname: '/legal/[type]', params: { type: legalDocumentSlug(type) } });
   };
 
-  // Prefill the last-used number on reload (real backends only — demo already
-  // seeds its own). So the simulator "remembers" the account across reloads.
-  useEffect(() => {
-    if (IS_DEMO_AUTH) return;
-    AsyncStorage.getItem(LAST_PHONE_KEY)
-      .then((saved) => {
-        if (saved) setPhone(saved);
-      })
-      .catch(() => undefined);
-  }, []);
-
   const phoneValid = isValidPhone(phone);
 
   const field = {
@@ -250,8 +219,6 @@ export default function PasswordlessAuthScreen() {
       triggerHaptic('success');
       setOtpToken(token);
       setOtpLength(resolveOtpLength(length));
-      // Remember this number so a reload prefills it next time.
-      AsyncStorage.setItem(LAST_PHONE_KEY, identifier).catch(() => undefined);
       // DEMO/E2E: auto-fill the code the mock handed back. Real backends omit it.
       setCode(devCode ?? '');
       setPhase('otp');

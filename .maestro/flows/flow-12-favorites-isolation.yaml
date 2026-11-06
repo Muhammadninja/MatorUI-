@@ -1,0 +1,73 @@
+appId: com.mator.e2e
+name: flow-12-favorites-isolation
+tags:
+  - favorites
+  - isolated
+---
+# Only this disposable test app is cleared. Production app has a different ID.
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "English, English"
+    timeout: 30000
+- tapOn: "English, English"
+- tapOn: "Continue"
+- runFlow:
+    file: ../subflows/favorites-sign-in.yaml
+    env:
+      PHONE: '+998900000001'
+- openLink: mator-e2e://item-detail/brembo-fp
+- extendedWaitUntil:
+    visible:
+      id: item-detail-screen
+    timeout: 15000
+- tapOn: Save to favorites
+- openLink: mator-e2e://liked
+- extendedWaitUntil:
+    visible:
+      id: part-card-brembo-fp
+    timeout: 15000
+- runFlow: ../subflows/favorites-sign-out.yaml
+# Reopening auth proves sign-out did not retain A's phone.
+- runFlow:
+    file: ../subflows/favorites-sign-in.yaml
+    env:
+      PHONE: '+998900000002'
+- openLink: mator-e2e://liked
+- assertVisible:
+    id: liked-empty
+- assertNotVisible:
+    id: part-card-brembo-fp
+- openLink: mator-e2e://item-detail/bosch-rotor
+- extendedWaitUntil:
+    visible:
+      id: item-detail-screen
+    timeout: 15000
+- tapOn: Save to favorites
+- openLink: mator-e2e://liked
+- extendedWaitUntil:
+    visible:
+      id: part-card-bosch-rotor
+    timeout: 15000
+- runFlow: ../subflows/favorites-sign-out.yaml
+- runFlow:
+    file: ../subflows/favorites-sign-in.yaml
+    env:
+      PHONE: '+998900000001'
+- openLink: mator-e2e://liked
+- extendedWaitUntil:
+    visible:
+      id: part-card-brembo-fp
+    timeout: 15000
+- assertNotVisible:
+    id: part-card-bosch-rotor
+# A process restart, with storage and session preserved.
+- stopApp
+- launchApp
+- openLink: mator-e2e://liked
+- extendedWaitUntil:
+    visible:
+      id: part-card-brembo-fp
+    timeout: 30000
+- assertNotVisible:
+    id: part-card-bosch-rotor
