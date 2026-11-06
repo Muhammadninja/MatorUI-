@@ -1,3 +1,4 @@
+import { addUzs, type CartCharges } from '@/services/cart-math';
 import type { Address, OrderDetail, ShippingOption } from '@/services/orders-service';
 
 export type DeliveryMethod = 'courier' | 'pickup';
@@ -42,6 +43,21 @@ export function resolveCheckoutDelivery(input: {
     : { method: 'courier', fee: null, ready: false, quoteId: null };
 }
 
+/**
+ * What the order would charge, from the backend's figures alone: the cart's total, which
+ * holds the service fee, and the quoted delivery. Null while either is unknown, or while a
+ * change to the cart is still on its way, so a total that is not the server's is never shown
+ * as one, nor confirmed.
+ */
+export function checkoutTotal(
+  charges: CartCharges | null,
+  deliveryFee: number | null,
+  cartSettled: boolean,
+): number | null {
+  if (!charges || deliveryFee === null || !cartSettled) return null;
+  return addUzs(charges.total, deliveryFee);
+}
+
 /** How the app words each delivery refusal: the server's own messages are English. */
 const DELIVERY_ERROR_KEYS: Record<string, string> = {
   DELIVERY_ADDRESS_COORDINATES_MISSING: 'checkout.deliveryErrorNeedsLocation',
@@ -60,6 +76,18 @@ const DELIVERY_ERROR_KEYS: Record<string, string> = {
 /** The copy for a delivery refusal, or null when the code is about something else. */
 export function deliveryRefusalKey(code: string | null): string | null {
   return (code && DELIVERY_ERROR_KEYS[code]) || null;
+}
+
+/** The server's total is not the one on screen: the cart, a sale or the fee moved since. */
+export const ORDER_TOTAL_CHANGED = 'ORDER_TOTAL_CHANGED';
+
+/**
+ * The copy for an order the server refused because what the buyer saw is out of date: the
+ * delivery price or the total. Either way the figures are fetched again before they agree.
+ */
+export function orderRefusalKey(code: string | null): string | null {
+  if (code === ORDER_TOTAL_CHANGED) return 'checkout.orderTotalChanged';
+  return deliveryRefusalKey(code);
 }
 
 /** The copy for a quote that failed. Anything unrecognised reads as "try again". */

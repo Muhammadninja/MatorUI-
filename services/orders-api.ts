@@ -19,6 +19,7 @@ import type {
   DeliveryCoverageInfo,
   DeliveryPoint,
   CreateOrderResult,
+  OrderCharges,
   OrderDetail,
   OrderListPage,
   OrderListRow,
@@ -432,6 +433,7 @@ export class MockOrdersTransport implements OrdersTransport {
  */
 import { shouldUseHttpTransport } from '@/config/api';
 import { apiClient, ApiError } from '@/services/api-client';
+import { formatCurrency } from '@/services/cart-math';
 import { debugLog } from '@/services/debug-log';
 import { parseCoverageGeometry } from '@/services/delivery-coverage';
 
@@ -600,12 +602,24 @@ export type RawBackendOrder = {
   updated_at?: string;
 };
 
-/** "280000" → "280 000 so'm". Manual thousands grouping (no reliance on Intl,
- *  which is patchy under Hermes). */
+/** "280000" → "280 000 сум" / "280 000 soʻm" / "280 000 UZS", in the app's language. */
 function formatUzs(n: number | undefined): string {
-  const v = Math.round(n ?? 0);
-  const grouped = String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-  return `${grouped} so'm`;
+  return formatCurrency(n ?? 0);
+}
+
+const isAmount = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0;
+
+/** Each part of what the order charges, as stored. Null unless the backend stated them all. */
+export function mapOrderCharges(o: RawBackendOrder): OrderCharges | null {
+  if (!isAmount(o.subtotal_uzs) || !isAmount(o.total_uzs)) return null;
+  return {
+    subtotal: o.subtotal_uzs,
+    discount: isAmount(o.discount_uzs) ? o.discount_uzs : 0,
+    serviceFee: isAmount(o.service_fee_uzs) ? o.service_fee_uzs : 0,
+    delivery: isAmount(o.delivery_uzs) ? o.delivery_uzs : 0,
+    total: o.total_uzs,
+  };
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -748,6 +762,7 @@ export function mapOrderToDetail(o: RawBackendOrder): OrderDetail {
       price: formatUzs(it.price_uzs),
     })),
     totalLabel: formatUzs(o.total_uzs),
+    charges: mapOrderCharges(o),
     serverStatus: o.status,
     paymentType: asPaymentType(o.payment_type),
   };
@@ -805,6 +820,10 @@ export class HttpOrdersTransport implements OrdersTransport {
       body.confirmed_delivery_uzs = input.confirmedDeliveryUzs;
     }
     if (input.deliveryQuoteId) body.delivery_quote_id = input.deliveryQuoteId;
+    // The total the buyer was shown, fee included. Compared, never charged from.
+    if (typeof input.confirmedTotalUzs === 'number') {
+      body.confirmed_total_uzs = input.confirmedTotalUzs;
+    }
 
     const r = await apiClient.post<RawBackendOrder>('/v1/orders', body, { signal });
     return {

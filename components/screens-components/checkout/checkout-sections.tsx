@@ -36,12 +36,78 @@ export function SectionLabel({ tokens, children }: { tokens: Tokens; children: s
   );
 }
 
-export function SummaryRow({ label, value, tokens }: { label: string; value: string; tokens: Tokens }) {
+export function SummaryRow({
+  label,
+  value,
+  tokens,
+  testID,
+}: {
+  label: string;
+  value: string;
+  tokens: Tokens;
+  testID?: string;
+}) {
   return (
-    <AppView row justify="space-between">
+    <AppView row justify="space-between" testID={testID}>
       <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted }}>{label}</AppText>
       <AppText family="accent" weight="semibold" style={{ fontSize: 13.5, color: tokens.text }}>{value}</AppText>
     </AppView>
+  );
+}
+
+/** Shown in place of a figure that is not known yet. Never zero. */
+export const NO_PRICE_YET = '—';
+
+// ── What an order charges ──────────────────────────────────────────────
+// Each part on its own line, as the backend states it: the parts, a discount, Mator's
+// service fee and delivery. The fee has no line when there is none, as a discount has
+// none; a fee not known yet reads as such rather than as zero.
+
+export type ChargeFigures = {
+  subtotal: number;
+  discount: number;
+  /** Null while the server has not said. */
+  serviceFee: number | null;
+  /** Null while no price is known. */
+  delivery: number | null;
+};
+
+export function OrderChargeRows({
+  tokens,
+  charges,
+  formatCurrency,
+}: {
+  tokens: Tokens;
+  charges: ChargeFigures;
+  formatCurrency: (amount: number) => string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <SummaryRow label={t('checkout.subtotal')} value={formatCurrency(charges.subtotal)} tokens={tokens} />
+      {charges.discount > 0 ? (
+        <SummaryRow label={t('checkout.discount')} value={`−${formatCurrency(charges.discount)}`} tokens={tokens} />
+      ) : null}
+      {charges.serviceFee !== 0 ? (
+        <SummaryRow
+          testID="order-service-fee"
+          label={t('checkout.serviceFee')}
+          value={charges.serviceFee === null ? NO_PRICE_YET : formatCurrency(charges.serviceFee)}
+          tokens={tokens}
+        />
+      ) : null}
+      <SummaryRow
+        label={t('checkout.deliveryPriceLabel')}
+        value={
+          charges.delivery === null
+            ? NO_PRICE_YET
+            : charges.delivery > 0
+              ? formatCurrency(charges.delivery)
+              : t('checkout.free')
+        }
+        tokens={tokens}
+      />
+    </>
   );
 }
 

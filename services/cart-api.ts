@@ -1,4 +1,4 @@
-import type { CartItem, PromoResult } from '@/services/cart-math';
+import type { CartCharges, CartItem, PromoResult } from '@/services/cart-math';
 
 /**
  * Transport contract for the cart. The provider mutates local state
@@ -14,6 +14,8 @@ import type { CartItem, PromoResult } from '@/services/cart-math';
 export type CartSnapshot = {
   items: CartItem[];
   appliedPromoCode: string | null;
+  /** What the backend says this cart costs, fee included. Absent when it has not said. */
+  charges?: CartCharges | null;
 };
 
 export type AddItemInput = {
@@ -31,6 +33,8 @@ export type AddItemInput = {
 
 export interface CartTransport {
   setSession?(ownerId: string | null): void;
+  /** What the backend last said the cart costs, as of its latest answer to any call. */
+  charges?(): CartCharges | null;
   fetch(): Promise<CartSnapshot>;
   addItem(input: AddItemInput): Promise<CartItem>;
   updateQuantity(itemId: string, quantity: number): Promise<CartItem | null>;
@@ -80,7 +84,17 @@ export class MockCartTransport implements CartTransport {
     return {
       items: [...this.items],
       appliedPromoCode: this.appliedPromoCode,
+      charges: this.charges(),
     };
+  }
+
+  /** Mock only: no fee. The real one is the backend's, and the app holds no tariff. */
+  charges(): CartCharges {
+    const subtotal = this.items.reduce(
+      (sum, item) => sum + (Number(item.price.replace(/[^0-9.]/g, '')) || 0) * item.quantity,
+      0,
+    );
+    return { subtotal, discount: 0, serviceFee: 0, total: subtotal };
   }
 
   async addItem(input: AddItemInput): Promise<CartItem> {
@@ -193,8 +207,33 @@ type ApiCart = {
   items?: ApiCartItem[] | null;
   promo?: { code?: string; discountUzs?: number; isValid?: boolean } | null;
   subtotal_uzs?: number;
+  discount_uzs?: number;
+  service_fee_uzs?: number;
+  /** Everything but delivery: the goods after discount, plus the service fee. */
   total_uzs?: number;
 };
+
+const isAmount = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0;
+
+/**
+ * What the backend says the cart costs, or null when it did not say all of it. A backend
+ * that names no fee has not said there is none, so nothing is assumed: the checkout then
+ * shows no total and cannot place the order.
+ */
+export function parseCartCharges(cart: ApiCart | undefined | null): CartCharges | null {
+  if (!cart) return null;
+  const { subtotal_uzs, discount_uzs, service_fee_uzs, total_uzs } = cart;
+  if (!isAmount(subtotal_uzs) || !isAmount(service_fee_uzs) || !isAmount(total_uzs)) {
+    return null;
+  }
+  return {
+    subtotal: subtotal_uzs,
+    discount: isAmount(discount_uzs) ? discount_uzs : 0,
+    serviceFee: service_fee_uzs,
+    total: total_uzs,
+  };
+}
 
 /** Server-enforced max quantity per cart line — the backend 400s above this,
  *  so clamp client-side to keep the stepper from hitting a hard error. */
@@ -205,12 +244,18 @@ export class HttpCartTransport implements CartTransport {
   private lineIdByPart = new Map<string, string>();
   private ownerId: string | null | undefined;
   private epoch = 0;
+  private lastCharges: CartCharges | null = null;
 
   setSession(ownerId: string | null): void {
     if (this.ownerId === ownerId) return;
     this.ownerId = ownerId;
     this.epoch += 1;
     this.lineIdByPart.clear();
+    this.lastCharges = null;
+  }
+
+  charges(): CartCharges | null {
+    return this.lastCharges;
   }
 
   private assertSession(epoch: number): void {
@@ -261,7 +306,9 @@ export class HttpCartTransport implements CartTransport {
       this.lineIdByPart.set(i.part_id ?? i.id, i.id);
       return this.mapItem(i);
     });
-    return { items, appliedPromoCode: cart?.promo?.code ?? null };
+    // Every answer is the whole cart, so its figures are always the latest the server has.
+    this.lastCharges = parseCartCharges(cart);
+    return { items, appliedPromoCode: cart?.promo?.code ?? null, charges: this.lastCharges };
   }
 
   async fetch(): Promise<CartSnapshot> {

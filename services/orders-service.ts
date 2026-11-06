@@ -167,6 +167,21 @@ export type OrderListPage = {
   pageSize: number;
 };
 
+/**
+ * What an order charges, each part apart, exactly as the backend stored it when the order was
+ * placed. Fixed from then on: nothing here is worked out by the app.
+ */
+export type OrderCharges = {
+  /** The cost of the parts. */
+  subtotal: number;
+  discount: number;
+  /** Mator's service fee. 0 when the order carries none. */
+  serviceFee: number;
+  delivery: number;
+  /** What the buyer pays: the parts after discount, the fee and delivery. */
+  total: number;
+};
+
 export type OrderDetail = {
   id: string;
   status: OrderStatus;
@@ -184,6 +199,8 @@ export type OrderDetail = {
   items: OrderItem[];
   /** Display-formatted grand total ("$2,170.00"). */
   totalLabel: string;
+  /** Each part of the total, as stored on the order. Absent when the source states none. */
+  charges?: OrderCharges | null;
   /** The backend's own word for the status (`pending_payment`, `paid`, …), before it is
    *  mapped onto the timeline, which calls an unpaid order 'placed'. Anything deciding
    *  about payment reads this. */
@@ -239,6 +256,9 @@ export type CreateOrderInput = {
   confirmedDeliveryUzs?: number | null;
   /** The quote that price came from. See `ShippingOption.quoteId`. */
   deliveryQuoteId?: string | null;
+  /** The total the buyer was shown, fee and delivery included. The server works out its own
+   *  and refuses the order (`ORDER_TOTAL_CHANGED`) if the two differ: it never charges this. */
+  confirmedTotalUzs?: number | null;
   /** Optional courier note. */
   note?: string;
   /** Garage vehicle this order is for (backend `vehicle_id`). Optional — the

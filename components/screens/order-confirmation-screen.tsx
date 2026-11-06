@@ -6,12 +6,14 @@ import { ScrollView } from 'react-native';
 import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { OrderChargeRows } from '@/components/screens-components/checkout/checkout-sections';
 import { AppButton } from '@/components/shared/app-button';
 import { AppPrice } from '@/components/shared/app-price';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useOrder } from '@/hooks/use-orders';
+import { formatCurrency } from '@/services/cart-math';
 import { isAwaitingOnlinePayment, orderPaymentState } from '@/services/checkout-presentation';
 import { formatOrderNo } from '@/services/orders-service';
 import { triggerHaptic } from '@/utils/haptics';
@@ -23,7 +25,8 @@ import { triggerHaptic } from '@/utils/haptics';
  * `OrderDetail`, whose `totalLabel` + line items populate the receipt.
  *
  * It says what the backend says. An order still waiting for online payment, or closed
- * without payment, is not shown as a success, however the buyer got here.
+ * without payment, is not shown as a success, however the buyer got here. The amounts are
+ * the ones stored on the order when it was placed, each on its own line.
  */
 export default function OrderConfirmationScreen() {
   const { t } = useTranslation();
@@ -215,6 +218,13 @@ export default function OrderConfirmationScreen() {
               </AppText>
             </AppView>
           ))}
+
+          {order.charges ? (
+            <AppView testID="order-confirmation-charges" gap={6} style={{ marginTop: 6 }}>
+              <AppView style={{ height: 1, backgroundColor: tokens.divider, marginBottom: 6 }} />
+              <OrderChargeRows tokens={tokens} charges={order.charges} formatCurrency={formatCurrency} />
+            </AppView>
+          ) : null}
         </AppView>
 
         {/* Buttons */}
