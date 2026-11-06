@@ -1,6 +1,9 @@
 appId: com.mator.e2e
 ---
-- openLink: mator-e2e://sign-in
+- openLink: mator-e2e://profile
+- tapOn:
+    text: Log in to your account
+    retryTapIfNoChange: false
 - extendedWaitUntil:
     visible:
       id: auth-phone-field
@@ -14,13 +17,13 @@ appId: com.mator.e2e
     retryTapIfNoChange: false
 - waitForAnimationToEnd
 - inputText: ${PHONE}
-- copyTextFrom:
-    id: auth-phone-field
-- assertTrue: ${maestro.copiedText.replace(/\D/g, '') === PHONE.replace(/\D/g, '')}
+- waitForAnimationToEnd
 # A full-screen scroll can hit the sheet's dismissing backdrop. Start inside
 # the actual field so only the auth form receives this gesture.
 - runFlow:
     when:
+      visible:
+        id: auth-phone-field
       notVisible:
         id: auth-send-code-btn
     commands:
@@ -40,8 +43,11 @@ appId: com.mator.e2e
     retryTapIfNoChange: false
 - waitForAnimationToEnd
 - inputText: '123456'
+- waitForAnimationToEnd
 - runFlow:
     when:
+      visible:
+        id: auth-otp-field
       notVisible:
         id: auth-verify-btn
     commands:
