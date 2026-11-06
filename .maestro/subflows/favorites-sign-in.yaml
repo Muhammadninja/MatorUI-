@@ -5,16 +5,18 @@ appId: com.mator.e2e
     visible:
       id: auth-phone-field
     timeout: 15000
-- assertVisible:
+- waitForAnimationToEnd
+- copyTextFrom:
     id: auth-phone-field
-    # Android exposes the placeholder as text when the value is empty.
-    text: '^([+]998 90 123 45 67)?$'
+- assertTrue: ${maestro.copiedText === '' || maestro.copiedText === '+998 90 123 45 67'}
+- hideKeyboard
 - assertVisible:
     id: auth-send-code-btn
     enabled: false
 - tapOn:
     id: auth-phone-field
 - inputText: ${PHONE}
+- hideKeyboard
 - tapOn:
     id: auth-send-code-btn
 - extendedWaitUntil:
@@ -24,6 +26,7 @@ appId: com.mator.e2e
 - tapOn:
     id: auth-otp-field
 - inputText: '123456'
+- hideKeyboard
 - tapOn:
     id: auth-verify-btn
 - extendedWaitUntil:
