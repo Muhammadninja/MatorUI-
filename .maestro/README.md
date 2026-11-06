@@ -37,7 +37,7 @@ With the dedicated APK installed and an Android emulator running:
 
 ```bash
 adb reverse tcp:8080 tcp:8080
-bash scripts/e2e.sh .maestro/flows/flow-12-favorites-isolation.yaml --format junit --output maestro-report.xml
+bash scripts/e2e.sh .maestro/flows/flow-12-favorites-isolation.yaml --format junit --output maestro-report.xml --test-output-dir artifacts
 ```
 
 The runner starts and stops its own mock, checks readiness, and resets test state.
@@ -57,6 +57,13 @@ The earlier flows 01–11 are retained for the existing iOS/dev-client setup
 Their historical assertions need separate maintenance before claiming that older
 suite is current. The shared sign-in helper now types the mock account and OTP.
 
-CI uploads the JUnit result and mock route log only, excluding Maestro's raw debug
+CI uploads the scrubbed JUnit result, mock route log, and final product-list screenshot,
+excluding Maestro's raw debug
 screenshots/hierarchies that can contain account fields. All accounts used here are
 synthetic. Do not reuse production accounts or tokens in these flows.
+
+The workflow caches only the dedicated APK, keyed by all app/native inputs and the
+build recipe. Maestro flows and the mock run outside that binary. CI records the
+actual frontend source SHA from the cache alongside the current mock/flow SHA.
+The cache is saved before UI tests, allowing flow fixes to reuse the same app.
+The final screenshot contains only the synthetic product list after A's restart.

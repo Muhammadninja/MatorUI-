@@ -169,7 +169,7 @@ jobs:
           script: |
             adb reverse tcp:8080 tcp:8080          # emulator localhost:8080 -> host mock
             adb install -r /tmp/mator-e2e-apk/app-release.apk
-            bash scripts/e2e.sh .maestro/flows/flow-12-favorites-isolation.yaml --format junit --output maestro-report.xml
+            bash scripts/e2e.sh .maestro/flows/flow-12-favorites-isolation.yaml --format junit --output maestro-report.xml --test-output-dir artifacts
 
       - name: Scrub text artifacts
         if: always()
@@ -192,6 +192,7 @@ jobs:
           name: maestro-results
           path: |
             maestro-report.xml
+            artifacts/favorites-a-after-restart.png
             /tmp/mator-e2e-mock.log
           if-no-files-found: ignore
           retention-days: 14

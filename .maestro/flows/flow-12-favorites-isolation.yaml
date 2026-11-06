@@ -84,3 +84,5 @@ tags:
     id: part-card-brembo-fp
 - assertNotVisible:
     id: part-card-bosch-rotor
+# Only the final product list is captured; no auth/profile fields are saved.
+- takeScreenshot: favorites-a-after-restart
