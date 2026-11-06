@@ -72,10 +72,22 @@ jobs:
           EAS_BUILD_PROFILE: ''
         run: npm test -- tests/environment-release.test.ts tests/environment-runtime.test.ts tests/production-transport-boundary.test.ts tests/e2e-mock.test.ts
 
+      # Source-keyed test APK cache excludes Maestro flows and mock fixtures,
+      # which run outside the app. Every bundle/native input and this build
+      # recipe participates in the key. Record the actual frontend SHA on hits.
+      - name: Restore dedicated test APK
+        id: apk
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/mator-e2e-apk
+          key: e2e-apk-v1-${{ hashFiles('app/**', 'assets/**', 'components/**', 'config/**', 'constants/**', 'contexts/**', 'guards/**', 'hooks/**', 'locales/**', 'mocks/**', 'patches/**', 'plugins/**', 'providers/**', 'services/**', 'text/**', 'themes/**', 'types/**', 'utils/**', '*.js', '*.cjs', '*.json', '*.ts', '.github/workflows/e2e-android.yml') }}
+
       - name: Run Expo Prebuild for dedicated test app
+        if: steps.apk.outputs.cache-hit != 'true'
         run: npx expo prebuild --platform android --clean --no-install
 
       - name: Verify generated test identity and HTTP manifest
+        if: steps.apk.outputs.cache-hit != 'true'
         run: |
           node - <<'NODE'
           const fs = require('node:fs');
@@ -87,6 +99,7 @@ jobs:
           NODE
 
       - name: Gradle cache
+        if: steps.apk.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -99,25 +112,39 @@ jobs:
       # left the daemon emitting OOMs instead of exiting. This disposable test
       # APK skips publishing lint; production builds retain their normal checks.
       - name: Build release APK (JS bundled, debug-signed)
+        if: steps.apk.outputs.cache-hit != 'true'
         timeout-minutes: 30
         working-directory: android
         run: >-
           ./gradlew :app:assembleRelease --no-daemon --console=plain --max-workers=2
           '-Dorg.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=1536m -XX:+ExitOnOutOfMemoryError'
           -Dorg.gradle.parallel=false -Pkotlin.compiler.execution.strategy=in-process
-          -x lint -x lintVitalAnalyzeRelease -x lintVitalReportRelease
+          -x lint -x lintVitalAnalyzeRelease -x lintVitalReportRelease -x lintVitalRelease
           -PreactNativeArchitectures=x86_64
 
       # The APK is all we need from here on. Gradle's daemon/build dirs and the
       # transform caches are several GB that would otherwise still be resident
       # when the AVD image and userdata partition get written.
       - name: Reclaim space after the build
+        if: steps.apk.outputs.cache-hit != 'true'
         run: |
-          cp android/app/build/outputs/apk/release/app-release.apk /tmp/app-release.apk
+          mkdir -p /tmp/mator-e2e-apk
+          cp android/app/build/outputs/apk/release/app-release.apk /tmp/mator-e2e-apk/app-release.apk
+          git rev-parse HEAD > /tmp/mator-e2e-apk/source-sha.txt
           rm -rf android/app/build android/build ~/.gradle/daemon
-          mkdir -p android/app/build/outputs/apk/release
-          cp /tmp/app-release.apk android/app/build/outputs/apk/release/app-release.apk
           df -h /
+
+      - name: Save dedicated test APK before UI tests
+        if: steps.apk.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/mator-e2e-apk
+          key: ${{ steps.apk.outputs.cache-primary-key }}
+
+      - name: Record actual frontend and mock versions
+        run: |
+          echo "Frontend source SHA: $(cat /tmp/mator-e2e-apk/source-sha.txt)"
+          echo "Mock and Maestro source SHA: $GITHUB_SHA"
 
       - name: Install Maestro
         run: |
@@ -141,7 +168,7 @@ jobs:
           disable-animations: true
           script: |
             adb reverse tcp:8080 tcp:8080          # emulator localhost:8080 -> host mock
-            adb install -r android/app/build/outputs/apk/release/app-release.apk
+            adb install -r /tmp/mator-e2e-apk/app-release.apk
             bash scripts/e2e.sh .maestro/flows/flow-12-favorites-isolation.yaml --format junit --output maestro-report.xml
 
       - name: Scrub text artifacts
