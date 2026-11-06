@@ -9,6 +9,7 @@ appId: com.mator.e2e
       id: auth-phone-field
     timeout: 15000
 - waitForAnimationToEnd
+# Read before typing: never erase a retained number to make this check pass.
 - copyTextFrom:
     id: auth-phone-field
 - assertTrue: ${maestro.copiedText === '' || maestro.copiedText === '+998 90 123 45 67'}
@@ -17,20 +18,10 @@ appId: com.mator.e2e
     retryTapIfNoChange: false
 - waitForAnimationToEnd
 - inputText: ${PHONE}
+# Native editor completion blurs the input without Android Back dismissing the
+# entire sheet, and without a full-screen scroll hitting its backdrop.
+- pressKey: Enter
 - waitForAnimationToEnd
-# A full-screen scroll can hit the sheet's dismissing backdrop. Start inside
-# the actual field so only the auth form receives this gesture.
-- runFlow:
-    when:
-      visible:
-        id: auth-phone-field
-      notVisible:
-        id: auth-send-code-btn
-    commands:
-      - swipe:
-          from:
-            id: auth-phone-field
-          direction: UP
 - tapOn:
     id: auth-send-code-btn
     retryTapIfNoChange: false
@@ -43,18 +34,8 @@ appId: com.mator.e2e
     retryTapIfNoChange: false
 - waitForAnimationToEnd
 - inputText: '123456'
+- pressKey: Enter
 - waitForAnimationToEnd
-- runFlow:
-    when:
-      visible:
-        id: auth-otp-field
-      notVisible:
-        id: auth-verify-btn
-    commands:
-      - swipe:
-          from:
-            id: auth-otp-field
-          direction: UP
 - tapOn:
     id: auth-verify-btn
     retryTapIfNoChange: false
