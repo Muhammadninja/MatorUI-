@@ -70,7 +70,7 @@ jobs:
         env:
           MATOR_E2E: ''
           EAS_BUILD_PROFILE: ''
-        run: npm test -- tests/environment-release.test.ts tests/environment-runtime.test.ts tests/e2e-mock.test.ts
+        run: npm test -- tests/environment-release.test.ts tests/environment-runtime.test.ts tests/production-transport-boundary.test.ts tests/e2e-mock.test.ts
 
       - name: Run Expo Prebuild for dedicated test app
         run: npx expo prebuild --platform android --clean --no-install

@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 const environment = vi.hoisted(() => ({ name: 'production', apiBaseUrl: 'https://api.mator.uz',
   httpDomains: '', allowDevOtp: false }));
-vi.mock('@/config/environment', () => ({ getAppEnvironment: () => environment, allowLocalDevOtp: () => false }));
+vi.mock('@/config/environment', () => ({ getAppEnvironment: () => environment, allowLocalDevOtp: () => false, isDedicatedE2EApp: () => false }));
 vi.mock('@/services/auth-storage', () => ({ getCurrentSession: () => null }));
 import { getApiBaseUrl, shouldUseHttpTransport } from '@/config/api';
 import { catalogTransport } from '@/services/catalog-service';
