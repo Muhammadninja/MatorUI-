@@ -11,26 +11,47 @@ appId: com.mator.e2e
 - assertTrue: ${maestro.copiedText === '' || maestro.copiedText === '+998 90 123 45 67'}
 - tapOn:
     id: auth-phone-field
+    retryTapIfNoChange: false
+- waitForAnimationToEnd
 - inputText: ${PHONE}
-- scrollUntilVisible:
-    element:
-      id: auth-send-code-btn
-    direction: DOWN
+- copyTextFrom:
+    id: auth-phone-field
+- assertTrue: ${maestro.copiedText.replace(/\D/g, '') === PHONE.replace(/\D/g, '')}
+# A full-screen scroll can hit the sheet's dismissing backdrop. Start inside
+# the actual field so only the auth form receives this gesture.
+- runFlow:
+    when:
+      notVisible:
+        id: auth-send-code-btn
+    commands:
+      - swipe:
+          from:
+            id: auth-phone-field
+          direction: UP
 - tapOn:
     id: auth-send-code-btn
+    retryTapIfNoChange: false
 - extendedWaitUntil:
     visible:
       id: auth-otp-field
     timeout: 15000
 - tapOn:
     id: auth-otp-field
+    retryTapIfNoChange: false
+- waitForAnimationToEnd
 - inputText: '123456'
-- scrollUntilVisible:
-    element:
-      id: auth-verify-btn
-    direction: DOWN
+- runFlow:
+    when:
+      notVisible:
+        id: auth-verify-btn
+    commands:
+      - swipe:
+          from:
+            id: auth-otp-field
+          direction: UP
 - tapOn:
     id: auth-verify-btn
+    retryTapIfNoChange: false
 - extendedWaitUntil:
     notVisible:
       id: sign-in-screen
