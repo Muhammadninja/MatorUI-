@@ -28,6 +28,7 @@ module.exports = ({ config }) => {
       // Public, resolved once by the launcher/config process. Expo 56's virtual
       // env module can otherwise override shell variables with stale .env files.
       appEnvironment,
+      e2e,
       ...(appEnvironment.name === 'local' ? {
         sentry: { dsn: '', environment: 'local', enableInDev: false },
       } : {}),

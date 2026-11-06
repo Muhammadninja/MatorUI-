@@ -71,3 +71,16 @@ tags:
     timeout: 30000
 - assertNotVisible:
     id: part-card-bosch-rotor
+# The restored list must belong to an authenticated session.
+- openLink: mator-e2e://profile
+- scrollUntilVisible:
+    element:
+      id: profile-sign-out
+    direction: DOWN
+- assertVisible:
+    id: profile-sign-out
+- openLink: mator-e2e://liked
+- assertVisible:
+    id: part-card-brembo-fp
+- assertNotVisible:
+    id: part-card-bosch-rotor

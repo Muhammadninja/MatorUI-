@@ -16,13 +16,13 @@
  */
 
 import { getCurrentSession } from '@/services/auth-storage';
-import { getAppEnvironment } from '@/config/environment';
+import { getAppEnvironment, isDedicatedE2EApp } from '@/config/environment';
 
 /** Returns the configured API base URL, or null when none is configured. */
 export function getApiBaseUrl(): string | null {
   const environment = getAppEnvironment();
   const raw = environment.apiBaseUrl;
-  if (typeof __DEV__ !== 'undefined' && !__DEV__) {
+  if (typeof __DEV__ !== 'undefined' && !__DEV__ && !isDedicatedE2EApp()) {
     const releaseEndpoints = {
       production: 'https://api.mator.uz',
       staging: 'https://api.staging.matorui.com',
