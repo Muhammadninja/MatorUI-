@@ -13,6 +13,10 @@ appId: com.mator.e2e
 - copyTextFrom:
     id: auth-phone-field
 - assertTrue: ${maestro.copiedText === '' || maestro.copiedText === '+998 90 123 45 67'}
+# A real retained placeholder-looking number would enable Next and fail here.
+- assertVisible:
+    id: auth-send-code-btn
+    enabled: false
 - tapOn:
     id: auth-phone-field
     retryTapIfNoChange: false

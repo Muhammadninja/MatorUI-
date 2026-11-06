@@ -73,10 +73,31 @@ tags:
     timeout: 15000
 - assertNotVisible:
     id: part-card-bosch-rotor
-# A process restart, with storage and session preserved.
+# A process restart, with storage and session preserved. Wait for the cold
+# startup redirect before using normal in-app navigation.
 - stopApp
 - launchApp
-- openLink: mator-e2e://liked
+- extendedWaitUntil:
+    visible:
+      id: explore-search-entry
+    timeout: 30000
+- tapOn:
+    text: Profile
+    retryTapIfNoChange: false
+# This control exists only in the authenticated Profile branch.
+- scrollUntilVisible:
+    element:
+      id: profile-sign-out
+    direction: DOWN
+- assertVisible:
+    id: profile-sign-out
+- scrollUntilVisible:
+    element:
+      text: Favorites
+    direction: UP
+- tapOn:
+    text: Favorites
+    retryTapIfNoChange: false
 - extendedWaitUntil:
     visible:
       id: liked-screen
@@ -85,23 +106,6 @@ tags:
     visible:
       id: part-card-brembo-fp
     timeout: 30000
-- assertNotVisible:
-    id: part-card-bosch-rotor
-# The restored list must belong to an authenticated session.
-- openLink: mator-e2e://profile
-- scrollUntilVisible:
-    element:
-      id: profile-sign-out
-    direction: DOWN
-- assertVisible:
-    id: profile-sign-out
-- openLink: mator-e2e://liked
-- extendedWaitUntil:
-    visible:
-      id: liked-screen
-    timeout: 15000
-- assertVisible:
-    id: part-card-brembo-fp
 - assertNotVisible:
     id: part-card-bosch-rotor
 # Only the final product list is captured; no auth/profile fields are saved.
