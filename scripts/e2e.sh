@@ -62,6 +62,17 @@ set +e
 MAESTRO_CLI_NO_ANALYTICS=1 maestro test "$@"
 MAESTRO_RESULT=$?
 set -e
+# Maestro now nests command captures inside each flow's artifact bundle. Keep
+# the upload allowlist narrow: only the final product list, never raw auth UI.
+if [[ "$MAESTRO_RESULT" -eq 0 && "$*" == *flow-12-favorites-isolation.yaml* ]]; then
+  FINAL_SHOT=$(find artifacts -type f -name favorites-a-after-restart.png -print -quit)
+  if [[ -z "$FINAL_SHOT" ]]; then
+    echo "✗ final Favorites screenshot missing" >&2
+    MAESTRO_RESULT=1
+  elif [[ "$FINAL_SHOT" != artifacts/favorites-a-after-restart.png ]]; then
+    cp "$FINAL_SHOT" artifacts/favorites-a-after-restart.png
+  fi
+fi
 if [[ "$MAESTRO_RESULT" -ne 0 ]] && command -v adb >/dev/null 2>&1; then
   node scripts/e2e-ui-diagnostic.mjs
 fi
