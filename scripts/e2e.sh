@@ -59,6 +59,8 @@ done
 # Reset server-side test state as well as the flow's app storage on every run.
 curl --fail --silent --request POST "http://127.0.0.1:$PORT/__e2e/reset" >/dev/null
 
+# Start each flow with an empty device log so a failure excerpt is its own.
+if command -v adb >/dev/null 2>&1; then adb logcat -c || true; fi
 echo "• running: maestro test $*"
 set +e
 MAESTRO_CLI_NO_ANALYTICS=1 maestro test "$@"
@@ -81,6 +83,6 @@ if [[ "$MAESTRO_RESULT" -eq 0 && -n "$FINAL_NAME" ]]; then
   fi
 fi
 if [[ "$MAESTRO_RESULT" -ne 0 ]] && command -v adb >/dev/null 2>&1; then
-  node scripts/e2e-ui-diagnostic.mjs
+  MOCK_LOG="$MOCK_LOG" node scripts/e2e-ui-diagnostic.mjs
 fi
 exit "$MAESTRO_RESULT"
