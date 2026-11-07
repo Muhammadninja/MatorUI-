@@ -2,7 +2,7 @@ import React from 'react';
 import { Image } from 'react-native';
 
 import { useTranslation } from 'react-i18next';
-import { router, useFocusEffect, useNavigation } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Heart, MapPin, ReceiptText, Shield, User } from 'lucide-react-native';
 
 import ProfileGuestEmpty from '@/components/screens-components/profile/profile-guest-empty';
@@ -99,7 +99,6 @@ export default function ProfileScreen() {
   const { t } = useTranslation();
   const toast = useToast();
   const { profile, isAuthenticated, isHydrating, signOut, refreshProfile } = useUserContext();
-  const navigation = useNavigation();
   const accountItems = React.useMemo(() => buildAccountItems(t), [t]);
 
   // Re-fetch GET /v1/me every time the tab gains focus so freshly-saved fields
@@ -126,12 +125,13 @@ export default function ProfileScreen() {
   const handleSignOut = async () => {
     await signOut();
     toast.info(t('profile.signedOutToast'));
-    // Start every tab fresh. `router.replace('/explore')` only switched tabs,
-    // so the next person landed on the previous account's last Explore page.
-    // The tab navigator is this Profile stack's parent.
-    const tabs = navigation.getParent();
-    if (tabs) tabs.reset({ index: 0, routes: [{ name: '(explore)' }] });
-    else router.replace('/explore');
+    // `replace` only switches tabs: Explore kept the previous account's stack,
+    // so the next person landed on its last page. Pop to Explore's root once
+    // the switch has committed (the pop targets the focused stack).
+    router.replace('/explore');
+    setTimeout(() => {
+      if (router.canDismiss()) router.dismissAll();
+    }, 0);
   };
 
   // Brief cold-boot hydrate — avoid flashing the guest state before we know
