@@ -95,9 +95,11 @@ tags:
     element:
       text: Favorites
     direction: UP
+# A visible row can still be moving after scrollUntilVisible. Let the native
+# scroll settle before tapping; otherwise the gesture can only stop the scroll.
+- waitForAnimationToEnd
 - tapOn:
     text: Favorites
-    retryTapIfNoChange: false
 - extendedWaitUntil:
     visible:
       id: liked-screen
@@ -110,3 +112,17 @@ tags:
     id: part-card-bosch-rotor
 # Only the final product list is captured; no auth/profile fields are saved.
 - takeScreenshot: favorites-a-after-restart
+# Separate routing regression: launch the stopped process WITH its initial URL,
+# rather than racing a second intent against a normal launch's startup redirect.
+- stopApp
+- openLink: mator-e2e://liked
+- extendedWaitUntil:
+    visible:
+      id: liked-screen
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: part-card-brembo-fp
+    timeout: 30000
+- assertNotVisible:
+    id: part-card-bosch-rotor
