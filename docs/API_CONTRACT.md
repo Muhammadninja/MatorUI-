@@ -415,14 +415,16 @@ Same CRUD shape as addresses (`GET /v1/account/payment-methods`, `POST/PATCH/DEL
 ## 12. Shipping — `POST /v1/shipping/quote`
 
 ```ts
-type ShippingQuoteRequest = { addressId; subtotal /* dollars */ };
-type ShippingOption = { key /* "standard"|"express"|"same_day" */; label; eta; price /* 0 = free */ };
+type ShippingQuoteRequest = { addressId; location?; cartKey? /* client-side cache keys */ };
+type ShippingOption =
+  | { key /* "pickup"|"courier" */; label; available?: true; price /* UZS, 0 = free */; quoteId? }
+  | { key; label; available: false; price: null; quoteId?: null; unavailableCode: string | null };
 ```
 
-Request `{ addressId, subtotal }` → `ShippingOption[]`. The chosen `key` is sent as
-`CreateOrderInput.shippingOptionKey`. `subtotal` lets the server flip free-shipping
-thresholds (client won't guess). Mock returns standard/$0 · express/$9.99 · same_day/$19.99,
-forcing standard→free at subtotal ≥ 500.
+Request body `{ delivery_address_id, delivery_method: 'courier' }` → pickup and Mator's courier,
+each priced or marked unavailable with the reason. The chosen `key` is sent as
+`CreateOrderInput.shippingOptionKey`. Wire shape and refusals: see "Delivery destination,
+address search and the map" below.
 
 ---
 
@@ -586,12 +588,13 @@ words at all. Delivery is priced by the backend and shown as a price alone.
 | `GET /v1/addresses/suggestions?street=&house=&city=&lang=&mode=&near_lat=&near_lng=` | `{ items, attribution }`. Debounced `autocomplete` while typing, `search` when submitted. Only what was typed and the rough map centre are sent. |
 | `GET /v1/addresses/reverse?lat=&lng=&lang=` | `{ address, within_coverage, attribution }`. Once per confirmed point, never while the map moves. Never fails for lack of an address. |
 | `POST` / `PATCH /v1/addresses` | `lat`, `lng`, `landmark` as well as the existing fields. `full_text` may be left out with a point. |
-| `POST /v1/shipping/quote` | With `delivery_method: 'courier'`: `{ options: [{ type, label, price_uzs, quote_id }], currency }`. |
-| `POST /v1/orders` | `confirmed_delivery_uzs` and `delivery_quote_id` from that answer. `409 DELIVERY_QUOTE_STALE` when the pin, a pickup point or the rates have changed; `409 DELIVERY_PRICE_CHANGED` when the price has. Fetch a new quote and confirm again. |
+| `POST /v1/shipping/quote` | With `delivery_method: 'courier'`: `{ options: [pickup, courier], currency: 'UZS' }`, each option `{ type, label, available, price_uzs, quote_id, unavailable_reason }`. Pickup is always `available`, `price_uzs: 0`. A courier that cannot be had is `available: false`, `price_uzs: null`, `unavailable_reason: { code, message }`, with code `COURIER_DELIVERY_UNAVAILABLE` (no area configured), `DELIVERY_OUTSIDE_COVERAGE`, `DELIVERY_ADDRESS_COORDINATES_MISSING`, `DELIVERY_ADDRESS_REQUIRED`, `PICKUP_LOCATION_MISSING`, `DELIVERY_ROUTE_NOT_FOUND` or `DELIVERY_ROUTING_UNAVAILABLE` (UzMaps gave no answer). The checkout shows both options as a choice and words each code itself. `404` for an address that is not the caller's, `400` for an empty cart. |
+| `POST /v1/orders` | `confirmed_delivery_uzs`, `delivery_quote_id` and `confirmed_total_uzs` from that answer and the cart. `409 ORDER_TOTAL_CHANGED` when the total has moved, rates changed since the quote included; `409 DELIVERY_QUOTE_STALE` when the pin or a pickup point changed at the same total; `409 DELIVERY_PRICE_CHANGED` when only the price disagrees. Each carries `details: { subtotal_uzs, discount_uzs, service_fee_uzs, delivery_uzs, total_uzs, delivery_quote_id }`, what an order placed now would charge. Fetch the quote and the cart again and confirm again. |
 
-Other refusals, with `code`: `422 COURIER_DELIVERY_UNAVAILABLE` (no area configured; pickup
-works), `422 DELIVERY_OUTSIDE_COVERAGE`, `400 DELIVERY_ADDRESS_COORDINATES_INVALID`,
-`503 ADDRESS_SEARCH_UNAVAILABLE` (the map still works).
+Other refusals, with `code`: `422 DELIVERY_OUTSIDE_COVERAGE` (saving an address),
+`400 DELIVERY_ADDRESS_COORDINATES_INVALID`, `503 ADDRESS_SEARCH_UNAVAILABLE` (the map still
+works). A backend from before the two-option answer refused an unpriced courier with
+`422`/`503` and these codes instead; the app reads both.
 
 **The map.** `AppMap` over `react-native-maps`: Apple Maps on iOS, which needs no key; Google
 Maps on Android, which needs `GOOGLE_MAPS_ANDROID_API_KEY` set at build time (EAS environment

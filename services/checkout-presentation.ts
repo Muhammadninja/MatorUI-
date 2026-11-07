@@ -14,17 +14,43 @@ export type CheckoutDelivery = {
   quoteId: string | null;
 };
 
+export type QuoteState = 'idle' | 'loading' | 'success' | 'error';
+
+/**
+ * What the backend says about Mator's courier for this address and cart. A price, or why
+ * there is none: the backend's own refusal code when it gave one, from an option it marked
+ * unavailable or from a refused request. Not asked yet counts as on its way, never as free.
+ */
+export type CourierOffer =
+  | { state: 'loading' }
+  | { state: 'priced'; price: number; quoteId: string | null }
+  | { state: 'refused'; code: string | null };
+
+export function courierOffer(input: {
+  quoteState: QuoteState;
+  options: ShippingOption[];
+  /** The code of a refused request, when the quote failed. */
+  errorCode?: string | null;
+}): CourierOffer {
+  if (input.quoteState === 'idle' || input.quoteState === 'loading') return { state: 'loading' };
+  if (input.quoteState === 'error') return { state: 'refused', code: input.errorCode ?? null };
+  const courier = input.options.find((option) => option.key === 'courier');
+  if (!courier) return { state: 'refused', code: null };
+  if (courier.available === false) return { state: 'refused', code: courier.unavailableCode };
+  return { state: 'priced', price: courier.price, quoteId: courier.quoteId ?? null };
+}
+
 /**
  * The checkout's one rule about delivery. A courier needs a price from the backend, so
- * while that is loading, refused or missing the order cannot be placed. Pickup costs
- * nothing, and with no address it is the only way to get the goods, but that has to be
+ * while that is loading, refused, unavailable or missing the order cannot be placed. Pickup
+ * costs nothing, and with no address it is the only way to get the goods, but that has to be
  * the buyer's choice: an unanswered address prompt does not place a pickup order.
  */
 export function resolveCheckoutDelivery(input: {
   hasAddress: boolean;
   addressSkipped: boolean;
   method: DeliveryMethod;
-  quoteState: 'idle' | 'loading' | 'success' | 'error';
+  quoteState: QuoteState;
   options: ShippingOption[];
 }): CheckoutDelivery {
   if (!input.hasAddress) {
@@ -34,12 +60,9 @@ export function resolveCheckoutDelivery(input: {
   }
   if (input.method === 'pickup') return { method: 'pickup', fee: 0, ready: true, quoteId: null };
 
-  const courier =
-    input.quoteState === 'success'
-      ? input.options.find((option) => option.key === 'courier')
-      : undefined;
-  return courier
-    ? { method: 'courier', fee: courier.price, ready: true, quoteId: courier.quoteId ?? null }
+  const offer = courierOffer(input);
+  return offer.state === 'priced'
+    ? { method: 'courier', fee: offer.price, ready: true, quoteId: offer.quoteId }
     : { method: 'courier', fee: null, ready: false, quoteId: null };
 }
 

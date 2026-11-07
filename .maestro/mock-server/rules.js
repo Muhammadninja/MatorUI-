@@ -222,7 +222,10 @@ router.get('/v1/account/payment-methods', (_req, res) => {
 router.post('/v1/shipping/quote', (_req, res) => {
   res.status = 200; res.headers = { 'Content-Type': 'application/json' };
   res.body = {
-    options: [{ type: 'courier', label: 'Kuryer', price_uzs: 15000, quote_id: 'mock_quote' }],
+    options: [
+      { type: 'pickup', label: 'Olib ketish', available: true, price_uzs: 0, quote_id: null, unavailable_reason: null },
+      { type: 'courier', label: 'Kuryer', available: true, price_uzs: 15000, quote_id: 'mock_quote', unavailable_reason: null },
+    ],
     currency: 'UZS',
   };
 });

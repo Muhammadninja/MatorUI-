@@ -441,12 +441,15 @@ const server = http.createServer(async (req, res) => {
     return send(res, 200, PAYMENT_METHODS);
   }
 
-  // BUY PATH — the courier price, as the backend answers it. Without a quote id the app
-  // treats it as no quote, and "Place order" stays disabled.
+  // BUY PATH — pickup and the courier price, as the backend answers them. Without a quote id
+  // the app treats the courier as unpriced, and "Place order" stays disabled for it.
   if (req.method === 'POST' && pathname === '/v1/shipping/quote') {
     await readBody(req);
     return send(res, 200, {
-      options: [{ type: 'courier', label: 'Kuryer', price_uzs: 15000, quote_id: 'mock_quote' }],
+      options: [
+        { type: 'pickup', label: 'Olib ketish', available: true, price_uzs: 0, quote_id: null, unavailable_reason: null },
+        { type: 'courier', label: 'Kuryer', available: true, price_uzs: 15000, quote_id: 'mock_quote', unavailable_reason: null },
+      ],
       currency: 'UZS',
     });
   }

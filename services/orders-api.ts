@@ -383,16 +383,25 @@ export class MockOrdersTransport implements OrdersTransport {
     signal?: AbortSignal,
   ): Promise<ShippingOption[]> {
     await delay(MOCK_LATENCY_MS, signal);
-    // Refuses like the real backend does, so the screen's error state can be exercised.
+    // Answers like the real backend does: pickup always, and a courier that an address with
+    // no location cannot have, so the screen's refusal state can be exercised.
+    const pickup: ShippingOption = { key: 'pickup', label: 'Pickup', price: 0, quoteId: null };
     const address = this.addresses.find((a) => a.id === request.addressId);
     if (address?.lat == null || address.lng == null) {
-      throw new ApiError(
-        422,
-        'DELIVERY_ADDRESS_COORDINATES_MISSING',
-        'This delivery address has no location.',
-      );
+      return [
+        pickup,
+        {
+          key: 'courier',
+          label: 'Courier',
+          available: false,
+          price: null,
+          quoteId: null,
+          unavailableCode: 'DELIVERY_ADDRESS_COORDINATES_MISSING',
+        },
+      ];
     }
     return [
+      pickup,
       {
         key: 'courier',
         label: 'Courier',
@@ -426,10 +435,12 @@ export class MockOrdersTransport implements OrdersTransport {
  *   PATCH  /v1/payment-methods/:id                  → PaymentMethod
  *   DELETE /v1/payment-methods/:id                  → 204
  *   POST   /v1/payment-methods/:id/default          → 204
- *   POST   /v1/shipping/quote                      → { options: [{ type, label,
- *          price_uzs, quote_id }], currency }  — NOT a bare array, and the request body is
- *          `{ delivery_address_id, delivery_method: 'courier' }` (snake_case). Refusals
- *          carry a `code` the checkout words itself (checkout-presentation.ts).
+ *   POST   /v1/shipping/quote                      → { options: [{ type, label, available,
+ *          price_uzs, quote_id, unavailable_reason }], currency }  — NOT a bare array, and the
+ *          request body is `{ delivery_address_id, delivery_method: 'courier' }` (snake_case).
+ *          Pickup and the courier both come back; a courier that cannot be had is
+ *          `available: false` with `unavailable_reason.code`, which the checkout words itself
+ *          (checkout-presentation.ts), as it does the `code` of a refused request.
  */
 import { shouldUseHttpTransport } from '@/config/api';
 import { apiClient, ApiError } from '@/services/api-client';
@@ -971,23 +982,44 @@ export class HttpOrdersTransport implements OrdersTransport {
       options?: {
         type?: string;
         label?: string;
-        price_uzs?: number;
+        available?: boolean;
+        price_uzs?: number | null;
         quote_id?: string | null;
+        unavailable_reason?: { code?: string | null; message?: string | null } | null;
       }[];
     }>(
       '/v1/shipping/quote',
       { delivery_address_id: req.addressId, delivery_method: 'courier' },
       { signal },
     );
-    // An option with no real price is dropped rather than read as free, so the checkout
-    // treats it as no quote at all. So is a price with no quote behind it: the order would
-    // only be refused. Zero has none, because there is nothing to deliver.
-    return (raw?.options ?? []).flatMap((o) => {
+    // The backend answers pickup and Mator's courier, each saying whether it can be had. One it
+    // cannot deliver comes with the reason and no price, and is kept as such, so the checkout
+    // can say why: never read as free. Of the rest, an option with no real price is dropped
+    // rather than read as free, so the checkout treats it as no quote at all. So is a price
+    // with no quote behind it: the order would only be refused. Zero has none, because there
+    // is nothing to deliver. An older backend states no `available` and lists only what it
+    // priced, which reads the same way.
+    return (raw?.options ?? []).flatMap((o): ShippingOption[] => {
+      const key = o.type ?? 'courier';
+      const label = o.label ?? '';
+      if (o.available === false) {
+        const code = o.unavailable_reason?.code;
+        return [
+          {
+            key,
+            label,
+            available: false,
+            price: null,
+            quoteId: null,
+            unavailableCode: typeof code === 'string' && code ? code : null,
+          },
+        ];
+      }
       const price = o.price_uzs;
       if (typeof price !== 'number' || !Number.isFinite(price) || price < 0) return [];
       const quoteId = o.quote_id || null;
       if (price > 0 && !quoteId) return [];
-      return [{ key: o.type ?? 'courier', label: o.label ?? '', price, quoteId }];
+      return [{ key, label, price, quoteId }];
     });
   }
 }

@@ -224,7 +224,7 @@ describe('The service fee at checkout', () => {
   test('pickup: the parts and the fee, and no delivery cost', async () => {
     await mount();
 
-    await press(pressable('Изменить Доставка'));
+    await press(pressable('Самовывоз, Бесплатно'));
 
     expect(allText()).toContain('Стоимость доставки | Бесплатно');
     expect(nbsp(String(button().props.title))).toBe('Оформить заказ · 620 000 сум');

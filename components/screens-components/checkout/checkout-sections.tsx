@@ -14,6 +14,8 @@ import {
   quoteErrorAction,
   quoteErrorKey,
   type CheckoutDelivery,
+  type CourierOffer,
+  type DeliveryMethod,
   type PaymentFailureReason,
 } from '@/services/checkout-presentation';
 import { formatOrderNo, type Address } from '@/services/orders-service';
@@ -198,6 +200,25 @@ export function DeliverySection({
 
 // ── Payment row (selectable) ───────────────────────────────────────────
 
+/** The round mark a selectable row shows: filled with a tick when chosen. */
+function RadioMark({ tokens, selected }: { tokens: Tokens; selected: boolean }) {
+  return (
+    <AppView
+      center
+      rounded={999}
+      style={{
+        width: 22,
+        height: 22,
+        borderWidth: selected ? 0 : 1.5,
+        borderColor: tokens.border,
+        backgroundColor: selected ? tokens.text : 'transparent',
+      }}
+    >
+      {selected ? <Check size={14} strokeWidth={3} color={tokens.background} /> : null}
+    </AppView>
+  );
+}
+
 export function PaymentRow({
   option,
   selected,
@@ -230,95 +251,143 @@ export function PaymentRow({
           <AppText family="default" weight="semibold" style={{ fontSize: 15, color: tokens.text }}>{t(option.labelKey)}</AppText>
           <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted, marginTop: 1 }}>{t(option.descriptionKey)}</AppText>
         </AppView>
-        <AppView
-          center
-          rounded={999}
-          style={{
-            width: 22,
-            height: 22,
-            borderWidth: selected ? 0 : 1.5,
-            borderColor: tokens.border,
-            backgroundColor: selected ? tokens.text : 'transparent',
-          }}
-        >
-          {selected ? <Check size={14} strokeWidth={3} color={tokens.background} /> : null}
-        </AppView>
+        <RadioMark tokens={tokens} selected={selected} />
       </AppView>
     </AppPressableView>
   );
 }
 
-// ── Delivery price card ────────────────────────────────────────────────
-// Pickup, the courier price, or why there is no price and what can be done about it.
+// ── Delivery options card ──────────────────────────────────────────────
+// The buyer's choice between pickup and Mator's courier, side by side: pickup is free, and
+// the courier shows the backend's price for the chosen address, that it is being worked out,
+// or why there is none and what can be done about it. Pickup stays choosable whatever
+// happened to the courier.
 
-export function DeliveryPriceCard({
+function DeliveryOptionRow({
+  tokens,
+  testID,
+  title,
+  value,
+  valueTestID,
+  selected,
+  onPress,
+}: {
+  tokens: Tokens;
+  testID: string;
+  title: string;
+  /** The price as shown, or null while there is none to show. */
+  value: string | null;
+  valueTestID?: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <AppPressableView
+      testID={testID}
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
+      accessibilityLabel={value && value !== NO_PRICE_YET ? `${title}, ${value}` : title}
+      rounded={12}
+      p={12}
+      borderWidth={1}
+      borderName={selected ? undefined : 'border'}
+      style={selected ? { borderWidth: 1.5, borderColor: tokens.text } : undefined}
+    >
+      <AppView row align="center" gap={12}>
+        <AppText family="default" weight="semibold" style={{ fontSize: 15, color: tokens.text, flex: 1 }}>
+          {title}
+        </AppText>
+        {value !== null ? (
+          <AppText testID={valueTestID} family="accent" weight="semibold" style={{ fontSize: 14, color: tokens.text }}>
+            {value}
+          </AppText>
+        ) : null}
+        <RadioMark tokens={tokens} selected={selected} />
+      </AppView>
+    </AppPressableView>
+  );
+}
+
+export function DeliveryOptionsCard({
   tokens,
   delivery,
-  canChooseMethod,
-  onToggleMethod,
-  quoteFailed,
-  quoteErrorCode,
+  courier,
+  onChooseMethod,
   onRetry,
   onEditAddress,
   formatCurrency,
 }: {
   tokens: Tokens;
+  /** What the order would be placed with. */
   delivery: CheckoutDelivery;
-  canChooseMethod: boolean;
-  onToggleMethod: () => void;
-  quoteFailed: boolean;
-  quoteErrorCode: string | null;
+  /** What the backend says about the courier, or null with no address: then only pickup. */
+  courier: CourierOffer | null;
+  onChooseMethod: (method: DeliveryMethod) => void;
   onRetry: () => void;
   onEditAddress: () => void;
   formatCurrency: (amount: number) => string;
 }) {
   const { t } = useTranslation();
-  const label = t('checkout.shipping');
-  const action = quoteErrorAction(quoteErrorCode);
-  const line = { fontSize: 15, color: tokens.text };
+  const pickupChosen = delivery.method === 'pickup';
+  const courierPrice =
+    courier?.state === 'priced'
+      ? courier.price > 0
+        ? formatCurrency(courier.price)
+        : t('checkout.free')
+      : courier?.state === 'refused'
+        ? NO_PRICE_YET
+        : null;
+  const action = courier?.state === 'refused' ? quoteErrorAction(courier.code) : null;
   return (
-    <AppView testID="checkout-delivery-card" rounded={16} p={16} colorName="card" borderWidth={1} borderName="border" gap={8}>
-      <AppView row align="center" justify="space-between">
-        <SectionLabel tokens={tokens}>{label}</SectionLabel>
-        {canChooseMethod ? (
-          <AppPressableView onPress={onToggleMethod} accessibilityRole="button" accessibilityLabel={t('checkout.changeLabel', { label })}>
-            <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.text }}>{t('checkout.change')}</AppText>
-          </AppPressableView>
-        ) : null}
-      </AppView>
+    <AppView testID="checkout-delivery-card" rounded={16} p={16} colorName="card" borderWidth={1} borderName="border" gap={10}>
+      <SectionLabel tokens={tokens}>{t('checkout.shipping')}</SectionLabel>
 
-      {delivery.method === 'pickup' ? (
-        <AppText testID="checkout-delivery-price" family="default" weight="semibold" style={line}>
-          {`${t('checkout.pickup')} · ${t('checkout.free')}`}
-        </AppText>
-      ) : delivery.fee !== null ? (
-        <AppText testID="checkout-delivery-price" family="default" weight="semibold" style={line}>
-          {delivery.fee > 0
-            ? t('checkout.deliveryPrice', { price: formatCurrency(delivery.fee) })
-            : t('checkout.deliveryPrice', { price: t('checkout.free') })}
-        </AppText>
-      ) : quoteFailed ? (
-        <AppView gap={8}>
-          <AppView row align="center" gap={8}>
-            <AlertCircle size={16} strokeWidth={2} color={tokens.error} />
-            <AppText family="default" style={{ fontSize: 13, color: tokens.error, flex: 1 }}>
-              {t(quoteErrorKey(quoteErrorCode))}
-            </AppText>
-          </AppView>
-          {action === 'edit_address' ? (
-            <LinkAction label={t('checkout.chooseExactAddress')} onPress={onEditAddress} color={tokens.text} />
-          ) : action === 'retry' ? (
-            <LinkAction label={t('common.retry')} onPress={onRetry} color={tokens.text} />
+      <DeliveryOptionRow
+        tokens={tokens}
+        testID="checkout-delivery-pickup"
+        title={t('checkout.pickup')}
+        value={t('checkout.free')}
+        valueTestID={pickupChosen ? 'checkout-delivery-price' : undefined}
+        selected={pickupChosen}
+        onPress={() => onChooseMethod('pickup')}
+      />
+
+      {courier ? (
+        <AppView testID="checkout-delivery-courier" gap={8}>
+          <DeliveryOptionRow
+            tokens={tokens}
+            testID="checkout-delivery-courier-option"
+            title={t('checkout.courierMator')}
+            value={courierPrice}
+            valueTestID={!pickupChosen && courier.state === 'priced' ? 'checkout-delivery-price' : undefined}
+            selected={!pickupChosen}
+            onPress={() => onChooseMethod('courier')}
+          />
+          {courier.state === 'loading' ? (
+            <AppView row align="center" gap={8}>
+              <WheelLoader size={18} color={tokens.text} />
+              <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted, flex: 1 }}>
+                {t('checkout.deliveryCalculating')}
+              </AppText>
+            </AppView>
+          ) : courier.state === 'refused' ? (
+            <AppView gap={8}>
+              <AppView row align="center" gap={8}>
+                <AlertCircle size={16} strokeWidth={2} color={tokens.error} />
+                <AppText family="default" style={{ fontSize: 13, color: tokens.error, flex: 1 }}>
+                  {t(quoteErrorKey(courier.code))}
+                </AppText>
+              </AppView>
+              {action === 'edit_address' ? (
+                <LinkAction label={t('checkout.chooseExactAddress')} onPress={onEditAddress} color={tokens.text} />
+              ) : action === 'retry' ? (
+                <LinkAction label={t('common.retry')} onPress={onRetry} color={tokens.text} />
+              ) : null}
+            </AppView>
           ) : null}
         </AppView>
-      ) : (
-        <AppView row align="center" gap={8}>
-          <WheelLoader size={18} color={tokens.text} />
-          <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted, flex: 1 }}>
-            {t('checkout.deliveryCalculating')}
-          </AppText>
-        </AppView>
-      )}
+      ) : null}
     </AppView>
   );
 }

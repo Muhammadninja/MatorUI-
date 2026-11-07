@@ -286,6 +286,61 @@ describe('HttpOrdersTransport', () => {
     expect(options).toEqual([{ key: 'courier', label: 'Kuryer', price: 32500, quoteId: 'quote_1' }]);
   });
 
+  test('reads both options the backend answers: pickup, free, and the priced courier', async () => {
+    post.mockResolvedValueOnce({
+      options: [
+        { type: 'pickup', label: 'Olib ketish', available: true, price_uzs: 0, quote_id: null, unavailable_reason: null },
+        { type: 'courier', label: 'Kuryer', available: true, price_uzs: 32500, quote_id: 'quote_1', unavailable_reason: null },
+      ],
+      currency: 'UZS',
+    });
+    await expect(t.getShippingQuote({ addressId: 'addr_1' })).resolves.toEqual([
+      { key: 'pickup', label: 'Olib ketish', price: 0, quoteId: null },
+      { key: 'courier', label: 'Kuryer', price: 32500, quoteId: 'quote_1' },
+    ]);
+  });
+
+  test('keeps a courier the backend cannot deliver as such, with its reason and no price', async () => {
+    post.mockResolvedValueOnce({
+      options: [
+        { type: 'pickup', label: 'Olib ketish', available: true, price_uzs: 0, quote_id: null, unavailable_reason: null },
+        {
+          type: 'courier',
+          label: 'Kuryer',
+          available: false,
+          price_uzs: null,
+          quote_id: null,
+          unavailable_reason: { code: 'DELIVERY_OUTSIDE_COVERAGE', message: 'outside' },
+        },
+      ],
+      currency: 'UZS',
+    });
+    await expect(t.getShippingQuote({ addressId: 'addr_1' })).resolves.toEqual([
+      { key: 'pickup', label: 'Olib ketish', price: 0, quoteId: null },
+      {
+        key: 'courier',
+        label: 'Kuryer',
+        available: false,
+        price: null,
+        quoteId: null,
+        unavailableCode: 'DELIVERY_OUTSIDE_COVERAGE',
+      },
+    ]);
+  });
+
+  test.each([
+    ['a price beside it', { price_uzs: 0, quote_id: 'quote_1', unavailable_reason: { code: 'DELIVERY_ROUTE_NOT_FOUND' } }, 'DELIVERY_ROUTE_NOT_FOUND'],
+    ['no reason', { price_uzs: null }, null],
+    ['a reason with no code', { unavailable_reason: { message: 'no' } }, null],
+  ])('an unavailable courier with %s is still never priced, nor free', async (_, over, code) => {
+    post.mockResolvedValueOnce({
+      options: [{ type: 'courier', label: 'Kuryer', available: false, ...over }],
+    });
+    await expect(t.getShippingQuote({ addressId: 'addr_1' })).resolves.toEqual([
+      { key: 'courier', label: 'Kuryer', available: false, price: null, quoteId: null, unavailableCode: code },
+    ]);
+  });
+
   test('a price with no quote behind it could only be refused, so it is no quote at all', async () => {
     post.mockResolvedValueOnce({
       options: [{ type: 'courier', label: 'Kuryer', price_uzs: 32500 }],
