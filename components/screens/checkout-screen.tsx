@@ -18,6 +18,7 @@ import {
   PaymentRow,
   SectionLabel,
 } from '@/components/screens-components/checkout/checkout-sections';
+import { PickupPoints } from '@/components/screens-components/checkout/pickup-points';
 import { AppButton } from '@/components/shared/app-button';
 import { AppPrice } from '@/components/shared/app-price';
 import { AppText } from '@/components/shared/app-text';
@@ -35,6 +36,7 @@ import {
   useShippingQuote,
   useUpdateAddress,
 } from '@/hooks/use-orders';
+import { usePickupPoints } from '@/hooks/use-pickup-points';
 import { parsePrice } from '@/services/cart-math';
 import {
   checkoutTotal,
@@ -45,6 +47,7 @@ import {
 } from '@/services/checkout-presentation';
 import garageService from '@/services/garage-service';
 import type { Address, PaymentType } from '@/services/orders-service';
+import { pickupCartKey } from '@/services/pickup-points';
 import { triggerHaptic } from '@/utils/haptics';
 
 /**
@@ -57,9 +60,11 @@ import { triggerHaptic } from '@/utils/haptics';
  * "Place order" builds a `CreateOrderInput` (addressId may be null) and hands the
  * created order id to the confirmation screen.
  *
- * The delivery price is the only thing the buyer learns about the delivery: no
- * map, distance, route or arrival time is shown here, and the app never talks to a
- * routing provider. Every figure comes from the backend's quote.
+ * The delivery price is the only thing the buyer learns about the courier: no
+ * map, distance, route or arrival time is shown for it, and the app never talks to a
+ * routing provider. Every figure comes from the backend's quote. A buyer who collects the
+ * order is shown where: the dealer each part is bought from, with its address and its pin
+ * on the existing map, as the backend states them (`PickupPoints`), never a route.
  *
  * So do the cost of the parts and Mator's service fee: the backend's cart states them, and
  * the app works none of it out. The total is shown and the order placed only while those
@@ -143,6 +148,17 @@ export default function CheckoutScreen() {
         errorCode: shipping.errorCode,
       })
     : null;
+  // Where each dealer's goods are collected: asked only while the buyer collects the order,
+  // for the cart as the server has it, so it waits for cart changes still on their way.
+  const pickup = usePickupPoints(
+    delivery.method === 'pickup' &&
+      (addr || addressSkipped) &&
+      items.length > 0 &&
+      pendingIds.size === 0 &&
+      !payment.pending
+      ? pickupCartKey(items)
+      : null,
+  );
   // The server's own figures for this cart: a sale may have started or ended, or the cart
   // changed on another device, since it was last read.
   useEffect(() => {
@@ -324,6 +340,14 @@ export default function CheckoutScreen() {
                   onRetry={shipping.refresh}
                   onEditAddress={() => openAddressForm(addr)}
                   formatCurrency={formatCurrency}
+                  pickupDetails={
+                    <PickupPoints
+                      tokens={tokens}
+                      state={pickup.state}
+                      points={pickup.points}
+                      onRetry={pickup.refresh}
+                    />
+                  }
                 />
               ) : null}
             </>

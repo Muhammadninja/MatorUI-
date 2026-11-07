@@ -255,6 +255,21 @@ export type UnavailableShippingOption = {
   unavailableCode: string | null;
 };
 
+/** Where the buyer collects one dealer's goods, as the backend states it for the cart: the
+ *  dealer each part is bought from, never a list of every dealer. */
+export type PickupPoint = {
+  /** The storefront the goods are bought from. Null for goods whose dealer is not known. */
+  dealerId: string | null;
+  dealerName: string | null;
+  /** Null while the dealer has given no address. */
+  address: string | null;
+  landmark: string | null;
+  /** Null while the dealer has no location on record. Never a made-up point. */
+  location: DeliveryPoint | null;
+  /** This dealer's lines in the cart, and only those. */
+  items: { cartItemId: string; partId: string | null; title: string; quantity: number }[];
+};
+
 /** Input from the client when creating an order. The server owns all
  *  pricing math from here — we send selections, not totals. */
 export type CreateOrderInput = {

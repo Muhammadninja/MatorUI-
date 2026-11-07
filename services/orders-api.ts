@@ -28,6 +28,7 @@ import type {
   PaymentMethod,
   PaymentMethodInput,
   PaymentType,
+  PickupPoint,
   PointDescription,
   ShippingOption,
 } from '@/services/orders-service';
@@ -69,6 +70,8 @@ export interface OrdersTransport {
     request: ShippingQuoteRequest,
     signal?: AbortSignal,
   ): Promise<ShippingOption[]>;
+  /** Where the cart's goods are collected: one entry per dealer the cart buys from. */
+  getPickupPoints(signal?: AbortSignal): Promise<PickupPoint[]>;
 }
 
 // ── Mock transport ───────────────────────────────────────────────────
@@ -410,6 +413,12 @@ export class MockOrdersTransport implements OrdersTransport {
       },
     ];
   }
+
+  async getPickupPoints(signal?: AbortSignal): Promise<PickupPoint[]> {
+    await delay(MOCK_LATENCY_MS, signal);
+    // The mock knows no cart and no dealer, so it names no place to collect from.
+    return [];
+  }
 }
 
 // ── HTTP transport (stub) ────────────────────────────────────────────
@@ -441,12 +450,17 @@ export class MockOrdersTransport implements OrdersTransport {
  *          Pickup and the courier both come back; a courier that cannot be had is
  *          `available: false` with `unavailable_reason.code`, which the checkout words itself
  *          (checkout-presentation.ts), as it does the `code` of a refused request.
+ *   GET    /v1/shipping/pickup-points              → { pickup_points: [{ dealer_id, dealer_name,
+ *          address, landmark, location: { lat, lng } | null, items: [{ cart_item_id, part_id,
+ *          title, quantity }] }] }: each dealer the cart buys from, once, with its own lines.
+ *          A null address or location means the dealer has none on record yet.
  */
 import { shouldUseHttpTransport } from '@/config/api';
 import { apiClient, ApiError } from '@/services/api-client';
 import { formatCurrency } from '@/services/cart-math';
 import { debugLog } from '@/services/debug-log';
 import { parseCoverageGeometry } from '@/services/delivery-coverage';
+import { parsePickupPoints } from '@/services/pickup-points';
 
 /** Strip spaces / dashes / parens so "+998 90 123 45 67" → "+998901234567". */
 function toE164(raw: string): string {
@@ -1021,6 +1035,13 @@ export class HttpOrdersTransport implements OrdersTransport {
       if (price > 0 && !quoteId) return [];
       return [{ key, label, price, quoteId }];
     });
+  }
+
+  async getPickupPoints(signal?: AbortSignal): Promise<PickupPoint[]> {
+    const raw = await apiClient.get<{ pickup_points?: unknown }>('/v1/shipping/pickup-points', {
+      signal,
+    });
+    return parsePickupPoints(raw?.pickup_points);
   }
 }
 

@@ -22,6 +22,7 @@ const { host, transport, cart, startPayment, openAuthSessionAsync, replace, push
     transport: {
       listAddresses: vi.fn(),
       getShippingQuote: vi.fn(),
+      getPickupPoints: vi.fn(async () => []),
       createOrder: vi.fn(),
       createAddress: vi.fn(),
       updateAddress: vi.fn(),
@@ -66,6 +67,7 @@ vi.mock('@/components/shared/app-price', () => ({
   AppPrice: ({ value }: { value: string }) => React.createElement('text', { testID: 'total' }, value),
 }));
 vi.mock('@/components/shared/wheel-loader', () => ({ WheelLoader: host('loader') }));
+vi.mock('@/components/shared/app-map', () => ({ default: host('map') }));
 vi.mock('@/components/screens-components/account/address-form-sheet', () => ({ default: () => null }));
 vi.mock('@/contexts/theme.context', () => ({ useThemeContext: () => ({ tokens: {} }) }));
 vi.mock('@/contexts/user.context', () => ({ useUserContext: () => ({ profile: { id: 'user_a' } }) }));
