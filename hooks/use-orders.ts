@@ -152,6 +152,11 @@ export type UseCreateOrderValue = {
   reset: () => void;
 };
 
+/** 8–128 letters, digits, `_` — the backend's `Idempotency-Key` alphabet. */
+function newOrderKey(): string {
+  return `ord_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
+}
+
 export function useCreateOrder(): UseCreateOrderValue {
   const { ownerId, canRead } = useAccountScope();
   const [snapshot, setSnapshot] = useState<{
@@ -159,6 +164,7 @@ export function useCreateOrder(): UseCreateOrderValue {
   }>({ ownerId, phase: 'idle', error: null, result: null });
   const session = useRef<{
     ownerId: string | null; pending: Promise<CreateOrderResult | null> | null; result: CreateOrderResult | null;
+    key?: { intent: string; value: string };
   }>({ ownerId, pending: null, result: null });
   if (session.current.ownerId !== ownerId) session.current = { ownerId, pending: null, result: null };
 
@@ -169,10 +175,16 @@ export function useCreateOrder(): UseCreateOrderValue {
     if (attempt.pending) return Promise.resolve(null);
     // Keep the successful order while hosted payment/navigation is in progress.
     if (attempt.result) return Promise.resolve(null);
+    // A failed request may still have created the order. Retrying the same
+    // order reuses its key; a changed cart or selection is a new order.
+    const { totalLabel: _display, idempotencyKey: _key, ...selection } = input;
+    const intent = JSON.stringify(selection);
+    if (attempt.key?.intent !== intent) attempt.key = { intent, value: newOrderKey() };
+    const keyed = { ...input, idempotencyKey: attempt.key.value };
     setSnapshot({ ownerId, attempt, phase: 'placing', error: null, result: null });
     const pending = Promise.resolve().then(() => {
       if (session.current !== attempt || !canRead()) throw new Error('Order session changed');
-      return ordersTransport.createOrder(input);
+      return ordersTransport.createOrder(keyed);
     }).then((result) => {
       if (session.current !== attempt || !canRead()) return null;
       attempt.result = result;

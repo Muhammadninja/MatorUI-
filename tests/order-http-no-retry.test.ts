@@ -12,3 +12,13 @@ test('a lost POST order response causes one network attempt, without automatic r
     .rejects.toMatchObject({ code: 'NETWORK_ERROR' });
   expect(fetch).toHaveBeenCalledTimes(1);
 });
+test('the order idempotency key is sent as a header, never in the whitelisted body', async () => {
+  const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ order_id: 'unit-order', status: 'pending_payment' }), { status: 201 }));
+  vi.stubGlobal('fetch', fetch);
+  await new HttpOrdersTransport().createOrder({ items: [{ productId: 'unit-part', quantity: 1 }],
+    addressId: null, paymentType: 'cash', shippingOptionKey: 'pickup', promoCode: null, idempotencyKey: 'ord_unit_key' });
+  const [, init] = fetch.mock.calls[0];
+  expect(init.headers['Idempotency-Key']).toBe('ord_unit_key');
+  expect(JSON.parse(init.body)).not.toHaveProperty('idempotencyKey');
+  expect(JSON.parse(init.body)).not.toHaveProperty('idempotency_key');
+});

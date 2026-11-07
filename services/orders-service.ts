@@ -235,6 +235,10 @@ export type CreateOrderInput = {
    *  authoritatively and MAY ignore this; the mock echoes it so the
    *  just-placed order's confirmation/track total isn't blank. */
   totalLabel?: string;
+  /** Sent as `Idempotency-Key`. The same key is reused when the buyer retries
+   *  the same order after a failure, so a request whose response was lost
+   *  can't create a second order on a backend that honors the header. */
+  idempotencyKey?: string;
 };
 
 /**

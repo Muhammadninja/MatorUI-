@@ -385,7 +385,8 @@ export class HttpOrdersTransport implements OrdersTransport {
     // Payme/Click webhook and report by method.
     if (input.paymentType) body.payment_type = input.paymentType;
 
-    const r = await apiClient.post<RawBackendOrder>('/v1/orders', body, { signal });
+    const headers = input.idempotencyKey ? { 'Idempotency-Key': input.idempotencyKey } : undefined;
+    const r = await apiClient.post<RawBackendOrder>('/v1/orders', body, { signal, headers });
     return {
       orderId: r.order_id,
       eta: r.status === 'pending_payment' ? 'Awaiting payment' : formatDate(r.created_at),
