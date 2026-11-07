@@ -374,28 +374,58 @@ const server = http.createServer(async (req, res) => {
     return send(res, 200, PAYMENT_METHODS);
   }
 
-  // BUY PATH — POST /v1/shipping/quote → ShippingOption[] (standard is free ≥ $500,
-  // mirroring the mock transport's rule). Without this the quote is empty and
-  // "Place order" no-ops (checkout guards on a selected shipping option).
+  // BUY PATH — pickup and the courier price, as the backend answers them. Without a quote id
+  // the app treats the courier as unpriced, and "Place order" stays disabled for it.
   if (req.method === 'POST' && pathname === '/v1/shipping/quote') {
-    const body = await readBody(req);
-    const subtotal = Number(body.subtotal) || 0;
-    const opts = SHIPPING_OPTIONS.map((o) =>
-      o.key === 'standard' && subtotal >= 500 ? { ...o, price: 0 } : o,
-    );
-    return send(res, 200, opts);
+    await readBody(req);
+    return send(res, 200, {
+      options: [
+        { type: 'pickup', label: 'Olib ketish', available: true, price_uzs: 0, quote_id: null, unavailable_reason: null },
+        { type: 'courier', label: 'Kuryer', available: true, price_uzs: 15000, quote_id: 'mock_quote', unavailable_reason: null },
+      ],
+      currency: 'UZS',
+    });
+  }
+  if (req.method === 'GET' && pathname === '/v1/shipping/coverage') {
+    return send(res, 200, {
+      configured: true,
+      bounds: { min_lat: 41.2, min_lng: 69.1, max_lat: 41.4, max_lng: 69.4 },
+    });
   }
 
-  // BUY PATH — POST /v1/orders → CreateOrderResult; seeds a detail row so the
-  // confirmation's GET /v1/orders/:id resolves the new order.
+  // BUY PATH — what the app searches and reverse-geocodes through while choosing a place.
+  if (req.method === 'GET' && pathname === '/v1/addresses/suggestions') {
+    return send(res, 200, {
+      items: [
+        { id: '1', title: 'Amir Temur 12', subtitle: 'Yunusobod, Toshkent', city: 'Toshkent', district: 'Yunusobod', street: 'Amir Temur', house_number: '12', lat: 41.3111, lng: 69.2797 },
+      ],
+      attribution: 'Map data © OpenStreetMap contributors, licensed under the ODbL.',
+    });
+  }
+  if (req.method === 'GET' && pathname === '/v1/addresses/reverse') {
+    return send(res, 200, { address: null, within_coverage: true, attribution: null });
+  }
+
+  // BUY PATH — POST /v1/orders → the backend's real order shape, which the app reads its
+  // status and payment type from. Stateful, so GET /v1/orders/:id resolves it.
   if (req.method === 'POST' && pathname === '/v1/orders') {
     const body = await readBody(req);
-    const orderId = `M-${40000 + Math.floor(Math.random() * 60000)}`;
-    const shipping = SHIPPING_OPTIONS.find((o) => o.key === body.shippingOptionKey);
-    const eta = shipping ? shipping.eta : '3-5 business days';
-    const totalLabel = body.totalLabel || '$—.—';
-    createdOrders.set(orderId, orderDetail(orderId, totalLabel));
-    return send(res, 200, { orderId, eta, totalLabel });
+    const orderId = `ord_${40000 + Math.floor(Math.random() * 60000)}`;
+    const order = {
+      order_id: orderId,
+      status: 'pending_payment',
+      payment_type: body.payment_type || null,
+      delivery_method: body.cart_snapshot ? body.cart_snapshot.delivery_method : null,
+      delivery_address_id: body.cart_snapshot ? body.cart_snapshot.delivery_address_id : null,
+      subtotal_uzs: 89000,
+      delivery_uzs: 15000,
+      total_uzs: 104000,
+      currency: 'UZS',
+      items: [{ part_id: 'brembo-fp', title: 'Brembo Front Brake Pads', qty: 1, price_uzs: 89000, line_total_uzs: 89000 }],
+      created_at: '2026-07-13T10:00:00.000Z',
+    };
+    createdOrders.set(orderId, order);
+    return send(res, 201, order);
   }
 
   // ORDERS — GET /v1/orders → order-history list (Flow 10).

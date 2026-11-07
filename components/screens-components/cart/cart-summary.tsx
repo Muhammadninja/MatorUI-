@@ -14,7 +14,6 @@ export type CartSummaryProps = {
 export default function CartSummary({ totals, appliedPromo, formatCurrency }: CartSummaryProps) {
   const { t } = useTranslation();
   const { tokens, scheme } = useThemeContext();
-  const shippingLabel = totals.shipping > 0 ? formatCurrency(totals.shipping) : t('cart.free');
   const showDiscount = totals.discount > 0;
 
   return (
@@ -42,8 +41,7 @@ export default function CartSummary({ totals, appliedPromo, formatCurrency }: Ca
             accentColor={tokens.success}
           />
         ) : null}
-        <SummaryRow label={t('cart.shipping')} value={shippingLabel} />
-        <SummaryRow label={t('cart.serviceFee')} value={formatCurrency(totals.serviceFee)} />
+        <SummaryRow label={t('cart.shipping')} value={t('cart.deliveryAtCheckout')} />
       </AppView>
     </AppView>
   );

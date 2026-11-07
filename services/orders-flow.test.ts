@@ -9,7 +9,6 @@ import { describe, expect, test } from 'vitest';
 
 import { asList } from "@/services/orders-api";
 import { MockOrdersTransport, MOCK_SEED } from "@/tests/support/transports/orders-api";
-import { STANDARD_DELIVERY_UZS } from './cart-math';
 import type { CreateOrderInput } from './orders-service';
 
 const BASE_INPUT: CreateOrderInput = {
@@ -127,13 +126,56 @@ describe('MockOrdersTransport — account collections', () => {
 });
 
 describe('MockOrdersTransport — shipping quote', () => {
-  test('mirrors the real backend: pickup free, courier a flat fee, no threshold', async () => {
-    const transport = new MockOrdersTransport();
+  test('offers pickup and prices a courier to an address that has a location, and says nothing else', async () => {
+    const transport = new MockOrdersTransport(MOCK_SEED);
     const quote = await transport.getShippingQuote({ addressId: 'addr_home' });
-    const pickup = quote.find((o) => o.key === 'pickup');
-    const courier = quote.find((o) => o.key === 'courier');
-    expect(pickup?.price).toBe(0);
-    expect(courier?.price).toBe(STANDARD_DELIVERY_UZS);
+    expect(quote).toEqual([
+      { key: 'pickup', label: 'Pickup', price: 0, quoteId: null },
+      { key: 'courier', label: 'Courier', price: expect.any(Number), quoteId: expect.any(String) },
+    ]);
+    expect(quote[1]!.price).toBeGreaterThan(0);
+  });
+
+  test('an address with no location has no courier, the way the backend answers it', async () => {
+    const transport = new MockOrdersTransport();
+    const created = await transport.createAddress({
+      label: 'New',
+      name: '',
+      line1: 'Amir Temur 1',
+      city: 'Toshkent',
+    });
+    await expect(transport.getShippingQuote({ addressId: created.id })).resolves.toEqual([
+      { key: 'pickup', label: 'Pickup', price: 0, quoteId: null },
+      {
+        key: 'courier',
+        label: 'Courier',
+        available: false,
+        price: null,
+        quoteId: null,
+        unavailableCode: 'DELIVERY_ADDRESS_COORDINATES_MISSING',
+      },
+    ]);
+  });
+
+  test('stating a location on an address makes it priceable', async () => {
+    const transport = new MockOrdersTransport();
+    const created = await transport.createAddress({
+      label: 'New',
+      name: '',
+      line1: 'Amir Temur 1',
+      city: 'Toshkent',
+    });
+    await transport.updateAddress(created.id, {
+      label: 'New',
+      name: '',
+      line1: 'Amir Temur 1',
+      city: 'Toshkent',
+      lat: 41.31,
+      lng: 69.28,
+    });
+    const quote = await transport.getShippingQuote({ addressId: created.id });
+    expect(quote.find((o) => o.key === 'courier')).toMatchObject({ price: expect.any(Number) });
+    expect(quote.find((o) => o.key === 'courier')).not.toHaveProperty('available', false);
   });
 });
 

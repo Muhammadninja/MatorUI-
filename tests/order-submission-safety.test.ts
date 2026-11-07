@@ -57,6 +57,17 @@ test('failed order creation is not automatically retried by React Query', async 
   expect(state.createOrder).toHaveBeenCalledTimes(1);
 });
 
+test('a refused total preserves the machine-readable code without weakening submission guards', async () => {
+  const refusal = Object.assign(new Error('Total changed'), { code: 'ORDER_TOTAL_CHANGED' });
+  state.createOrder.mockRejectedValueOnce(refusal);
+  const get = await renderOrder();
+  await act(async () => { expect(await get().placeOrder(input)).toBeNull(); });
+  expect(get()).toMatchObject({ phase: 'error', error: 'Total changed', errorCode: 'ORDER_TOTAL_CHANGED' });
+  expect(state.createOrder).toHaveBeenCalledTimes(1);
+  await act(async () => get().reset());
+  expect(get()).toMatchObject({ phase: 'idle', error: null, errorCode: null });
+});
+
 test('empty cart never reaches the order transport', async () => {
   const get = await renderOrder();
   await act(async () => { expect(await get().placeOrder({ ...input, items: [] })).toBeNull(); });

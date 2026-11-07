@@ -42,8 +42,23 @@ export type PromoCode = {
 export type CartTotals = {
   subtotal: number;
   discount: number;
-  shipping: number;
+  /** The goods after discount. Delivery is not in here: its price depends on the
+   *  address and the sellers, so only the backend's quote at checkout can state it. */
+  total: number;
+};
+
+/**
+ * What the backend says the cart costs, from its own copy of the cart. The service fee is
+ * only ever known from here: the app holds no tariff, so it never works one out itself.
+ */
+export type CartCharges = {
+  /** The cost of the parts, at their current prices. */
+  subtotal: number;
+  /** A promo discount on the goods. */
+  discount: number;
+  /** Mator's service fee for the whole order. 0 when there is none. */
   serviceFee: number;
+  /** Everything but delivery: the goods after discount, and the fee. */
   total: number;
 };
 
@@ -53,16 +68,6 @@ export type PromoResult =
 
 // ── Constants ────────────────────────────────────────────────────────
 
-/**
- * Flat courier delivery fee, UZS. Mirrors the backend's real pricing
- * (`DELIVERY_COURIER_UZS`, default 25,000 in `orders.service.ts` /
- * `shipping.service.ts`) — there is no free-shipping threshold server-side,
- * every order is charged this unless the buyer picks pickup (0).
- */
-export const STANDARD_DELIVERY_UZS = 25000;
-/** Flat per-order service fee, UZS. Mirrors the backend's `SERVICE_FEE_UZS`
- *  (default 5,000), charged on every order regardless of subtotal. */
-export const SERVICE_FEE_UZS = 5000;
 export const PROMO_MIN_SUBTOTAL = 100;
 
 export const PROMO_CODES: Record<string, PromoCode> = {
@@ -98,6 +103,11 @@ export function round(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+/** Sums of money to the tiyin, so a float can never add a stray fraction to a total. */
+export function addUzs(...amounts: number[]): number {
+  return amounts.reduce((sum, amount) => sum + Math.round(amount * 100), 0) / 100;
+}
+
 export function formatCurrency(amount: number): string {
   // The label follows the active language: "369 000 сум", "369 000 soʻm",
   // "369 000 UZS". The amount reads the same everywhere (see `formatSomAmount`).
@@ -106,27 +116,18 @@ export function formatCurrency(amount: number): string {
 }
 
 /**
- * Compute the full totals breakdown given a subtotal and an optional promo.
- *
- * Mirrors the backend's real order math (`orders.service.ts`:
- * `total = subtotal + deliveryUzs + serviceFeeUzs - discount`) exactly, so
- * this preview never disagrees with what `POST /v1/orders` actually charges.
- * There is no tax line and no free-shipping threshold — the backend has
- * neither.
+ * The goods-only totals for a subtotal and an optional promo, for what the app can show
+ * before the backend has answered: a guest's cart, or a change on its way. The service fee
+ * and delivery are not in here. Only the backend states them (see CartCharges).
  *
  * Rules:
- *  - Shipping is STANDARD_DELIVERY_UZS for any non-zero subtotal (the
- *    checkout screen zeroes it itself when the buyer picks pickup).
- *  - The service fee is SERVICE_FEE_UZS for any non-zero subtotal.
  *  - 'percent' promos apply to subtotal and respect maxDiscount cap.
  *  - 'fixed' promos cap to subtotal (no negative balances).
- *  - 'free_shipping' promos zero shipping but leave discount at 0.
+ *  - 'free_shipping' promos discount no goods, and delivery is not priced here.
  *  - All returned numbers are rounded to 2 decimal places.
  */
 export function computeTotals(subtotal: number, promo: PromoCode | null): CartTotals {
   let discount = 0;
-  let shipping = subtotal > 0 ? STANDARD_DELIVERY_UZS : 0;
-  const serviceFee = subtotal > 0 ? SERVICE_FEE_UZS : 0;
 
   if (promo && subtotal > 0) {
     if (promo.kind === 'percent') {
@@ -134,20 +135,13 @@ export function computeTotals(subtotal: number, promo: PromoCode | null): CartTo
       if (promo.maxDiscount) discount = Math.min(discount, promo.maxDiscount);
     } else if (promo.kind === 'fixed') {
       discount = Math.min(subtotal, promo.value);
-    } else if (promo.kind === 'free_shipping') {
-      shipping = 0;
     }
   }
-
-  const discountedBase = Math.max(0, subtotal - discount);
-  const total = discountedBase + shipping + serviceFee;
 
   return {
     subtotal: round(subtotal),
     discount: round(discount),
-    shipping: round(shipping),
-    serviceFee: round(serviceFee),
-    total: round(total),
+    total: round(Math.max(0, subtotal - discount)),
   };
 }
 

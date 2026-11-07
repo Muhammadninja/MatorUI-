@@ -311,13 +311,25 @@ type PromoCode = { code; label; kind: 'percent'|'fixed'|'free_shipping'; value: 
 > Promo codes live **client-side** (`WELCOME10` 10%, `RIDE25` 25% cap $200, `FREESHIP`).
 > The server's rules must mirror this table exactly or the two diverge.
 
-### Cart math (client; backend must mirror) — `services/cart-math.ts`
+### Cart money and the service fee — the backend's figures, never the app's
 
-- `TAX_RATE = 0.085`, `FLAT_SHIPPING = 49`, `FREE_SHIPPING_THRESHOLD = 500`, `PROMO_MIN_SUBTOTAL = 100`.
-- `shipping = subtotal>0 ? (subtotal>=500 ? 0 : 49) : 0`
-- promo `percent → min(subtotal*value, maxDiscount?)`; `fixed → min(subtotal, value)`; `free_shipping → shipping=0`
-- `taxedBase = max(0, subtotal − discount)`; **`tax = taxedBase * 0.085`**; `total = taxedBase + shipping + tax`
-- `subtotal = Σ parsePrice(price) * quantity`.
+Every cart answer (`GET /v1/cart` and each mutation, which returns the whole cart) carries the
+backend's own figures for that cart, worked out again on every change:
+
+| Field | Meaning |
+|---|---|
+| `subtotal_uzs` | The cost of the parts at their current prices. |
+| `discount_uzs` | A promo discount on the goods. |
+| `service_fee_uzs` | Mator's service fee for the whole order. 0 when there is none. |
+| `total_uzs` | Everything but delivery: `subtotal − discount + service fee`. |
+
+The tariff lives in the backend alone (`src/orders/service-fee.util.ts`): the app holds no copy
+and works out no fee. `parseCartCharges` reads these into `CartCharges`, and the cart context
+exposes them as `charges`, null while the server has not stated them (a guest's cart, a failed
+read). An answer that names no `service_fee_uzs` is not taken to mean "no fee".
+
+What the app still works out from the lines (`computeTotals`, goods only) is only for showing a
+guest's cart, or a change on its way; the cart screen then says the fee is stated at checkout.
 
 ---
 
@@ -335,6 +347,17 @@ type CreateOrderResult = { orderId; eta; totalLabel };
 | Method & path | Request | Response |
 |---|---|---|
 | `POST /v1/orders` | `CreateOrderInput` | `CreateOrderResult` (server re-validates pricing; empty items → error) |
+
+**The service fee at checkout.** The checkout shows the parts, the fee and delivery apart, and
+its total is `charges.total` (parts after discount and the fee) plus the quoted delivery, shown
+only while no change to the cart is on its way. Placing the order sends that total as
+`confirmed_total_uzs`. The server computes every amount itself, never charges a client figure,
+and answers `409 ORDER_TOTAL_CHANGED` when the total it computes is not the one confirmed; the
+app then fetches the cart and the quote again and shows `checkout.orderTotalChanged`. A body
+stating a fee or a total of its own (`service_fee_uzs`, `total_uzs`) is refused as an unknown
+field. An order's response states `subtotal_uzs`, `discount_uzs`, `service_fee_uzs`,
+`delivery_uzs` and `total_uzs` as stored when it was placed, which the confirmation, tracking
+and unpaid-order views show (`OrderDetail.charges`).
 | `GET /v1/orders?page&pageSize&status` | query (all optional) | `OrderListPage` |
 | `GET /v1/orders/:orderId` | — | `OrderDetail` (404 → not-found) |
 
@@ -392,14 +415,34 @@ Same CRUD shape as addresses (`GET /v1/account/payment-methods`, `POST/PATCH/DEL
 ## 12. Shipping — `POST /v1/shipping/quote`
 
 ```ts
-type ShippingQuoteRequest = { addressId; subtotal /* dollars */ };
-type ShippingOption = { key /* "standard"|"express"|"same_day" */; label; eta; price /* 0 = free */ };
+type ShippingQuoteRequest = { addressId; location?; cartKey? /* client-side cache keys */ };
+type ShippingOption =
+  | { key /* "pickup"|"courier" */; label; available?: true; price /* UZS, 0 = free */; quoteId? }
+  | { key; label; available: false; price: null; quoteId?: null; unavailableCode: string | null };
 ```
 
-Request `{ addressId, subtotal }` → `ShippingOption[]`. The chosen `key` is sent as
-`CreateOrderInput.shippingOptionKey`. `subtotal` lets the server flip free-shipping
-thresholds (client won't guess). Mock returns standard/$0 · express/$9.99 · same_day/$19.99,
-forcing standard→free at subtotal ≥ 500.
+Request body `{ delivery_address_id, delivery_method: 'courier' }` → pickup and Mator's courier,
+each priced or marked unavailable with the reason. The chosen `key` is sent as
+`CreateOrderInput.shippingOptionKey`. Wire shape and refusals: see "Delivery destination,
+address search and the map" below.
+
+Where pickup is collected — `GET /v1/shipping/pickup-points` (`getPickupPoints`, asked only
+while pickup is chosen):
+
+```ts
+type PickupPoint = {
+  dealerId: string | null; // null: goods whose dealer is not known
+  dealerName: string | null;
+  address: string | null; // null: the dealer has given none yet
+  landmark: string | null; // no dealer column holds one yet: always null for now
+  location: { lat: number; lng: number } | null; // null: none on record, never made up
+  items: { cartItemId: string; partId: string | null; title: string; quantity: number }[];
+};
+```
+
+One entry per dealer the cart buys from, each with its own lines, never every dealer. The
+checkout shows each under «Самовывоз»: name, address, landmark, the pin on `AppMap` (the
+coordinates where the build has no map), and says which part is not specified yet.
 
 ---
 
@@ -548,3 +591,34 @@ Also mock seed only (demo screens, not contract): `MATOR_PRODUCTS`, `MATOR_ADDRE
 9. **(Optional) VIN proxy** — Add-Vehicle depends on the external NHTSA decoder (§15). If we
    want server-side/offline decode, caching, or a UZ VIN DB, expose **`GET /v1/vin/{vin}`**
    and repoint `VinDecodeTransport`.
+
+---
+
+## Delivery destination, address search and the map
+
+The buyer chooses where the courier goes: any point in the delivery area, wherever they are
+themselves. `lat`/`lng` on a saved address are that point, and with them an address needs no
+words at all. Delivery is priced by the backend and shown as a price alone.
+
+| Call | Purpose |
+|---|---|
+| `GET /v1/shipping/coverage` | `{ configured, bounds, geometry }`. `bounds` says where the map opens. `geometry` is the MultiPolygon the backend enforces, so the map can refuse a point outside it at once; the backend still decides. |
+| `GET /v1/addresses/suggestions?street=&house=&city=&lang=&mode=&near_lat=&near_lng=` | `{ items, attribution }`. Debounced `autocomplete` while typing, `search` when submitted. Only what was typed and the rough map centre are sent. |
+| `GET /v1/addresses/reverse?lat=&lng=&lang=` | `{ address, within_coverage, attribution }`. Once per confirmed point, never while the map moves. Never fails for lack of an address. |
+| `POST` / `PATCH /v1/addresses` | `lat`, `lng`, `landmark` as well as the existing fields. `full_text` may be left out with a point. |
+| `POST /v1/shipping/quote` | With `delivery_method: 'courier'`: `{ options: [pickup, courier], currency: 'UZS' }`, each option `{ type, label, available, price_uzs, quote_id, unavailable_reason }`. Pickup is always `available`, `price_uzs: 0`. A courier that cannot be had is `available: false`, `price_uzs: null`, `unavailable_reason: { code, message }`, with code `COURIER_DELIVERY_UNAVAILABLE` (no area configured), `DELIVERY_OUTSIDE_COVERAGE`, `DELIVERY_ADDRESS_COORDINATES_MISSING`, `DELIVERY_ADDRESS_REQUIRED`, `PICKUP_LOCATION_MISSING`, `DELIVERY_ROUTE_NOT_FOUND` or `DELIVERY_ROUTING_UNAVAILABLE` (UzMaps gave no answer). The checkout shows both options as a choice and words each code itself. `404` for an address that is not the caller's, `400` for an empty cart. |
+| `GET /v1/shipping/pickup-points` | `{ pickup_points: [{ dealer_id, dealer_name, address, landmark, location: { lat, lng } \| null, items: [{ cart_item_id, part_id, title, quantity }] }] }` for the caller's cart: each dealer once, with its own lines and no other dealer's place. `address` and `location` are null while the dealer has none on record (`sellers.address_comment`, `sellers.location_lat/lng`); `landmark` is always null for now. Goods whose dealer is not known come last with `dealer_id: null`. Services are not listed; an empty cart is `[]`. Nothing here is priced. |
+| `POST /v1/orders` | `confirmed_delivery_uzs`, `delivery_quote_id` and `confirmed_total_uzs` from that answer and the cart. `409 ORDER_TOTAL_CHANGED` when the total has moved, rates changed since the quote included; `409 DELIVERY_QUOTE_STALE` when the pin or a pickup point changed at the same total; `409 DELIVERY_PRICE_CHANGED` when only the price disagrees. Each carries `details: { subtotal_uzs, discount_uzs, service_fee_uzs, delivery_uzs, total_uzs, delivery_quote_id }`, what an order placed now would charge. Fetch the quote and the cart again and confirm again. |
+
+Other refusals, with `code`: `422 DELIVERY_OUTSIDE_COVERAGE` (saving an address),
+`400 DELIVERY_ADDRESS_COORDINATES_INVALID`, `503 ADDRESS_SEARCH_UNAVAILABLE` (the map still
+works). A backend from before the two-option answer refused an unpriced courier with
+`422`/`503` and these codes instead; the app reads both.
+
+**The map.** `AppMap` over `react-native-maps`: Apple Maps on iOS, which needs no key; Google
+Maps on Android, which needs `GOOGLE_MAPS_ANDROID_API_KEY` set at build time (EAS environment
+variable). That key is baked into the build, so it is public: restrict it in Google Cloud to
+the package `com.mator.myapp` and the app's signing certificate, with a quota. A build without
+it offers address search in place of the Android map, since the native map would crash. The
+app holds no UzMaps key: it uses no UzMaps tiles, and UzMaps cannot restrict a key to a native
+app. Search and reverse geocoding go through the backend.

@@ -20,6 +20,17 @@ test('complete server breakdown renders fees, explicit zero discount and unchang
   expect(JSON.stringify(tree.toJSON())).not.toContain('breakdownUnavailable');
   await act(async () => tree.unmount());
 });
+test('receipt options hide a zero service fee and label delivery without suppressing amount warnings', async () => {
+  const pricing = getOrderPricing({ ...complete, service_fee_uzs: 0, total_uzs: 125000 });
+  const tree = await mount(<OrderPriceBreakdown pricing={pricing} hideZeroServiceFee deliveryLabel="Delivery price" />);
+  expect(tree.root.findAllByProps({ testID: 'order-amount-serviceFee' })).toHaveLength(0);
+  expect(JSON.stringify(tree.toJSON())).toContain('Delivery price');
+  expect(JSON.stringify(tree.toJSON())).toContain("125\u00A0000 UZS");
+  await act(async () => tree.update(<OrderPriceBreakdown pricing={getOrderPricing({ ...complete, service_fee_uzs: 0, total_uzs: 125001 })} hideZeroServiceFee deliveryLabel="Delivery price" />));
+  expect(JSON.stringify(tree.toJSON())).toContain('trackOrder.amountsMismatch');
+  expect(JSON.stringify(tree.toJSON())).toContain("125\u00A0001 UZS");
+  await act(async () => tree.unmount());
+});
 test('missing fee fields do not label the unexplained difference as delivery', async () => {
   const tree = await mount(<OrderPriceBreakdown pricing={getOrderPricing({ subtotal_uzs: 100000, total_uzs: 130000 })} />);
   expect(tree.root.findAllByProps({ testID: 'order-amount-delivery' })).toHaveLength(0);

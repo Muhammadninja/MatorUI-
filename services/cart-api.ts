@@ -1,10 +1,12 @@
-import type { CartItem, PromoResult } from '@/services/cart-math';
+import type { CartCharges, CartItem, PromoResult } from '@/services/cart-math';
 
 /** Live HTTP transport and public contracts. Test doubles live under tests/support. */
 
 export type CartSnapshot = {
   items: CartItem[];
   appliedPromoCode: string | null;
+  /** What the backend says this cart costs, fee included. Absent when it has not said. */
+  charges?: CartCharges | null;
 };
 
 export type AddItemInput = {
@@ -16,10 +18,14 @@ export type AddItemInput = {
   badge?: string;
   status?: string;
   imageUrl?: string;
+  /** How many to add. One unless stated. */
+  quantity?: number;
 };
 
 export interface CartTransport {
   setSession?(ownerId: string | null): void;
+  /** What the backend last said the cart costs, as of its latest answer to any call. */
+  charges?(): CartCharges | null;
   fetch(): Promise<CartSnapshot>;
   addItem(input: AddItemInput): Promise<CartItem>;
   updateQuantity(itemId: string, quantity: number): Promise<CartItem | null>;
@@ -51,7 +57,6 @@ export interface CartTransport {
  * is unchanged) and keep an internal `part_id → line_id` map — rebuilt
  * from every response — to translate update/remove onto the right line.
  */
-import { shouldUseHttpTransport } from '@/config/api';
 import { apiClient } from '@/services/api-client';
 import { PROMO_CODES } from '@/services/cart-math';
 
@@ -72,8 +77,33 @@ type ApiCart = {
   items?: ApiCartItem[] | null;
   promo?: { code?: string; discountUzs?: number; isValid?: boolean } | null;
   subtotal_uzs?: number;
+  discount_uzs?: number;
+  service_fee_uzs?: number;
+  /** Everything but delivery: the goods after discount, plus the service fee. */
   total_uzs?: number;
 };
+
+const isAmount = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0;
+
+/**
+ * What the backend says the cart costs, or null when it did not say all of it. A backend
+ * that names no fee has not said there is none, so nothing is assumed: the checkout then
+ * shows no total and cannot place the order.
+ */
+export function parseCartCharges(cart: ApiCart | undefined | null): CartCharges | null {
+  if (!cart) return null;
+  const { subtotal_uzs, discount_uzs, service_fee_uzs, total_uzs } = cart;
+  if (!isAmount(subtotal_uzs) || !isAmount(service_fee_uzs) || !isAmount(total_uzs)) {
+    return null;
+  }
+  return {
+    subtotal: subtotal_uzs,
+    discount: isAmount(discount_uzs) ? discount_uzs : 0,
+    serviceFee: service_fee_uzs,
+    total: total_uzs,
+  };
+}
 
 /** Server-enforced max quantity per cart line — the backend 400s above this,
  *  so clamp client-side to keep the stepper from hitting a hard error. */
@@ -84,12 +114,18 @@ export class HttpCartTransport implements CartTransport {
   private lineIdByPart = new Map<string, string>();
   private ownerId: string | null | undefined;
   private epoch = 0;
+  private lastCharges: CartCharges | null = null;
 
   setSession(ownerId: string | null): void {
     if (this.ownerId === ownerId) return;
     this.ownerId = ownerId;
     this.epoch += 1;
     this.lineIdByPart.clear();
+    this.lastCharges = null;
+  }
+
+  charges(): CartCharges | null {
+    return this.lastCharges;
   }
 
   private assertSession(epoch: number): void {
@@ -140,7 +176,9 @@ export class HttpCartTransport implements CartTransport {
       this.lineIdByPart.set(i.part_id ?? i.id, i.id);
       return this.mapItem(i);
     });
-    return { items, appliedPromoCode: cart?.promo?.code ?? null };
+    // Every answer is the whole cart, so its figures are always the latest the server has.
+    this.lastCharges = parseCartCharges(cart);
+    return { items, appliedPromoCode: cart?.promo?.code ?? null, charges: this.lastCharges };
   }
 
   async fetch(): Promise<CartSnapshot> {
@@ -152,7 +190,7 @@ export class HttpCartTransport implements CartTransport {
     const epoch = this.epoch;
     const cart = await apiClient.post<ApiCart>('/v1/cart/items', {
       part_id: input.productId,
-      quantity: 1,
+      quantity: input.quantity ?? 1,
     });
     const snap = this.ingest(cart, epoch);
     // Return the reconciled server line; fall back to the optimistic input
@@ -167,7 +205,7 @@ export class HttpCartTransport implements CartTransport {
         badge: input.badge,
         status: input.status,
         imageUrl: input.imageUrl,
-        quantity: 1,
+        quantity: input.quantity ?? 1,
       }
     );
   }

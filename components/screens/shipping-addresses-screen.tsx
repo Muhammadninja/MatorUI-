@@ -66,7 +66,8 @@ export default function ShippingAddressesScreen() {
         }
       } catch (err) {
         debugLog('address', '✗ save FAILED', { message: (err as Error)?.message });
-        toast.danger(t('addresses.saveFailed'));
+        // The form stays open and says why.
+        throw err;
       }
     },
     [editing, updateAddress, createAddress, toast, t],
@@ -246,17 +247,27 @@ const AddressCard = React.memo(function AddressCard({
           {address.name}
         </AppText>
       ) : null}
-      {/* Street */}
-      <AppText
-        family="default"
-        style={{ fontSize: 13, color: tokens.textMuted, marginTop: 2 }}
-      >
-        {address.line1}
-      </AppText>
+      {/* Street. A point saved with no words has none, and no city either. */}
+      {address.line1 ? (
+        <AppText
+          family="default"
+          style={{ fontSize: 13, color: tokens.textMuted, marginTop: 2 }}
+        >
+          {address.line1}
+        </AppText>
+      ) : null}
       {/* City / state / zip */}
-      <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>
-        {address.city}
-      </AppText>
+      {address.city ? (
+        <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>
+          {address.city}
+        </AppText>
+      ) : null}
+      {/* A hint for the courier */}
+      {address.landmark ? (
+        <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>
+          {address.landmark}
+        </AppText>
+      ) : null}
 
       {/* Actions */}
       <AppView row style={{ gap: 16, marginTop: 12 }}>

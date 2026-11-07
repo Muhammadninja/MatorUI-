@@ -9,7 +9,6 @@ import {
   type PropsWithChildren,
   type SetStateAction,
 } from 'react';
-
 import { cartTransport, type AddItemInput } from '@/services/cart-api';
 import {
   computeSubtotal,
@@ -17,6 +16,7 @@ import {
   evaluatePromoCode,
   formatCurrency,
   PROMO_CODES,
+  type CartCharges,
   type CartItem,
   type CartTotals,
   type PromoCode,
@@ -26,22 +26,22 @@ import { clearStoredCart, loadCart, saveCart } from '@/services/cart-storage';
 import { toastService } from '@/services/toast-service';
 import { useUserContext } from '@/contexts/user.context';
 import { CartMutationQueue } from '@/services/cart-mutation-queue';
+import { useCartRestore } from '@/hooks/use-cart-restore';
 
-// Re-export types and constants so existing imports keep working without churn.
-export type { CartItem, CartTotals, PromoCode, PromoResult };
-export { STANDARD_DELIVERY_UZS, SERVICE_FEE_UZS } from '@/services/cart-math';
-
+export type { CartCharges, CartItem, CartTotals, PromoCode, PromoResult };
 type AddCartItemInput = Omit<CartItem, 'quantity'>;
 
 type CartContextValue = {
   items: CartItem[];
   itemCount: number;
+  /** Local goods-only estimate before the server answers. */
   totals: CartTotals;
+  /** Last server charges, null for guests/unfetched carts; may lag pending changes. */
+  charges: CartCharges | null;
   appliedPromo: PromoCode | null;
   /** True once the persisted cart has been read from storage. */
   isHydrated: boolean;
-  /** Set of item IDs currently mid-flight to the transport. UI can grey
-   *  out rows or show a spinner per row using this. */
+  /** Item IDs currently awaiting transport responses. */
   pendingIds: Set<string>;
   /** Last transport error, if any. Cleared on the next successful op. */
   error: string | null;
@@ -50,6 +50,8 @@ type CartContextValue = {
   addItem: (item: AddCartItemInput) => void;
   removeItem: (itemId: string) => void;
   clearCart: () => void;
+  /** Restores missing server lines after an unpaid order; safe to repeat. */
+  restoreCart: () => Promise<CartItem[]>;
   incrementItem: (itemId: string) => void;
   decrementItem: (itemId: string) => void;
   applyPromoCode: (code: string) => PromoResult;
@@ -70,6 +72,7 @@ export function CartProvider({ children }: PropsWithChildren) {
 function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren<{ ownerId: string | null; hydrating: boolean }>) {
   const [items, setItemsState] = useState<CartItem[]>([]);
   const [appliedPromo, setAppliedPromoState] = useState<PromoCode | null>(null);
+  const [charges, setCharges] = useState<CartCharges | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [pendingIds, setPendingIds] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
@@ -79,23 +82,24 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
     return () => { mutations.invalidate(true); };
   }, [mutations, ownerId]);
 
-  // The server-side cart endpoints require auth. Guests use a purely LOCAL cart
-  // (persisted to storage); we only talk to the remote cart once signed in —
-  // otherwise every mutation 401s and rolls the change back. A ref keeps the
-  // async transport gate reading the CURRENT auth state, not a stale closure.
+  // Guests use local storage; async transport calls read current authentication.
   const { isAuthenticated } = useUserContext();
   const authedRef = useRef(isAuthenticated);
   useEffect(() => {
     if (authedRef.current !== isAuthenticated) {
       mutations.invalidate(true);
       setPendingIds(new Set());
+      setCharges(null);
     }
     authedRef.current = isAuthenticated;
   }, [isAuthenticated, mutations]);
 
-  // Always-current snapshot for rollback during optimistic mutations.
-  // We can't rely on closure values inside async callbacks because they
-  // capture stale state from the moment the mutation was queued.
+  // Transport answers carry authoritative charges; guests have none.
+  const syncCharges = useCallback(() => {
+    setCharges(authedRef.current ? (cartTransport.charges?.() ?? null) : null);
+  }, []);
+
+  // Optimistic rollback reads the current snapshot instead of queued closures.
   const snapshotRef = useRef<{ items: CartItem[]; appliedPromo: PromoCode | null }>({
     items: [],
     appliedPromo: null,
@@ -149,12 +153,7 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
     };
   }, [hydrating, ownerId]);
 
-  // ── Reconcile with the server whenever we're signed in. This runs on every
-  // transition into an authenticated state — not just at mount — because auth
-  // is restored asynchronously on relaunch and may not be ready when hydrate
-  // fires. Beyond syncing state, the fetch WARMS the transport's part_id →
-  // line_id map for the persisted cart, so a subsequent quantity update PATCHes
-  // the right line instead of 404ing on a cold map.
+  // Reconcile after async auth hydration and warm the transport's part→line ID map.
   useEffect(() => {
     if (!isAuthenticated || !isHydrated) return;
     let cancelled = false;
@@ -163,15 +162,13 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
       try {
         const remote = await mutations.read(() => cartTransport.fetch());
         if (!remote || cancelled || version !== mutations.readVersion()) return;
-        // A successful authenticated response is authoritative, including an
-        // empty cart. Cached lines must not survive only in the UI and inflate
-        // checkout totals. Failed fetches still retain the offline cache.
+        // Successful responses, including empty carts, replace the offline cache.
         setItems(remote.items);
+        syncCharges();
         const promo = remote.appliedPromoCode ? PROMO_CODES[remote.appliedPromoCode] : null;
         setAppliedPromo(promo ?? null);
       } catch {
-        // Offline / fetch failed — silently keep local state. The transport
-        // self-heals the id map lazily on the next mutation if needed.
+        // Offline: retain local state; the next mutation can rebuild the ID map.
       }
     })();
     return () => {
@@ -218,6 +215,7 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
         // Guests: local-only cart. Skip the server call (it requires auth and
         // would 401 → rollback). The optimistic update still persists to storage.
         const result = authedRef.current ? await mutations.enqueue(ticket, apiCall) : undefined;
+        syncCharges();
         if (mutations.isLatest(ticket)) {
           if (result !== undefined) reconcile?.(result);
           setError(null);
@@ -258,6 +256,7 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
           if (remote && version === mutations.readVersion()) {
             setItems(remote.items);
             setAppliedPromo(remote.appliedPromoCode ? PROMO_CODES[remote.appliedPromoCode] ?? null : null);
+            syncCharges();
           }
         } catch { /* Offline: retain the scoped rollback. */ }
         return null;
@@ -265,7 +264,7 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
         if (mutations.finish(ticket)) clearPending(pendingId);
       }
     },
-    [markPending, clearPending, mutations],
+    [markPending, clearPending, mutations, syncCharges],
   );
 
   const reconcileItem = useCallback((id: string, canonical: CartItem | null) => {
@@ -380,6 +379,9 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
     );
   }, [withOptimistic]);
 
+  const restoreCart = useCartRestore({ snapshotRef, authedRef, mutations, setPendingIds,
+    markPending, clearPending, setItems, setAppliedPromo, syncCharges });
+
   const removePromoCode = useCallback(() => {
     void withOptimistic(
       PROMO_PENDING_ID,
@@ -420,6 +422,7 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
       setItems(remote.items);
       const promo = remote.appliedPromoCode ? PROMO_CODES[remote.appliedPromoCode] : null;
       setAppliedPromo(promo ?? null);
+      syncCharges();
       setError(null);
     } catch (err) {
       if (version !== mutations.readVersion()) return;
@@ -427,7 +430,7 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
       setError(message);
       toastService.danger('Could not refresh cart', { description: message });
     }
-  }, [mutations, setItems, setAppliedPromo]);
+  }, [mutations, setItems, setAppliedPromo, syncCharges]);
 
   // ── Derived ───────────────────────────────────────────────────────
   const itemCount = useMemo(
@@ -445,6 +448,7 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
       items,
       itemCount,
       totals,
+      charges,
       appliedPromo,
       isHydrated,
       pendingIds,
@@ -453,6 +457,7 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
       addItem,
       removeItem,
       clearCart,
+      restoreCart,
       incrementItem,
       decrementItem,
       applyPromoCode,
@@ -463,6 +468,7 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
       items,
       itemCount,
       totals,
+      charges,
       appliedPromo,
       isHydrated,
       pendingIds,
@@ -471,6 +477,7 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
       addItem,
       removeItem,
       clearCart,
+      restoreCart,
       incrementItem,
       decrementItem,
       applyPromoCode,

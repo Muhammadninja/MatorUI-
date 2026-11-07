@@ -7,13 +7,17 @@ import { ScrollView } from 'react-native';
 import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/shared/app-button';
 import { OrderLinePrice, OrderPriceBreakdown } from '@/components/screens-components/orders/order-price-breakdown';
+import { OrderChargeRows } from '@/components/screens-components/checkout/checkout-sections';
+import { AppButton } from '@/components/shared/app-button';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
+import { useRecoverPayment } from '@/hooks/use-order-payment';
 import { useOrder } from '@/hooks/use-orders';
+import { formatCurrency } from '@/services/cart-math';
+import { isAwaitingOnlinePayment, paymentFailureKey } from '@/services/checkout-presentation';
 import {
   formatOrderNo,
   ORDER_STATUS_LABEL_I18N,
@@ -42,6 +46,7 @@ export default function TrackOrderScreen() {
 
   const { orderId } = useLocalSearchParams<{ orderId?: string }>();
   const { state, order, refresh } = useOrder(orderId ?? null);
+  const recover = useRecoverPayment(orderId, refresh);
 
   // Pull the latest status every time the screen is focused — navigating here
   // from order history (or returning to a still-mounted track screen) must show
@@ -153,6 +158,34 @@ export default function TrackOrderScreen() {
             </AppView>
           </AppView>
 
+          {/* An order still waiting for online payment can be paid from here, at any time
+              until it expires. It is the same order: nothing new is created. */}
+          {isAwaitingOnlinePayment(order) ? (
+            <AppView gap={8} testID="track-order-pay">
+              <AppButton
+                testID="track-order-pay-btn"
+                title={
+                  recover.paying
+                    ? t('checkout.payingOrder')
+                    : t('trackOrder.payNow', { total: order.totalLabel })
+                }
+                kind="brand"
+                size="lg"
+                fullWidth
+                disabled={recover.paying}
+                onPress={recover.pay}
+              />
+              {recover.failure ? (
+                <AppView row align="center" gap={8}>
+                  <AlertCircle size={16} strokeWidth={2} color={tokens.error} />
+                  <AppText family="default" style={{ fontSize: 12.5, color: tokens.error, flex: 1 }}>
+                    {t(paymentFailureKey(recover.failure))}
+                  </AppText>
+                </AppView>
+              ) : null}
+            </AppView>
+          ) : null}
+
           {/* Order items — real line data (no placeholder imagery). */}
           <AppView
             style={{
@@ -179,11 +212,41 @@ export default function TrackOrderScreen() {
                 >
                   {line.title}{line.quantity > 0 ? ` × ${line.quantity}` : ''}
                 </AppText>
-                <OrderLinePrice line={order.pricing?.lines[index]} />
+                {order.pricing ? (
+                  <OrderLinePrice line={order.pricing.lines[index]} />
+                ) : (
+                  <AppText family="accent" weight="semibold" style={{ fontSize: 14, color: tokens.text }}>
+                    {line.price}
+                  </AppText>
+                )}
               </AppView>
             ))}
             <AppView style={{ height: 1, backgroundColor: tokens.divider, marginVertical: 2 }} />
-            <OrderPriceBreakdown pricing={order.pricing} />
+            {/* Confirmed amounts, without substituting units for line totals. */}
+            {order.pricing ? (
+              <OrderPriceBreakdown
+                pricing={order.pricing}
+                hideZeroServiceFee
+                deliveryLabel={t('checkout.deliveryPriceLabel')}
+              />
+            ) : (
+              <>
+                {order.charges ? (
+                  <>
+                    <OrderChargeRows tokens={tokens} charges={order.charges} formatCurrency={formatCurrency} />
+                    <AppView style={{ height: 1, backgroundColor: tokens.divider, marginVertical: 2 }} />
+                  </>
+                ) : null}
+                <AppView row justify="space-between">
+                  <AppText family="default" weight="semibold" style={{ fontSize: 14, color: tokens.textMuted }}>
+                    {t('trackOrder.total')}
+                  </AppText>
+                  <AppText family="heading" weight="bold" style={{ fontSize: 16, color: tokens.text }}>
+                    {order.totalLabel}
+                  </AppText>
+                </AppView>
+              </>
+            )}
           </AppView>
 
           {/* Timeline */}

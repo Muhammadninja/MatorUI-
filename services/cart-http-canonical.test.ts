@@ -19,6 +19,57 @@ test('numeric fractional UZS is authoritative over the rounded display label', a
   expect(computeSubtotal(snapshot.items)).toBeCloseTo(64516.71);
 });
 
+test('the server’s figures for the whole cart, fee included, follow every answer', async () => {
+  const transport = new HttpCartTransport();
+  expect(transport.charges()).toBeNull();
+
+  api.get.mockResolvedValue({
+    items: [wireLine],
+    subtotal_uzs: 64516.71,
+    discount_uzs: 0,
+    service_fee_uzs: 0,
+    total_uzs: 64516.71,
+  });
+  expect((await transport.fetch()).charges).toEqual({
+    subtotal: 64516.71,
+    discount: 0,
+    serviceFee: 0,
+    total: 64516.71,
+  });
+
+  api.patch.mockResolvedValue({
+    items: [{ ...wireLine, quantity: 5 }],
+    subtotal_uzs: 107527.85,
+    discount_uzs: 0,
+    service_fee_uzs: 5000,
+    total_uzs: 112527.85,
+  });
+  await transport.updateQuantity(wireLine.part_id, 5);
+  expect(transport.charges()).toMatchObject({ serviceFee: 5000, total: 112527.85 });
+});
+
+test('another account’s figures are never shown: a new session starts with none', async () => {
+  const transport = new HttpCartTransport();
+  transport.setSession('a');
+  api.get.mockResolvedValue({
+    items: [wireLine],
+    subtotal_uzs: 1,
+    service_fee_uzs: 0,
+    total_uzs: 1,
+  });
+  await transport.fetch();
+  expect(transport.charges()).not.toBeNull();
+
+  transport.setSession('b');
+  expect(transport.charges()).toBeNull();
+});
+
+test('a backend stating no fee has stated nothing: no figures are assumed', async () => {
+  api.get.mockResolvedValue({ items: [wireLine], subtotal_uzs: 64516.71, total_uzs: 64516.71 });
+  const transport = new HttpCartTransport();
+  expect((await transport.fetch()).charges).toBeNull();
+});
+
 test('label remains a fallback when the server has no numeric price', async () => {
   api.get.mockResolvedValue({ items: [{ ...wireLine, price_uzs: undefined }] });
   expect((await new HttpCartTransport().fetch()).items[0].price).toBe('UZS 21 506');

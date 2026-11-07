@@ -1,19 +1,223 @@
-import type { ShippingOption } from '@/services/orders-service';
+import { addUzs, type CartCharges } from '@/services/cart-math';
+import type { Address, OrderDetail, ShippingOption } from '@/services/orders-service';
 
-type Translate = (key: string, values?: Record<string, unknown>) => string;
+export type DeliveryMethod = 'courier' | 'pickup';
 
-/** Localize stable shipping types and the ETA formats emitted by our transport.
- * Unknown carrier text remains server-owned; no fee, key or selection changes. */
-export function localizeShipping(option: ShippingOption, t: Translate) {
-  const label = option.key === 'pickup' ? t('checkout.pickup')
-    : option.key === 'courier' ? t('checkout.courier') : option.label;
-  if (option.eta === 'Today') return { label, eta: t('checkout.etaToday') };
-  const match = /^(\d+)(?:[-–](\d+))?(?:d| days?)$/.exec(option.eta);
-  if (!match) return { label, eta: option.eta };
-  const min = Number(match[1]);
-  const max = match[2] === undefined ? min : Number(match[2]);
-  if (!Number.isSafeInteger(min) || !Number.isSafeInteger(max) || max < min) return { label, eta: option.eta };
-  return { label, eta: min === 0 && max === 0 ? t('checkout.etaToday')
-    : min === max ? t('checkout.etaDays', { count: min })
-    : t('checkout.etaRange', { min, max }) };
+export type CheckoutDelivery = {
+  method: DeliveryMethod;
+  /** What delivery adds to the order, or null while no price is known. Null is never
+   *  shown or sent as zero: a free courier is not something the checkout can state. */
+  fee: number | null;
+  /** Whether an order can be placed with this. */
+  ready: boolean;
+  /** The quote behind a courier price, which placing the order hands back. */
+  quoteId: string | null;
+};
+
+export type QuoteState = 'idle' | 'loading' | 'success' | 'error';
+
+/**
+ * What the backend says about Mator's courier for this address and cart. A price, or why
+ * there is none: the backend's own refusal code when it gave one, from an option it marked
+ * unavailable or from a refused request. Not asked yet counts as on its way, never as free.
+ */
+export type CourierOffer =
+  | { state: 'loading' }
+  | { state: 'priced'; price: number; quoteId: string | null }
+  | { state: 'refused'; code: string | null };
+
+export function courierOffer(input: {
+  quoteState: QuoteState;
+  options: ShippingOption[];
+  /** The code of a refused request, when the quote failed. */
+  errorCode?: string | null;
+}): CourierOffer {
+  if (input.quoteState === 'idle' || input.quoteState === 'loading') return { state: 'loading' };
+  if (input.quoteState === 'error') return { state: 'refused', code: input.errorCode ?? null };
+  const courier = input.options.find((option) => option.key === 'courier');
+  if (!courier) return { state: 'refused', code: null };
+  if (courier.available === false) return { state: 'refused', code: courier.unavailableCode };
+  return { state: 'priced', price: courier.price, quoteId: courier.quoteId ?? null };
+}
+
+/**
+ * The checkout's one rule about delivery. A courier needs a price from the backend, so
+ * while that is loading, refused, unavailable or missing the order cannot be placed. Pickup
+ * costs nothing, and with no address it is the only way to get the goods, but that has to be
+ * the buyer's choice: an unanswered address prompt does not place a pickup order.
+ */
+export function resolveCheckoutDelivery(input: {
+  hasAddress: boolean;
+  addressSkipped: boolean;
+  method: DeliveryMethod;
+  quoteState: QuoteState;
+  options: ShippingOption[];
+}): CheckoutDelivery {
+  if (!input.hasAddress) {
+    return input.addressSkipped
+      ? { method: 'pickup', fee: 0, ready: true, quoteId: null }
+      : { method: 'pickup', fee: null, ready: false, quoteId: null };
+  }
+  if (input.method === 'pickup') return { method: 'pickup', fee: 0, ready: true, quoteId: null };
+
+  const offer = courierOffer(input);
+  return offer.state === 'priced'
+    ? { method: 'courier', fee: offer.price, ready: true, quoteId: offer.quoteId }
+    : { method: 'courier', fee: null, ready: false, quoteId: null };
+}
+
+/**
+ * What the order would charge, from the backend's figures alone: the cart's total, which
+ * holds the service fee, and the quoted delivery. Null while either is unknown, or while a
+ * change to the cart is still on its way, so a total that is not the server's is never shown
+ * as one, nor confirmed.
+ */
+export function checkoutTotal(
+  charges: CartCharges | null,
+  deliveryFee: number | null,
+  cartSettled: boolean,
+): number | null {
+  if (!charges || deliveryFee === null || !cartSettled) return null;
+  return addUzs(charges.total, deliveryFee);
+}
+
+/** How the app words each delivery refusal: the server's own messages are English. */
+const DELIVERY_ERROR_KEYS: Record<string, string> = {
+  DELIVERY_ADDRESS_COORDINATES_MISSING: 'checkout.deliveryErrorNeedsLocation',
+  PICKUP_LOCATION_MISSING: 'checkout.deliveryErrorSeller',
+  DELIVERY_ROUTE_NOT_FOUND: 'checkout.deliveryErrorNoRoute',
+  DELIVERY_ROUTING_UNAVAILABLE: 'checkout.deliveryErrorUnavailable',
+  DELIVERY_ADDRESS_REQUIRED: 'checkout.deliveryErrorUnavailable',
+  DELIVERY_COST_UNAVAILABLE: 'checkout.deliveryErrorUnavailable',
+  DELIVERY_PRICE_CHANGED: 'checkout.deliveryPriceChanged',
+  DELIVERY_QUOTE_STALE: 'checkout.deliveryQuoteStale',
+  DELIVERY_OUTSIDE_COVERAGE: 'checkout.deliveryErrorOutsideCoverage',
+  COURIER_DELIVERY_UNAVAILABLE: 'checkout.deliveryErrorCourierOff',
+  DELIVERY_ADDRESS_COORDINATES_INVALID: 'checkout.deliveryErrorNeedsLocation',
+};
+
+/** The copy for a delivery refusal, or null when the code is about something else. */
+export function deliveryRefusalKey(code: string | null): string | null {
+  return (code && DELIVERY_ERROR_KEYS[code]) || null;
+}
+
+/** The server's total is not the one on screen: the cart, a sale or the fee moved since. */
+export const ORDER_TOTAL_CHANGED = 'ORDER_TOTAL_CHANGED';
+
+/**
+ * The copy for an order the server refused because what the buyer saw is out of date: the
+ * delivery price or the total. Either way the figures are fetched again before they agree.
+ */
+export function orderRefusalKey(code: string | null): string | null {
+  if (code === ORDER_TOTAL_CHANGED) return 'checkout.orderTotalChanged';
+  return deliveryRefusalKey(code);
+}
+
+/** The copy for a quote that failed. Anything unrecognised reads as "try again". */
+export function quoteErrorKey(code: string | null): string {
+  return deliveryRefusalKey(code) ?? 'checkout.deliveryErrorUnavailable';
+}
+
+/**
+ * What the buyer can do about a failed quote. Most of these are about the point the address
+ * names, so they choose another; retrying helps only with a failure that may pass by itself,
+ * and neither a seller with no pickup location nor couriers being off can be changed by the
+ * buyer, who can still pick pickup.
+ */
+export function quoteErrorAction(code: string | null): 'edit_address' | 'retry' | null {
+  if (
+    code === 'DELIVERY_ADDRESS_COORDINATES_MISSING' ||
+    code === 'DELIVERY_ADDRESS_COORDINATES_INVALID' ||
+    code === 'DELIVERY_OUTSIDE_COVERAGE' ||
+    code === 'DELIVERY_ROUTE_NOT_FOUND'
+  ) {
+    return 'edit_address';
+  }
+  if (code === 'PICKUP_LOCATION_MISSING' || code === 'COURIER_DELIVERY_UNAVAILABLE') return null;
+  return 'retry';
+}
+
+// ── Addresses ──────────────────────────────────────────────────────────
+
+/** The address as one line, for an address that may have no words at all. */
+export function formatAddressLine(address: Pick<Address, 'line1' | 'city'>): string {
+  return [address.line1, address.city].filter(Boolean).join(', ');
+}
+
+/** "Навои 12" → street and house, for the form's separate fields. Only ever split so that
+ *  joining them gives the same text back, which is what tells an unedited address apart. */
+export function splitLine1(line1: string): { street: string; house: string } {
+  const match = /^(.*\S) (\d[^\s]{0,7})$/.exec(line1);
+  return match ? { street: match[1]!, house: match[2]! } : { street: line1, house: '' };
+}
+
+export function composeLine1(street: string, house: string): string {
+  return [street.trim(), house.trim()].filter(Boolean).join(' ');
+}
+
+/** How the app words a refused address. Anything else reads as "try again". */
+export function addressSaveErrorKey(code: string | null): string {
+  if (code === 'DELIVERY_OUTSIDE_COVERAGE') return 'account.addressOutsideCoverage';
+  if (code === 'DELIVERY_ADDRESS_COORDINATES_INVALID') return 'account.addressInvalidLocation';
+  return 'addresses.saveFailed';
+}
+
+// ── Payment ────────────────────────────────────────────────────────────
+
+/** What the backend says about an order's payment. Only its status counts: a browser that
+ *  came back, or a link that opened, proves nothing. An unknown status is not "paid". */
+export type OrderPaymentState = 'settled' | 'closed' | 'awaiting' | 'unknown';
+
+const SETTLED_STATUSES: ReadonlySet<string> = new Set(['paid', 'processing', 'shipped', 'delivered']);
+const CLOSED_STATUSES: ReadonlySet<string> = new Set(['cancelled', 'expired', 'refunded']);
+
+export function orderPaymentState(status: string | null | undefined): OrderPaymentState {
+  if (status === 'pending_payment') return 'awaiting';
+  if (status && SETTLED_STATUSES.has(status)) return 'settled';
+  if (status && CLOSED_STATUSES.has(status)) return 'closed';
+  return 'unknown';
+}
+
+/** An order still waiting for the buyer to pay online. A cash or terminal order waits in the
+ *  same status, for an operator, and has nothing to pay here. */
+export function isAwaitingOnlinePayment(
+  order: Pick<OrderDetail, 'serverStatus' | 'paymentType'>,
+): boolean {
+  return order.paymentType === 'payme' && orderPaymentState(order.serverStatus) === 'awaiting';
+}
+
+/** Why an order is still unpaid after trying. */
+export type PaymentFailureReason =
+  | 'fiscal' // the order's receipt data is not ready, so it cannot be charged online
+  | 'parts' // something in the order can no longer be sold
+  | 'start' // the payment could not be started: network, server, no link
+  | 'cancelled' // the buyer left the payment page without paying
+  | 'unconfirmed' // the buyer came back and the backend has not confirmed payment yet
+  | 'unpaid'; // found unpaid on coming back to the checkout later
+
+/** Why starting a payment was refused, from the server's code. */
+export function paymentRefusalReason(code: string | null): PaymentFailureReason {
+  if (code === 'FISCAL_DATA_INCOMPLETE') return 'fiscal';
+  if (code === 'PART_UNAVAILABLE') return 'parts';
+  return 'start';
+}
+
+const PAYMENT_FAILURE_KEYS: Record<PaymentFailureReason, string> = {
+  fiscal: 'checkout.paymentErrorFiscal',
+  parts: 'checkout.paymentErrorParts',
+  start: 'checkout.paymentErrorStart',
+  cancelled: 'checkout.paymentErrorCancelled',
+  unconfirmed: 'checkout.paymentErrorUnconfirmed',
+  unpaid: 'checkout.paymentErrorUnpaid',
+};
+
+export function paymentFailureKey(reason: PaymentFailureReason): string {
+  return PAYMENT_FAILURE_KEYS[reason];
+}
+
+/** The heading over that: it failed, or it simply has not happened yet. */
+export function paymentFailureTitleKey(reason: PaymentFailureReason): string {
+  return reason === 'fiscal' || reason === 'parts' || reason === 'start'
+    ? 'checkout.paymentFailedTitle'
+    : 'checkout.paymentUnpaidTitle';
 }
