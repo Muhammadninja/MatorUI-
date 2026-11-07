@@ -9,7 +9,7 @@ import AddressFormSheet, {
   type AddressFormValues,
 } from '@/components/screens-components/account/address-form-sheet';
 import {
-  DeliveryPriceCard,
+  DeliveryOptionsCard,
   DeliverySection,
   LinkAction,
   NO_PRICE_YET,
@@ -38,6 +38,7 @@ import {
 import { parsePrice } from '@/services/cart-math';
 import {
   checkoutTotal,
+  courierOffer,
   orderRefusalKey,
   resolveCheckoutDelivery,
   type DeliveryMethod,
@@ -47,10 +48,12 @@ import type { Address, PaymentType } from '@/services/orders-service';
 import { triggerHaptic } from '@/utils/haptics';
 
 /**
- * Checkout — the Uzbek-market flow. A courier needs a delivery address, because
- * the backend prices the delivery from it; a buyer who skips the address collects
- * the order themselves. Payment is a fixed choice of Payme / Terminal / Cash
- * rather than a stored card. Addresses can be added inline via a bottom-sheet.
+ * Checkout — the Uzbek-market flow. The buyer chooses pickup or Mator's courier, seeing
+ * both: pickup is free, and the courier's price is the backend's for the chosen address.
+ * A courier needs a delivery address, because the backend prices the delivery from it; a
+ * buyer who skips the address collects the order themselves. Payment is a fixed choice of
+ * Payme / Terminal / Cash rather than a stored card. Addresses can be added inline via a
+ * bottom-sheet.
  * "Place order" builds a `CreateOrderInput` (addressId may be null) and hands the
  * created order id to the confirmation screen.
  *
@@ -114,15 +117,16 @@ export default function CheckoutScreen() {
   const addr: Address | null = addressSkipped ? null : chosenAddr ?? defaultAddr ?? null;
 
   // The server prices its own copy of the cart and address, so this asks again when
-  // either changes, and waits for cart changes still on their way to the server. Nothing
-  // is asked for pickup, which costs nothing, or while paying an order already priced.
+  // either changes, and waits for cart changes still on their way to the server. It asks
+  // whichever way the buyer has chosen, so the courier's price stands beside pickup for them
+  // to compare. Nothing is asked without an address, or while paying an order already priced.
   const cartKey = useMemo(() => items.map((i) => i.id).sort().join(','), [items]);
   const shippingRequest = useMemo(
     () =>
-      addr && deliveryMethod === 'courier' && pendingIds.size === 0 && !payment.pending
+      addr && pendingIds.size === 0 && !payment.pending
         ? { addressId: addr.id, location: `${addr.lat ?? ''},${addr.lng ?? ''}`, cartKey }
         : null,
-    [addr, deliveryMethod, pendingIds.size, cartKey, payment.pending],
+    [addr, pendingIds.size, cartKey, payment.pending],
   );
   const shipping = useShippingQuote(shippingRequest);
   const delivery = resolveCheckoutDelivery({
@@ -132,6 +136,13 @@ export default function CheckoutScreen() {
     quoteState: shipping.state,
     options: shipping.options,
   });
+  const courier = addr
+    ? courierOffer({
+        quoteState: shipping.state,
+        options: shipping.options,
+        errorCode: shipping.errorCode,
+      })
+    : null;
   // The server's own figures for this cart: a sale may have started or ended, or the cart
   // changed on another device, since it was last read.
   useEffect(() => {
@@ -300,21 +311,16 @@ export default function CheckoutScreen() {
                 ))}
               </AppView>
 
-              {/* Delivery — the price and nothing else about the trip */}
+              {/* Delivery — pickup or Mator's courier: the price and nothing else about the trip */}
               {addr || addressSkipped ? (
-                <DeliveryPriceCard
+                <DeliveryOptionsCard
                   tokens={tokens}
                   delivery={delivery}
-                  canChooseMethod={!!addr}
-                  onToggleMethod={() => {
-                    setDeliveryMethod((m) => (m === 'courier' ? 'pickup' : 'courier'));
+                  courier={courier}
+                  onChooseMethod={(method) => {
+                    setDeliveryMethod(method);
                     create.reset();
                   }}
-                  quoteFailed={
-                    shipping.state === 'error' ||
-                    (shipping.state === 'success' && delivery.fee === null)
-                  }
-                  quoteErrorCode={shipping.errorCode}
                   onRetry={shipping.refresh}
                   onEditAddress={() => openAddressForm(addr)}
                   formatCurrency={formatCurrency}

@@ -385,7 +385,7 @@ describe('Paying for an order at checkout', () => {
       await press(pressable('Оформить заказ заново'));
 
       expect(exists('checkout-payment-failed')).toBe(false);
-      expect(allText()).toContain('Стоимость доставки: 32 500 сум');
+      expect(allText()).toContain('Курьер Mator | 32 500 сум');
       expect(nbsp(String(button().props.title))).toBe('Оформить заказ · 232 500 сум');
       expect(transport.createOrder).toHaveBeenCalledTimes(1);
       expect(stored.record).toBeNull();

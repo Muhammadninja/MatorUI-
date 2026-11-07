@@ -226,15 +226,33 @@ export type PaymentMethod = {
  *  brings; Cash is cash-on-delivery. */
 export type PaymentType = 'payme' | 'terminal' | 'cash';
 
-export type ShippingOption = {
+/** One way to get the order, as the backend's quote states it: priced, or not available. */
+export type ShippingOption = AvailableShippingOption | UnavailableShippingOption;
+
+export type AvailableShippingOption = {
   /** Stable server key (`pickup`, `courier`). */
   key: string;
   label: string;
+  /** Absent on a backend that only ever listed options it could price. */
+  available?: true;
   /** Numeric fee in UZS. 0 = free (pickup). */
   price: number;
   /** Names what a courier price is for: the saved destination, the pickup points and the
    *  rates. Handed back when placing the order, which the server refuses if any changed. */
   quoteId?: string | null;
+};
+
+/** The backend offers this way but cannot deliver it now: it says why, and gives no price. */
+export type UnavailableShippingOption = {
+  key: string;
+  label: string;
+  available: false;
+  /** Never a number: an option that cannot be had is not a free one. */
+  price: null;
+  quoteId?: null;
+  /** The backend's code for why (`DELIVERY_OUTSIDE_COVERAGE`, …), worded by the checkout.
+   *  Null when it gave none. */
+  unavailableCode: string | null;
 };
 
 /** Input from the client when creating an order. The server owns all

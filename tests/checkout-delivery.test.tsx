@@ -115,8 +115,16 @@ const HOME = { id: 'addr_home', label: 'Дом', line1: 'Навои 1', city: '�
 const WORK = { id: 'addr_work', label: 'Работа', line1: 'Бабура 5', city: 'Ташкент', isDefault: false, lat: 41.29, lng: 69.25 };
 const NO_POINT = { id: 'addr_home', label: 'Дом', line1: 'Навои 1', city: 'Ташкент', isDefault: true, lat: null, lng: null };
 
+const PICKUP_OPTION = { key: 'pickup', label: 'Olib ketish', price: 0, quoteId: null };
+/** The backend's answer with the courier priced: pickup beside it, as it always sends. */
 const courier = (price: number, quoteId = 'quote_1') => [
+  PICKUP_OPTION,
   { key: 'courier', label: 'Kuryer', price, quoteId },
+];
+/** The backend's answer when Mator's courier cannot be had: pickup, and the courier with why. */
+const unavailable = (code: string) => [
+  PICKUP_OPTION,
+  { key: 'courier', label: 'Kuryer', available: false, price: null, quoteId: null, unavailableCode: code },
 ];
 const refusal = (code: string) => Object.assign(new Error(`server words for ${code}`), { code });
 const nbsp = (text: string) => text.replace(/ /g, ' ');
@@ -158,6 +166,30 @@ describe('What the app holds about routing', () => {
     expect(drawsMap).toEqual(['components/screens-components/account/delivery-location-picker.tsx']);
   });
 
+  test('no delivery or fee amount is written into the checkout: every figure is the server’s', () => {
+    const money = [
+      'services/cart-math.ts',
+      'services/checkout-presentation.ts',
+      'services/orders-service.ts',
+      'services/cart-api.ts',
+      'services/order-payment.ts',
+      'contexts/cart.context.tsx',
+      'hooks/use-orders.ts',
+      'hooks/use-order-payment.ts',
+      'components/screens/checkout-screen.tsx',
+      'components/screens-components/checkout/checkout-sections.tsx',
+    ];
+    // The HTTP transport only: the mock transport, below it, has a stand-in price of its own.
+    const http = readFileSync('services/orders-api.ts', 'utf8').split('class HttpOrdersTransport')[1]!;
+    const offenders = [...money.map((path) => [path, readFileSync(path, 'utf8')]), ['HttpOrdersTransport', http]]
+      .filter(([, source]) =>
+        /\b(?:25|30)[ _]?000\b|STANDARD_DELIVERY|SERVICE_FEE_UZS|DELIVERY_COURIER_UZS/.test(source!),
+      )
+      .map(([path]) => path);
+    expect(http.length).toBeGreaterThan(1000);
+    expect(offenders).toEqual([]);
+  });
+
   test('no other map library has been added', () => {
     const { dependencies } = JSON.parse(readFileSync('package.json', 'utf8')) as {
       dependencies: Record<string, string>;
@@ -188,6 +220,23 @@ describe('Checkout delivery', () => {
     renderer.root.find(
       (node) => String(node.type) === 'pressable' && node.props.accessibilityLabel === name,
     );
+  /** The rendered element with this testID (not the component that was handed it). */
+  const hostWith = (testID: string) =>
+    renderer.root.find((node) => typeof node.type === 'string' && node.props.testID === testID);
+  const textsIn = (testID: string) =>
+    hostWith(testID)
+      .findAll((node) => node.type === 'text')
+      .flatMap((node) => node.children.filter((c): c is string => typeof c === 'string'))
+      .map(nbsp)
+      .join(' | ');
+  const courierRow = () => textsIn('checkout-delivery-courier');
+  const pickupRow = () => textsIn('checkout-delivery-pickup');
+  const hasCourierRow = () =>
+    renderer.root.findAll((node) => node.props.testID === 'checkout-delivery-courier').length > 0;
+  const PICKUP = 'checkout-delivery-pickup';
+  const COURIER = 'checkout-delivery-courier-option';
+  const choose = (option: string) => press(hostWith(option));
+  const chosen = (option: string) => hostWith(option).props.accessibilityState.selected;
   const placeOrder = () => press(button());
   const mount = async () => {
     const client = new QueryClient({ defaultOptions: { queries: { gcTime: 0 } } });
@@ -221,10 +270,36 @@ describe('Checkout delivery', () => {
   test('shows exactly the delivery price, and adds it to the total', async () => {
     await mount();
 
-    expect(allText()).toContain('Стоимость доставки: 32 500 сум');
+    expect(courierRow()).toBe('Курьер Mator | 32 500 сум');
+    expect(allText()).toContain('Стоимость доставки | 32 500 сум');
     expect(button().props.disabled).toBe(false);
     expect(nbsp(String(button().props.title))).toContain('232 500 сум');
     expect(texts().filter((t) => t === '232 500 сум')).toHaveLength(1);
+  });
+
+  test('offers both ways side by side: pickup, free, and the courier, chosen by default', async () => {
+    await mount();
+
+    expect(pickupRow()).toBe('Самовывоз | Бесплатно');
+    expect(courierRow()).toBe('Курьер Mator | 32 500 сум');
+    expect(chosen(COURIER)).toBe(true);
+    expect(chosen(PICKUP)).toBe(false);
+    expect(hostWith(PICKUP).props.accessibilityRole).toBe('radio');
+    expect(nbsp(hostWith(COURIER).props.accessibilityLabel)).toBe('Курьер Mator, 32 500 сум');
+  });
+
+  test('choosing pickup keeps the courier price in view for comparison, and charges nothing', async () => {
+    await mount();
+
+    await choose(PICKUP);
+
+    expect(chosen(PICKUP)).toBe(true);
+    expect(courierRow()).toBe('Курьер Mator | 32 500 сум');
+    expect(allText()).toContain('Стоимость доставки | Бесплатно');
+    expect(nbsp(String(button().props.title))).toContain('200 000 сум');
+
+    await choose(COURIER);
+    expect(nbsp(String(button().props.title))).toContain('232 500 сум');
   });
 
   test('says nothing else about the trip', async () => {
@@ -243,8 +318,9 @@ describe('Checkout delivery', () => {
     transport.getShippingQuote.mockReturnValue(new Promise(() => undefined));
     await mount();
 
-    expect(allText()).toContain('Считаем стоимость доставки…');
-    expect(allText()).not.toContain('Бесплатно');
+    expect(courierRow()).toContain('Считаем стоимость доставки…');
+    expect(courierRow()).not.toContain('Бесплатно');
+    expect(allText()).toContain('Стоимость доставки | —');
     expect(button().props.disabled).toBe(true);
 
     await placeOrder();
@@ -266,7 +342,15 @@ describe('Checkout delivery', () => {
     expect(replace).toHaveBeenCalled();
   });
 
-  describe('a failed quote blocks the order', () => {
+  // The backend says "no courier" in an answer that marks it unavailable, and a request can
+  // still be refused outright (no network, or a backend from before that answer). Both read
+  // the same to the buyer.
+  const NO_COURIER: [string, (code: string) => void][] = [
+    ['an answer marking it unavailable', (code) => transport.getShippingQuote.mockResolvedValue(unavailable(code))],
+    ['a refused request', (code) => transport.getShippingQuote.mockRejectedValue(refusal(code))],
+  ];
+
+  describe.each(NO_COURIER)('no courier, by %s', (_, noCourier) => {
     test.each([
       ['DELIVERY_ROUTING_UNAVAILABLE', 'Не удалось рассчитать стоимость доставки. Попробуйте ещё раз.'],
       ['PICKUP_LOCATION_MISSING', 'Эти товары пока нельзя доставить курьером. Можно забрать заказ самовывозом.'],
@@ -274,24 +358,58 @@ describe('Checkout delivery', () => {
       ['DELIVERY_ADDRESS_COORDINATES_MISSING', 'Чтобы рассчитать доставку, уточните этот адрес: выберите его из подсказок или укажите точку на карте.'],
       ['COURIER_DELIVERY_UNAVAILABLE', 'Доставка курьером пока недоступна. Можно забрать заказ самовывозом.'],
       ['DELIVERY_OUTSIDE_COVERAGE', 'Этот адрес вне зоны доставки. Выберите другой адрес или самовывоз.'],
-    ])('%s, in the app\'s own words', async (code, words) => {
-      transport.getShippingQuote.mockRejectedValue(refusal(code));
+    ])('%s blocks the courier order, in the app\'s own words', async (code, words) => {
+      noCourier(code);
       await mount();
 
-      expect(allText()).toContain(words);
+      expect(courierRow()).toContain(words);
       expect(allText()).not.toContain('server words');
-      expect(allText()).not.toContain('Бесплатно');
+      // Never free: the courier row shows no price, and the order summary none either.
+      expect(courierRow()).not.toContain('Бесплатно');
+      expect(allText()).toContain('Стоимость доставки | —');
       expect(button().props.disabled).toBe(true);
       expect(nbsp(String(button().props.title))).toBe('Оформить заказ');
     });
 
+    test.each(['PICKUP_LOCATION_MISSING', 'COURIER_DELIVERY_UNAVAILABLE'])(
+      'a refusal that would only repeat offers no retry: %s',
+      async (code) => {
+        noCourier(code);
+        await mount();
+        expect(allText()).not.toContain('Повторить');
+      },
+    );
+
+    test.each(['COURIER_DELIVERY_UNAVAILABLE', 'PICKUP_LOCATION_MISSING', 'DELIVERY_ROUTING_UNAVAILABLE'])(
+      'pickup carries on as ever (%s), and costs nothing',
+      async (code) => {
+        noCourier(code);
+        await mount();
+        expect(button().props.disabled).toBe(true);
+
+        await choose(PICKUP);
+
+        expect(chosen(PICKUP)).toBe(true);
+        expect(pickupRow()).toBe('Самовывоз | Бесплатно');
+        expect(button().props.disabled).toBe(false);
+        await placeOrder();
+        expect(transport.createOrder.mock.calls[0]![0]).toMatchObject({
+          shippingOptionKey: 'pickup',
+          confirmedDeliveryUzs: null,
+          deliveryQuoteId: null,
+        });
+      },
+    );
+  });
+
+  describe('a failed quote blocks the order', () => {
     test('an answer with no usable price is a failure too, not an endless wait', async () => {
       transport.getShippingQuote.mockResolvedValue([]);
       await mount();
 
-      expect(allText()).not.toContain('Считаем стоимость доставки');
-      expect(allText()).toContain('Не удалось рассчитать стоимость доставки');
-      expect(allText()).not.toContain('Бесплатно');
+      expect(courierRow()).not.toContain('Считаем стоимость доставки');
+      expect(courierRow()).toContain('Не удалось рассчитать стоимость доставки');
+      expect(courierRow()).not.toContain('Бесплатно');
       expect(button().props.disabled).toBe(true);
       expect(pressable('Повторить')).toBeDefined();
     });
@@ -303,49 +421,20 @@ describe('Checkout delivery', () => {
 
       await press(pressable('Повторить'));
 
-      expect(allText()).toContain('Стоимость доставки: 32 500 сум');
+      expect(courierRow()).toBe('Курьер Mator | 32 500 сум');
       expect(button().props.disabled).toBe(false);
     });
 
-    test.each(['PICKUP_LOCATION_MISSING', 'COURIER_DELIVERY_UNAVAILABLE'])(
-      'a refusal that would only repeat offers no retry: %s',
-      async (code) => {
-        transport.getShippingQuote.mockRejectedValue(refusal(code));
-        await mount();
-        expect(allText()).not.toContain('Повторить');
-      },
-    );
-
-    test('with couriers off, pickup carries on as ever', async () => {
-      transport.getShippingQuote.mockRejectedValue(refusal('COURIER_DELIVERY_UNAVAILABLE'));
+    test('UzMaps being down is answered as a courier to retry, and the retry recovers', async () => {
+      transport.getShippingQuote.mockResolvedValueOnce(unavailable('DELIVERY_ROUTING_UNAVAILABLE'));
       await mount();
+      expect(chosen(COURIER)).toBe(true);
       expect(button().props.disabled).toBe(true);
 
-      await press(pressable('Изменить Доставка'));
+      await press(pressable('Повторить'));
 
-      expect(allText()).toContain('Самовывоз · Бесплатно');
+      expect(courierRow()).toBe('Курьер Mator | 32 500 сум');
       expect(button().props.disabled).toBe(false);
-      await placeOrder();
-      expect(transport.createOrder.mock.calls[0]![0]).toMatchObject({
-        shippingOptionKey: 'pickup',
-        deliveryQuoteId: null,
-      });
-    });
-
-    test('a buyer who cannot get a courier can still choose pickup, which costs nothing', async () => {
-      transport.getShippingQuote.mockRejectedValue(refusal('PICKUP_LOCATION_MISSING'));
-      await mount();
-
-      await press(pressable('Изменить Доставка'));
-
-      expect(allText()).toContain('Самовывоз · Бесплатно');
-      expect(button().props.disabled).toBe(false);
-      await placeOrder();
-      expect(transport.createOrder.mock.calls[0]![0]).toMatchObject({
-        shippingOptionKey: 'pickup',
-        confirmedDeliveryUzs: null,
-        deliveryQuoteId: null,
-      });
     });
   });
 
@@ -355,7 +444,7 @@ describe('Checkout delivery', () => {
 
     beforeEach(() => {
       transport.listAddresses.mockResolvedValue([NO_POINT]);
-      transport.getShippingQuote.mockRejectedValue(refusal('DELIVERY_ADDRESS_COORDINATES_MISSING'));
+      transport.getShippingQuote.mockResolvedValue(unavailable('DELIVERY_ADDRESS_COORDINATES_MISSING'));
     });
 
     test('opens that address to be chosen, and never reads the location itself', async () => {
@@ -385,7 +474,7 @@ describe('Checkout delivery', () => {
       await settle();
 
       expect(transport.updateAddress).toHaveBeenCalledWith('addr_home', values);
-      expect(allText()).toContain('Стоимость доставки: 24 000 сум');
+      expect(courierRow()).toBe('Курьер Mator | 24 000 сум');
       expect(button().props.disabled).toBe(false);
     });
 
@@ -400,14 +489,17 @@ describe('Checkout delivery', () => {
       expect(button().props.disabled).toBe(true);
     });
 
-    test.each(['DELIVERY_OUTSIDE_COVERAGE', 'DELIVERY_ROUTE_NOT_FOUND'])(
-      '%s can be answered by choosing another point',
-      async (code) => {
-        transport.getShippingQuote.mockRejectedValue(refusal(code));
-        await mount();
-        expect(pressable(CHOOSE)).toBeDefined();
-      },
-    );
+    test.each(
+      NO_COURIER.flatMap(([how, noCourier]) =>
+        ['DELIVERY_OUTSIDE_COVERAGE', 'DELIVERY_ROUTE_NOT_FOUND'].map(
+          (code) => [code, how, noCourier] as const,
+        ),
+      ),
+    )('%s, by %s, can be answered by choosing another point', async (code, _, noCourier) => {
+      noCourier(code);
+      await mount();
+      expect(pressable(CHOOSE)).toBeDefined();
+    });
   });
 
   describe('a new address', () => {
@@ -429,7 +521,7 @@ describe('Checkout delivery', () => {
       await settle();
 
       expect(transport.getShippingQuote.mock.lastCall![0].addressId).toBe('addr_new');
-      expect(allText()).toContain('Стоимость доставки: 55 000 сум');
+      expect(courierRow()).toBe('Курьер Mator | 55 000 сум');
 
       await placeOrder();
       expect(transport.createOrder.mock.calls[0]![0]).toMatchObject({
@@ -447,11 +539,11 @@ describe('Checkout delivery', () => {
         courier(addressId === 'addr_home' ? 32_500 : 9_000),
       );
       await mount();
-      expect(allText()).toContain('Стоимость доставки: 32 500 сум');
+      expect(courierRow()).toBe('Курьер Mator | 32 500 сум');
 
       await press(pressable('Изменить адрес'));
 
-      expect(allText()).toContain('Стоимость доставки: 9 000 сум');
+      expect(courierRow()).toBe('Курьер Mator | 9 000 сум');
       expect(nbsp(String(button().props.title))).toContain('209 000 сум');
     });
 
@@ -471,7 +563,7 @@ describe('Checkout delivery', () => {
       await settle();
 
       expect(transport.getShippingQuote.mock.lastCall![0].cartKey).toBe('part_1,part_2');
-      expect(allText()).toContain('Стоимость доставки: 40 000 сум');
+      expect(courierRow()).toBe('Курьер Mator | 40 000 сум');
     });
 
     test('a cart change still on its way to the server holds the quote back', async () => {
@@ -482,13 +574,25 @@ describe('Checkout delivery', () => {
       expect(button().props.disabled).toBe(true);
     });
 
-    test('no request is made for pickup', async () => {
+    test('switching between pickup and the courier asks the server nothing new', async () => {
       await mount();
       transport.getShippingQuote.mockClear();
 
-      await press(pressable('Изменить Доставка'));
+      await choose(PICKUP);
+      await choose(COURIER);
 
       expect(transport.getShippingQuote).not.toHaveBeenCalled();
+      expect(courierRow()).toBe('Курьер Mator | 32 500 сум');
+    });
+
+    test('with pickup chosen, a courier price still on its way does not hold the order back', async () => {
+      transport.getShippingQuote.mockReturnValue(new Promise(() => undefined));
+      await mount();
+
+      await choose(PICKUP);
+
+      expect(courierRow()).toContain('Считаем стоимость доставки…');
+      expect(button().props.disabled).toBe(false);
     });
   });
 
@@ -502,12 +606,34 @@ describe('Checkout delivery', () => {
       await settle();
 
       expect(allText()).toContain('Стоимость доставки изменилась');
-      expect(allText()).toContain('Стоимость доставки: 40 000 сум');
+      expect(courierRow()).toBe('Курьер Mator | 40 000 сум');
       expect(cart.clearCart).not.toHaveBeenCalled();
       expect(replace).not.toHaveBeenCalled();
 
       await placeOrder();
       expect(transport.createOrder.mock.lastCall![0].confirmedDeliveryUzs).toBe(40_000);
+      expect(cart.clearCart).toHaveBeenCalled();
+    });
+
+    test('rates changed since the quote: the new total is shown, and only that is confirmed', async () => {
+      await mount();
+      transport.createOrder.mockRejectedValueOnce(refusal('ORDER_TOTAL_CHANGED'));
+      transport.getShippingQuote.mockResolvedValue(courier(40_000, 'quote_under_the_new_rates'));
+
+      await placeOrder();
+      await settle();
+
+      expect(allText()).toContain('Сумма заказа изменилась');
+      expect(courierRow()).toBe('Курьер Mator | 40 000 сум');
+      expect(nbsp(String(button().props.title))).toContain('240 000 сум');
+      expect(cart.clearCart).not.toHaveBeenCalled();
+
+      await placeOrder();
+      expect(transport.createOrder.mock.lastCall![0]).toMatchObject({
+        confirmedDeliveryUzs: 40_000,
+        deliveryQuoteId: 'quote_under_the_new_rates',
+        confirmedTotalUzs: 240_000,
+      });
       expect(cart.clearCart).toHaveBeenCalled();
     });
 
@@ -560,7 +686,10 @@ describe('Checkout delivery', () => {
       await press(skip);
 
       expect(allText()).toContain('Без адреса заказ можно только забрать самовывозом.');
-      expect(allText()).toContain('Самовывоз · Бесплатно');
+      expect(pickupRow()).toBe('Самовывоз | Бесплатно');
+      expect(chosen(PICKUP)).toBe(true);
+      // Without an address there is no courier to offer, so no row for one.
+      expect(hasCourierRow()).toBe(false);
       expect(button().props.disabled).toBe(false);
       await placeOrder();
       expect(transport.createOrder.mock.calls[0]![0]).toMatchObject({

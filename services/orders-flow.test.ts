@@ -125,16 +125,17 @@ describe('MockOrdersTransport — account collections', () => {
 });
 
 describe('MockOrdersTransport — shipping quote', () => {
-  test('prices a courier to an address that has a location, and says nothing else', async () => {
+  test('offers pickup and prices a courier to an address that has a location, and says nothing else', async () => {
     const transport = new MockOrdersTransport(MOCK_SEED);
     const quote = await transport.getShippingQuote({ addressId: 'addr_home' });
     expect(quote).toEqual([
+      { key: 'pickup', label: 'Pickup', price: 0, quoteId: null },
       { key: 'courier', label: 'Courier', price: expect.any(Number), quoteId: expect.any(String) },
     ]);
-    expect(quote[0]!.price).toBeGreaterThan(0);
+    expect(quote[1]!.price).toBeGreaterThan(0);
   });
 
-  test('refuses an address with no location the way the backend does', async () => {
+  test('an address with no location has no courier, the way the backend answers it', async () => {
     const transport = new MockOrdersTransport();
     const created = await transport.createAddress({
       label: 'New',
@@ -142,10 +143,17 @@ describe('MockOrdersTransport — shipping quote', () => {
       line1: 'Amir Temur 1',
       city: 'Toshkent',
     });
-    await expect(transport.getShippingQuote({ addressId: created.id })).rejects.toMatchObject({
-      status: 422,
-      code: 'DELIVERY_ADDRESS_COORDINATES_MISSING',
-    });
+    await expect(transport.getShippingQuote({ addressId: created.id })).resolves.toEqual([
+      { key: 'pickup', label: 'Pickup', price: 0, quoteId: null },
+      {
+        key: 'courier',
+        label: 'Courier',
+        available: false,
+        price: null,
+        quoteId: null,
+        unavailableCode: 'DELIVERY_ADDRESS_COORDINATES_MISSING',
+      },
+    ]);
   });
 
   test('stating a location on an address makes it priceable', async () => {
@@ -164,7 +172,9 @@ describe('MockOrdersTransport — shipping quote', () => {
       lat: 41.31,
       lng: 69.28,
     });
-    await expect(transport.getShippingQuote({ addressId: created.id })).resolves.toHaveLength(1);
+    const quote = await transport.getShippingQuote({ addressId: created.id });
+    expect(quote.find((o) => o.key === 'courier')).toMatchObject({ price: expect.any(Number) });
+    expect(quote.find((o) => o.key === 'courier')).not.toHaveProperty('available', false);
   });
 });
 

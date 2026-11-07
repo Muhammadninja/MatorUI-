@@ -8,6 +8,7 @@ import { PAYMENT_OPTIONS } from '@/constants/payment-options';
 import {
   addressSaveErrorKey,
   composeLine1,
+  courierOffer,
   deliveryRefusalKey,
   formatAddressLine,
   isAwaitingOnlinePayment,
@@ -24,16 +25,14 @@ import {
 const resources = { ru: { translation: ru }, uz: { translation: uz }, en: { translation: en } };
 
 test.each([
-  ['ru', 'Самовывоз', 'Наличные', 'Стоимость доставки: 32 500 сум'],
-  ['uz', 'Olib ketish', 'Naqd pul', 'Yetkazib berish narxi: 32 500 soʻm'],
-  ['en', 'Pickup', 'Cash', 'Delivery cost: 32 500 UZS'],
-])('checkout copy follows %s', async (lng, pickup, cash, price) => {
+  ['ru', 'Самовывоз', 'Наличные', 'Курьер Mator'],
+  ['uz', 'Olib ketish', 'Naqd pul', 'Mator kuryeri'],
+  ['en', 'Pickup', 'Cash', 'Mator courier'],
+])('checkout copy follows %s', async (lng, pickup, cash, courier) => {
   const i18n = createInstance();
   await i18n.init({ lng, resources });
   expect(i18n.t('checkout.pickup')).toBe(pickup);
-  expect(
-    i18n.t('checkout.deliveryPrice', { price: `32 500 ${i18n.t('common.currency')}` }),
-  ).toBe(price);
+  expect(i18n.t('checkout.courierMator')).toBe(courier);
   expect(PAYMENT_OPTIONS.map((p) => p.id)).toEqual(['payme', 'terminal', 'cash']);
   expect(i18n.t(PAYMENT_OPTIONS[2].labelKey)).toBe(cash);
   for (const p of PAYMENT_OPTIONS) {
@@ -224,5 +223,59 @@ describe('resolveCheckoutDelivery', () => {
     expect(
       resolveCheckoutDelivery({ ...base, options: [{ ...courier, price: 0 }] }),
     ).toEqual({ method: 'courier', fee: 0, ready: true, quoteId: 'quote_1' });
+  });
+
+  test('a courier the backend marks unavailable has no price and cannot be ordered, beside a free pickup', () => {
+    expect(
+      resolveCheckoutDelivery({
+        ...base,
+        options: [{ key: 'pickup', label: '', price: 0 }, UNAVAILABLE],
+      }),
+    ).toEqual({ method: 'courier', fee: null, ready: false, quoteId: null });
+  });
+});
+
+const UNAVAILABLE = {
+  key: 'courier',
+  label: 'Kuryer',
+  available: false as const,
+  price: null,
+  quoteId: null,
+  unavailableCode: 'DELIVERY_OUTSIDE_COVERAGE',
+};
+
+describe('courierOffer', () => {
+  const priced = { key: 'courier', label: 'Kuryer', price: 32500, quoteId: 'quote_1' };
+
+  test('a priced courier, at that price, with its quote', () => {
+    expect(courierOffer({ quoteState: 'success', options: [priced] })).toEqual({
+      state: 'priced',
+      price: 32500,
+      quoteId: 'quote_1',
+    });
+  });
+
+  test('not asked yet, or on its way, is loading: never free', () => {
+    expect(courierOffer({ quoteState: 'idle', options: [] })).toEqual({ state: 'loading' });
+    expect(courierOffer({ quoteState: 'loading', options: [priced] })).toEqual({ state: 'loading' });
+  });
+
+  test('unavailable, with the code the backend gave', () => {
+    expect(courierOffer({ quoteState: 'success', options: [UNAVAILABLE] })).toEqual({
+      state: 'refused',
+      code: 'DELIVERY_OUTSIDE_COVERAGE',
+    });
+  });
+
+  test('a refused request, with its code', () => {
+    expect(
+      courierOffer({ quoteState: 'error', options: [], errorCode: 'DELIVERY_ROUTING_UNAVAILABLE' }),
+    ).toEqual({ state: 'refused', code: 'DELIVERY_ROUTING_UNAVAILABLE' });
+  });
+
+  test('an answer naming no courier is no price, and says nothing in particular', () => {
+    expect(
+      courierOffer({ quoteState: 'success', options: [{ key: 'pickup', label: '', price: 0 }] }),
+    ).toEqual({ state: 'refused', code: null });
   });
 });
