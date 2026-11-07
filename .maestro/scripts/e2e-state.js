@@ -16,6 +16,6 @@ output.cart = {
 output.orders = {
   a: (state.orders.e2e_a || []).length, b: (state.orders.e2e_b || []).length,
   aTotal: (state.orders.e2e_a || []).map((o) => o.total_uzs).join(','),
-  posts: state.orderPosts, keys: state.idempotencyKeys, unkeyed: state.unkeyedOrderPosts,
+  requests: state.orderRequests, posts: state.orderPosts, keys: state.idempotencyKeys, unkeyed: state.unkeyedOrderPosts,
 };
 console.log('mock state ' + JSON.stringify({ cart: output.cart, orders: output.orders }));

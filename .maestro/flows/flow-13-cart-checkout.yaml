@@ -242,7 +242,31 @@ tags:
 - runScript: ../scripts/e2e-state.js
 - assertTrue: ${output.orders.a === 0}
 
-# ── Lost response after the server commits: one order exists ─────────────────
+# ── Slow failure with a rapid second tap: one request, still no order ───────
+- runScript:
+    file: ../scripts/e2e-fault.js
+    env:
+      METHOD: POST
+      FAULT_PATH: /v1/orders
+      MODE: fail
+      MS: '5000'
+- tapOn:
+    id: checkout-place-order-btn
+    retryTapIfNoChange: false
+- tapOn:
+    id: checkout-place-order-btn
+    retryTapIfNoChange: false
+- assertVisible: "Placing order…"
+- extendedWaitUntil:
+    visible: 'Request failed \(503\)\.'
+    timeout: 15000
+- runScript: ../scripts/e2e-state.js
+- assertTrue: ${output.orders.a === 0 && output.orders.requests === 2}
+
+# ── Lost response after the server commits ───────────────────────────────────
+# Android's HTTP stack may resend the POST by itself when the connection closes
+# without a response; otherwise the buyer sees the error and taps again. Either
+# way the same Idempotency-Key must yield one order.
 - runScript:
     file: ../scripts/e2e-fault.js
     env:
@@ -253,27 +277,17 @@ tags:
     id: checkout-place-order-btn
     retryTapIfNoChange: false
 - extendedWaitUntil:
-    visible: 'Network request failed\.'
+    visible: '(Network request failed\.|Order placed)'
     timeout: 20000
-- assertVisible:
-    id: checkout-screen
-- runScript: ../scripts/e2e-state.js
-- assertTrue: ${output.orders.a === 1}
-
-# ── Delayed retry with a rapid second tap: still exactly one order ───────────
-- runScript:
-    file: ../scripts/e2e-fault.js
-    env:
-      METHOD: POST
-      FAULT_PATH: /v1/orders
-      MODE: delay
-      MS: '5000'
-- tapOn:
-    id: checkout-place-order-btn
-    retryTapIfNoChange: false
-- tapOn:
-    id: checkout-place-order-btn
-    retryTapIfNoChange: false
+- runFlow:
+    when:
+      visible: 'Network request failed\.'
+    commands:
+      - runScript: ../scripts/e2e-state.js
+      - assertTrue: ${output.orders.a === 1}
+      - tapOn:
+          id: checkout-place-order-btn
+          retryTapIfNoChange: false
 - extendedWaitUntil:
     visible:
       id: order-confirmation-screen
@@ -285,7 +299,8 @@ tags:
 - assertTrue: ${output.orders.a === 1 && output.orders.b === 0}
 - assertTrue: ${output.orders.aTotal === '227190.72'}
 - assertTrue: ${output.orders.keys === 1 && output.orders.unkeyed === 0}
-- assertTrue: ${output.orders.posts === 2}
+# 503, slow 503 (one request for two taps), lost response, then one resend.
+- assertTrue: ${output.orders.requests === 4 && output.orders.posts === 2}
 - takeScreenshot: cart-checkout-confirmation
 
 # ── The placed order empties A's cart only ───────────────────────────────────

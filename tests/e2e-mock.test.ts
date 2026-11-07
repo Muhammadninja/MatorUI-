@@ -89,6 +89,7 @@ test('one Idempotency-Key creates one order, also when the first response is los
   const s = await state();
   expect(s.orders.e2e_a).toHaveLength(1);
   expect(s.orderPosts).toBe(3); // the injected 503 never reached the handler
+  expect(s.orderRequests).toBe(4);
   expect(s.idempotencyKeys).toBe(1);
   expect((await state()).carts.e2e_a).toEqual([]);
   // Without a key, as on the backend source: the order empties the cart, so a

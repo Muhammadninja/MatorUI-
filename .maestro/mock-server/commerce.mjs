@@ -5,11 +5,11 @@
  *
  * Test controls (loopback only, never in the app):
  *   POST /__e2e/faults  { method, path, mode: fail|delay|drop, status?, ms?, times? }
- *     fail  → answer `status` (503) without processing
+ *     fail  → answer `status` (503) without processing, after `ms` if given
  *     delay → wait `ms`, then process normally
  *     drop  → process, then close the socket: a lost response after commit
- *   GET  /__e2e/state   → orders, processed order POSTs (injected `fail`
- *                         excluded), idempotency keys and carts per account.
+ *   GET  /__e2e/state   → orders, order POSTs that arrived (orderRequests) and
+ *                         were processed (orderPosts), idempotency keys, carts.
  *                         Waits up to 10 s for open app requests unless ?nosettle.
  */
 import { PARTS_BY_ID } from './catalog-fixtures.mjs';
@@ -27,6 +27,7 @@ let carts = new Map();
 let orders = new Map();
 let keys = new Map();
 let orderPosts = [];
+let orderRequests = 0;
 let faults = [];
 let seq = 0;
 let inFlight = 0;
@@ -38,7 +39,7 @@ function trackRequest(res) {
 }
 
 export function resetCommerce() {
-  carts = new Map(); orders = new Map(); keys = new Map(); orderPosts = []; faults = []; seq = 0;
+  carts = new Map(); orders = new Map(); keys = new Map(); orderPosts = []; orderRequests = 0; faults = []; seq = 0;
 }
 
 const money = (n) => Math.round(n * 100) / 100;
@@ -74,9 +75,10 @@ function takeFault(method, pathname) {
 export async function applyFault(req, res, pathname, send) {
   if (pathname.startsWith('/__e2e/')) return false;
   trackRequest(res);
+  if (req.method === 'POST' && pathname === '/v1/orders') orderRequests += 1;
   const fault = takeFault(req.method, pathname);
+  if (fault && fault.mode !== 'drop') await new Promise((done) => setTimeout(done, fault.ms));
   if (fault?.mode === 'fail') { send(res, fault.status, { error: { code: 'E2E_INJECTED_FAILURE' } }); return true; }
-  if (fault?.mode === 'delay') await new Promise((done) => setTimeout(done, fault.ms));
   // send() closes the socket instead of answering: the response is lost.
   if (fault?.mode === 'drop') res.dropResponse = true;
   return false;
@@ -127,6 +129,7 @@ export async function handleCommerce(req, pathname, account, { send, readBody })
     const byAccount = (m) => Object.fromEntries([...m].map(([a, v]) => [a, v]));
     send(200, {
       orders: byAccount(new Map([...orders].map(([a, list]) => [a, list.map((o) => ({ order_id: o.order_id, total_uzs: o.total_uzs }))]))),
+      orderRequests,
       orderPosts: orderPosts.length,
       idempotencyKeys: [...new Set(orderPosts.map((p) => p.key).filter(Boolean))].length,
       unkeyedOrderPosts: orderPosts.filter((p) => !p.key).length,
