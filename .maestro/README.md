@@ -52,6 +52,17 @@ gh run list --workflow e2e-android.yml --branch codex/favorites-e2e
 gh run watch <run-id> --exit-status
 ```
 
+For release-candidate provenance, force a new APK from the exact RC commit:
+
+```bash
+gh workflow run e2e-android.yml --ref design/teal-explore-home -f rebuild_apk=true
+```
+
+This skips APK cache restore/save, requires the APK source SHA to equal the test
+SHA, and uploads `build-provenance.txt` with both SHAs and the APK SHA-256. Normal
+runs retain the content-keyed APK cache. This builds only the disposable E2E app;
+it does not submit a release or publish an OTA update.
+
 The earlier flows 01–11 are retained for the existing iOS/dev-client setup
 (`com.fotih12.mator`, `mator://`). They are not part of this dedicated Android run.
 Their historical assertions need separate maintenance before claiming that older

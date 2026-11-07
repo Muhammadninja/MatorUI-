@@ -7,7 +7,12 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      rebuild_apk:
+        description: Build a fresh APK at this exact commit instead of restoring it
+        type: boolean
+        default: false
 
 concurrency:
   group: e2e-android-${{ github.ref }}
@@ -76,6 +81,7 @@ jobs:
       # which run outside the app. Every bundle/native input and this build
       # recipe participates in the key. Record the actual frontend SHA on hits.
       - name: Restore dedicated test APK
+        if: ${{ !inputs.rebuild_apk }}
         id: apk
         uses: actions/cache/restore@v4
         with:
@@ -135,16 +141,28 @@ jobs:
           df -h /
 
       - name: Save dedicated test APK before UI tests
-        if: steps.apk.outputs.cache-hit != 'true'
+        if: steps.apk.outputs.cache-hit != 'true' && !inputs.rebuild_apk
         uses: actions/cache/save@v4
         with:
           path: /tmp/mator-e2e-apk
           key: ${{ steps.apk.outputs.cache-primary-key }}
 
       - name: Record actual frontend and mock versions
+        env:
+          REBUILD_APK: ${{ inputs.rebuild_apk }}
         run: |
-          echo "Frontend source SHA: $(cat /tmp/mator-e2e-apk/source-sha.txt)"
-          echo "Mock and Maestro source SHA: $GITHUB_SHA"
+          APK_SOURCE_SHA=$(cat /tmp/mator-e2e-apk/source-sha.txt)
+          if [ "$REBUILD_APK" = true ] && [ "$APK_SOURCE_SHA" != "$GITHUB_SHA" ]; then
+            echo "Fresh APK source must match the tested commit" >&2
+            exit 1
+          fi
+          mkdir -p artifacts
+          {
+            echo "Frontend source SHA: $APK_SOURCE_SHA"
+            echo "Mock and Maestro source SHA: $GITHUB_SHA"
+            echo "Forced fresh build: ${REBUILD_APK:-false}"
+            sha256sum /tmp/mator-e2e-apk/app-release.apk
+          } | tee artifacts/build-provenance.txt
 
       - name: Install Maestro
         run: |
@@ -193,6 +211,7 @@ jobs:
           path: |
             maestro-report.xml
             artifacts/favorites-a-after-restart.png
+            artifacts/build-provenance.txt
             /tmp/mator-e2e-mock.log
           if-no-files-found: ignore
           retention-days: 14
