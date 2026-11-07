@@ -99,12 +99,14 @@ tags:
 - scrollUntilVisible:
     element:
       text: Favorites
+      below: Shipping addresses
     direction: UP
 # A visible row can still be moving after scrollUntilVisible. Let the native
 # scroll settle before tapping; otherwise the gesture can only stop the scroll.
 - waitForAnimationToEnd
 - tapOn:
     text: Favorites
+    below: Shipping addresses
 - extendedWaitUntil:
     visible:
       id: liked-screen
