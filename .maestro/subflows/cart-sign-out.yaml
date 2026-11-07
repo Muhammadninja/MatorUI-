@@ -11,3 +11,11 @@ appId: com.mator.e2e
     notVisible:
       id: profile-sign-out
     timeout: 15000
+# Sign-out starts every tab fresh: Explore home, not the previous account's
+# last product page.
+- extendedWaitUntil:
+    visible:
+      id: explore-search-entry
+    timeout: 15000
+- assertNotVisible:
+    id: item-detail-screen

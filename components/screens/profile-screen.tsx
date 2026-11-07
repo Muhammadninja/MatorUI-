@@ -2,7 +2,7 @@ import React from 'react';
 import { Image } from 'react-native';
 
 import { useTranslation } from 'react-i18next';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useNavigationContainerRef } from 'expo-router';
 import { Heart, MapPin, ReceiptText, Shield, User } from 'lucide-react-native';
 
 import ProfileGuestEmpty from '@/components/screens-components/profile/profile-guest-empty';
@@ -99,6 +99,7 @@ export default function ProfileScreen() {
   const { t } = useTranslation();
   const toast = useToast();
   const { profile, isAuthenticated, isHydrating, signOut, refreshProfile } = useUserContext();
+  const rootNavigation = useNavigationContainerRef();
   const accountItems = React.useMemo(() => buildAccountItems(t), [t]);
 
   // Re-fetch GET /v1/me every time the tab gains focus so freshly-saved fields
@@ -125,7 +126,9 @@ export default function ProfileScreen() {
   const handleSignOut = async () => {
     await signOut();
     toast.info(t('profile.signedOutToast'));
-    router.replace('/explore');
+    // Start every tab fresh. `router.replace('/explore')` only switched tabs,
+    // so the next person landed on the previous account's last Explore page.
+    rootNavigation.reset({ index: 0, routes: [{ name: '(tabs)' }] });
   };
 
   // Brief cold-boot hydrate — avoid flashing the guest state before we know
