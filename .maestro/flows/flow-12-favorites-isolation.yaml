@@ -81,9 +81,14 @@ tags:
     visible:
       id: explore-search-entry
     timeout: 30000
+# Explore is mounted behind the branded splash before it becomes interactive.
+# Wait for the overlay's existing English accessibility label to disappear.
+- extendedWaitUntil:
+    notVisible: Skip
+    timeout: 30000
+- waitForAnimationToEnd
 - tapOn:
     text: Profile
-    retryTapIfNoChange: false
 # This control exists only in the authenticated Profile branch.
 - scrollUntilVisible:
     element:
