@@ -24,6 +24,7 @@ const { host, transport, cart, sheet, replace } = vi.hoisted(() => {
     transport: {
       listAddresses: vi.fn(),
       getShippingQuote: vi.fn(),
+      getPickupPoints: vi.fn(async () => []),
       createOrder: vi.fn(),
       createAddress: vi.fn(),
       updateAddress: vi.fn(),
@@ -65,6 +66,7 @@ vi.mock('@/components/shared/app-price', () => ({
   AppPrice: ({ value }: { value: string }) => React.createElement('text', { testID: 'total' }, value),
 }));
 vi.mock('@/components/shared/wheel-loader', () => ({ WheelLoader: host('loader') }));
+vi.mock('@/components/shared/app-map', () => ({ default: host('map') }));
 vi.mock('@/components/screens-components/account/address-form-sheet', () => ({
   default: (props: Record<string, any>) => {
     sheet.props = props;
@@ -151,19 +153,25 @@ describe('What the app holds about routing', () => {
     expect(offenders).toEqual([]);
   });
 
-  test('the checkout itself draws no map', () => {
-    expect(readFileSync('components/screens/checkout-screen.tsx', 'utf8')).not.toMatch(
-      /react-native-maps|app-map|AppMap/i,
-    );
+  test('the checkout draws no map for the courier: its only map is where a dealer is collected from', () => {
+    for (const path of [
+      'components/screens/checkout-screen.tsx',
+      'components/screens-components/checkout/checkout-sections.tsx',
+    ]) {
+      expect(readFileSync(path, 'utf8')).not.toMatch(/react-native-maps|app-map|AppMap/i);
+    }
   });
 
-  test('nothing draws a route: the only map chooses where to deliver', () => {
+  test('nothing draws a route: one map chooses where to deliver, the other shows where to collect', () => {
     const offenders = app.filter((path) =>
       /\bPolyline\b|\bDirections\b|routeDistance|api\/route/.test(readFileSync(path, 'utf8')),
     );
     expect(offenders).toEqual([]);
     const drawsMap = app.filter((path) => /shared\/app-map'/.test(readFileSync(path, 'utf8')));
-    expect(drawsMap).toEqual(['components/screens-components/account/delivery-location-picker.tsx']);
+    expect([...drawsMap].sort()).toEqual([
+      'components/screens-components/account/delivery-location-picker.tsx',
+      'components/screens-components/checkout/pickup-points.tsx',
+    ]);
   });
 
   test('no delivery or fee amount is written into the checkout: every figure is the server’s', () => {

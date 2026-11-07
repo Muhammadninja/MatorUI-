@@ -426,6 +426,24 @@ each priced or marked unavailable with the reason. The chosen `key` is sent as
 `CreateOrderInput.shippingOptionKey`. Wire shape and refusals: see "Delivery destination,
 address search and the map" below.
 
+Where pickup is collected — `GET /v1/shipping/pickup-points` (`getPickupPoints`, asked only
+while pickup is chosen):
+
+```ts
+type PickupPoint = {
+  dealerId: string | null; // null: goods whose dealer is not known
+  dealerName: string | null;
+  address: string | null; // null: the dealer has given none yet
+  landmark: string | null; // no dealer column holds one yet: always null for now
+  location: { lat: number; lng: number } | null; // null: none on record, never made up
+  items: { cartItemId: string; partId: string | null; title: string; quantity: number }[];
+};
+```
+
+One entry per dealer the cart buys from, each with its own lines, never every dealer. The
+checkout shows each under «Самовывоз»: name, address, landmark, the pin on `AppMap` (the
+coordinates where the build has no map), and says which part is not specified yet.
+
 ---
 
 ## 13. Garage / Vehicles — `services/garage-api.ts` (domain key `garage`)
@@ -589,6 +607,7 @@ words at all. Delivery is priced by the backend and shown as a price alone.
 | `GET /v1/addresses/reverse?lat=&lng=&lang=` | `{ address, within_coverage, attribution }`. Once per confirmed point, never while the map moves. Never fails for lack of an address. |
 | `POST` / `PATCH /v1/addresses` | `lat`, `lng`, `landmark` as well as the existing fields. `full_text` may be left out with a point. |
 | `POST /v1/shipping/quote` | With `delivery_method: 'courier'`: `{ options: [pickup, courier], currency: 'UZS' }`, each option `{ type, label, available, price_uzs, quote_id, unavailable_reason }`. Pickup is always `available`, `price_uzs: 0`. A courier that cannot be had is `available: false`, `price_uzs: null`, `unavailable_reason: { code, message }`, with code `COURIER_DELIVERY_UNAVAILABLE` (no area configured), `DELIVERY_OUTSIDE_COVERAGE`, `DELIVERY_ADDRESS_COORDINATES_MISSING`, `DELIVERY_ADDRESS_REQUIRED`, `PICKUP_LOCATION_MISSING`, `DELIVERY_ROUTE_NOT_FOUND` or `DELIVERY_ROUTING_UNAVAILABLE` (UzMaps gave no answer). The checkout shows both options as a choice and words each code itself. `404` for an address that is not the caller's, `400` for an empty cart. |
+| `GET /v1/shipping/pickup-points` | `{ pickup_points: [{ dealer_id, dealer_name, address, landmark, location: { lat, lng } \| null, items: [{ cart_item_id, part_id, title, quantity }] }] }` for the caller's cart: each dealer once, with its own lines and no other dealer's place. `address` and `location` are null while the dealer has none on record (`sellers.address_comment`, `sellers.location_lat/lng`); `landmark` is always null for now. Goods whose dealer is not known come last with `dealer_id: null`. Services are not listed; an empty cart is `[]`. Nothing here is priced. |
 | `POST /v1/orders` | `confirmed_delivery_uzs`, `delivery_quote_id` and `confirmed_total_uzs` from that answer and the cart. `409 ORDER_TOTAL_CHANGED` when the total has moved, rates changed since the quote included; `409 DELIVERY_QUOTE_STALE` when the pin or a pickup point changed at the same total; `409 DELIVERY_PRICE_CHANGED` when only the price disagrees. Each carries `details: { subtotal_uzs, discount_uzs, service_fee_uzs, delivery_uzs, total_uzs, delivery_quote_id }`, what an order placed now would charge. Fetch the quote and the cart again and confirm again. |
 
 Other refusals, with `code`: `422 DELIVERY_OUTSIDE_COVERAGE` (saving an address),

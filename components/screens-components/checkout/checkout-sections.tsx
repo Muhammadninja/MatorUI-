@@ -1,4 +1,5 @@
 import { AlertCircle, Check, MapPin } from 'lucide-react-native';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AppButton } from '@/components/shared/app-button';
@@ -317,6 +318,7 @@ export function DeliveryOptionsCard({
   onRetry,
   onEditAddress,
   formatCurrency,
+  pickupDetails,
 }: {
   tokens: Tokens;
   /** What the order would be placed with. */
@@ -327,6 +329,8 @@ export function DeliveryOptionsCard({
   onRetry: () => void;
   onEditAddress: () => void;
   formatCurrency: (amount: number) => string;
+  /** Where the order is collected, shown under pickup while pickup is chosen. */
+  pickupDetails?: ReactNode;
 }) {
   const { t } = useTranslation();
   const pickupChosen = delivery.method === 'pickup';
@@ -352,6 +356,7 @@ export function DeliveryOptionsCard({
         selected={pickupChosen}
         onPress={() => onChooseMethod('pickup')}
       />
+      {pickupChosen ? pickupDetails : null}
 
       {courier ? (
         <AppView testID="checkout-delivery-courier" gap={8}>

@@ -568,4 +568,54 @@ describe('HttpOrdersTransport', () => {
     const d = await t.getOrder('ord_missing');
     expect(d).toBeNull();
   });
+
+  test("getPickupPoints asks where the cart's goods are collected and reads each dealer's place", async () => {
+    get.mockResolvedValueOnce({
+      pickup_points: [
+        {
+          dealer_id: 'seller_7',
+          dealer_name: 'Avto Ehtiyot',
+          address: 'Sergeli avtobozori, 3-qator 25',
+          landmark: null,
+          location: { lat: 41.2263, lng: 69.219 },
+          items: [{ cart_item_id: 'ci_1', part_id: 'part_1', title: 'Колодки', quantity: 2 }],
+        },
+        {
+          dealer_id: 'seller_4',
+          dealer_name: 'Nuqtasiz Savdo',
+          address: null,
+          landmark: null,
+          location: null,
+          items: [{ cart_item_id: 'ci_2', part_id: 'part_2', title: 'Фильтр', quantity: 1 }],
+        },
+      ],
+    });
+
+    const points = await t.getPickupPoints();
+
+    expect(get.mock.lastCall![0]).toBe('/v1/shipping/pickup-points');
+    expect(points).toEqual([
+      {
+        dealerId: 'seller_7',
+        dealerName: 'Avto Ehtiyot',
+        address: 'Sergeli avtobozori, 3-qator 25',
+        landmark: null,
+        location: { lat: 41.2263, lng: 69.219 },
+        items: [{ cartItemId: 'ci_1', partId: 'part_1', title: 'Колодки', quantity: 2 }],
+      },
+      {
+        dealerId: 'seller_4',
+        dealerName: 'Nuqtasiz Savdo',
+        address: null,
+        landmark: null,
+        location: null,
+        items: [{ cartItemId: 'ci_2', partId: 'part_2', title: 'Фильтр', quantity: 1 }],
+      },
+    ]);
+  });
+
+  test('getPickupPoints reads an answer with no list as no places', async () => {
+    get.mockResolvedValueOnce({});
+    await expect(t.getPickupPoints()).resolves.toEqual([]);
+  });
 });

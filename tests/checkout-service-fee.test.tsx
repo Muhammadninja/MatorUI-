@@ -23,6 +23,7 @@ const { host, transport, cart, replace } = vi.hoisted(() => {
     transport: {
       listAddresses: vi.fn(),
       getShippingQuote: vi.fn(),
+      getPickupPoints: vi.fn(async () => []),
       createOrder: vi.fn(),
       createAddress: vi.fn(),
       updateAddress: vi.fn(),
@@ -72,6 +73,7 @@ vi.mock('@/components/shared/app-price', () => ({
     React.createElement('text', { testID: 'total' }, value),
 }));
 vi.mock('@/components/shared/wheel-loader', () => ({ WheelLoader: host('loader') }));
+vi.mock('@/components/shared/app-map', () => ({ default: host('map') }));
 vi.mock('@/components/screens-components/account/address-form-sheet', () => ({
   default: () => null,
 }));
