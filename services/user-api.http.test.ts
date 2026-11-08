@@ -27,6 +27,7 @@ import { userTransport } from './user-api';
 beforeEach(() => {
   get.mockReset();
   patch.mockReset();
+  post.mockReset();
 });
 
 const backendUser = {
@@ -97,5 +98,58 @@ describe('HttpUserTransport — updateMe (PATCH /v1/me)', () => {
     const [, body] = patch.mock.calls[0]!;
     expect(body).not.toHaveProperty('avatar_url');
     expect(body).toHaveProperty('first_name', 'Sardor');
+  });
+});
+
+describe('phone change: both numbers prove it', () => {
+  const tokens = { access_token: 'a', refresh_token: 'r' };
+
+  test('reads what the backend asks for', async () => {
+    post.mockResolvedValueOnce({
+      expires_at: new Date(Date.now() + 300_000).toISOString(),
+      current_phone_otp_required: true,
+      current_phone_masked: '+99890***0000',
+      dev_otp_code: '111111',
+      dev_current_phone_otp_code: '222222',
+    });
+
+    const res = await userTransport.requestPhoneChange('+998901234567');
+
+    expect(res).toMatchObject({
+      currentPhoneOtpRequired: true,
+      currentPhoneMasked: '+99890***0000',
+      devCode: '111111',
+      devCurrentCode: '222222',
+    });
+  });
+
+  test('sends the current number’s code with the new number’s', async () => {
+    post.mockResolvedValueOnce({ user: backendUser, tokens });
+
+    await userTransport.confirmPhoneChange('+998901234567', '111111', '222222');
+
+    const [url, body] = post.mock.calls[0]!;
+    expect(url).toBe('/v1/me/phone/confirm');
+    expect(body).toEqual({
+      phone: '+998901234567',
+      otp: '111111',
+      current_phone_otp: '222222',
+    });
+  });
+
+  test('omits the field when it was not asked for: the backend refuses unknown fields', async () => {
+    post.mockResolvedValueOnce({ user: backendUser, tokens });
+
+    await userTransport.confirmPhoneChange('+998901234567', '111111');
+
+    expect(post.mock.calls[0]![1]).not.toHaveProperty('current_phone_otp');
+  });
+
+  test('treats a backend that does not ask as needing one code', async () => {
+    post.mockResolvedValueOnce({ resend_after_seconds: 60 });
+
+    const res = await userTransport.requestPhoneChange('+998901234567');
+
+    expect(res.currentPhoneOtpRequired).toBe(false);
   });
 });
