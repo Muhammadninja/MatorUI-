@@ -26,12 +26,19 @@ import { debugLog } from '@/services/debug-log';
 
 export type UserPatch = Partial<Omit<UserSummary, 'id' | 'memberSince'>>;
 
-/** Result of kicking off a phone change — an OTP was sent to the NEW number. */
+/** Result of kicking off a phone change. An OTP was sent to the NEW number and, when
+ *  the account has one, another to the CURRENT number. */
 export type PhoneChangeRequest = {
   /** Seconds until the code expires. */
   expiresIn: number;
   /** DEV/DEMO only — the code, so dev builds can prefill it. Prod omits it. */
   devCode?: string;
+  /** The change also needs the code sent to the number on the account. */
+  currentPhoneOtpRequired: boolean;
+  /** That number, masked by the backend, for the prompt. */
+  currentPhoneMasked?: string;
+  /** DEV/DEMO only — the code sent to the current number. */
+  devCurrentCode?: string;
 };
 
 /** Result of confirming a phone change — the account is rebound to the new
@@ -46,8 +53,13 @@ export interface UserTransport {
   updateMe(patch: UserPatch, signal?: AbortSignal): Promise<UserSummary>;
   /** Send an OTP to `phone` to start changing the login number. */
   requestPhoneChange(phone: string, signal?: AbortSignal): Promise<PhoneChangeRequest>;
-  /** Verify the OTP and rebind the account to `phone`; returns fresh session+user. */
-  confirmPhoneChange(phone: string, otp: string, signal?: AbortSignal): Promise<PhoneChangeResult>;
+  /** Verify the OTPs and rebind the account to `phone`; returns fresh session+user. */
+  confirmPhoneChange(
+    phone: string,
+    otp: string,
+    currentPhoneOtp?: string,
+    signal?: AbortSignal,
+  ): Promise<PhoneChangeResult>;
   /** Permanently delete the signed-in account server-side. The caller clears the
    *  local session afterward; this only asks the backend to erase the account. */
   deleteMe(signal?: AbortSignal): Promise<void>;
@@ -104,7 +116,13 @@ class MockUserTransport implements UserTransport {
   async requestPhoneChange(): Promise<PhoneChangeRequest> {
     await delay(300);
     // Mock accepts any 6-digit code; prefill "123456" like the auth mock.
-    return { expiresIn: 300, devCode: '123456' };
+    return {
+      expiresIn: 300,
+      devCode: '123456',
+      currentPhoneOtpRequired: !!this.state.phone,
+      currentPhoneMasked: this.state.phone ?? undefined,
+      devCurrentCode: '654321',
+    };
   }
 
   async confirmPhoneChange(phone: string, otp: string): Promise<PhoneChangeResult> {
@@ -173,27 +191,38 @@ class HttpUserTransport implements UserTransport {
   }
 
   async requestPhoneChange(phone: string, signal?: AbortSignal): Promise<PhoneChangeRequest> {
-    // Live 2026-07-23: POST /v1/me/phone/request { phone } → sends an OTP to the
-    // NEW number and returns { expires_at, resend_after_seconds, dev_otp_code? }.
+    // POST /v1/me/phone/request { phone } → sends an OTP to the NEW number and one to
+    // the number on the account, and returns { expires_at, resend_after_seconds,
+    // current_phone_otp_required, current_phone_masked?, dev_otp_code? }.
     const r = await apiClient.post<{
       expires_at?: string;
       resend_after_seconds?: number;
       dev_otp_code?: string;
+      current_phone_otp_required?: boolean;
+      current_phone_masked?: string;
+      dev_current_phone_otp_code?: string;
     }>('/v1/me/phone/request', { phone: toE164(phone) }, { signal });
     const expiresAt = epochFromIso(r.expires_at);
     const expiresIn = expiresAt
       ? Math.max(0, expiresAt - Math.floor(Date.now() / 1000))
       : (r.resend_after_seconds ?? 300);
     debugLog('profile', 'requestPhoneChange → OTP sent', { expiresIn });
-    return { expiresIn, devCode: r.dev_otp_code };
+    return {
+      expiresIn,
+      devCode: r.dev_otp_code,
+      currentPhoneOtpRequired: r.current_phone_otp_required ?? false,
+      currentPhoneMasked: r.current_phone_masked,
+      devCurrentCode: r.dev_current_phone_otp_code,
+    };
   }
 
   async confirmPhoneChange(
     phone: string,
     otp: string,
+    currentPhoneOtp?: string,
     signal?: AbortSignal,
   ): Promise<PhoneChangeResult> {
-    // POST /v1/me/phone/confirm { phone, otp } → rebinds the account to the new
+    // POST /v1/me/phone/confirm { phone, otp, current_phone_otp? } → rebinds the account to the new
     // number and returns a fresh { user, tokens } (the login identity changed).
     const r = await apiClient.post<{
       user: RawBackendUser;
@@ -202,7 +231,16 @@ class HttpUserTransport implements UserTransport {
         access_token_expires_at?: string;
         refresh_token: string;
       };
-    }>('/v1/me/phone/confirm', { phone: toE164(phone), otp }, { signal });
+    }>(
+      '/v1/me/phone/confirm',
+      {
+        phone: toE164(phone),
+        otp,
+        // Only when asked for: a backend that does not know the field refuses it.
+        ...(currentPhoneOtp ? { current_phone_otp: currentPhoneOtp } : {}),
+      },
+      { signal },
+    );
     const user = mapBackendUser(r.user);
     const session: AuthSession = {
       accessToken: r.tokens.access_token,
