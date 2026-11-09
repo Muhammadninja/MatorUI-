@@ -474,7 +474,15 @@
     "order": "Buyurtma",
     "items": "Mahsulotlar",
     "total": "Jami",
-    "payNow": "Toʻlash · {{total}}"
+    "payNow": "Toʻlash · {{total}}",
+    "cancelOrder": "Buyurtmani bekor qilish",
+    "cancelling": "Bekor qilinmoqda…",
+    "cancelConfirmTitle": "Buyurtma bekor qilinsinmi?",
+    "cancelConfirmBody": "Buyurtma bekor qilinadi. Fikringiz oʻzgarsa, yangi buyurtma bering.",
+    "cancelKeep": "Bekor qilmaslik",
+    "cancelConfirm": "Bekor qilish",
+    "cancelRefused": "Bu buyurtmani endi ilovadan bekor qilib boʻlmaydi.",
+    "cancelFailed": "Buyurtmani bekor qilib boʻlmadi. Qayta urinib koʻring."
   },
   "explore": {
     "pricesStockUpdated": "Narx va mavjudlik yangilandi",

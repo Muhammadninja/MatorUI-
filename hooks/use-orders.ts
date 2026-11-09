@@ -189,6 +189,19 @@ export function useCreateOrder(): UseCreateOrderValue {
   );
 }
 
+// ── useCancelOrder ─────────────────────────────────────────────────────
+
+/** Cancel an order, then re-read it: on a refusal too, since its status has moved on. */
+export function useCancelOrder(orderId: string | null | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => ordersTransport.cancelOrder(orderId as string),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['orders'] });
+    },
+  });
+}
+
 // ── useAddresses / usePaymentMethods (read-only collections) ───────────
 
 type CollectionState = 'idle' | 'loading' | 'success' | 'error';

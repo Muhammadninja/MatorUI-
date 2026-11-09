@@ -480,7 +480,15 @@
     "order": "Заказ",
     "items": "Товары",
     "total": "Итого",
-    "payNow": "Оплатить · {{total}}"
+    "payNow": "Оплатить · {{total}}",
+    "cancelOrder": "Отменить заказ",
+    "cancelling": "Отменяем…",
+    "cancelConfirmTitle": "Отменить заказ?",
+    "cancelConfirmBody": "Заказ будет отменён. Если передумаете, оформите новый заказ.",
+    "cancelKeep": "Не отменять",
+    "cancelConfirm": "Отменить заказ",
+    "cancelRefused": "Этот заказ уже нельзя отменить из приложения.",
+    "cancelFailed": "Не удалось отменить заказ. Попробуйте ещё раз."
   },
   "explore": {
     "pricesStockUpdated": "Цены и наличие обновлены",
