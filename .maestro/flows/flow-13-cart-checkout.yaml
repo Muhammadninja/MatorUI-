@@ -39,7 +39,7 @@ tags:
       PART_ID: mann-cabin-filter
       PRICE_PATTERN: '.*65.730\.24.*'
 - assertVisible: "1 item"
-- assertVisible: '.*95.730\.24.*'
+- assertVisible: '.*70.730\.24.*'
 - tapOn:
     id: cart-qty-mann-cabin-filter-inc
     retryTapIfNoChange: false
@@ -50,7 +50,7 @@ tags:
     visible: "3 items"
     timeout: 10000
 - assertVisible: '.*197.190\.72.*'
-- assertVisible: '.*227.190\.72.*'
+- assertVisible: '.*202.190\.72.*'
 - retry:
     maxRetries: 3
     commands:
@@ -124,7 +124,7 @@ tags:
 - extendedWaitUntil:
     visible: "4 items"
     timeout: 10000
-- assertVisible: '.*275.440\.72.*'
+- assertVisible: '.*250.440\.72.*'
 - tapOn:
     id: cart-remove-mann-fuel-filter
     retryTapIfNoChange: false
@@ -133,7 +133,7 @@ tags:
       id: cart-item-mann-fuel-filter
     timeout: 10000
 - assertVisible: "3 items"
-- assertVisible: '.*227.190\.72.*'
+- assertVisible: '.*202.190\.72.*'
 - retry:
     maxRetries: 3
     commands:
@@ -158,7 +158,7 @@ tags:
       id: cart-item-mann-cabin-filter
     timeout: 15000
 - assertVisible: "3 items"
-- assertVisible: '.*227.190\.72.*'
+- assertVisible: '.*202.190\.72.*'
 - assertNotVisible:
     id: cart-item-mann-fuel-filter
 

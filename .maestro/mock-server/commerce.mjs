@@ -58,7 +58,9 @@ function cartOf(account) {
 function apiCart(account) {
   const items = cartOf(account);
   const subtotal = money(items.reduce((s, l) => s + l.price_uzs * l.quantity, 0));
-  return { items, promo: null, subtotal_uzs: subtotal, total_uzs: subtotal };
+  // The app needs the server's fee to show a total; delivery is priced at checkout.
+  if (!items.length) return { items, promo: null, subtotal_uzs: 0, service_fee_uzs: 0, total_uzs: 0 };
+  return { items, promo: null, subtotal_uzs: subtotal, service_fee_uzs: SERVICE_FEE_UZS, total_uzs: money(subtotal + SERVICE_FEE_UZS) };
 }
 
 /** Matches the next armed fault for this request, consuming one use. */
