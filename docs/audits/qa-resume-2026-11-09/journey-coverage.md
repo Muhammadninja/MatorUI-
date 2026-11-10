@@ -113,3 +113,11 @@ One matrix (this file), owner decision 2026-11-09. Each agent appends dated entr
   - Rows to update once evidence exists:
     - **J21:** push taps now route like the feed. This needs device evidence.
     - **J24:** the toast in ru and uz, the empty cart, the Garage tab icon, and the dark heart.
+- **2026-11-10 18:45, Claude: final-RC integration HALTED before freeze.** Branch `rc/final-2026-11-10`, worktree `.local/worktrees/rc-final`. It contains `f03e18a` (checkout recovery), then `c4192aa` (Midnight Teal first pass: Explore, product card, tab bar), then this branch's QA docs. Application sources equal `c4192aa`.
+  - Note: `qa/evidence-5da6971` (`0fc447f`) does **not** contain `ed64684`/`f03e18a`. Building from it would drop checkout recovery.
+  - Checks on this branch: typecheck passes; `lint:tokens` passes. The checkout/order/cart/payment Vitest set has 47 failures out of 259. The same 47 fail on `f03e18a` and all pass at `e17c641`, so the regression comes from `ed64684`.
+  - 44 of the 47 failures only lack an `order-attempt-storage` stub in four checkout test files.
+  - **3 are a real blocker (owner: Codex + backend employee).** `useCreateOrder` keeps the first attempt's key and input after *any* error, for up to 30 days. After a definitive refusal (a changed delivery price or quote, or a moved destination), retries resend the old quote and amounts. Cart and address edits are ignored the same way.
+    - Suggested rule: clear the stored attempt on a definitive 4xx refusal. Keep it only for network errors, timeouts and 5xx (`ApiError.isRetryable`).
+    - The backend must confirm that a refused keyed request commits nothing, and that it accepts a new key afterwards.
+  - No freeze, no EAS build, no device use until this is fixed and the checkout set passes.
