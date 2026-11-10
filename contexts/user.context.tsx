@@ -176,7 +176,7 @@ export function UserProvider({ children }: PropsWithChildren) {
     await persistSession(null);
     // Best-effort revocation — don't block the sign-out UX on it.
     if (existing) {
-      authTransport.signOut(existing.refreshToken).catch(() => undefined);
+      authTransport.signOut(existing.refreshToken, undefined, existing.accessToken).catch(() => undefined);
     }
   }, [persistSession]);
 
