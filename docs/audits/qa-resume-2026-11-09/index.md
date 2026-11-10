@@ -2,6 +2,16 @@
 
 Work in progress. Deterministic Android loopback/mock evidence only; this is not production verification or release acceptance.
 
+## Current review package
+
+- [Claude candidate freeze](candidate-freeze.md): consolidated application/test/mock/flow SHA `5da6971e7e9e6d74926a20ee17437a7290f6cfc5`; Claude has handed builds/emulator/mock use to Codex during verification. Preserve the APK, verify its checksum before each pair, and stop if an artifact changes.
+- [Frozen candidate build provenance and flow evidence](candidate-build/provenance.md): pinned APK SHA and source proof; two ordered flow-12 → flow-13 Android/mock pairs passed. Exact-source CI run 42763400382 is in progress.
+- [User journeys and coverage matrix](journey-coverage.md): 25 journeys with expected results, failure cases, existing tests, missing acceptance scenarios and requirement sources. Reuses historical evidence without promoting it to current-candidate verification.
+- [Combined RC acceptance and backend handoff](combined-rc-acceptance.md): current local acceptance results, CI run state, APK provenance and backend employee order-idempotency steps. Real-backend evidence is still not verified; PR #16 merging and publication remain pending.
+- [Final iPhone/localization checklist](final-iphone-checklist.md): remaining device/localization checks within the fixed matrix scope, with reuse boundaries for existing evidence.
+
+The historical results below retain their recorded source/APK scope. The November 20 App Review target still requires a final iPhone check; screenshots alone do not establish functional acceptance.
+
 ## Starting state
 
 Remote QA tip `df1d0697c44ba143a112da4e9f9de12654a55548` and RC tip `d62ed71114eb39dbe0afe876e789d217dc3edfd2` unchanged at resume. Latest QA run remains failed 42424513328; flow-13 did not execute there. Main advanced to `5261e16b944d59d78d5e2712f6a4309c34c7447a` (phone-change fix); unrelated offline-order-cancel branch exists. Original workspace modifications preserved. Cart worktree contains the pre-existing uncommitted Profile root-slot navigation reset. RC temporary worktree is absent, with its branch preserved.
@@ -80,7 +90,7 @@ Cold-boot same AVD without loading/saving snapshot, memory 4096 MB, animations d
 
 ## Direct ADB control on cold-booted AVD
 
-Same installed f6237f5 APK, no Maestro process or input: three `pm clear com.mator.e2e` -> `am start -W -n com.mator.e2e/.MainActivity -a android.intent.action.MAIN -c android.intent.category.LAUNCHER` starts. After eight seconds capture pixels/resources, then run UIAutomator. All three showed the language screen/English row without an ANR dialog: [results](direct-coldboot/results.json), [versions and exact sequence](direct-coldboot/versions.log), [mock routes](direct-coldboot/mock.log).
+Same installed f6237f5 APK, no Maestro process or input: three `pm clear com.mator.e2e` -> `am start -W -n com.mator.e2e/.MainActivity -a android.intent.action.MAIN -c android.intent.category.LAUNCHER` starts. After eight seconds capture pixels/resources, then run UIAutomator. All three showed the language screen/English row without an ANR dialog: [results](direct-coldboot/results.json), [versions and exact sequence](direct-coldboot/versions.log), mock route log was referenced historically but is absent from this checkout (not reused as evidence).
 
 | Attempt | Launch | Guest frame | App log | Resource snapshot | Scrubbed hierarchy |
 | --- | --- | --- | --- | --- | --- |

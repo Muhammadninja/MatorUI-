@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="Pixel_9_API_35" tests="1" failures="0" time="171.0">
+    <testcase id="flow-12-favorites-isolation" name="flow-12-favorites-isolation" classname="flow-12-favorites-isolation" file=".maestro/flows/flow-12-favorites-isolation.yaml" time="171.0" status="SUCCESS">
+      <properties>
+        <property name="tags" value="favorites, isolated"/>
+      </properties>
+    </testcase>
+  </testsuite>
+</testsuites>
