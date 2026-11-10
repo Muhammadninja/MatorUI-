@@ -51,6 +51,8 @@ export type ShippingQuoteRequest = {
 export interface OrdersTransport {
   listOrders(request: OrderListRequest, signal?: AbortSignal): Promise<OrderListPage>;
   getOrder(orderId: string, signal?: AbortSignal): Promise<OrderDetail | null>;
+  /** Cancel an uncollected cash or terminal order. The server decides; 409 if it cannot. */
+  cancelOrder(orderId: string): Promise<OrderDetail>;
   createOrder(input: CreateOrderInput, signal?: AbortSignal): Promise<CreateOrderResult>;
   listAddresses(signal?: AbortSignal): Promise<Address[]>;
   searchAddresses(query: AddressSearchQuery, signal?: AbortSignal): Promise<AddressSuggestions>;
@@ -243,6 +245,20 @@ export class MockOrdersTransport implements OrdersTransport {
   async getOrder(orderId: string, signal?: AbortSignal): Promise<OrderDetail | null> {
     await delay(MOCK_LATENCY_MS, signal);
     return this.details[orderId] ?? null;
+  }
+
+  async cancelOrder(orderId: string): Promise<OrderDetail> {
+    await delay(MOCK_LATENCY_MS);
+    const current = this.details[orderId];
+    if (!current) throw new Error('Order not found');
+    const cancelled: OrderDetail = {
+      ...current,
+      status: 'cancelled',
+      statusLabel: 'Cancelled',
+      serverStatus: 'cancelled',
+    };
+    this.details[orderId] = cancelled;
+    return cancelled;
   }
 
   async createOrder(
@@ -819,6 +835,14 @@ export class HttpOrdersTransport implements OrdersTransport {
       if (e instanceof ApiError && e.status === 404) return null;
       throw e;
     }
+  }
+
+  async cancelOrder(orderId: string): Promise<OrderDetail> {
+    const raw = await apiClient.post<RawBackendOrder>(
+      `/v1/orders/${encodeURIComponent(orderId)}/cancel`,
+      {},
+    );
+    return mapOrderToDetail(raw);
   }
 
   async createOrder(input: CreateOrderInput, signal?: AbortSignal): Promise<CreateOrderResult> {

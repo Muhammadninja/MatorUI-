@@ -474,7 +474,15 @@
     "order": "Order",
     "items": "Items",
     "total": "Total",
-    "payNow": "Pay · {{total}}"
+    "payNow": "Pay · {{total}}",
+    "cancelOrder": "Cancel order",
+    "cancelling": "Cancelling…",
+    "cancelConfirmTitle": "Cancel this order?",
+    "cancelConfirmBody": "The order will be cancelled. If you change your mind, place a new order.",
+    "cancelKeep": "Keep order",
+    "cancelConfirm": "Cancel order",
+    "cancelRefused": "This order can no longer be cancelled from the app.",
+    "cancelFailed": "The order could not be cancelled. Please try again."
   },
   "explore": {
     "pricesStockUpdated": "Prices & stock updated",

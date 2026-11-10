@@ -619,3 +619,21 @@ describe('HttpOrdersTransport', () => {
     await expect(t.getPickupPoints()).resolves.toEqual([]);
   });
 });
+
+describe('cancelling an offline order', () => {
+  const t = new HttpOrdersTransport();
+  beforeEach(() => post.mockReset());
+
+  test('posts to the cancel endpoint and maps the answer', async () => {
+    post.mockResolvedValue({ order_id: 'o 1', status: 'cancelled', payment_type: 'cash' });
+    const order = await t.cancelOrder('o 1');
+    expect(post).toHaveBeenCalledWith('/v1/orders/o%201/cancel', {});
+    expect(order.status).toBe('cancelled');
+    expect(order.serverStatus).toBe('cancelled');
+  });
+
+  test('a refusal reaches the caller', async () => {
+    post.mockRejectedValueOnce(new Error('409'));
+    await expect(t.cancelOrder('o1')).rejects.toThrow('409');
+  });
+});
