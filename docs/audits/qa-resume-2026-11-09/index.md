@@ -77,3 +77,15 @@ ANR at 19:04:58 emulator time: focus input event timed out after 5003ms. Main th
 ### Next controlled reproduction
 
 Cold-boot same AVD without loading/saving snapshot, memory 4096 MB, animations disabled as CI, preserve same f6237f5 APK. The first launch attempt was blocked while the old AVD shut down; retry succeeded. A prematurely started full pair was interrupted at owner instruction to focus on diagnosis (exit130; flow-13 not started), not counted as a failure/pass. Next collect direct ADB startup evidence without Maestro and compare matched conditions before changing application code or running full pairs again.
+
+## Direct ADB control on cold-booted AVD
+
+Same installed f6237f5 APK, no Maestro process or input: three `pm clear com.mator.e2e` -> `am start -W -n com.mator.e2e/.MainActivity -a android.intent.action.MAIN -c android.intent.category.LAUNCHER` starts. After eight seconds capture pixels/resources, then run UIAutomator. All three showed the language screen/English row without an ANR dialog: [results](direct-coldboot/results.json), [versions and exact sequence](direct-coldboot/versions.log), [mock routes](direct-coldboot/mock.log).
+
+| Attempt | Launch | Guest frame | App log | Resource snapshot | Scrubbed hierarchy |
+| --- | --- | --- | --- | --- | --- |
+| 1 | [log](direct-coldboot/run-1-launch.log) | [PNG](direct-coldboot/run-1-guest.png) | [logcat](direct-coldboot/run-1-app.log) | [resources](direct-coldboot/run-1-resources.log) | [XML](direct-coldboot/run-1-ui.xml) |
+| 2 | [log](direct-coldboot/run-2-launch.log) | [PNG](direct-coldboot/run-2-guest.png) | [logcat](direct-coldboot/run-2-app.log) | [resources](direct-coldboot/run-2-resources.log) | [XML](direct-coldboot/run-2-ui.xml) |
+| 3 | [log](direct-coldboot/run-3-launch.log) | [PNG](direct-coldboot/run-3-guest.png) | [logcat](direct-coldboot/run-3-app.log) | [resources](direct-coldboot/run-3-resources.log) | [XML](direct-coldboot/run-3-ui.xml) |
+
+All three PNGs: fresh guest language picker, Android API35 arm64 / Pixel_9_API_35, EN/light, capture runner SHA 5a8fcd2 with unchanged APK source equivalent to f7f0f02, loopback mock. No personal or authenticated information. [Baseline resources](direct-coldboot/resources-before.log). The versions file labels the AVD name as RAM; actual MemTotal is 4015044kB. CPU-info output is explicitly time-stamped and reported an older sample, so it is not current-at-frame CPU evidence. This control shows successful native startup without Maestro in the changed emulator condition; it does not alone identify either earlier root cause.
