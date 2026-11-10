@@ -29,7 +29,6 @@ import { useCategories } from '@/hooks/use-categories';
 import { useMakes } from '@/hooks/use-vehicle-catalog';
 import { useNotifications } from '@/hooks/use-notifications';
 import { useToast } from '@/hooks/use-toast';
-import { modalService } from '@/services/global-modal-service/global-modal.service';
 import { triggerHaptic } from '@/utils/haptics';
 
 // Soft feather under the header so the frosted panel dissolves into the
@@ -160,16 +159,18 @@ export default function ExploreScreen() {
   const openMake = useCallback(
     (brandId: string) => {
       triggerHaptic('selection');
-      // Coming-soon brands are teasers — open a modal instead of navigating to
-      // an empty model list.
+      // Coming-soon brands are teasers — say so in a toast instead of navigating
+      // to an empty model list.
       const make = makes.find((m) => m.id === brandId);
       if (make?.comingSoon) {
-        modalService.openModal('comingSoon', { name: make.name });
+        toast.info(t('modalHost.comingSoonTitleNamed', { name: make.name }), {
+          description: t('modalHost.comingSoonMessage'),
+        });
         return;
       }
       router.push({ pathname: '/make', params: { make: brandId } });
     },
-    [makes],
+    [makes, toast, t],
   );
 
   return (
