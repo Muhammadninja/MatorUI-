@@ -2,11 +2,12 @@
  * Orders React glue — all read hooks back React Query, mutations stay
  * imperative for now (createOrder side-effects: cart clear, navigation).
  */
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient, type MutateOptions } from '@tanstack/react-query';
 
 import { useUserContext } from '@/contexts/user.context';
 import { getAuthRequestEpoch } from '@/services/api-client';
+import { clearPendingOrderAttempt, loadPendingOrderAttempt, savePendingOrderAttempt } from '@/services/order-attempt-storage';
 
 import {
   ordersTransport,
@@ -178,13 +179,36 @@ export function useCreateOrder(): UseCreateOrderValue {
   }>({ ownerId, phase: 'idle', error: null, errorCode: null, result: null });
   const session = useRef<{
     ownerId: string | null; pending: Promise<CreateOrderResult | null> | null; result: CreateOrderResult | null;
-    key?: { intent: string; value: string };
-  }>({ ownerId, pending: null, result: null });
-  if (session.current.ownerId !== ownerId) session.current = { ownerId, pending: null, result: null };
+    key?: { intent: string; value: string }; hydrated: boolean;
+  }>({ ownerId, pending: null, result: null, hydrated: false });
+  if (session.current.ownerId !== ownerId) session.current = { ownerId, pending: null, result: null, hydrated: ownerId === null };
+
+  useEffect(() => {
+    const attempt = session.current;
+    let active = true;
+    if (!ownerId) {
+      attempt.hydrated = true;
+      return () => { active = false; };
+    }
+    void loadPendingOrderAttempt(ownerId).then((key) => {
+      if (!active || session.current !== attempt) return;
+      if (key) attempt.key = { intent: '', value: key };
+      attempt.hydrated = true;
+    }).catch(() => {
+      // Fail closed: never send a fresh key when recovery state could not be read.
+      if (!active || session.current !== attempt) return;
+      attempt.hydrated = false;
+    });
+    return () => { active = false; };
+  }, [ownerId]);
 
   const placeOrder = useCallback((input: CreateOrderInput): Promise<CreateOrderResult | null> => {
     if (!canRead() || input.items.length === 0) return Promise.resolve(null);
     const attempt = session.current;
+    if (!attempt.hydrated) {
+      setSnapshot({ ownerId, attempt, phase: 'error', error: 'Checkout recovery is still loading. Try again shortly.', errorCode: 'ORDER_ATTEMPT_RECOVERY_PENDING', result: null });
+      return Promise.resolve(null);
+    }
     // Only the first caller may continue into hosted payment/navigation.
     if (attempt.pending) return Promise.resolve(null);
     // Keep the successful order while hosted payment/navigation is in progress.
@@ -193,14 +217,17 @@ export function useCreateOrder(): UseCreateOrderValue {
     // order reuses its key; a changed cart or selection is a new order.
     const { totalLabel: _display, idempotencyKey: _key, ...selection } = input;
     const intent = JSON.stringify(selection);
-    if (attempt.key?.intent !== intent) attempt.key = { intent, value: newOrderKey() };
+    // An uncertain attempt owns its key even if the screen's inputs changed or
+    // the process restarted. Only a confirmed response clears durable recovery.
+    if (!attempt.key) attempt.key = { intent, value: newOrderKey() };
     const keyed = { ...input, idempotencyKey: attempt.key.value };
     setSnapshot({ ownerId, attempt, phase: 'placing', error: null, errorCode: null, result: null });
     const pending = Promise.resolve().then(() => {
       if (session.current !== attempt || !canRead()) throw new Error('Order session changed');
-      return ordersTransport.createOrder(keyed);
-    }).then((result) => {
+      return savePendingOrderAttempt(ownerId!, attempt.key!.value).then(() => ordersTransport.createOrder(keyed));
+    }).then(async (result) => {
       if (session.current !== attempt || !canRead()) return null;
+      await clearPendingOrderAttempt(ownerId!);
       attempt.result = result;
       setSnapshot({ ownerId, attempt, phase: 'success', error: null, errorCode: null, result });
       return result;
@@ -216,8 +243,10 @@ export function useCreateOrder(): UseCreateOrderValue {
 
   const reset = useCallback(() => {
     // Resetting UI must not unlock an in-flight order submission.
-    if (!canRead() || session.current.pending) return;
-    session.current = { ownerId, pending: null, result: null };
+    if (!canRead() || session.current.pending || !session.current.hydrated) return;
+    const previous = session.current;
+    if (previous.result && ownerId) void clearPendingOrderAttempt(ownerId);
+    session.current = { ownerId, pending: null, result: null, hydrated: previous.hydrated, ...(!previous.result && previous.key ? { key: previous.key } : {}) };
     setSnapshot({ ownerId, phase: 'idle', error: null, errorCode: null, result: null });
   }, [ownerId, canRead]);
 

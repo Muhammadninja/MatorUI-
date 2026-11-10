@@ -4,8 +4,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, expect, test, vi } from 'vitest';
 import type { CreateOrderInput, CreateOrderResult } from '@/services/orders-service';
 
-const state = vi.hoisted(() => ({ createOrder: vi.fn() }));
+const state = vi.hoisted(() => ({ createOrder: vi.fn(), pendingKey: null as string | null }));
 vi.mock('@/services/orders-api', () => ({ ordersTransport: { createOrder: state.createOrder } }));
+vi.mock('@/services/order-attempt-storage', () => ({
+  loadPendingOrderAttempt: async () => state.pendingKey,
+  savePendingOrderAttempt: async (_owner: string, key: string) => { state.pendingKey = key; },
+  clearPendingOrderAttempt: async () => { state.pendingKey = null; },
+}));
 // The hook scopes orders to the signed-in account; only its owner matters here.
 vi.mock('@/contexts/user.context', () => ({ useUserContext: () => ({ isAuthenticated: true, isHydrating: false, profile: { id: 'unit-owner' } }) }));
 vi.mock('react-native', () => ({ Platform: { OS: 'ios', select: (o: { ios?: unknown }) => o.ios } }));
@@ -18,6 +23,7 @@ afterEach(async () => {
   await act(async () => tree?.unmount());
   client?.clear();
   state.createOrder.mockReset();
+  state.pendingKey = null;
 });
 const input: CreateOrderInput = { items: [{ productId: 'unit-part', quantity: 1 }],
   addressId: null, paymentType: 'cash', shippingOptionKey: 'pickup', promoCode: null };
@@ -74,7 +80,7 @@ test('empty cart never reaches the order transport', async () => {
   expect(state.createOrder).not.toHaveBeenCalled();
 });
 
-test('a retry after a lost response reuses the idempotency key; a changed order or reset gets a new one', async () => {
+test('a retry after a lost response reuses the idempotency key even if inputs change; only confirmed success clears it', async () => {
   state.createOrder.mockRejectedValueOnce(new TypeError('response lost'))
     .mockRejectedValueOnce(new TypeError('response lost'))
     .mockRejectedValueOnce(new TypeError('response lost'))
@@ -87,9 +93,24 @@ test('a retry after a lost response reuses the idempotency key; a changed order 
   expect(keyOf(0)).toMatch(/^[A-Za-z0-9_]{8,128}$/);
   expect(keyOf(1)).toBe(keyOf(0));
   await act(async () => { await get().placeOrder({ ...input, items: [{ productId: 'unit-part', quantity: 2 }] }); });
-  expect(keyOf(2)).not.toBe(keyOf(0));
+  expect(keyOf(2)).toBe(keyOf(0));
   await act(async () => get().reset());
+  state.createOrder.mockResolvedValueOnce({ orderId: 'resolved-order', eta: 'unit', totalLabel: '1 UZS' });
   await act(async () => { await get().placeOrder(input); });
-  expect(keyOf(3)).not.toBe(keyOf(2));
-  expect(keyOf(3)).not.toBe(keyOf(0));
+  expect(keyOf(3)).toBe(keyOf(2));
+  expect(state.pendingKey).toBeNull();
+});
+
+test('a remounted hook restores the pending key after process loss', async () => {
+  state.createOrder.mockRejectedValueOnce(new TypeError('response lost'));
+  let get = await renderOrder();
+  await act(async () => { await get().placeOrder(input); });
+  const sentKey = state.createOrder.mock.calls[0]![0].idempotencyKey;
+  expect(state.pendingKey).toBe(sentKey);
+  await act(async () => tree?.unmount());
+  tree = undefined;
+  state.createOrder.mockResolvedValueOnce({ orderId: 'recovered-order', eta: 'unit', totalLabel: '1 UZS' });
+  get = await renderOrder();
+  await act(async () => { await get().placeOrder(input); });
+  expect(state.createOrder.mock.calls[1]![0].idempotencyKey).toBe(sentKey);
 });
