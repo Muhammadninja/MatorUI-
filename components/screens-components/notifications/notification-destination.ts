@@ -1,4 +1,4 @@
-import type { NotificationItem } from '@/services/notifications-service';
+import { mapRawNotification, type NotificationItem } from '@/services/notifications-service';
 
 /**
  * Where a tapped notification goes, or null when it has nowhere real to go.
@@ -20,4 +20,23 @@ export function notificationDestination(
   if (n.orderId) return `/track-order?orderId=${encodeURIComponent(n.orderId)}`;
   if (!n.deeplinkPath || n.deeplinkPath.startsWith('/(tabs)')) return null;
   return n.deeplinkPath;
+}
+
+/**
+ * Where a tapped push banner goes. The push `data` is the inbox row's `data`
+ * plus `notification_id`, `type` and the link under `deeplink` (older payloads
+ * used `deeplinkPath`), so it routes exactly like the same row in the feed.
+ * The car isn't looked up here: its screen shows "not found" if it's gone.
+ */
+export function pushNotificationDestination(data: unknown): string | null {
+  if (!data || typeof data !== 'object') return null;
+  const d = data as Record<string, unknown>;
+  const text = (v: unknown) => (typeof v === 'string' && v ? v : undefined);
+  const item = mapRawNotification({
+    id: text(d.notification_id) ?? '',
+    type: text(d.type),
+    data: d,
+    deeplink_path: text(d.deeplink) ?? text(d.deeplinkPath) ?? text(d.deeplink_path) ?? null,
+  });
+  return notificationDestination(item, true);
 }
