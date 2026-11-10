@@ -34,6 +34,12 @@ export const ordersQueryKeys = {
     ['shipping', 'quote', req.addressId, req.location ?? null, req.cartKey ?? null] as const,
 };
 
+/** What the server put beside its code in a refusal, when it said more. */
+function errorDetailsOf(error: unknown): unknown {
+  const body = (error as { response?: unknown } | null)?.response;
+  return body && typeof body === 'object' ? (body as { details?: unknown }).details ?? null : null;
+}
+
 /** The machine-readable code of a failed request, when the server stated one. */
 function errorCodeOf(error: unknown): string | null {
   const code = (error as { code?: unknown } | null)?.code;
@@ -139,6 +145,7 @@ export type UseCreateOrderValue = {
   phase: CreateOrderPhase;
   error: string | null;
   errorCode: string | null;
+  errorDetails: unknown;
   result: CreateOrderResult | null;
   placeOrder: (input: CreateOrderInput) => Promise<CreateOrderResult | null>;
   reset: () => void;
@@ -181,6 +188,7 @@ export function useCreateOrder(): UseCreateOrderValue {
       phase,
       error: mutation.error instanceof Error ? mutation.error.message : null,
       errorCode: errorCodeOf(mutation.error),
+      errorDetails: errorDetailsOf(mutation.error),
       result,
       placeOrder,
       reset,

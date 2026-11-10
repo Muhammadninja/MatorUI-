@@ -19,6 +19,7 @@ import {
   SectionLabel,
 } from '@/components/screens-components/checkout/checkout-sections';
 import { PickupPoints } from '@/components/screens-components/checkout/pickup-points';
+import { StockShortagePanel } from '@/components/screens-components/checkout/stock-shortage-panel';
 import { AppButton } from '@/components/shared/app-button';
 import { AppPrice } from '@/components/shared/app-price';
 import { AppText } from '@/components/shared/app-text';
@@ -28,6 +29,12 @@ import { DEFAULT_PAYMENT_TYPE, PAYMENT_OPTIONS } from '@/constants/payment-optio
 import { useCartContext } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useUserContext } from '@/contexts/user.context';
+import {
+  type ShortageAlternative,
+  type StockShortageLine,
+  alternativeQuantity,
+  stockShortageLines,
+} from '@/services/stock-shortage';
 import { cartKeyOf, useCheckoutPayment } from '@/hooks/use-order-payment';
 import {
   useAddresses,
@@ -90,6 +97,9 @@ export default function CheckoutScreen() {
     formatCurrency,
     clearCart,
     refresh: refreshCart,
+    addItem,
+    removeItem,
+    incrementItem,
   } = useCartContext();
   const { profile } = useUserContext();
 
@@ -182,6 +192,36 @@ export default function CheckoutScreen() {
     // Only on a new refusal: `shipping` is a new object every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refusalKey]);
+
+  // Not enough stock: what each part lacks, and the same part at other sellers. The cart is
+  // read again so it shows what the server now has; it changes only when the buyer chooses.
+  const shortages = useMemo(
+    () => stockShortageLines(create.errorCode, create.errorDetails),
+    [create.errorCode, create.errorDetails],
+  );
+  useEffect(() => {
+    if (shortages.length > 0) void refreshCart();
+    // Only on a new refusal.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shortages]);
+  const cartTitles = useMemo(
+    () => Object.fromEntries(items.map((i) => [i.id, i.title])),
+    [items],
+  );
+  const chooseAlternative = (line: StockShortageLine, alt: ShortageAlternative) => {
+    const original = items.find((i) => i.id === line.partId);
+    if (original) removeItem(original.id);
+    addItem({
+      id: alt.partId,
+      title: alt.title,
+      description: alt.sellerName,
+      price: String(alt.priceUzs),
+      priceLabel: formatCurrency(alt.priceUzs),
+      imageUrl: original?.imageUrl,
+    });
+    for (let n = 1; n < alternativeQuantity(line, alt); n += 1) incrementItem(alt.partId);
+    create.reset();
+  };
 
   const chooseAddress = (id: string) => {
     setSelectedAddressId(id);
@@ -421,6 +461,16 @@ export default function CheckoutScreen() {
               </AppView>
             </AppView>
           )}
+
+          {shortages.length > 0 ? (
+            <StockShortagePanel
+              lines={shortages}
+              titles={cartTitles}
+              tokens={tokens}
+              formatCurrency={formatCurrency}
+              onChoose={chooseAlternative}
+            />
+          ) : null}
 
           {create.error ? (
             <AppView row align="center" gap={8}>

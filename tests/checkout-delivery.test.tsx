@@ -34,6 +34,9 @@ const { host, transport, cart, sheet, replace } = vi.hoisted(() => {
       items: [] as { id: string; title: string; price: string; quantity: number }[],
       pendingIds: new Set<string>(),
       clearCart: vi.fn(),
+      addItem: vi.fn(),
+      removeItem: vi.fn(),
+      incrementItem: vi.fn(),
     },
     sheet: { props: null as null | Record<string, any> },
     replace: vi.fn(),
@@ -103,6 +106,9 @@ vi.mock('@/contexts/cart.context', async () => {
         error: null,
         formatCurrency: math.formatCurrency,
         clearCart: cart.clearCart,
+        addItem: cart.addItem,
+        removeItem: cart.removeItem,
+        incrementItem: cart.incrementItem,
         restoreCart: vi.fn(async () => cart.items),
         refresh: vi.fn(async () => undefined),
       };
@@ -670,6 +676,60 @@ describe('Checkout delivery', () => {
 
       expect(allText()).toContain('server words for PART_UNAVAILABLE');
       expect(transport.getShippingQuote).not.toHaveBeenCalled();
+    });
+
+    test('not enough stock: says what is missing, and switches seller only when the buyer chooses', async () => {
+      await mount();
+      transport.createOrder.mockRejectedValueOnce(
+        Object.assign(refusal('PART_UNAVAILABLE'), {
+          response: {
+            code: 'PART_UNAVAILABLE',
+            details: {
+              lines: [
+                {
+                  part_id: 'part_1',
+                  requested_quantity: 2,
+                  available_quantity: 0,
+                  cause: 'reserved',
+                  sourcing_requested: false,
+                  alternatives: [
+                    {
+                      part_id: 'part_9',
+                      title: 'Колодки',
+                      seller_name: 'Другой дилер',
+                      price_uzs: 120_000,
+                      available_quantity: 5,
+                      covers_requested: true,
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }),
+      );
+
+      await placeOrder();
+
+      expect(allText()).toContain('Нужно 2 шт., доступно 0 шт.');
+      expect(allText()).toContain('зарезервирован другими заказами');
+      expect(allText()).not.toContain('нет нужного количества');
+      expect(allText()).toContain('Другой дилер');
+      expect(allText()).toContain('120 000 сум');
+      expect(cart.addItem).not.toHaveBeenCalled();
+      expect(cart.removeItem).not.toHaveBeenCalled();
+
+      const pick = hostWith('stock-alternative-part_9').find(
+        (node) => node.type === 'button' && node.props.title === 'Выбрать',
+      );
+      await press(pick);
+
+      expect(cart.removeItem).toHaveBeenCalledWith('part_1');
+      expect(cart.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'part_9', price: '120000', description: 'Другой дилер' }),
+      );
+      expect(cart.incrementItem).toHaveBeenCalledTimes(1);
+      expect(transport.createOrder).toHaveBeenCalledTimes(1);
     });
   });
 
