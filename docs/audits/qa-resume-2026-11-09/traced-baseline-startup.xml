@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="Pixel_9_API_35" tests="1" failures="0" time="66.0">
+    <testcase id="controlled-guest-startup" name="controlled-guest-startup" classname="controlled-guest-startup" file="/tmp/mator-startup-controlled.yaml" time="66.0" status="SUCCESS"/>
+  </testsuite>
+</testsuites>
