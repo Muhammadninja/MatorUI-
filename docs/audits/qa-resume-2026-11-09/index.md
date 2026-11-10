@@ -89,3 +89,10 @@ Same installed f6237f5 APK, no Maestro process or input: three `pm clear com.mat
 | 3 | [log](direct-coldboot/run-3-launch.log) | [PNG](direct-coldboot/run-3-guest.png) | [logcat](direct-coldboot/run-3-app.log) | [resources](direct-coldboot/run-3-resources.log) | [XML](direct-coldboot/run-3-ui.xml) |
 
 All three PNGs: fresh guest language picker, Android API35 arm64 / Pixel_9_API_35, EN/light, capture runner SHA 5a8fcd2 with unchanged APK source equivalent to f7f0f02, loopback mock. No personal or authenticated information. [Baseline resources](direct-coldboot/resources-before.log). The versions file labels the AVD name as RAM; actual MemTotal is 4015044kB. CPU-info output is explicitly time-stamped and reported an older sample, so it is not current-at-frame CPU evidence. This control shows successful native startup without Maestro in the changed emulator condition; it does not alone identify either earlier root cause.
+
+
+## Matched harness control
+
+Same f6237f5 APK and coldboot4096/animations0 condition, local Maestro Java25: [three fresh onboarding/Explore cycles passed in 39s](stable-controller-coldboot-smoke.xml), [mock log](stable-controller-coldboot-smoke.log), [exact targeted scenario](controlled-startup.yaml). No full cart/order flow ran. The earlier same-APK failure thus did not reproduce in this condition.
+
+[Additional dedicated ART/main/GC/JIT excerpts](api35-anr-runtime-threads.log): main waits at JNI method end during text layout; heap daemon is coordinating concurrent mark/compact checkpoints; JIT worker is active. JS/native queues and RenderThread were idle in the full inspected trace, with no identified app lock cycle. Heap was small, with free space. This does not establish an ART deadlock, Fabric defect, JS busy loop, or provider causality. Next compare the Profile-reset-only source against this exact focused scenario before promoting the broader exploratory change.
