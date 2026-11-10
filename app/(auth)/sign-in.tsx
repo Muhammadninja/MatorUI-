@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 
 import PasswordlessAuthScreen from '@/components/screens-components/auth/passwordless-auth-screen';
-import { useE2EStartupMount } from '@/hooks/use-e2e-startup-trace';
+import { useE2EStartupMount } from '@/hooks/use-e2e-startup-mount';
 
 /**
  * Auth route — a single unified phone-OTP bottom sheet (there is no separate

@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -26,7 +27,7 @@ import { clearStoredCart, loadCart, saveCart } from '@/services/cart-storage';
 import { toastService } from '@/services/toast-service';
 import { useUserContext } from '@/contexts/user.context';
 import { CartMutationQueue } from '@/services/cart-mutation-queue';
-import { useE2EStartupMount } from '@/hooks/use-e2e-startup-trace';
+import { useE2EStartupMount } from '@/hooks/use-e2e-startup-mount';
 
 // Re-export types and constants so existing imports keep working without churn.
 export type { CartItem, CartTotals, PromoCode, PromoResult };
@@ -34,29 +35,8 @@ export { STANDARD_DELIVERY_UZS, SERVICE_FEE_UZS } from '@/services/cart-math';
 
 type AddCartItemInput = Omit<CartItem, 'quantity'>;
 
-type CartContextValue = {
-  items: CartItem[];
-  itemCount: number;
-  totals: CartTotals;
-  appliedPromo: PromoCode | null;
-  /** True once the persisted cart has been read from storage. */
-  isHydrated: boolean;
-  /** Set of item IDs currently mid-flight to the transport. UI can grey
-   *  out rows or show a spinner per row using this. */
-  pendingIds: Set<string>;
-  /** Last transport error, if any. Cleared on the next successful op. */
-  error: string | null;
-  /** Force a fresh fetch from the transport, reconciling local state. */
-  refresh: () => Promise<void>;
-  addItem: (item: AddCartItemInput) => void;
-  removeItem: (itemId: string) => void;
-  clearCart: () => void;
-  incrementItem: (itemId: string) => void;
-  decrementItem: (itemId: string) => void;
-  applyPromoCode: (code: string) => PromoResult;
-  removePromoCode: () => void;
-  formatCurrency: (amount: number) => string;
-};
+import { EMPTY_CART_CONTEXT, type CartContextValue } from '@/contexts/cart-context-value';
+import { useSessionContextValue } from '@/contexts/session-context-value';
 
 const CartContext = createContext<CartContextValue | undefined>(undefined);
 
@@ -65,10 +45,17 @@ const PROMO_PENDING_ID = '__promo__';
 export function CartProvider({ children }: PropsWithChildren) {
   const { profile, isHydrating } = useUserContext();
   const ownerId = profile?.id ?? null;
-  return <CartSessionProvider key={ownerId ?? 'guest'} ownerId={ownerId} hydrating={!!isHydrating}>{children}</CartSessionProvider>;
+  const key = ownerId ?? 'guest';
+  const [value, publish] = useSessionContextValue(key, EMPTY_CART_CONTEXT);
+  return (
+    <CartContext.Provider value={value}>
+      <CartSessionProvider key={key} ownerId={ownerId} hydrating={!!isHydrating} publish={publish} />
+      {children}
+    </CartContext.Provider>
+  );
 }
 
-function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren<{ ownerId: string | null; hydrating: boolean }>) {
+function CartSessionProvider({ ownerId, hydrating, publish }: { ownerId: string | null; hydrating: boolean; publish: (value: CartContextValue) => void }) {
   useE2EStartupMount('cart-controller');
   const [items, setItemsState] = useState<CartItem[]>([]);
   const [appliedPromo, setAppliedPromoState] = useState<PromoCode | null>(null);
@@ -480,7 +467,8 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
     ],
   );
 
-  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
+  useLayoutEffect(() => publish(value), [publish, value]);
+  return null;
 }
 
 export function useCartContext() {

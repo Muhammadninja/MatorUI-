@@ -65,7 +65,8 @@ import { LikesProvider } from '@/contexts/likes.context';
 import { SearchUIProvider } from '@/contexts/search-ui.context';
 import { ThemeProvider as AppThemeProvider, useThemeContext } from '@/contexts/theme.context';
 import { UserProvider } from '@/contexts/user.context';
-import { E2EStartupObserver, useE2EStartupMount } from '@/hooks/use-e2e-startup-trace';
+import { E2EStartupObserver } from '@/hooks/use-e2e-startup-trace';
+import { useE2EStartupMount } from '@/hooks/use-e2e-startup-mount';
 import { createNavigationTheme } from '@/themes';
 
 export {

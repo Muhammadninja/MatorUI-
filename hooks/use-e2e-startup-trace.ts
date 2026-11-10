@@ -6,14 +6,7 @@ import { isDedicatedE2EApp } from '@/config/environment';
 import { useLanguageContext } from '@/contexts/language.context';
 import { useUserContext } from '@/contexts/user.context';
 import { getCurrentSession } from '@/services/auth-storage';
-import { traceStartup, traceStartupLink, traceStartupRoutes, type StartupScope } from '@/services/e2e-startup-trace';
-
-export function useE2EStartupMount(scope: StartupScope) {
-  useEffect(() => {
-    traceStartup(scope, { mounted: true });
-    return () => traceStartup(scope, { mounted: false });
-  }, [scope]);
-}
+import { traceStartup, traceStartupLink, traceStartupRoutes } from '@/services/e2e-startup-trace';
 
 /** Lives outside keyed account providers, so it observes their navigation teardown. */
 export function E2EStartupObserver() {

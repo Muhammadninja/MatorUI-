@@ -6,7 +6,7 @@ const state = vi.hoisted(() => ({
   session: null as unknown,
   getMe: vi.fn(), updateMe: vi.fn(), verifyOtp: vi.fn(), refresh: vi.fn(),
   load: vi.fn(), save: vi.fn(), clear: vi.fn(), garageSession: vi.fn(), cartSession: vi.fn(),
-  handler: null as null | (() => Promise<void>), cache: vi.fn(),
+  handler: null as null | (() => Promise<void>), cache: vi.fn(), cacheRead: vi.fn(),
 }));
 vi.mock('expo-router', () => ({ router: { replace: vi.fn() } }));
 vi.mock('@/services/api-client', () => ({
@@ -25,7 +25,7 @@ vi.mock('@/services/auth-api', () => ({ authTransport: {
   verifyOtp: state.verifyOtp, refresh: state.refresh, signOut: vi.fn(async () => undefined),
 } }));
 vi.mock('@react-native-async-storage/async-storage', () => ({ default: {
-  getItem: async () => null, setItem: state.cache, removeItem: state.cache,
+  getItem: state.cacheRead, setItem: state.cache, removeItem: state.cache,
 } }));
 vi.mock('@/services/debug-log', () => ({ debugLog: vi.fn() }));
 import { UserProvider, useUserContext } from '@/contexts/user.context';
@@ -47,6 +47,7 @@ beforeEach(() => {
   state.updateMe.mockReset(); state.refresh.mockReset(); state.verifyOtp.mockReset();
   state.save.mockReset().mockResolvedValue(undefined);
   state.clear.mockReset().mockResolvedValue(undefined);
+  state.cacheRead.mockReset().mockResolvedValue(null);
 });
 async function renderUser() {
   let value!: ReturnType<typeof useUserContext>;
@@ -55,6 +56,22 @@ async function renderUser() {
   await act(async () => { tree = TestRenderer.create(createElement(UserProvider, null, createElement(Probe))); });
   return { get: () => value, unmount: async () => { await act(async () => tree.unmount()); } };
 }
+
+test('cold-boot cached owner is available while /me is pending and survives an offline refresh', async () => {
+  state.cacheRead.mockResolvedValue(JSON.stringify(user));
+  const pending = deferred<typeof user>();
+  state.getMe.mockReturnValueOnce(pending.promise);
+  const screen = await renderUser();
+  expect(screen.get().isHydrating).toBe(true);
+  expect(screen.get().profile?.id).toBe(user.id);
+  expect(state.session).toEqual(session);
+  await act(async () => { pending.reject(new Error('offline')); });
+  expect(screen.get().isHydrating).toBe(false);
+  expect(screen.get().profile?.id).toBe(user.id);
+  expect(state.session).toEqual(session);
+  expect(state.clear).not.toHaveBeenCalled();
+  await screen.unmount();
+});
 
 test('a profile refresh resolving after logout cannot restore the previous account', async () => {
   const screen = await renderUser();
