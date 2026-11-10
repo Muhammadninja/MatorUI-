@@ -1,6 +1,6 @@
 # Frozen combined candidate — local Android QA
 
-**Current result:** both required local Android/mock flow pairs passed on the same pinned APK. Run [42763400382](https://github.com/Muhammadninja/MatorUI-/actions/runs/42763400382) failed Flow-13 on an edge-clipped catalog target. The one-line Flow-13 fix passed locally, and [confirming CI run 42884256820](https://github.com/Muhammadninja/MatorUI-/actions/runs/42884256820) passed Flow-12 and Flow-13 on a fresh APK. These mock checks do not verify the production backend or establish release readiness.
+**Final local RC:** `claude/rc-startup-integration` at `f03e18a0af5e832afe3f614aac66fcc5caf7a225`. This includes the earlier Maestro scroll fix and the scoped client idempotency recovery change. CI [42884256820](https://github.com/Muhammadninja/MatorUI-/actions/runs/42884256820) passed Flow-12 and Flow-13, 1/1 each, with mock data on a fresh APK at `e77c124`; that APK predates the client idempotency change. The CI evidence remains valid for the exact `e77c124` build and the Maestro scroll fix, but does not verify the final RC checkout client. No full flow suite or new RC build was run for this handoff.
 
 ## Candidate and APK provenance
 
@@ -8,6 +8,9 @@
 | --- | --- |
 | Frozen frontend source SHA | `5da6971e7e9e6d74926a20ee17437a7290f6cfc5` |
 | Source branch | `claude/rc-startup-integration`; app, tests, mock and Maestro source clean at the frozen SHA |
+| Prior local RC before idempotency client integration | `claude/rc-startup-integration` at `e17c6415e14a8c988df9f1c4a12d61bc9a778257` |
+| CI source tested | `e77c12410e5939639273f0f5c082325a0f6d5372`; identical app/build inputs to final RC; post-CI change is the same Maestro-only scroll step |
+| Current local RC | `claude/rc-startup-integration` at `f03e18a0af5e832afe3f614aac66fcc5caf7a225`; includes frontend idempotency recovery, so e77 APK is not source-equivalent for checkout |
 | Local APK | [`app-release.apk`](../../../../../../../.local/artifacts/rc/5da6971/app-release.apk), pinned read-only (`0444`) |
 | Local APK SHA256 | `eeb3c5fd3f9f58435370399d940839874a103536ef01f37998215c45c1d71ed9` |
 | Embedded JS bundle SHA256 | `b8ff21b2189b8f4aa810f1c520adf14bc2136f36946f21cf4ca7a454a6dc599c` |
@@ -54,6 +57,19 @@ The remote candidate branch was absent before upload. The current remote `design
 - **Scoped fix:** commit `e77c124` adds `centerElement: true` to `scrollUntilVisible` in `.maestro/subflows/cart-add-from-catalog.yaml`. Maestro's documented option continues scrolling until the target is away from the viewport edge. Cart and checkout assertions and app code are unchanged.
 - **Local check:** the exact pinned APK (`eeb3c5fd…`) remained installed; Flow-13 passed 1/1 in 3m10s with the changed subflow on Pixel_9_API_35 and the loopback mock. `npm test -- tests/e2e-mock.test.ts` passed 6/6; `git diff --check` passed. The focused JUnit is `/private/tmp/flow13-local-check.xml` and mock log is `/private/tmp/flow13-local-check.log` (temporary, not saved to the repository).
 - **Confirming CI:** isolated branch `codex/flow13-ci-fix` points at `e77c12410e5939639273f0f5c082325a0f6d5372`. [Run 42884256820](https://github.com/Muhammadninja/MatorUI-/actions/runs/42884256820) was dispatched once with `rebuild_apk=true` and succeeded. Flow-12 JUnit: 1/1, 198.5 s; Flow-13 JUnit: 1/1, 291.1 s. The uploaded provenance records both frontend and mock/Maestro source at `e77c12410e5939639273f0f5c082325a0f6d5372`, forced fresh build, and CI APK SHA256 `2d502930c6b7d25d481d088ae549a8616bf9a7f2aa2a65aea1297f62433cf6c7`. The downloaded artifact is in `/private/tmp/flow13-ci-42884256820/`; the durable run artifact includes both JUnit reports, build provenance and final screenshots. No more CI retries are needed for this fix.
+
+## Idempotency handoff after the verified mock CI run
+
+- Backend implementation: `codex/orders-idempotency-release` at `1ae88e3cc53327b6f95b1b168c4802d972fe2dd0`, based on reconciled `23083756c688a7f1ca8709ef7f50a08792b74210`. Release documentation/checklist commit: `f45346f1ae615ea4782c651738ce3364ea042a43`.
+- Frontend recovery commit integrated into the local RC: `f03e18a0af5e832afe3f614aac66fcc5caf7a225`. It persists the key and original request together, replays that payload after edits/restart, and fails closed at the 30-day expiry pending reconciliation.
+- Focused frontend evidence on the final source: `npm test -- tests/order-submission-safety.test.ts` passed 6/6; `npm run typecheck` passed; `git diff --check` passed. The new remount regression changes current fields and empties the cart, then asserts the original key and request are replayed.
+- Isolated PostgreSQL 15.15 backend evidence and migration/deployment checklist are recorded in `Backend/docs/ORDER_IDEMPOTENCY.md` in the separate backend checkout: six selected integration checks passed. The broader concurrency suite is not reported as passing; its unrelated offline-collection fixture failed on a missing `admin_audits_actor_id_fkey` actor fixture.
+- Existing Flow-12 CI remains evidence for `e77c124` and the unaffected flow behavior. Flow-13 CI remains evidence for the scroll fix on `e77c124`; it does not verify idempotency recovery in `f03e18a`. Real deployed API behavior remains unverified.
+
+## Remaining acceptance (not verified by mock E2E)
+
+- **Backend owner:** verify idempotency on the deployed backend; record deployed version/build, test cases, and log/request evidence. Production order creation is backend-owner controlled. Missing: real API replay, lost-response, concurrent and conflict evidence.
+- **Frontend QA / owner:** final iPhone pass for session persistence, Garage, favorites, cart, exact checkout totals before submission, notification navigation, RU/UZ, and light/dark. Missing: confirmation of the installed iPhone build's source/build provenance and results against `f03e18a`; no device changes/builds were made for this handoff.
 
 ## Remaining release gates
 
