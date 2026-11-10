@@ -11,6 +11,7 @@ appId: com.mator.e2e
     element:
       id: part-card-${PART_ID}
     direction: DOWN
+    centerElement: true
 - waitForAnimationToEnd
 - tapOn:
     id: part-card-${PART_ID}
