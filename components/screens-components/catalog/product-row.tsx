@@ -86,12 +86,9 @@ function priceFontSize(amount: string): number {
  */
 function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
   const { t } = useTranslation();
-  const { tokens, scheme } = useThemeContext();
+  const { tokens } = useThemeContext();
   const { currentActiveVehicle } = useActiveVehicle();
   const { isLiked, toggleLike } = useLikesContext();
-  // The heart sits on the always-white photo, and dark `brand` is white, so a
-  // liked heart would vanish there. Ink it black in dark mode instead.
-  const likedHeart = scheme === 'dark' ? tokens.black : tokens.brand;
   const { isAuthenticated } = useUserContext();
   const toast = useToast();
 
@@ -276,8 +273,10 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
           <Heart
             size={20}
             strokeWidth={2.2}
-            color={liked ? likedHeart : tokens.textMuted}
-            fill={liked ? likedHeart : 'transparent'}
+            // The photo is white in both themes, so the heart takes the
+            // on-photo inks rather than the page's.
+            color={liked ? tokens.onPhotoAccent : tokens.onPhotoMuted}
+            fill={liked ? tokens.onPhotoAccent : 'transparent'}
           />
         </AppPressableView>
       </AppView>

@@ -34,10 +34,6 @@ export type AppTabBarProps = {
   activeKey?: string;
 };
 
-/** Dark-theme fill of the emphasized AI Assistant button. Light uses `brand`;
- *  dark can't, because `brand` is white there and the icon is white too. */
-const ASSISTANT_ACCENT_DARK = '#000';
-
 /** Diameter of the emphasized Assistant button (drives the shine geometry). */
 const EMPHASIZED_SIZE = 46;
 
@@ -158,8 +154,8 @@ export default function AppTabBar({ items = PREVIEW_ITEMS, activeKey = 'home' }:
     return null;
   }
 
-  // A white bar over the light theme's grey page; dark keeps its own background.
-  const barColorName = scheme === 'dark' ? 'background' : 'surface';
+  // A raised bar over the page: white over light grey, card over midnight.
+  const barColorName = scheme === 'dark' ? 'card' : 'surface';
 
   return (
     <AppView style={styles.container} colorName={barColorName}>
@@ -199,12 +195,12 @@ export default function AppTabBar({ items = PREVIEW_ITEMS, activeKey = 'home' }:
                     {
                       // Faint top-sheen rim + a gentle color-tinted shadow keep
                       // the AI Assistant button modern but modest.
-                      backgroundColor: scheme === 'dark' ? ASSISTANT_ACCENT_DARK : tokens.brand,
+                      backgroundColor: tokens.assistantFab,
                       borderWidth: 1,
                       borderColor: 'rgba(255, 255, 255, 0.22)',
                       ...(isActive
                         ? {
-                            shadowColor: tokens.gray400,
+                            shadowColor: tokens.assistantFabShadow,
                             shadowOpacity: 0.45,
                             shadowRadius: 14,
                             shadowOffset: { width: 5, height: 5 },
