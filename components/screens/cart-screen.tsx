@@ -139,13 +139,6 @@ export default function CartScreen() {
           >
             {t('cart.emptySubtitle')}
           </AppText>
-          <AppButton
-            title={t('cart.startShopping')}
-            kind="brand"
-            size="lg"
-            onPress={() => router.navigate('/explore')}
-            containerStyle={{ marginTop: 4 }}
-          />
         </AppView>
       </AppView>
     );
