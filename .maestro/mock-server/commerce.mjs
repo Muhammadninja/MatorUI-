@@ -16,6 +16,7 @@ import { PARTS_BY_ID } from './catalog-fixtures.mjs';
 
 const DELIVERY_UZS = 25000;
 const SERVICE_FEE_UZS = 5000;
+const COURIER_QUOTE_ID = 'quote_e2e_courier';
 const KEY_PATTERN = /^[A-Za-z0-9:_-]{8,128}$/;
 
 // Synthetic address only; no real person or place.
@@ -185,7 +186,7 @@ export async function handleCommerce(req, pathname, account, { send, readBody })
   // ── Checkout reads ──
   if (pathname === '/v1/account/addresses' && method === 'GET') { send(200, { items: ADDRESSES }); return true; }
   if (pathname === '/v1/shipping/quote' && method === 'POST') {
-    send(200, { options: [{ type: 'courier', label: 'Courier', price_uzs: DELIVERY_UZS, eta_days_min: 1, eta_days_max: 2 }], currency: 'UZS' });
+    send(200, { options: [{ type: 'courier', label: 'Courier', available: true, price_uzs: DELIVERY_UZS, quote_id: COURIER_QUOTE_ID, eta_days_min: 1, eta_days_max: 2 }], currency: 'UZS' });
     return true;
   }
 
@@ -202,6 +203,8 @@ export async function handleCommerce(req, pathname, account, { send, readBody })
       send(201, prior.order); return true;
     }
     if (cartOf(account).length === 0) { send(400, { message: 'Cart is empty' }); return true; }
+    // A priced courier order must carry the quote it was priced by, as the backend requires.
+    if (body?.cart_snapshot?.delivery_method !== 'pickup' && body?.delivery_quote_id !== COURIER_QUOTE_ID) { send(409, { error: { code: 'QUOTE_INVALID' } }); return true; }
     const order = buildOrder(account, body);
     if (!orders.has(account)) orders.set(account, []);
     orders.get(account).push(order);

@@ -76,7 +76,7 @@ test('one Idempotency-Key creates one order, also when the first response is los
   await post('/__e2e/reset', {});
   const a = (await signIn('+998900000001')).tokens.access_token;
   await authed(a, 'POST', '/v1/cart/items', { part_id: 'mann-cabin-filter', quantity: 3 });
-  const order = { cart_snapshot: { delivery_method: 'courier', delivery_address_id: 'addr_e2e_home', promo_code: null }, payment_type: 'cash' };
+  const order = { cart_snapshot: { delivery_method: 'courier', delivery_address_id: 'addr_e2e_home', promo_code: null }, payment_type: 'cash', delivery_quote_id: 'quote_e2e_courier' };
   await post('/__e2e/faults', { method: 'POST', path: '/v1/orders', mode: 'fail' });
   await post('/__e2e/faults', { method: 'POST', path: '/v1/orders', mode: 'drop' });
   const key = { 'Idempotency-Key': 'ord_unit_key_1' };
@@ -110,7 +110,17 @@ test('delay faults hold the response; orders are invisible to other accounts', a
   expect((await authed(a, 'GET', '/v1/cart')).status).toBe(200);
   expect(Date.now() - started).toBeGreaterThanOrEqual(280);
   await authed(a, 'POST', '/v1/cart/items', { part_id: 'mann-fuel-filter', quantity: 1 });
-  const created = await (await authed(a, 'POST', '/v1/orders', { cart_snapshot: { delivery_method: 'courier' } })).json();
+  const created = await (await authed(a, 'POST', '/v1/orders', { cart_snapshot: { delivery_method: 'courier' }, delivery_quote_id: 'quote_e2e_courier' })).json();
   expect((await authed(b, 'GET', `/v1/orders/${created.order_id}`)).status).toBe(404);
   expect((await authed(a, 'GET', `/v1/orders/${created.order_id}`)).status).toBe(200);
+});
+test('a courier order without the quote it was priced by is refused and keeps the cart', async () => {
+  await post('/__e2e/reset', {});
+  const a = (await signIn('+998900000001')).tokens.access_token;
+  await authed(a, 'POST', '/v1/cart/items', { part_id: 'mann-fuel-filter', quantity: 1 });
+  const quote = await (await authed(a, 'POST', '/v1/shipping/quote', { delivery_address_id: 'addr_e2e_home', delivery_method: 'courier' })).json();
+  expect(quote.options[0]).toMatchObject({ available: true, quote_id: 'quote_e2e_courier' });
+  const refused = await authed(a, 'POST', '/v1/orders', { cart_snapshot: { delivery_method: 'courier' } });
+  expect(refused.status).toBe(409);
+  expect((await state()).carts.e2e_a).toHaveLength(1);
 });
