@@ -45,6 +45,7 @@ import {
 } from '@/services/auth-storage';
 import { userTransport } from '@/services/user-api';
 import { debugLog } from '@/services/debug-log';
+import { isDedicatedE2EApp } from '@/config/environment';
 import { garageService } from '@/services/garage-service';
 import { cartTransport } from '@/services/cart-api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -301,6 +302,9 @@ export function UserProvider({ children }: PropsWithChildren) {
     let cancelled = false;
     const generation = lifecycleRef.current;
     (async () => {
+      // Diagnostic fault injection only: resolve auth after the initial route
+      // attaches, exercising the opposite ordering to the observed fast boot.
+      if (isDedicatedE2EApp()) await new Promise((resolve) => setTimeout(resolve, 1000));
       const [session, cachedProfile] = await Promise.all([loadAuthSession(), loadProfileCache()]);
       if (cancelled || generation !== lifecycleRef.current) return;
       setCurrentSession(session);
