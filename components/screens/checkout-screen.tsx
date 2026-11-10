@@ -215,7 +215,7 @@ export default function CheckoutScreen() {
   };
 
   const placeOrder = async () => {
-    if (items.length === 0 || !delivery.ready || grandTotal === null || payment.phase !== 'idle') {
+    if ((!create.hasPendingAttempt && (items.length === 0 || !delivery.ready || grandTotal === null)) || payment.phase !== 'idle') {
       return;
     }
     triggerHaptic('success');
@@ -226,9 +226,9 @@ export default function CheckoutScreen() {
       shippingOptionKey: delivery.method,
       confirmedDeliveryUzs: delivery.method === 'courier' ? delivery.fee : null,
       deliveryQuoteId: delivery.method === 'courier' ? delivery.quoteId : null,
-      confirmedTotalUzs: grandTotal,
+      confirmedTotalUzs: grandTotal ?? 0,
       promoCode: appliedPromo?.code ?? null,
-      totalLabel: formatCurrency(grandTotal),
+      totalLabel: formatCurrency(grandTotal ?? 0),
       // Backend order is built from the server cart; these tag it with the
       // buyer's vehicle + contact number (both optional server-side).
       vehicleId: garageService.getPrimary()?.id,
@@ -238,15 +238,17 @@ export default function CheckoutScreen() {
 
     // Payme is paid online, against the order that now exists. Terminal and cash are paid on
     // delivery, so the order is all there is to do.
-    if (paymentType === 'payme') {
+    const submittedAttempt = result.recoveredAttempt;
+    const submittedPaymentType = submittedAttempt?.paymentType ?? paymentType;
+    if (submittedPaymentType === 'payme') {
       await payment.collect({
         orderId: result.orderId,
         totalLabel: result.totalLabel,
-        cartKey: cartKeyOf(items),
+        cartKey: cartKeyOf(submittedAttempt?.items.map((item) => ({ id: item.productId, quantity: item.quantity })) ?? items),
       });
       return;
     }
-    clearCart();
+    if (!submittedAttempt) clearCart();
     goToConfirmation(result.orderId);
   };
 

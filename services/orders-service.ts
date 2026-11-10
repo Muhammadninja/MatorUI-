@@ -335,6 +335,8 @@ export type CreateOrderResult = {
   eta: string;
   /** Pre-formatted grand total for the receipt. */
   totalLabel: string;
+  /** Original checkout payload when this response resolves a stored attempt. */
+  recoveredAttempt?: Omit<CreateOrderInput, 'totalLabel' | 'idempotencyKey'>;
 };
 
 // ── Address search ─────────────────────────────────────────────────────

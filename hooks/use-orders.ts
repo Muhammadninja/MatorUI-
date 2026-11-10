@@ -7,7 +7,7 @@ import { useMutation, useQuery, useQueryClient, type MutateOptions } from '@tans
 
 import { useUserContext } from '@/contexts/user.context';
 import { getAuthRequestEpoch } from '@/services/api-client';
-import { clearPendingOrderAttempt, loadPendingOrderAttempt, savePendingOrderAttempt } from '@/services/order-attempt-storage';
+import { clearPendingOrderAttempt, loadPendingOrderAttempt, savePendingOrderAttempt, type PendingOrderAttempt } from '@/services/order-attempt-storage';
 
 import {
   ordersTransport,
@@ -163,6 +163,8 @@ export type UseCreateOrderValue = {
   error: string | null;
   errorCode: string | null;
   result: CreateOrderResult | null;
+  recoveryReady: boolean;
+  hasPendingAttempt: boolean;
   placeOrder: (input: CreateOrderInput) => Promise<CreateOrderResult | null>;
   reset: () => void;
 };
@@ -179,7 +181,7 @@ export function useCreateOrder(): UseCreateOrderValue {
   }>({ ownerId, phase: 'idle', error: null, errorCode: null, result: null });
   const session = useRef<{
     ownerId: string | null; pending: Promise<CreateOrderResult | null> | null; result: CreateOrderResult | null;
-    key?: { intent: string; value: string }; hydrated: boolean;
+    key?: PendingOrderAttempt & { intent: string; recovered: boolean }; hydrated: boolean;
   }>({ ownerId, pending: null, result: null, hydrated: false });
   if (session.current.ownerId !== ownerId) session.current = { ownerId, pending: null, result: null, hydrated: ownerId === null };
 
@@ -192,45 +194,57 @@ export function useCreateOrder(): UseCreateOrderValue {
     }
     void loadPendingOrderAttempt(ownerId).then((key) => {
       if (!active || session.current !== attempt) return;
-      if (key) attempt.key = { intent: '', value: key };
+      if (key) attempt.key = { ...key, intent: JSON.stringify(key.input), recovered: true };
       attempt.hydrated = true;
+      setSnapshot((current) => current.ownerId === ownerId ? { ...current } : current);
     }).catch(() => {
       // Fail closed: never send a fresh key when recovery state could not be read.
       if (!active || session.current !== attempt) return;
       attempt.hydrated = false;
+      setSnapshot((current) => current.ownerId === ownerId ? { ...current } : current);
     });
     return () => { active = false; };
   }, [ownerId]);
 
   const placeOrder = useCallback((input: CreateOrderInput): Promise<CreateOrderResult | null> => {
-    if (!canRead() || input.items.length === 0) return Promise.resolve(null);
+    if (!canRead()) return Promise.resolve(null);
     const attempt = session.current;
     if (!attempt.hydrated) {
       setSnapshot({ ownerId, attempt, phase: 'error', error: 'Checkout recovery is still loading. Try again shortly.', errorCode: 'ORDER_ATTEMPT_RECOVERY_PENDING', result: null });
       return Promise.resolve(null);
     }
+    if (!attempt.key && input.items.length === 0) return Promise.resolve(null);
     // Only the first caller may continue into hosted payment/navigation.
     if (attempt.pending) return Promise.resolve(null);
     // Keep the successful order while hosted payment/navigation is in progress.
     if (attempt.result) return Promise.resolve(null);
-    // A failed request may still have created the order. Retrying the same
-    // order reuses its key; a changed cart or selection is a new order.
+    // A failed request may have committed. Its original parameters and key
+    // remain bound together until the server confirms the replay.
     const { totalLabel: _display, idempotencyKey: _key, ...selection } = input;
     const intent = JSON.stringify(selection);
     // An uncertain attempt owns its key even if the screen's inputs changed or
     // the process restarted. Only a confirmed response clears durable recovery.
-    if (!attempt.key) attempt.key = { intent, value: newOrderKey() };
-    const keyed = { ...input, idempotencyKey: attempt.key.value };
+    if (!attempt.key) {
+      attempt.key = { intent, key: newOrderKey(), createdAt: Date.now(), input: selection, recovered: false };
+    }
+    const attemptInput = attempt.key.input;
+    const recovered = attempt.key.recovered || intent !== attempt.key.intent;
+    if (attempt.key.createdAt + 30 * 24 * 60 * 60 * 1000 <= Date.now()) {
+      setSnapshot({ ownerId, attempt, phase: 'error', error: 'This checkout recovery window expired. Check order history before starting another checkout.', errorCode: 'ORDER_ATTEMPT_EXPIRED', result: null });
+      return Promise.resolve(null);
+    }
+    const keyed = { ...attemptInput, idempotencyKey: attempt.key.key };
     setSnapshot({ ownerId, attempt, phase: 'placing', error: null, errorCode: null, result: null });
     const pending = Promise.resolve().then(() => {
       if (session.current !== attempt || !canRead()) throw new Error('Order session changed');
-      return savePendingOrderAttempt(ownerId!, attempt.key!.value).then(() => ordersTransport.createOrder(keyed));
+      return savePendingOrderAttempt(ownerId!, attempt.key!).then(() => ordersTransport.createOrder(keyed));
     }).then(async (result) => {
       if (session.current !== attempt || !canRead()) return null;
       await clearPendingOrderAttempt(ownerId!);
       attempt.result = result;
-      setSnapshot({ ownerId, attempt, phase: 'success', error: null, errorCode: null, result });
-      return result;
+      const completed = recovered ? { ...result, recoveredAttempt: attemptInput } : result;
+      setSnapshot({ ownerId, attempt, phase: 'success', error: null, errorCode: null, result: completed });
+      return completed;
     }, (error: unknown) => {
       if (session.current === attempt && canRead()) {
         setSnapshot({ ownerId, attempt, phase: 'error', error: error instanceof Error ? error.message : 'Order failed', errorCode: errorCodeOf(error), result: null });
@@ -251,7 +265,12 @@ export function useCreateOrder(): UseCreateOrderValue {
   }, [ownerId, canRead]);
 
   const visible = snapshot.ownerId === ownerId && (!snapshot.attempt || snapshot.attempt === session.current) ? snapshot : { phase: 'idle' as const, error: null, errorCode: null, result: null };
-  return { phase: visible.phase, error: visible.error, errorCode: visible.errorCode, result: visible.result, placeOrder, reset };
+  return {
+    phase: visible.phase, error: visible.error, errorCode: visible.errorCode, result: visible.result,
+    recoveryReady: session.current.hydrated,
+    hasPendingAttempt: Boolean(session.current.key),
+    placeOrder, reset,
+  };
 }
 
 // ── useAddresses / usePaymentMethods (read-only collections) ───────────
