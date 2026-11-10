@@ -1,0 +1,18 @@
+UTC: 2026-11-10T00:32:54.253032+00:00
+AVD: Pixel_9_API_35; cold boot; no snapshot load/save; memory 7487; animations 0
+APK build source: 7fccf256371e6917deea1e38f192408106cb3f20
+Installed APK: 817364f30268df98aff7f787678033078466d81c62ab1b3ab085f2abee5f06a9  /data/app/~~N48nHSfBiujlkQGG8E8KWA==/com.mator.e2e-ADapv-ZgWVDT5rEA4I8E-A==/base.apk
+
+MemTotal:        7419188 kB
+MemAvailable:    5210784 kB
+SwapTotal:       5564384 kB
+SwapFree:        5545184 kB
+  Mem:  7419188K total,  4525920K used,  2893268K free,    34884K buffers
+ Swap:  5564384K total,    19200K used,  5545184K free,  2616868K cached
+400%cpu   0%user   0%nice   4%sys 392%idle   0%iow   4%irq   0%sirq   0%host
+  PID USER         PR  NI VIRT  RES  SHR S[%CPU] %MEM     TIME+ ARGS
+  Mem:  7419188K total,  4526900K used,  2892288K free,    34884K buffers
+ Swap:  5564384K total,    19200K used,  5545184K free,  2617136K cached
+400%cpu   3%user   2%nice   5%sys 386%idle   0%iow   4%irq   0%sirq   0%host
+  PID USER         PR  NI VIRT  RES  SHR S[%CPU] %MEM     TIME+ ARGS
+  554 system       18  -2  21G 348M 216M S  2.0   4.8   0:05.27 system_server

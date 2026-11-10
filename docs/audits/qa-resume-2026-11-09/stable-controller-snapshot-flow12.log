@@ -1,0 +1,36 @@
+Mator mock server → http://localhost:8080
+Point EXPO_PUBLIC_API_BASE_URL at this host, then run: maestro test .maestro/  (cart/orders: commerce.mjs)
+[mock] GET /
+[mock] POST /__e2e/reset
+[mock] GET /v1/reference/makes
+[mock] GET /v1/reference/categories
+[mock] GET /v1/app/config
+
+[redacted test-device UI]
+<?xml version='1.0' encoding='UTF-8' standalone='yes' ?><hierarchy rotation="0">
+<node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="android" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[28,994][1052,1508]">
+<node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="android" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[70,1036][1010,1466]">
+<node index="0" text="" resource-id="android:id/content" class="android.widget.FrameLayout" package="android" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[70,1036][1010,1466]">
+<node index="0" text="" resource-id="android:id/parentPanel" class="android.widget.LinearLayout" package="android" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[70,1036][1010,1466]">
+<node index="0" text="" resource-id="android:id/topPanel" class="android.widget.LinearLayout" package="android" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[70,1036][1010,1154]">
+<node index="0" text="" resource-id="android:id/title_template" class="android.widget.LinearLayout" package="android" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[70,1036][1010,1154]">
+<node index="0" text="Mator E2E isn't responding" resource-id="android:id/alertTitle" class="android.widget.TextView" package="android" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[133,1083][947,1154]" /></node></node>
+<node index="1" text="" resource-id="android:id/customPanel" class="android.widget.FrameLayout" package="android" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[70,1154][1010,1466]">
+<node index="0" text="" resource-id="android:id/custom" class="android.widget.FrameLayout" package="android" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[70,1154][1010,1466]">
+<node index="0" text="" resource-id="" class="android.widget.LinearLayout" package="android" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[70,1154][1010,1466]">
+<node index="0" text="Close app" resource-id="android:id/aerr_close" class="android.widget.Button" package="android" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[70,1193][1010,1319]" />
+<node index="1" text="Wait" resource-id="android:id/aerr_wait" class="android.widget.Button" package="android" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[70,1319][1010,1445]" /></node></node></node></node></node></node></node></hierarchy>UI hierchary dumped to: /proc/self/fd/1
+
+
+[redacted crash and focus log]
+I/ActivityManager(  563): Force stopping com.mator.e2e appid=10210 user=0: clear data
+I/ActivityManager(  563): Killing 14335:com.mator.e2e/u0a210 (adj 0): stop com.mator.e2e due to clear data
+I/ActivityManager(  563): Force stopping com.mator.e2e appid=10210 user=-1: clearApplicationUserData
+I/ActivityManager(  563): Force stopping com.mator.e2e appid=10210 user=0: from pid 15280
+I/ActivityManager(  563): Start proc 15288:com.mator.e2e/u0a210 for next-top-activity {com.mator.e2e/com.mator.e2e.MainActivity}
+E/ActivityManager(  563): ANR in com.mator.e2e (com.mator.e2e/.MainActivity)
+E/ActivityManager(  563): Reason: Input dispatching timed out (9cdf73d com.mator.e2e/com.mator.e2e.MainActivity (server) is not responding. Waited 5003ms for FocusEvent(hasFocus=true)).
+E/ActivityManager(  563): Parent: com.mator.e2e/.MainActivity
+E/ActivityManager(  563):   35% 15288/com.mator.e2e: 16% user + 19% kernel / faults: 13880 minor 6 major
+E/ActivityManager(  563):   83% 15288/com.mator.e2e: 83% user + 0% kernel / faults: 1633 minor
+E/ActivityManager(  563):     31% 15288/com.mator.e2e: 31% user + 0% kernel

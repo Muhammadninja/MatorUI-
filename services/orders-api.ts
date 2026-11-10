@@ -376,7 +376,8 @@ export class HttpOrdersTransport extends HttpOrdersAccountTransport implements O
       body.confirmed_total_uzs = input.confirmedTotalUzs;
     }
 
-    const r = await apiClient.post<RawBackendOrder>('/v1/orders', body, { signal });
+    const headers = input.idempotencyKey ? { 'Idempotency-Key': input.idempotencyKey } : undefined;
+    const r = await apiClient.post<RawBackendOrder>('/v1/orders', body, { signal, headers });
     return {
       orderId: r.order_id,
       eta: r.status === 'pending_payment' ? 'Awaiting payment' : formatDate(r.created_at),

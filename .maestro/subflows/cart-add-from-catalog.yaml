@@ -1,0 +1,31 @@
+# Normal buy path: Filters list → product image → item page → Add to cart.
+# The app replaces the item page with the Cart tab.
+appId: com.mator.e2e
+---
+- openLink: mator-e2e://catalog/parts?categoryId=filters
+- extendedWaitUntil:
+    visible:
+      id: parts-directory-screen
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: part-card-${PART_ID}
+    direction: DOWN
+- waitForAnimationToEnd
+- tapOn:
+    id: part-card-${PART_ID}
+- extendedWaitUntil:
+    visible:
+      id: item-detail-screen
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      text: ${PRICE_PATTERN}
+    timeout: 15000
+- tapOn:
+    id: add-to-cart-btn
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible:
+      id: cart-item-${PART_ID}
+    timeout: 15000

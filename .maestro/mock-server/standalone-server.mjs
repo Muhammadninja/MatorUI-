@@ -5,6 +5,7 @@ const PORT = Number(process.env.PORT || 8080);
 const SEEDED_CAR = { make: 'CHEVROLET', model: 'Cobalt', year: 2022 };
 
 import { ALL_PARTS, PARTS_BY_ID, CATALOG } from './catalog-fixtures.mjs';
+import { applyFault, handleCommerce, resetCommerce } from './commerce.mjs';
 
 // ── BUY PATH: checkout + orders ──────────────────────────────────────────────
 // Ported verbatim from services/orders-api.ts' seed data so the response shapes
@@ -164,6 +165,8 @@ function garageSorted() {
 }
 
 function send(res, status, body) {
+  // An armed `drop` fault: the request was processed, the response is lost.
+  if (res.dropResponse) { res.socket?.destroy(); return; }
   const payload = JSON.stringify(body);
   res.writeHead(status, { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) });
   res.end(payload);
@@ -185,9 +188,12 @@ const server = http.createServer(async (req, res) => {
   console.log(`[mock] ${req.method} ${req.url}`);
 
   if (req.method === 'POST' && pathname === '/__e2e/reset') {
-    pendingOtps.clear(); createdOrders.clear();
+    pendingOtps.clear(); createdOrders.clear(); resetCommerce();
     return send(res, 200, { reset: true });
   }
+  if (await applyFault(req, res, pathname, send)) return;
+  const account = [...TEST_ACCOUNTS.values()].find((id) => req.headers.authorization === `Bearer srv_access_${id}`) ?? null;
+  if (await handleCommerce(req, pathname, account, { send: (status, body) => send(res, status, body), readBody })) return;
   if (req.method === 'GET' && pathname === '/v1/me') {
     const account = [...TEST_ACCOUNTS].find(([, id]) => req.headers.authorization === `Bearer srv_access_${id}`);
     if (!account) return send(res, 401, { error: { code: 'UNAUTHORIZED' } });
@@ -515,11 +521,5 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`Mator mock server → http://localhost:${server.address().port}`);
-  console.log('  POST /v1/auth/decode-vin');
-  console.log('  GET  /v1/catalog/parts?systemId=brakes | ?q=<term>  (browse | search)');
-  console.log('  GET  /v1/catalog/parts/:id           (item detail)');
-  console.log('  GET  /v1/account/addresses|payment-methods  (checkout)');
-  console.log('  POST /v1/shipping/quote  ·  POST /v1/orders');
-  console.log('  GET  /v1/orders  (history)  ·  GET /v1/orders/:id  (track)');
-  console.log('Point EXPO_PUBLIC_API_BASE_URL at this host, then run: maestro test .maestro/');
+  console.log('Point EXPO_PUBLIC_API_BASE_URL at this host, then run: maestro test .maestro/  (cart/orders: commerce.mjs)');
 });

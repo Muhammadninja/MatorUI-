@@ -27,6 +27,18 @@ const FILTER_PARTS = [
     oem_numbers: ['MANN C26168'], price_label: '$12.40', in_stock: true, region: 'europe', units_sold: 1580,
     images: ['https://cdn.mator.local/parts/mann-air-filter.png'],
     specs: [{ label: 'Shape', value: 'Panel' }], features: ['High dust capacity'] },
+  // Cart/checkout fixtures: numeric som like the live API, one with tiyin
+  // (10 of 159 live prices have fractions).
+  { id: 'mann-cabin-filter', title: 'MANN Cabin Filter CU 2939',
+    brand: { id: 'mann', name: 'MANN-FILTER' }, category: { id: 'filters', name: 'Filters' },
+    oem_numbers: ['MANN CU2939'], price_uzs: 65730.24, in_stock: true, region: 'europe', units_sold: 410,
+    images: ['https://cdn.mator.local/parts/mann-cabin-filter.png'],
+    specs: [{ label: 'Type', value: 'Particle' }], features: ['Pollen filtering'] },
+  { id: 'mann-fuel-filter', title: 'MANN Fuel Filter WK 69',
+    brand: { id: 'mann', name: 'MANN-FILTER' }, category: { id: 'filters', name: 'Filters' },
+    oem_numbers: ['MANN WK69'], price_uzs: 48250, in_stock: true, region: 'europe', units_sold: 380,
+    images: ['https://cdn.mator.local/parts/mann-fuel-filter.png'],
+    specs: [{ label: 'Type', value: 'In-line' }], features: ['Water separation'] },
 ];
 
 const IGNITION_PARTS = [

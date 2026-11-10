@@ -1,0 +1,21 @@
+appId: com.mator.e2e
+---
+- openLink: mator-e2e://profile
+- scrollUntilVisible:
+    element:
+      id: profile-sign-out
+    direction: DOWN
+- tapOn:
+    id: profile-sign-out
+- extendedWaitUntil:
+    notVisible:
+      id: profile-sign-out
+    timeout: 15000
+# Sign-out starts every tab fresh: Explore home, not the previous account's
+# last product page.
+- extendedWaitUntil:
+    visible:
+      id: explore-search-entry
+    timeout: 15000
+- assertNotVisible:
+    id: item-detail-screen

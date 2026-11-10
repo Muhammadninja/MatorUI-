@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -12,7 +13,9 @@ import { useUserContext } from '@/contexts/user.context';
 import { createFavoritesTransport } from '@/services/favorites-api';
 import { FavoritesSync, type FavoritesView } from '@/services/favorites-sync';
 import { favoritesStorage } from '@/services/likes-storage';
+import { useSessionContextValue } from '@/contexts/session-context-value';
 import { getAuthRequestEpoch } from '@/services/api-client';
+import { useE2EStartupMount } from '@/hooks/use-e2e-startup-mount';
 
 type LikesContextValue = {
   likedIds: Set<string>;
@@ -27,30 +30,53 @@ type LikesContextValue = {
   retrySync: () => Promise<void>;
 };
 
+const EMPTY_LIKES_CONTEXT: LikesContextValue = {
+  likedIds: new Set(),
+  isLiked: () => false,
+  toggleLike: () => false,
+  shouldSuggestList: false,
+  acknowledgeListSuggestion: () => undefined,
+  isHydrated: false,
+  isSyncing: false,
+  pendingIds: new Set(),
+  syncError: null,
+  retrySync: async () => undefined,
+};
+
 const LikesContext = createContext<LikesContextValue | undefined>(undefined);
 
 export function LikesProvider({ children }: PropsWithChildren) {
   const { profile, isHydrating, isAuthenticated } = useUserContext();
-  const ownerId = isAuthenticated ? profile?.id ?? null : null;
+  const ownerId = isAuthenticated ? (profile?.id ?? null) : null;
   const epoch = getAuthRequestEpoch();
+  const key = `${isHydrating ? 'auth-pending' : ownerId === null ? 'guest' : `user:${ownerId}`}:${epoch}`;
+  const [value, publish] = useSessionContextValue(key, EMPTY_LIKES_CONTEXT);
   return (
-    <LikesSessionProvider
-      key={`${isHydrating ? 'auth-pending' : ownerId === null ? 'guest' : `user:${ownerId}`}:${epoch}`}
-      ownerId={ownerId}
-      authHydrating={!!isHydrating}
-      epoch={epoch}
-    >
+    <LikesContext.Provider value={value}>
+      <LikesSessionProvider
+        key={key}
+        ownerId={ownerId}
+        authHydrating={!!isHydrating}
+        epoch={epoch}
+        publish={publish}
+      />
       {children}
-    </LikesSessionProvider>
+    </LikesContext.Provider>
   );
 }
 
 function LikesSessionProvider({
-  children,
+  publish,
   ownerId,
   authHydrating,
   epoch,
-}: PropsWithChildren<{ ownerId: string | null; authHydrating: boolean; epoch: number }>) {
+}: {
+  ownerId: string | null;
+  authHydrating: boolean;
+  epoch: number;
+  publish: (value: LikesContextValue) => void;
+}) {
+  useE2EStartupMount('likes-controller');
   const engine = useRef<FavoritesSync | null>(null);
   const [view, setView] = useState<FavoritesView>(() => ({
     likedIds: new Set(),
@@ -100,7 +126,8 @@ function LikesSessionProvider({
     }),
     [view, authHydrating, isLiked, toggleLike, acknowledgeListSuggestion, retrySync],
   );
-  return <LikesContext.Provider value={value}>{children}</LikesContext.Provider>;
+  useLayoutEffect(() => publish(value), [publish, value]);
+  return null;
 }
 
 export function useLikesContext() {

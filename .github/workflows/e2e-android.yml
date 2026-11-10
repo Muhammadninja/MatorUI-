@@ -188,13 +188,14 @@ jobs:
             adb reverse tcp:8080 tcp:8080          # emulator localhost:8080 -> host mock
             adb install -r /tmp/mator-e2e-apk/app-release.apk
             bash scripts/e2e.sh .maestro/flows/flow-12-favorites-isolation.yaml --format junit --output maestro-report.xml --test-output-dir artifacts
+            MOCK_LOG=/tmp/mator-e2e-cart-mock.log bash scripts/e2e.sh .maestro/flows/flow-13-cart-checkout.yaml --format junit --output maestro-report-cart.xml --test-output-dir artifacts
 
       - name: Scrub text artifacts
         if: always()
         run: |
           node - <<'NODE'
           const fs = require('node:fs');
-          for (const path of ['maestro-report.xml', '/tmp/mator-e2e-mock.log']) {
+          for (const path of ['maestro-report.xml', 'maestro-report-cart.xml', '/tmp/mator-e2e-mock.log', '/tmp/mator-e2e-cart-mock.log']) {
             if (!fs.existsSync(path)) continue;
             const text = fs.readFileSync(path, 'utf8')
               .replace(/\+?998[\d ()-]{9,}/g, '[TEST_PHONE]')
@@ -210,8 +211,11 @@ jobs:
           name: maestro-results
           path: |
             maestro-report.xml
+            maestro-report-cart.xml
             artifacts/favorites-a-after-restart.png
             artifacts/build-provenance.txt
+            artifacts/cart-checkout-confirmation.png
             /tmp/mator-e2e-mock.log
+            /tmp/mator-e2e-cart-mock.log
           if-no-files-found: ignore
           retention-days: 14

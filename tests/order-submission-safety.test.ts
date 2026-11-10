@@ -73,3 +73,23 @@ test('empty cart never reaches the order transport', async () => {
   await act(async () => { expect(await get().placeOrder({ ...input, items: [] })).toBeNull(); });
   expect(state.createOrder).not.toHaveBeenCalled();
 });
+
+test('a retry after a lost response reuses the idempotency key; a changed order or reset gets a new one', async () => {
+  state.createOrder.mockRejectedValueOnce(new TypeError('response lost'))
+    .mockRejectedValueOnce(new TypeError('response lost'))
+    .mockRejectedValueOnce(new TypeError('response lost'))
+    .mockResolvedValue({ orderId: 'unit-order', eta: 'unit', totalLabel: '1 UZS' });
+  const get = await renderOrder();
+  const keyOf = (call: number) => (state.createOrder.mock.calls[call][0] as CreateOrderInput).idempotencyKey;
+  await act(async () => { await get().placeOrder({ ...input, totalLabel: '1 UZS' }); });
+  // A re-rendered display total is the same order.
+  await act(async () => { await get().placeOrder({ ...input, totalLabel: '1 сум' }); });
+  expect(keyOf(0)).toMatch(/^[A-Za-z0-9_]{8,128}$/);
+  expect(keyOf(1)).toBe(keyOf(0));
+  await act(async () => { await get().placeOrder({ ...input, items: [{ productId: 'unit-part', quantity: 2 }] }); });
+  expect(keyOf(2)).not.toBe(keyOf(0));
+  await act(async () => get().reset());
+  await act(async () => { await get().placeOrder(input); });
+  expect(keyOf(3)).not.toBe(keyOf(2));
+  expect(keyOf(3)).not.toBe(keyOf(0));
+});
