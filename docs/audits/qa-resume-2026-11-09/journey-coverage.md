@@ -13,6 +13,7 @@ The 25 journeys below are the owner's fixed release scope. Current local RC is `
 | Flow-12 and Flow-13 mock E2E | verified for `e77c124` only | [CI 42884256820](https://github.com/Muhammadninja/MatorUI-/actions/runs/42884256820): both 1/1 passed on a fresh APK. Flow-13 evidence covers scroll fix, not the later client idempotency code in final RC `f03e18a`. Mock evidence only. |
 | Client uncertain-attempt recovery | verified (focused) | `npm test -- tests/order-submission-safety.test.ts` 6/6 and `npm run typecheck` passed at `f03e18a`; regression remounts, edits fields, empties cart, and asserts original request/key replay. Not a full E2E run. |
 | Backend idempotency | verified on isolated local PostgreSQL only | Six selected integration checks passed on local synthetic data; deployed backend remains unverified. See backend release handoff in separate backend checkout. |
+| Expired checkout recovery resolution | not-verified | Client blocks automatic replay after 30 days, but no self-service resolution action exists. Backend support must reconcile and clear the per-user pending record; a safe in-app resolution path remains a follow-up. |
 | Real-backend idempotency | not-verified | [Employee acceptance steps](combined-rc-acceptance.md#backend-employee-acceptance-steps-production-order-idempotency); needs backend-owned evidence. |
 | Final iPhone/localization | not-verified | [Short remaining-gap checklist](final-iphone-checklist.md), before November 20 App Review submission target. |
 
