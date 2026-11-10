@@ -26,6 +26,7 @@ import { clearStoredCart, loadCart, saveCart } from '@/services/cart-storage';
 import { toastService } from '@/services/toast-service';
 import { useUserContext } from '@/contexts/user.context';
 import { CartMutationQueue } from '@/services/cart-mutation-queue';
+import { useE2EStartupMount } from '@/hooks/use-e2e-startup-trace';
 
 // Re-export types and constants so existing imports keep working without churn.
 export type { CartItem, CartTotals, PromoCode, PromoResult };
@@ -68,6 +69,7 @@ export function CartProvider({ children }: PropsWithChildren) {
 }
 
 function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren<{ ownerId: string | null; hydrating: boolean }>) {
+  useE2EStartupMount('cart-controller');
   const [items, setItemsState] = useState<CartItem[]>([]);
   const [appliedPromo, setAppliedPromoState] = useState<PromoCode | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);

@@ -65,6 +65,7 @@ import { LikesProvider } from '@/contexts/likes.context';
 import { SearchUIProvider } from '@/contexts/search-ui.context';
 import { ThemeProvider as AppThemeProvider, useThemeContext } from '@/contexts/theme.context';
 import { UserProvider } from '@/contexts/user.context';
+import { E2EStartupObserver, useE2EStartupMount } from '@/hooks/use-e2e-startup-trace';
 import { createNavigationTheme } from '@/themes';
 
 export {
@@ -125,6 +126,7 @@ function RootLayoutNav() {
           <QueryClientProvider client={queryClient}>
             <LanguageProvider>
               <UserProvider>
+                <E2EStartupObserver />
                 <CartProvider>
                   <LikesProvider>
                     <ActiveVehicleProvider>
@@ -149,6 +151,7 @@ function RootLayoutNav() {
 }
 
 function RootNavigation() {
+  useE2EStartupMount('root-navigation');
   const colorScheme = useColorScheme();
   const { scheme, tokens } = useThemeContext();
   const resolvedScheme = scheme ?? (colorScheme === 'dark' ? 'dark' : 'light');

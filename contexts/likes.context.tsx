@@ -13,6 +13,7 @@ import { createFavoritesTransport } from '@/services/favorites-api';
 import { FavoritesSync, type FavoritesView } from '@/services/favorites-sync';
 import { favoritesStorage } from '@/services/likes-storage';
 import { getAuthRequestEpoch } from '@/services/api-client';
+import { useE2EStartupMount } from '@/hooks/use-e2e-startup-trace';
 
 type LikesContextValue = {
   likedIds: Set<string>;
@@ -51,6 +52,7 @@ function LikesSessionProvider({
   authHydrating,
   epoch,
 }: PropsWithChildren<{ ownerId: string | null; authHydrating: boolean; epoch: number }>) {
+  useE2EStartupMount('likes-controller');
   const engine = useRef<FavoritesSync | null>(null);
   const [view, setView] = useState<FavoritesView>(() => ({
     likedIds: new Set(),

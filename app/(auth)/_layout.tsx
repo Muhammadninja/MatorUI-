@@ -1,8 +1,10 @@
 import { Stack } from 'expo-router';
 
 import { useThemeContext } from '@/contexts/theme.context';
+import { useE2EStartupMount } from '@/hooks/use-e2e-startup-trace';
 
 export default function AuthStackLayout() {
+  useE2EStartupMount('auth-layout');
   const { tokens } = useThemeContext();
 
   return (
