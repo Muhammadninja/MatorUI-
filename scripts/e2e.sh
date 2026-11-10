@@ -25,12 +25,14 @@ if ! command -v maestro >/dev/null 2>&1; then
 fi
 
 MOCK_PID=""
+CAPTURE_MARKER=""
 cleanup() {
   if [[ -n "$MOCK_PID" ]] && kill -0 "$MOCK_PID" 2>/dev/null; then
     kill "$MOCK_PID" 2>/dev/null || true
     wait "$MOCK_PID" 2>/dev/null || true
     echo "• mock server stopped"
   fi
+  if [[ -n "$CAPTURE_MARKER" ]]; then rm -f "$CAPTURE_MARKER"; fi
 }
 trap cleanup EXIT INT TERM
 
@@ -62,6 +64,7 @@ curl --fail --silent --request POST "http://127.0.0.1:$PORT/__e2e/reset" >/dev/n
 # Start each flow with an empty device log so a failure excerpt is its own.
 if command -v adb >/dev/null 2>&1; then adb logcat -c || true; fi
 echo "• running: maestro test $*"
+CAPTURE_MARKER=$(mktemp "${TMPDIR:-/tmp}/mator-e2e-capture.XXXXXX")
 set +e
 MAESTRO_CLI_NO_ANALYTICS=1 maestro test "$@"
 MAESTRO_RESULT=$?
@@ -74,7 +77,8 @@ case "$*" in
   *flow-13-cart-checkout.yaml*) FINAL_NAME=cart-checkout-confirmation.png ;;
 esac
 if [[ "$MAESTRO_RESULT" -eq 0 && -n "$FINAL_NAME" ]]; then
-  FINAL_SHOT=$(find artifacts -type f -name "$FINAL_NAME" -print -quit)
+  # A previous run's named capture is not evidence for this execution.
+  FINAL_SHOT=$(find artifacts -type f -name "$FINAL_NAME" -newer "$CAPTURE_MARKER" -print -quit)
   if [[ -z "$FINAL_SHOT" ]]; then
     echo "✗ final screenshot $FINAL_NAME missing" >&2
     MAESTRO_RESULT=1
