@@ -105,3 +105,15 @@ The 7fccf25 checkpoint rebuilt successfully in 36s. Its APK is bit-identical to 
 A cold boot at original RAM7487, still animations0/no snapshot, then failed the first language-screen assertion: [JUnit](signout-only-cold7487-startup.xml), [scrubbed hierarchy/focus](signout-only-cold7487-startup.log), [app-scoped logcat](cold7487-app.log), [exact pre-run resources/installed hash](environment-cold7487-before.log). No scripted taps executed. Failure hierarchy had 169 nodes with sign-in-screen over Explore; there was no ANR since boot. Native activity intent was MAIN/LAUNCHER, without URL data. Available RAM was about 5.2GB, swap used only 19MB, and current top showed about 96% aggregate idle before launch. This is neither the empty-frame failure nor an ANR and cannot establish a resource cause.
 
 Source inspection offers a specific routing hypothesis: after redirect to auth/select-language, a provider key remount clears nested auth state; the recreated auth navigator defaults to its first screen, sign-in, over the tabs anchor. This needs no tap or explicit sign-in redirect, but the exact event ordering needs dedicated-app-only route/mount tracing. No raw auth screenshot was saved to this package; scrubbed hierarchy is the evidence.
+
+## Root cause confirmed and fix verified (Claude resume, 2026-11-09)
+
+[Pre-fix delayed-hydration probe](ordered-baseline-routes.log) (E2E-only 1s auth-hydration delay, 43eb8ba): the Likes key change `auth-pending -> guest` unmounted `root-navigation`; the recreated auth stack defaulted to `sign-in`, matching the cold7487 wrong-route hierarchy. Fix 7bbdfb9 keeps the screen subtree mounted while keyed Cart/Likes controllers publish as siblings.
+
+| Check | Binary | Result |
+| --- | --- | --- |
+| Same delayed-hydration probe, 3 runs | 7bbdfb9 (APK `09664d11…`, identical to pre-commit build) | 3/3 passed; 0 `root-navigation` unmounts, 0 `sign-in` mounts ([routes 1](post-fix/delayed-hydration-probe-1-routes.log), [2](post-fix/delayed-hydration-probe-2-routes.log), [3](post-fix/delayed-hydration-probe-3-routes.log)) |
+| Fault injection reverted | 41ab8a3 | Delay removed; full unit suite 1,305 / 102 files passed; typecheck, token lint passed |
+| Consecutive flow-12 + flow-13 pairs | 41ab8a3, APK SHA256 `a68b3474fb12b76adbbbf3df4a846b9238d37f3f5fa2622883244127d73cfa65` | Pair 1 passed, pair 2 passed ([JUnit](post-fix/)); [Favorites](post-fix/favorites-a-after-restart.png), [confirmation](post-fix/cart-checkout-confirmation.png) |
+
+Condition: Pixel_9_API_35 cold boot, RAM 7487, no snapshot (the condition that reproduced the wrong route), local Maestro, loopback mock. Screenshots: authenticated synthetic accounts, EN/light, no contact fields. The empty-frame (Failure A) and native ANR (Failure B) have not recurred on the fixed binary; their shared cause with the remount is plausible but not proven. CI and the combined RC build remain to be verified.

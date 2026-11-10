@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="Pixel_9_API_35" tests="1" failures="0" time="257.0">
+    <testcase id="flow-13-cart-checkout" name="flow-13-cart-checkout" classname="flow-13-cart-checkout" file=".maestro/flows/flow-13-cart-checkout.yaml" time="257.0" status="SUCCESS">
+      <properties>
+        <property name="tags" value="cart, checkout, isolated"/>
+      </properties>
+    </testcase>
+  </testsuite>
+</testsuites>
