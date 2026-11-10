@@ -98,7 +98,15 @@ export function AppIconButton({
         opacity: disabled ? 0.5 : 1,
       }}
     >
-      <Icon size={iconSize} strokeWidth={strokeWidth} color={resolvedColor} fill={fill} />
+      {/* Lucide spreads props over its `fill: "none"` default, so an explicit
+       *  `fill={undefined}` drops it and react-native-svg fills the path black —
+       *  an open glyph like Check turns into a solid wedge. Forward it only when set. */}
+      <Icon
+        size={iconSize}
+        strokeWidth={strokeWidth}
+        color={resolvedColor}
+        {...(fill !== undefined ? { fill } : null)}
+      />
     </AppPressableView>
   );
 }
