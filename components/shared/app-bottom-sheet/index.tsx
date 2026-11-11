@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Animated,
   Dimensions,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   PanResponder,
@@ -40,6 +41,44 @@ export type AppBottomSheetProps = {
 const MIN_SAFE_BOTTOM = Platform.OS === 'android' ? 20 : 0;
 const SWIPE_CLOSE_DISTANCE = 100;
 const SWIPE_CLOSE_VELOCITY = 0.5;
+/** Clear space kept between the sheet's top edge and the status bar / Dynamic Island. */
+const SHEET_TOP_GAP = 12;
+/** Bottom padding while the keyboard is up: it already covers the home indicator. */
+const KEYBOARD_BOTTOM_GAP = 8;
+
+/**
+ * Where the keyboard's top edge is on screen while it is up, else null.
+ *
+ * The keyboard-avoiding wrapper lifts the sheet by the keyboard's height but
+ * never shrinks it, so a tall sheet (the 0.8 address form) was pushed up under
+ * the status bar and Dynamic Island. Knowing the keyboard's top lets the sheet
+ * cap itself to the room that is really left.
+ */
+function useKeyboardTop(enabled: boolean): number | null {
+  const [top, setTop] = useState<number | null>(null);
+  useEffect(() => {
+    if (!enabled) {
+      setTop(null);
+      return;
+    }
+    const screenHeight = Dimensions.get('screen').height;
+    const onFrame = (e: { endCoordinates: { screenY: number } }) =>
+      setTop(e.endCoordinates.screenY < screenHeight ? e.endCoordinates.screenY : null);
+    const subs =
+      Platform.OS === 'ios'
+        ? [
+            // Will-change also catches the QuickType bar and keyboard switches.
+            Keyboard.addListener('keyboardWillChangeFrame', onFrame),
+            Keyboard.addListener('keyboardWillHide', () => setTop(null)),
+          ]
+        : [
+            Keyboard.addListener('keyboardDidShow', onFrame),
+            Keyboard.addListener('keyboardDidHide', () => setTop(null)),
+          ];
+    return () => subs.forEach((sub) => sub.remove());
+  }, [enabled]);
+  return top;
+}
 
 export function AppBottomSheet({
   visible,
@@ -56,7 +95,12 @@ export function AppBottomSheet({
   const insets = useSafeAreaInsets();
   const screenHeight = Dimensions.get('window').height;
   const clampedFraction = Math.max(0.1, Math.min(1, heightFraction));
-  const sheetHeight = Math.round(screenHeight * clampedFraction);
+  const fullHeight = Math.round(screenHeight * clampedFraction);
+  const keyboardTop = useKeyboardTop(visible && avoidKeyboard);
+  // Never taller than the room between the status bar and the keyboard (or the
+  // screen's foot): the content scrolls inside instead of riding off the top.
+  const roomAbove = (keyboardTop ?? screenHeight) - insets.top - SHEET_TOP_GAP;
+  const sheetHeight = Math.max(0, Math.min(fullHeight, Math.round(roomAbove)));
 
   const translateY = useRef(new Animated.Value(0)).current;
 
@@ -64,10 +108,11 @@ export function AppBottomSheet({
   // fades in via the Modal's `fade` animation, so the screen underneath stays
   // put (just dims) instead of the whole modal window sliding up from the
   // bottom — which read as a brand-new screen appearing. Starting from the
-  // capped sheet height guarantees the panel begins fully off-screen.
+  // full sheet height guarantees the panel begins fully off-screen. Keyed on the
+  // uncapped height so the keyboard resizing the sheet doesn't replay it.
   useEffect(() => {
     if (visible) {
-      translateY.setValue(sheetHeight);
+      translateY.setValue(fullHeight);
       Animated.spring(translateY, {
         toValue: 0,
         useNativeDriver: true,
@@ -75,7 +120,7 @@ export function AppBottomSheet({
         friction: 12,
       }).start();
     }
-  }, [visible, translateY, sheetHeight]);
+  }, [visible, translateY, fullHeight]);
 
   const animateClose = useCallback(() => {
     Animated.timing(translateY, {
@@ -118,7 +163,8 @@ export function AppBottomSheet({
     [swipeToClose, translateY, animateClose],
   );
 
-  const bottomPadding = Math.max(insets.bottom, MIN_SAFE_BOTTOM);
+  const bottomPadding =
+    keyboardTop != null ? KEYBOARD_BOTTOM_GAP : Math.max(insets.bottom, MIN_SAFE_BOTTOM);
 
   const sheetStyle = expandable
     ? { maxHeight: sheetHeight, paddingBottom: bottomPadding }
