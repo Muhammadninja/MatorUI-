@@ -6,16 +6,20 @@ import { useThemeContext } from '@/contexts/theme.context';
 
 // Several file names predate their artwork; the identifiers say what each shows.
 import AirFilt from '../../../assets/3D _Icons/airfilt.png';
-import AcCompressor from '../../../assets/3D _Icons/atlts.png';
-import Battery from '../../../assets/3D _Icons/battery.png';
-import EngineIcon from '../../../assets/auto-parts/engine.png';
-import BrakeDisc from '../../../assets/3D _Icons/brake2.png';
+// Owner-approved 2026-11-11 (category-art audit): true-alpha renders, part
+// centred at 86% of a 1024 canvas. The rotor and gearbox were cut out of a
+// white studio backdrop (Vision subject lift, lug holes cleared, defringed).
+import AcCompressor from '../../../assets/categories/climate-ac-compressor.png';
+import Battery from '../../../assets/categories/electrical-battery.png';
+import BrakeDisc from '../../../assets/categories/brakes-rotor-caliper.png';
+import EngineIcon from '../../../assets/categories/engine-turbo.png';
+import Gearbox from '../../../assets/categories/transmission-gearbox.png';
+import Susp from '../../../assets/categories/suspension-coilover.png';
 import WheelRim from '../../../assets/3D _Icons/disk.png';
 import Light from '../../../assets/3D _Icons/light.png';
 import Oil from '../../../assets/3D _Icons/oil.png';
 import OilFilter from '../../../assets/3D _Icons/oilfilter.png';
 import Piston from '../../../assets/3D _Icons/p.png';
-import Susp from '../../../assets/3D _Icons/susp.png';
 import Wipe from '../../../assets/3D _Icons/wipe.png';
 
 /** Category display name → the 3D PNG icon in `assets/3D _Icons/`. */
@@ -55,7 +59,8 @@ const PART_ICONS_BY_KEY: Record<string, any> = {
   suspension: Susp,
   exterior: BrakeDisc,
   maintenance: OilFilter,
-  transmission: Piston,
+  // A gearbox: the piston that stood in here is an engine part.
+  transmission: Gearbox,
   // `cooling` is the category table's own key for Heating & Cooling.
   climate: AcCompressor,
   cooling: AcCompressor,
