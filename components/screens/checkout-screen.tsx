@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { AlertCircle, ArrowLeft } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView } from 'react-native';
+import { Platform, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AddressFormSheet, {
@@ -57,6 +57,7 @@ import garageService from '@/services/garage-service';
 import type { Address, PaymentType } from '@/services/orders-service';
 import { pickupCartKey } from '@/services/pickup-points';
 import { triggerHaptic } from '@/utils/haptics';
+import { checkoutFooterBottom } from '@/utils/sticky-footer';
 
 /**
  * Checkout — the Uzbek-market flow. The buyer chooses pickup or Mator's courier, seeing
@@ -491,7 +492,7 @@ export default function CheckoutScreen() {
       </ScrollView>
 
       {/* Sticky place order */}
-      <AppView colorName="background" px="lg" style={{ paddingTop: 14, paddingBottom: Math.max(insets.bottom, 20), borderTopWidth: 1, borderTopColor: tokens.divider }}>
+      <AppView testID="checkout-footer" colorName="background" px="lg" style={{ paddingTop: 14, paddingBottom: checkoutFooterBottom(insets.bottom, Platform.OS), borderTopWidth: 1, borderTopColor: tokens.divider }}>
         <AppButton
           testID="checkout-place-order-btn"
           title={
