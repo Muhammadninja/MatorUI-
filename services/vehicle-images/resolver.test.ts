@@ -31,11 +31,11 @@ function approvedFixture(): VehicleImageManifest {
       { key: 'malibu-gen1', bodyType: 'sedan', verified: true, assets: { white: MALIBU1_WHITE } },
       { key: 'malibu-gen2', bodyType: 'sedan', verified: true, assets: { white: MALIBU2_WHITE, red: MALIBU2_RED } },
       { key: 'nexia-n150', bodyType: 'sedan', verified: true, assets: { white: N150_WHITE } },
-      { key: 'nexia-r3', bodyType: 'sedan', verified: true, assets: { white: R3_WHITE } },
+      { key: 'nexia-r3', bodyType: 'sedan', verified: true, sharedBy: ['nexia-3'], assets: { white: R3_WHITE } },
       { key: 'tracker-gen3', bodyType: 'suv', verified: true, assets: { white: TRACKER3_WHITE } },
       { key: 'tracker-gen2', bodyType: 'suv', verified: true, assets: { white: TRACKER2_WHITE } },
       { key: 'gentra', bodyType: 'sedan', verified: true, assets: {} },
-      { key: 'spark', bodyType: 'hatchback', verified: false, assets: {} },
+      { key: 'spark-m300', bodyType: 'hatchback', verified: false, assets: {} },
     ],
     models: {
       ...CHEVROLET_IMAGE_MANIFEST.models,
@@ -53,20 +53,37 @@ describe('the shipped Chevrolet manifest', () => {
     expect(validateManifest(CHEVROLET_IMAGE_MANIFEST)).toEqual([]);
   });
 
-  test('contains no images yet: every live model shows the neutral placeholder', () => {
+  test('only the Cobalt and Gentra have images; every other live model shows the placeholder', () => {
     for (const modelId of LIVE_CHEVROLET_MODEL_IDS) {
-      expect(resolveVehicleImage(chevy(modelId, { trimId: `${modelId}-x`, year: 2020, colorHex: '#F4F5F7' })).kind).toBe('placeholder');
+      const result = resolveVehicleImage(chevy(modelId, { trimId: `${modelId}-x`, year: 2020, colorHex: '#F4F5F7' }));
+      expect(result.kind).toBe(modelId === 'cobalt' || modelId === 'gentra' ? 'image' : 'placeholder');
     }
-    expect(CHEVROLET_IMAGE_MANIFEST.bodies.every((b) => Object.keys(b.assets).length === 0)).toBe(true);
+    const withImages = CHEVROLET_IMAGE_MANIFEST.bodies.filter((b) => Object.keys(b.assets).length > 0);
+    expect(withImages.map((b) => b.key)).toEqual(['cobalt-gen2', 'gentra']);
+  });
+
+  test('every Cobalt trim, and a Cobalt with no or an unknown trim, is the one pre-restyle body', () => {
+    for (const trimId of ['cobalt-p1-elegant', 'cobalt-p2-premier', 'cobalt-p3-elegant', 'cobalt-p4-ls', 'cobalt-p4-ltz', 'unknown', undefined]) {
+      expect(resolveVehicleImage(chevy('cobalt', { trimId }))).toMatchObject({ kind: 'image', bodyKey: 'cobalt-gen2', paint: 'white' });
+    }
+  });
+
+  test('a Cobalt in a colour without an approved image shows the white Cobalt, flagged as unmatched', () => {
+    expect(resolveVehicleImage(chevy('cobalt', { colorHex: '#C42B2B' }))).toMatchObject({ bodyKey: 'cobalt-gen2', paint: 'white', paintMatched: false });
+    expect(resolveVehicleImage(chevy('cobalt', { colorHex: '#F4F5F7' }))).toMatchObject({ paint: 'white', paintMatched: true });
   });
 
   test('keeps the catalog problems on the placeholder', () => {
     expect(resolveVehicleImage(chevy('genrta-lacetti'))).toEqual({ kind: 'placeholder', reason: 'catalog-issue' });
+    expect(resolveVehicleImage(chevy('lacetti', { trimId: 'lacetti-sx', year: 2008 }))).toEqual({ kind: 'placeholder', reason: 'generation-unverified' });
     expect(resolveVehicleImage(chevy('nexia-2'))).toEqual({ kind: 'placeholder', reason: 'shared-body-unverified' });
-    expect(resolveVehicleImage(chevy('nexia-3'))).toEqual({ kind: 'placeholder', reason: 'shared-body-unverified' });
-    for (const trimId of ['cobalt-p1-elegant', 'cobalt-p2-premier', 'cobalt-p3-elegant', 'cobalt-p4-ltz', undefined]) {
-      expect(resolveVehicleImage(chevy('cobalt', { trimId }))).toEqual({ kind: 'placeholder', reason: 'generation-unverified' });
-    }
+  });
+
+  test('Nexia 3 is one body for both backend records; Nexia generations never mix', () => {
+    // No image yet: both records reach the same body and report it as unverified.
+    expect(resolveVehicleImage(chevy('nexia-3'))).toEqual({ kind: 'placeholder', reason: 'body-unverified', bodyType: 'sedan' });
+    expect(resolveVehicleImage(chevy('nexia', { trimId: 'nexia-3-ls' }))).toEqual({ kind: 'placeholder', reason: 'body-unverified', bodyType: 'sedan' });
+    expect(resolveVehicleImage(chevy('nexia', { trimId: 'nexia-9-zz' }))).toEqual({ kind: 'placeholder', reason: 'generation-unverified' });
   });
 });
 
@@ -126,10 +143,10 @@ describe('strict model matching', () => {
   test('a body that is not verified is never shown, even with an image', () => {
     const unverified: VehicleImageManifest = {
       ...manifest,
-      bodies: manifest.bodies.map((b) => (b.key === 'spark' ? { ...b, assets: { white: 999 } } : b)),
+      bodies: manifest.bodies.map((b) => (b.key === 'spark-m300' ? { ...b, assets: { white: 999 } } : b)),
     };
     expect(resolveVehicleImage(chevy('spark'), unverified)).toEqual({ kind: 'placeholder', reason: 'body-unverified', bodyType: 'hatchback' });
-    expect(validateManifest(unverified)).toContain('body "spark" has assets but is unverified');
+    expect(validateManifest(unverified)).toContain('body "spark-m300" has assets but is unverified');
   });
 
   test('a verified body without an image is the placeholder, with its body type', () => {
@@ -175,8 +192,8 @@ describe('shared bodies', () => {
     expect(validateManifest(manifest).filter((p) => p.includes('nexia-n150'))).toEqual([]);
     expect(resolveVehicleImage(chevy('nexia-2'), manifest)).toMatchObject({ bodyKey: 'nexia-n150', source: N150_WHITE });
     expect(resolveVehicleImage(chevy('nexia', { trimId: 'nexia-2-base' }), manifest)).toMatchObject({ bodyKey: 'nexia-n150' });
-    // The share is per body: Nexia 3 is still unresolved.
-    expect(resolveVehicleImage(chevy('nexia-3'), manifest)).toMatchObject({ reason: 'shared-body-unverified' });
+    // Shares are per body: Nexia 3 reaches the R3 through its own approved share, never the N150.
+    expect(resolveVehicleImage(chevy('nexia-3'), manifest)).toMatchObject({ bodyKey: 'nexia-r3', source: R3_WHITE });
   });
 });
 

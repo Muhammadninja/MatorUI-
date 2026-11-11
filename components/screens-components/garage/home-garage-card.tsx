@@ -6,7 +6,6 @@ import GarageAddHero, {
   GarageHeroCard,
   type GarageHeroVisual,
 } from '@/components/screens-components/garage/garage-add-hero';
-import GarageBrandBadge from '@/components/screens-components/garage/garage-brand-badge';
 import { carBodyForVehicle } from '@/components/screens-components/garage/car-body';
 import type { CarBody } from '@/components/shared/mator-icons';
 import { AppText } from '@/components/shared/app-text';
@@ -23,13 +22,13 @@ import {
 } from '@/services/uz-vehicle-catalog';
 import type { Vehicle } from '@/services/garage-service';
 import type { BodyType } from '@/services/vehicle-images/manifest';
+import { paintForHex } from '@/services/vehicle-images/paint';
 import { resolveVehicleImage } from '@/services/vehicle-images/resolver';
 import { triggerHaptic } from '@/utils/haptics';
 
 /** Reserved while the persisted vehicle hydrates, so nothing below the card
  *  jumps when it resolves. Matches a one-line name + year + button. */
 const SKELETON_HEIGHT = 140;
-const LOGO_CHIP_SIZE = 48;
 
 type VehicleSummary = {
   name: string;
@@ -94,7 +93,7 @@ const SILHOUETTE: Record<BodyType, CarBody> = {
 function heroVisual(
   active: ReturnType<typeof useActiveVehicle>['currentActiveVehicle'],
   vehicle: Vehicle | undefined,
-): GarageHeroVisual {
+): GarageHeroVisual & { shownInWhite?: boolean } {
   const resolved = resolveVehicleImage({
     brandId: vehicle?.brandId || active?.fitment.brandId,
     modelId: vehicle?.modelId || active?.fitment.modelId,
@@ -102,7 +101,12 @@ function heroVisual(
     year: vehicle?.year,
     colorHex: vehicle?.colorHex,
   });
-  if (resolved.kind === 'image') return { kind: 'image', source: resolved.source };
+  if (resolved.kind === 'image') {
+    // The car has a real saved paint, but only the white image exists: say so
+    // rather than let white pass as their colour.
+    const shownInWhite = !resolved.paintMatched && paintForHex(vehicle?.colorHex) !== null;
+    return { kind: 'image', source: resolved.source, shownInWhite };
+  }
   const body = resolved.bodyType
     ? SILHOUETTE[resolved.bodyType]
     : carBodyForVehicle({ modelId: vehicle?.modelId || active?.fitment.modelId, model: vehicle?.model ?? '' });
@@ -166,19 +170,25 @@ function HomeGarageCard() {
   // No car yet: the Cobalt hero, opening the same Garage destination.
   if (!summary) return <GarageAddHero onPress={openGarage} />;
 
+  const visual = heroVisual(currentActiveVehicle, vehicle);
+
   return (
     <GarageHeroCard
       testID="home-garage-card"
-      visual={heroVisual(currentActiveVehicle, vehicle)}
+      visual={visual}
       action={{ testID: 'home-garage-shop-parts', title: t('explore.shopParts'), onPress: shopParts }}
     >
-      {summary.make ? <GarageBrandBadge make={summary.make} size={LOGO_CHIP_SIZE} /> : null}
       <AppText textVariant="h4" weight="bold" style={{ color: tokens.onVehicleBanner }}>
         {summary.name}
       </AppText>
       {summary.spec ? (
         <AppText textVariant="bodySm" style={{ color: tokens.vehicleBannerMuted }}>
           {summary.spec}
+        </AppText>
+      ) : null}
+      {visual.kind === 'image' && visual.shownInWhite ? (
+        <AppText testID="home-garage-image-in-white" textVariant="caption" style={{ color: tokens.vehicleBannerMuted }}>
+          {t('explore.vehicleImageInWhite')}
         </AppText>
       ) : null}
       <AppPressableView

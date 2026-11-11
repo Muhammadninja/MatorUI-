@@ -1,3 +1,6 @@
+import cobaltGen2White from '@/assets/vehicles/chevrolet/cobalt-gen2/white.webp';
+import gentraWhite from '@/assets/vehicles/chevrolet/gentra/white.webp';
+
 import type { PaintKey } from './paint';
 
 /**
@@ -70,26 +73,44 @@ const body = (
 ): VehicleBody => ({ key, bodyType, verified: false, assets: {}, ...(note ? { note } : {}) });
 
 /**
- * Chevrolet, all 25 live models. No image is approved yet, so every vehicle
- * resolves to the placeholder. The Explore hero's Cobalt image is the approved
- * marketing artwork and is deliberately NOT listed here (see `cobalt` below).
+ * Chevrolet, all 25 live models. Only the Cobalt and Gentra have images; every
+ * other vehicle resolves to the placeholder until its image is approved. The
+ * Explore hero keeps its own decorative copy of the Cobalt artwork.
  */
 export const CHEVROLET_IMAGE_MANIFEST: VehicleImageManifest = {
   makeId: 'chevrolet',
   bodies: [
+    {
+      key: 'cobalt-gen2',
+      bodyType: 'sedan',
+      // Owner-approved body: the pre-restyle exterior sold since 2013. "Positions"
+      // are equipment levels, so every Cobalt trim shares it. Midnight and the
+      // announced restyle are out of scope (section 11 of the asset matrix).
+      verified: true,
+      assets: { white: cobaltGen2White },
+    },
     body('malibu-gen1', 'sedan', 'Backend trims malibu-1-*.'),
     body('malibu-gen2', 'sedan', 'Backend trims malibu-2-*.'),
     body('nexia-n150', 'sedan', 'Backend model `nexia` with trims nexia-2-*.'),
-    body('nexia-r3', 'sedan', 'Backend model `nexia` with trims nexia-3-*; sold as Ravon Nexia R3.'),
+    {
+      ...body('nexia-r3', 'sedan', 'Backend model `nexia` with trims nexia-3-*; sold as Ravon Nexia R3.'),
+      // Same car as the separate "Nexia 3" record (Aveo T250 sedan; section 11).
+      sharedBy: ['nexia-3'],
+    },
     body('nexia-n100', 'sedan', 'Backend model `nexia-1`.'),
     body('lacetti-j200', 'sedan'),
-    body('gentra', 'sedan', 'Kept apart from Lacetti (owner decision 3).'),
-    body('spark', 'hatchback', 'Generation unverified: backend trim says M400.'),
+    {
+      ...body('gentra', 'sedan', 'Kept apart from Lacetti (owner decision 3).'),
+      // Owner-approved 2026-11-10. Cut out with Vision subject lift + edge refinement (section 14).
+      verified: true,
+      assets: { white: gentraWhite },
+    },
+    body('spark-m300', 'hatchback', 'Uzbek Spark is the M300 (Ravon R2); the backend trim id says M400.'),
     body('tracker-gen3', 'suv', 'Backend model `tracker` (trim tracker-3-premier).'),
     body('tracker-gen2', 'suv', 'Backend model `tracker-2`; same display name as `tracker`.'),
     body('captiva', 'suv', 'Which Captiva body "Captiva 5" is: unverified.'),
     body('onix', 'sedan', 'Trim is onix-1-premier; local catalog says 2020+. Unverified.'),
-    body('damas', 'microvan'),
+    body('damas-classic', 'microvan', 'Classic passenger Damas; not the 2025 Damas Move/Max.'),
     body('labo', 'pickup', 'Shares the Damas cab, but the bed shows in a 3/4 view: own image.'),
     body('matiz', 'hatchback', 'Generation unverified.'),
     body('orlando', 'mpv'),
@@ -102,27 +123,24 @@ export const CHEVROLET_IMAGE_MANIFEST: VehicleImageManifest = {
     body('trailblazer', 'suv', 'Two very different vehicles share the name: unverified.'),
   ],
   models: {
-    // "Position 1–4" may be equipment levels, and a front restyle was announced
-    // for late 2025 / early 2026. Not resolved until the exteriors are verified
-    // (owner decision 2), so the hero's Cobalt image is not reused here.
-    cobalt: { kind: 'placeholder', reason: 'generation-unverified' },
+    cobalt: { kind: 'body', bodyKey: 'cobalt-gen2' },
     malibu: { kind: 'trim-prefix', prefixes: { 'malibu-1-': 'malibu-gen1', 'malibu-2-': 'malibu-gen2' } },
     nexia: { kind: 'trim-prefix', prefixes: { 'nexia-2-': 'nexia-n150', 'nexia-3-': 'nexia-r3' } },
-    // Separate records for the same names; sharing nexia-n150 / nexia-r3 needs
-    // a verified match first (owner decision 2).
     'nexia-1': { kind: 'body', bodyKey: 'nexia-n100' },
+    // Not yet verified as the same car as `nexia` + nexia-2-* trims.
     'nexia-2': { kind: 'placeholder', reason: 'shared-body-unverified' },
-    'nexia-3': { kind: 'placeholder', reason: 'shared-body-unverified' },
-    lacetti: { kind: 'body', bodyKey: 'lacetti-j200' },
+    'nexia-3': { kind: 'body', bodyKey: 'nexia-r3' },
+    // Can be the 2004–13 sedan or a 2020+ "Lacetti", which is a Gentra body.
+    lacetti: { kind: 'placeholder', reason: 'generation-unverified' },
     gentra: { kind: 'body', bodyKey: 'gentra' },
     // Misspelled "Genrta", no trims (owner decision 1).
     'genrta-lacetti': { kind: 'placeholder', reason: 'catalog-issue' },
-    spark: { kind: 'body', bodyKey: 'spark' },
+    spark: { kind: 'body', bodyKey: 'spark-m300' },
     tracker: { kind: 'body', bodyKey: 'tracker-gen3' },
     'tracker-2': { kind: 'body', bodyKey: 'tracker-gen2' },
     captiva: { kind: 'body', bodyKey: 'captiva' },
     onix: { kind: 'body', bodyKey: 'onix' },
-    damas: { kind: 'body', bodyKey: 'damas' },
+    damas: { kind: 'body', bodyKey: 'damas-classic' },
     labo: { kind: 'body', bodyKey: 'labo' },
     'chevrolet-matiz': { kind: 'body', bodyKey: 'matiz' },
     orlando: { kind: 'body', bodyKey: 'orlando' },

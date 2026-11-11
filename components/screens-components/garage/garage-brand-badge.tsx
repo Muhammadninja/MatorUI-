@@ -1,25 +1,33 @@
 import BrandLogo from '@/components/screens-components/catalog/brand-logo';
 import { AppView } from '@/components/shared/app-view';
+import { CarIcon } from '@/components/shared/mator-icons';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useMakes } from '@/hooks/use-vehicle-catalog';
 
 export type GarageBrandBadgeProps = {
-  /** The vehicle's make, matched by name against the catalogue's makes. */
+  /** The vehicle's manufacturer id (`make.id` from the backend). */
+  makeId?: string;
+  /** The vehicle's make name: matched only for older rows without an id. */
   make: string;
   size?: number;
 };
 
 /**
- * A make's logo on a small white rounded square — white in both themes, because
- * logos are drawn for a white ground. A make with no logo, or a catalogue that
- * hasn't loaded, gets `BrandLogo`'s initial instead of a blank chip. Decorative:
- * the name beside it is what a screen reader should read.
+ * A make's logo (the same backend logos as Explore's "shop by make" row) on a
+ * small white rounded square — white in both themes, because logos are drawn
+ * for a white ground. Resolved by manufacturer id, never by a name's first
+ * letter; a make with no logo, or a catalogue that hasn't loaded, gets a
+ * neutral car instead of an initial. Decorative: the name beside it is what a
+ * screen reader should read.
  */
-export function GarageBrandBadge({ make, size = 48 }: GarageBrandBadgeProps) {
+export function GarageBrandBadge({ makeId, make, size = 48 }: GarageBrandBadgeProps) {
   const { tokens } = useThemeContext();
   const { makes } = useMakes();
   const makeName = make.toLowerCase();
-  const match = makes.find((m) => m.name.toLowerCase() === makeName);
+  const match = makeId
+    ? makes.find((m) => m.id === makeId)
+    : makes.find((m) => m.name.toLowerCase() === makeName);
+  const logoSize = Math.round(size * 0.85);
 
   return (
     <AppView
@@ -34,8 +42,8 @@ export function GarageBrandBadge({ make, size = 48 }: GarageBrandBadgeProps) {
       <BrandLogo
         logoUrl={match?.logoUrl}
         name={make}
-        size={Math.round(size * 0.75)}
-        color={tokens.black}
+        size={logoSize}
+        fallback={<CarIcon size={logoSize} color={tokens.onPhotoMuted} />}
       />
     </AppView>
   );

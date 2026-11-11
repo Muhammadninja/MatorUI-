@@ -58,7 +58,7 @@ export function GarageSwitchRow({ vehicle, onSetActive, onOpenDetail }: GarageSw
       accessibilityLabel={t('garage.setActiveVehicle', { vehicle: fullName })}
       style={{ paddingVertical: 12, paddingLeft: 12, minHeight: 48 }}
     >
-      <GarageBrandBadge make={vehicle.make} />
+      <GarageBrandBadge makeId={vehicle.brandId} make={vehicle.make} />
       <AppView flex={1} style={{ minWidth: 0 }}>
         <AppText
           family="default"
