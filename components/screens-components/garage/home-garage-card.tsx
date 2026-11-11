@@ -22,7 +22,7 @@ import {
 } from '@/services/uz-vehicle-catalog';
 import type { Vehicle } from '@/services/garage-service';
 import type { BodyType } from '@/services/vehicle-images/manifest';
-import { paintForHex } from '@/services/vehicle-images/paint';
+import { parseHex } from '@/services/vehicle-images/paint';
 import { resolveVehicleImage } from '@/services/vehicle-images/resolver';
 import { triggerHaptic } from '@/utils/haptics';
 
@@ -102,9 +102,9 @@ function heroVisual(
     colorHex: vehicle?.colorHex,
   });
   if (resolved.kind === 'image') {
-    // The car has a real saved paint, but only the white image exists: say so
-    // rather than let white pass as their colour.
-    const shownInWhite = !resolved.paintMatched && paintForHex(vehicle?.colorHex) !== null;
+    // The car has a real saved colour the image doesn't show (another paint, or
+    // one outside the eight): say so rather than let white pass as their colour.
+    const shownInWhite = !resolved.paintMatched && parseHex(vehicle?.colorHex) !== null;
     return { kind: 'image', source: resolved.source, shownInWhite };
   }
   const body = resolved.bodyType

@@ -89,6 +89,38 @@ describe('the shipped Chevrolet manifest', () => {
   });
 });
 
+describe('id schemes', () => {
+  test('the demo/mock scheme resolves like the live ids: Cobalt 2019 LS AT and Gentra 2021 LTZ', () => {
+    expect(resolveVehicleImage({ brandId: 'make_chevrolet', modelId: 'model_cobalt', trimId: 'trim_ls_at', year: 2019 }))
+      .toMatchObject({ kind: 'image', bodyKey: 'cobalt-gen2' });
+    expect(resolveVehicleImage({ brandId: 'make_chevrolet', modelId: 'model_gentra', trimId: 'trim_ltz', year: 2021 }))
+      .toMatchObject({ kind: 'image', bodyKey: 'gentra' });
+    expect(resolveVehicleImage({ brandId: 'make_chevrolet', modelId: 'model_chevrolet_cobalt' }))
+      .toMatchObject({ kind: 'image', bodyKey: 'cobalt-gen2' });
+  });
+
+  test('Cobalt and Gentra show their image with a missing, unknown or foreign trim', () => {
+    for (const modelId of ['cobalt', 'gentra']) {
+      for (const trimId of [undefined, null, '', 'trim_ls_at', 'malibu-2-lt', 'nexia-3-ls']) {
+        expect(resolveVehicleImage(chevy(modelId, { trimId })).kind).toBe('image');
+      }
+    }
+  });
+
+  test('normalising the scheme never maps one model to another', () => {
+    expect(resolveVehicleImage({ brandId: 'make_chevrolet', modelId: 'model_lacetti' })).toMatchObject({ kind: 'placeholder' });
+    // Only exact known shapes: no underscore-to-hyphen guessing, no foreign make segment.
+    expect(resolveVehicleImage({ brandId: 'make_chevrolet', modelId: 'model_tracker_2' })).toEqual({ kind: 'placeholder', reason: 'unknown-model' });
+    expect(resolveVehicleImage({ brandId: 'make_chevrolet', modelId: 'model_kia_cobalt' })).toEqual({ kind: 'placeholder', reason: 'unknown-model' });
+    expect(resolveVehicleImage({ brandId: 'make_chevrolet', modelId: 'model_Cobalt' })).toEqual({ kind: 'placeholder', reason: 'unknown-model' });
+    // The demo Tracker can't say which of the two live Trackers it is.
+    expect(resolveVehicleImage({ brandId: 'make_chevrolet', modelId: 'model_chevrolet_tracker' })).toEqual({ kind: 'placeholder', reason: 'unknown-model' });
+    expect(resolveVehicleImage({ brandId: 'make_chevrolet', modelId: 'model_nexia', trimId: 'trim_ls' })).toEqual({ kind: 'placeholder', reason: 'generation-unverified' });
+    expect(resolveVehicleImage({ brandId: 'make_kia', modelId: 'model_cobalt' })).toEqual({ kind: 'placeholder', reason: 'unsupported-make' });
+    expect(resolveVehicleImage({ brandId: 'chevrolet_make', modelId: 'cobalt' })).toEqual({ kind: 'placeholder', reason: 'unsupported-make' });
+  });
+});
+
 describe('strict model matching', () => {
   const manifest = approvedFixture();
 

@@ -3,6 +3,7 @@ import { AppView } from '@/components/shared/app-view';
 import { CarIcon } from '@/components/shared/mator-icons';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useMakes } from '@/hooks/use-vehicle-catalog';
+import { plainMakeId } from '@/services/vehicle-images/catalog-id';
 
 export type GarageBrandBadgeProps = {
   /** The vehicle's manufacturer id (`make.id` from the backend). */
@@ -25,7 +26,7 @@ export function GarageBrandBadge({ makeId, make, size = 48 }: GarageBrandBadgePr
   const { makes } = useMakes();
   const makeName = make.toLowerCase();
   const match = makeId
-    ? makes.find((m) => m.id === makeId)
+    ? makes.find((m) => m.id === plainMakeId(makeId))
     : makes.find((m) => m.name.toLowerCase() === makeName);
   const logoSize = Math.round(size * 0.85);
 

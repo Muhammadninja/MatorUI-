@@ -6,6 +6,7 @@ import {
   type VehicleImageManifest,
   type VehicleImageSource,
 } from './manifest';
+import { plainMakeId, plainModelId } from './catalog-id';
 import { BASE_PAINT, PAINT_KEYS, paintForHex, type PaintKey } from './paint';
 
 /** The vehicle fields image resolution may read: backend ids, year and the
@@ -100,7 +101,9 @@ export function resolveVehicleImage(
   input: VehicleImageInput,
   manifest: VehicleImageManifest = CHEVROLET_IMAGE_MANIFEST,
 ): VehicleImageResolution {
-  if (!input.brandId || input.brandId !== manifest.makeId) return placeholder('unsupported-make');
+  const brandId = plainMakeId(input.brandId);
+  if (!brandId || brandId !== manifest.makeId) return placeholder('unsupported-make');
+  input = { ...input, brandId, modelId: plainModelId(input.modelId, input.brandId) };
 
   const target = bodyKeyFor(manifest, input);
   if ('reason' in target) return placeholder(target.reason);
