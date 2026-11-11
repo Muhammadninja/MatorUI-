@@ -1,7 +1,4 @@
-/**
- * Dark category art gets a quiet neutral plate on the dark card, and nothing
- * else changes: light mode, and the silver / red / grey art, draw as before.
- */
+/** Category art stays directly on the tile surface in both color schemes. */
 import React from 'react';
 import { act, create } from 'react-test-renderer';
 import { describe, expect, test, vi } from 'vitest';
@@ -27,7 +24,7 @@ vi.mock('@/components/shared/app-view', () => ({
 vi.mock('@/contexts/theme.context', () => ({
   useThemeContext: () => ({
     scheme: theme.scheme,
-    tokens: { gray300: '#34404A', text: '#text', textMuted: '#muted', backgroundSecondary: '#bg2' },
+    tokens: { text: '#text', textMuted: '#muted', backgroundSecondary: '#bg2' },
   }),
 }));
 
@@ -35,7 +32,7 @@ const { default: CategoryTile } =
   await import('@/components/screens-components/catalog/category-tile');
 const { ROOT_META } = await import('@/services/categories-service');
 
-function plateFor(rootId: string, scheme: 'dark' | 'light') {
+function artFor(rootId: string, scheme: 'dark' | 'light') {
   theme.scheme = scheme;
   let tree!: ReturnType<typeof create>;
   act(() => {
@@ -51,12 +48,17 @@ function plateFor(rootId: string, scheme: 'dark' | 'light') {
   const art = tree.root.find(
     (n) => n.props.testID === 'category-tile-art' && String(n.type) === 'view',
   );
-  return art.props.style.backgroundColor as string | undefined;
+  return {
+    backgroundColor: art.props.style.backgroundColor as string | undefined,
+    imageSize: art.findByType('image').props.style.width as number,
+  };
 }
 
-const DARK = ['electrical-and-lighting', 'suspension-and-steering', 'engine-system'];
-const READS_ALONE = [
+const ROOTS = [
   'brake-system',
+  'electrical-and-lighting',
+  'suspension-and-steering',
+  'engine-system',
   'motor-oil',
   'tuning-and-accessories',
   'transmission',
@@ -64,16 +66,16 @@ const READS_ALONE = [
   'heating-and-cooling',
 ];
 
-describe('category tile backplate', () => {
-  test.each(DARK)('dark mode: %s sits on the gray300 plate', (root) => {
-    expect(plateFor(root, 'dark')).toBe('#34404A');
+describe('category tile art', () => {
+  test.each(ROOTS)('dark mode: %s has no art backplate', (root) => {
+    expect(artFor(root, 'dark').backgroundColor).toBeUndefined();
   });
 
-  test.each(READS_ALONE)('dark mode: %s needs none', (root) => {
-    expect(plateFor(root, 'dark')).toBeUndefined();
+  test.each(ROOTS)('light mode: %s has no art backplate', (root) => {
+    expect(artFor(root, 'light').backgroundColor).toBeUndefined();
   });
 
-  test.each([...DARK, ...READS_ALONE])('light mode: %s has no plate', (root) => {
-    expect(plateFor(root, 'light')).toBeUndefined();
+  test.each(ROOTS)('dark mode: %s uses the same 64pt art box', (root) => {
+    expect(artFor(root, 'dark').imageSize).toBe(64);
   });
 });

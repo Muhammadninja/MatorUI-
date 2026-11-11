@@ -79,20 +79,6 @@ const GLYPH_ICONS_BY_KEY: Record<string, LucideIcon> = {
  *  never render blank, so fall back to a neutral engine glyph. */
 const DEFAULT_ICON = EngineIcon;
 
-/**
- * Art that is mostly black plastic or rubber. On the dark card (#171E23) more
- * than a third of each blends in (battery 63%, coilover 55%, engine 37% of
- * the part within 1.25:1), so the tile sets it on a neutral plate in dark
- * mode. Measured 2026-11-11; the silver, red and grey art reads without one.
- */
-const DARK_ART = new Set<unknown>([Battery, Susp, EngineIcon]);
-
-/** Whether a category's art needs the dark-mode backplate. */
-export function isDarkPartArt(name: string, iconKey?: string): boolean {
-  const icon = resolvePartIcon(name, iconKey);
-  return 'image' in icon && DARK_ART.has(icon.image);
-}
-
 /** What a category draws: one of the 3D PNGs, or an icon-set glyph. */
 export type PartIconSource = { image: any } | { glyph: LucideIcon };
 

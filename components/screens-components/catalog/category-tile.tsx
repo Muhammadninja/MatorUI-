@@ -1,9 +1,7 @@
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import AutoPartIcon, {
-  isDarkPartArt,
-} from '@/components/screens-components/catalog/auto-part-icon';
+import AutoPartIcon from '@/components/screens-components/catalog/auto-part-icon';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
@@ -67,10 +65,7 @@ const LABEL_MAX_WORD = 13;
  */
 function CategoryTile({ name, label, iconKey, count, onPress, width }: CategoryTileProps) {
   const { t } = useTranslation();
-  const { tokens, scheme } = useThemeContext();
-  // Dark art on the dark card sinks into it: a quiet neutral plate (one step up
-  // the Midnight Teal grey scale, 1.6:1 against the card) gives it a ground.
-  const backplate = scheme === 'dark' && isDarkPartArt(name, iconKey);
+  const { tokens } = useThemeContext();
   // Everything user-facing reads the localized label; `name` is only ever an
   // icon-resolution fallback.
   const display = label ?? name;
@@ -95,10 +90,9 @@ function CategoryTile({ name, label, iconKey, count, onPress, width }: CategoryT
       <AppView
         testID="category-tile-art"
         center
-        rounded={16}
-        style={{ width: 68, height: 68, backgroundColor: backplate ? tokens.gray300 : undefined }}
+        style={{ width: 68, height: 68 }}
       >
-        <AutoPartIcon name={name} iconKey={iconKey} size={60} />
+        <AutoPartIcon name={name} iconKey={iconKey} size={64} />
       </AppView>
       <AppView align="center" style={{ alignSelf: 'stretch' }}>
         <AppView justify="center" style={{ minHeight: LABEL_BLOCK_HEIGHT, alignSelf: 'stretch' }}>
