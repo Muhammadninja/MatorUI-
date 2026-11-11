@@ -76,6 +76,8 @@ export default function AddressFormSheet({ visible, onClose, initial, onSubmit }
   const [text, setText] = useState({ city: '', street: '', house: '' });
   const [landmark, setLandmark] = useState('');
   const [chosen, setChosen] = useState<ChosenPoint | null>(null);
+  /** The named place chosen on the map (a search result), shown and used as the label. */
+  const [place, setPlace] = useState<{ title: string; subtitle: string | null } | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
   const [outsideCoverage, setOutsideCoverage] = useState(false);
   const [dataCredit, setDataCredit] = useState<string | null>(null);
@@ -110,6 +112,7 @@ export default function AddressFormSheet({ visible, onClose, initial, onSubmit }
     const wordless =
       initial && !initial.line1 && !initial.city && initial.lat != null && initial.lng != null;
     setChosen(wordless ? { lat: initial.lat!, lng: initial.lng!, from: 'saved' } : null);
+    setPlace(null);
     setMapOpen(false);
     setOutsideCoverage(false);
     setDataCredit(null);
@@ -165,7 +168,10 @@ export default function AddressFormSheet({ visible, onClose, initial, onSubmit }
    * its address, to save typing. Not while the map moves, and never required: with no answer
    * the point is still the destination. It fills in only what the buyer has left empty.
    */
-  const describeChosenPoint = async (point: DeliveryPoint) => {
+  const describeChosenPoint = async (
+    point: DeliveryPoint,
+    { replaceText = false, fillText = true }: { replaceText?: boolean; fillText?: boolean } = {},
+  ) => {
     describeRequest.current += 1;
     const request = describeRequest.current;
     setOutsideCoverage(false);
@@ -178,9 +184,9 @@ export default function AddressFormSheet({ visible, onClose, initial, onSubmit }
       if (request !== describeRequest.current) return;
       setOutsideCoverage(withinCoverage === false);
       const typedSoFar = latestText.current;
-      if (!address || typedSoFar.street.trim() || typedSoFar.house.trim() || typedSoFar.city.trim()) {
-        return;
-      }
+      const typedAnything =
+        !!typedSoFar.street.trim() || !!typedSoFar.house.trim() || !!typedSoFar.city.trim();
+      if (!address || !fillText || (typedAnything && !replaceText)) return;
       setText({
         street: address.street ?? '',
         house: address.houseNumber ?? '',
@@ -192,11 +198,28 @@ export default function AddressFormSheet({ visible, onClose, initial, onSubmit }
     }
   };
 
-  const confirmMapPoint = (point: DeliveryPoint) => {
+  /**
+   * The map choice is the buyer's latest word on where this is, so the address shows that
+   * place: a found place's name and address as they are, or else what is known at the
+   * point, in place of whatever was typed before. Nothing known leaves the text as it was.
+   */
+  const confirmMapPoint = (point: DeliveryPoint, found: AddressSuggestion | null) => {
     setMapOpen(false);
     setChosen({ ...point, from: 'map' });
     setSaveError(null);
-    void describeChosenPoint(point);
+    if (found) {
+      setText({
+        street: found.street ?? found.title,
+        house: found.houseNumber ?? '',
+        city: found.city ?? found.district ?? '',
+      });
+      setPlace({ title: found.title, subtitle: found.subtitle });
+      // Still asked, for whether couriers go there; the found address stands.
+      void describeChosenPoint(point, { fillText: false });
+    } else {
+      setPlace(null);
+      void describeChosenPoint(point, { replaceText: true });
+    }
   };
 
   const pick = (suggestion: AddressSuggestion) => {
@@ -208,6 +231,7 @@ export default function AddressFormSheet({ visible, onClose, initial, onSubmit }
       city: suggestion.city ?? city,
     });
     setChosen({ lat: suggestion.lat, lng: suggestion.lng, from: 'suggestion' });
+    setPlace(null);
     setOutsideCoverage(false);
     setSaveError(null);
   };
@@ -219,6 +243,7 @@ export default function AddressFormSheet({ visible, onClose, initial, onSubmit }
     if (coords) {
       const point = { lat: coords.latitude, lng: coords.longitude };
       setChosen({ ...point, from: 'location' });
+      setPlace(null);
       void describeChosenPoint(point);
     } else {
       // The point the address already had, if any, stays as it was.
@@ -233,7 +258,7 @@ export default function AddressFormSheet({ visible, onClose, initial, onSubmit }
     const autoNamed =
       !initial?.label || initial.label === initial.line1 || initial.label === pinned;
     const payload: AddressFormValues = {
-      label: autoNamed ? line1 || pinned : initial.label,
+      label: autoNamed ? place?.title || line1 || pinned : initial.label,
       name: initial?.name ?? '',
       line1,
       city,
@@ -300,6 +325,25 @@ export default function AddressFormSheet({ visible, onClose, initial, onSubmit }
               {t('account.anyPlaceHint')}
             </AppText>
           </AppView>
+
+          {/* What the chosen point is, in words: the place's name, then where it is. */}
+          {chosen?.from === 'map' && (place || line1 || city) ? (
+            <AppView testID="address-chosen-place" row align="center" gap={10} rounded={12} p={12} colorName="backgroundSecondary" borderWidth={1} borderName="border">
+              <MapPin size={20} strokeWidth={2.2} color={tokens.brandBg} />
+              <AppView flex={1}>
+                <AppText family="accent" weight="bold" style={{ fontSize: 14.5, color: tokens.text }}>
+                  {place?.title || line1 || city}
+                </AppText>
+                {[place && line1 !== place.title ? line1 : null, line1 || place ? city || place?.subtitle : null]
+                  .filter(Boolean)
+                  .map((line) => (
+                    <AppText key={line} family="default" style={{ fontSize: 13, color: tokens.textMuted }}>
+                      {line}
+                    </AppText>
+                  ))}
+              </AppView>
+            </AppView>
+          ) : null}
 
           <AppView gap={6} testID="address-location">
             <AppPressableView

@@ -185,7 +185,7 @@ describe('DeliveryLocationPicker', () => {
       expect(map.props!.initialRegion).toMatchObject({ latitude: SAVED.lat, longitude: SAVED.lng });
       expect(confirmButton().props.disabled).toBe(false);
       confirm();
-      expect(onConfirm).toHaveBeenCalledWith(SAVED);
+      expect(onConfirm).toHaveBeenCalledWith(SAVED, null);
     });
 
     test('with nothing saved: selects nothing, so the camera cannot become an address', async () => {
@@ -263,7 +263,7 @@ describe('DeliveryLocationPicker', () => {
       mapMoved(41.3, 69.2);
       confirm();
 
-      expect(onConfirm).toHaveBeenCalledWith({ lat: 41.3, lng: 69.2 });
+      expect(onConfirm).toHaveBeenCalledWith({ lat: 41.3, lng: 69.2 }, null);
     });
 
     test('tapping anywhere chooses exactly that place, and brings it under the marker', async () => {
@@ -276,7 +276,7 @@ describe('DeliveryLocationPicker', () => {
         longitude: 69.240562987,
       });
       confirm();
-      expect(onConfirm).toHaveBeenCalledWith({ lat: 41.311081234, lng: 69.240562987 });
+      expect(onConfirm).toHaveBeenCalledWith({ lat: 41.311081234, lng: 69.240562987 }, null);
     });
 
     test('a tap stays exact when the map settles a hair away from it', async () => {
@@ -286,7 +286,7 @@ describe('DeliveryLocationPicker', () => {
       mapMoved(41.31108125, 69.24056301, 0.02);
       confirm();
 
-      expect(onConfirm).toHaveBeenCalledWith({ lat: 41.311081234, lng: 69.240562987 });
+      expect(onConfirm).toHaveBeenCalledWith({ lat: 41.311081234, lng: 69.240562987 }, null);
     });
 
     test('a move the buyer cuts short counts where they left it, not where it was heading', async () => {
@@ -300,7 +300,7 @@ describe('DeliveryLocationPicker', () => {
       });
 
       confirm();
-      expect(onConfirm).toHaveBeenCalledWith({ lat: 41.35, lng: 69.25 });
+      expect(onConfirm).toHaveBeenCalledWith({ lat: 41.35, lng: 69.25 }, null);
     });
 
     test('the buyer can keep moving it: the last place counts', async () => {
@@ -311,7 +311,7 @@ describe('DeliveryLocationPicker', () => {
       mapMoved(41.35, 69.25);
       confirm();
 
-      expect(onConfirm).toHaveBeenCalledWith({ lat: 41.35, lng: 69.25 });
+      expect(onConfirm).toHaveBeenCalledWith({ lat: 41.35, lng: 69.25 }, null);
     });
 
     test('a tap on a zoomed-out map zooms in, and keeps a closer zoom as it is', async () => {
@@ -391,7 +391,7 @@ describe('DeliveryLocationPicker', () => {
       expect(confirmButton().props.disabled).toBe(false);
       expect(exists('delivery-map-outside')).toBe(false);
       confirm();
-      expect(onConfirm).toHaveBeenCalledWith({ lat: 41.25, lng: 69.2 });
+      expect(onConfirm).toHaveBeenCalledWith({ lat: 41.25, lng: 69.2 }, null);
     });
 
     test('a point outside says so at once, and cannot be confirmed', async () => {
@@ -460,7 +460,7 @@ describe('DeliveryLocationPicker', () => {
       expect(requestPosition).toHaveBeenCalledTimes(1);
       expect(map.animateToRegion.mock.lastCall![0]).toMatchObject({ latitude: 41.3, longitude: 69.2 });
       confirm();
-      expect(onConfirm).toHaveBeenCalledWith({ lat: 41.3, lng: 69.2 });
+      expect(onConfirm).toHaveBeenCalledWith({ lat: 41.3, lng: 69.2 }, null);
     });
 
     test('does not hold the buyer there: another place can be chosen, however far', async () => {
@@ -472,7 +472,7 @@ describe('DeliveryLocationPicker', () => {
       tap(39.65, 66.96);
       confirm();
 
-      expect(onConfirm).toHaveBeenCalledWith({ lat: 39.65, lng: 66.96 });
+      expect(onConfirm).toHaveBeenCalledWith({ lat: 39.65, lng: 66.96 }, null);
     });
 
     test('failing says so, and the map goes on working', async () => {
@@ -502,7 +502,23 @@ describe('DeliveryLocationPicker', () => {
         longitude: MATCH.lng,
       });
       confirm();
-      expect(onConfirm).toHaveBeenCalledWith({ lat: MATCH.lat, lng: MATCH.lng });
+      // The found place goes with the point, so the address can show its name.
+      expect(onConfirm).toHaveBeenCalledWith({ lat: MATCH.lat, lng: MATCH.lng }, MATCH);
+      expect(allText()).toContain('Амира Темура 12');
+    });
+
+    test('moving off a found place leaves its name behind', async () => {
+      await mount();
+      type('Амира');
+      await debounced();
+      act(() => {
+        hostNode('address-suggestion-0').props.onPress();
+      });
+      act(() => {
+        map.props!.onPress({ nativeEvent: { coordinate: { latitude: 41.3, longitude: 69.2 } } });
+      });
+      confirm();
+      expect(onConfirm).toHaveBeenCalledWith({ lat: 41.3, lng: 69.2 }, null);
     });
 
     test('shows the credit the data needs', async () => {
@@ -628,7 +644,7 @@ describe('DeliveryLocationPicker', () => {
       expect(allText()).toContain('Поиск адреса сейчас недоступен');
       tap(41.3, 69.2);
       confirm();
-      expect(onConfirm).toHaveBeenCalledWith({ lat: 41.3, lng: 69.2 });
+      expect(onConfirm).toHaveBeenCalledWith({ lat: 41.3, lng: 69.2 }, null);
     });
   });
 
@@ -661,7 +677,7 @@ describe('DeliveryLocationPicker', () => {
       });
       confirm();
 
-      expect(onConfirm).toHaveBeenCalledWith({ lat: MATCH.lat, lng: MATCH.lng });
+      expect(onConfirm).toHaveBeenCalledWith({ lat: MATCH.lat, lng: MATCH.lng }, MATCH);
     });
   });
 });

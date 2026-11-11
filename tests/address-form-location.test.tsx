@@ -94,6 +94,12 @@ describe('AddressFormSheet', () => {
       .findAll((node) => node.type === 'text')
       .flatMap((node) => node.children.filter((c): c is string => typeof c === 'string'))
       .join(' | ');
+  /** Every string drawn inside one testID'd host view. */
+  const hostText = (id: string) =>
+    hostNode(id)
+      .findAll((node) => node.type === 'text')
+      .flatMap((node) => node.children.filter((c): c is string => typeof c === 'string'))
+      .join(' | ');
   const hostNode = (id: string) =>
     renderer.root.find((node) => node.props.testID === id && typeof node.type === 'string');
   const exists = (id: string) =>
@@ -403,9 +409,9 @@ describe('AddressFormSheet', () => {
       });
     });
 
-    test('never overwrites what the buyer typed', async () => {
+    test('the confirmed point address replaces what was typed before', async () => {
       describePoint.mockResolvedValue({
-        address: { city: 'Ташкент', district: null, street: 'Сеул', houseNumber: null },
+        address: { city: 'Ташкент', district: null, street: 'Сеул', houseNumber: '7' },
         withinCoverage: true,
         attribution: 'credit',
       });
@@ -414,8 +420,37 @@ describe('AddressFormSheet', () => {
 
       await confirmOnMap(PIN.lat, PIN.lng);
 
-      expect(fieldValue('street')).toBe('Мой дом');
-      expect(allText()).not.toContain('credit');
+      expect(fieldValue('street')).toBe('Сеул');
+      expect(fieldValue('house')).toBe('7');
+      expect(fieldValue('city')).toBe('Ташкент');
+      expect(allText()).toContain('credit');
+      expect(hostText('address-chosen-place')).toContain('Сеул 7');
+    });
+
+    test('a place found on the map shows by name, fills the address and names the saved address', async () => {
+      await mount();
+      type('street', 'Мой дом');
+      openMap();
+      await act(async () => {
+        picker.props!.onConfirm(
+          { lat: PIN.lat, lng: PIN.lng },
+          { id: 'p1', title: 'Tashkent City Mall', subtitle: 'Олмазор, Ташкент', city: 'Ташкент', district: 'Олмазор', street: 'Олмазор', houseNumber: '1', lat: PIN.lat, lng: PIN.lng },
+        );
+      });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      expect(fieldValue('street')).toBe('Олмазор');
+      expect(fieldValue('house')).toBe('1');
+      expect(fieldValue('city')).toBe('Ташкент');
+      expect(hostText('address-chosen-place')).toContain('Tashkent City Mall');
+      expect(hostText('address-chosen-place')).toContain('Ташкент');
+
+      await act(async () => {
+        saveButton().props.onPress();
+      });
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ label: 'Tashkent City Mall', city: 'Ташкент' }));
     });
 
     test('a point with no known address is still the destination', async () => {
