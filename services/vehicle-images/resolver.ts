@@ -5,6 +5,7 @@ import {
   type VehicleBody,
   type VehicleImageManifest,
   type VehicleImageSource,
+  type VerifiedYearRange,
 } from './manifest';
 import { plainMakeId, plainModelId } from './catalog-id';
 import { BASE_PAINT, PAINT_KEYS, paintForHex, type PaintKey } from './paint';
@@ -49,7 +50,9 @@ function bodyReferences(manifest: VehicleImageManifest): Map<string, Set<string>
   for (const [modelId, rule] of Object.entries(manifest.models)) {
     if (rule.kind === 'body') add(rule.bodyKey, modelId);
     if (rule.kind === 'trim-prefix') {
-      Object.values(rule.prefixes).forEach((key) => add(key, modelId));
+      Object.values(rule.prefixes).forEach((target) =>
+        typeof target === 'string' ? add(target, modelId) : target.forEach((r) => add(r.bodyKey, modelId)),
+      );
       rule.years?.forEach((range) => add(range.bodyKey, modelId));
     }
   }
@@ -79,16 +82,26 @@ function bodyKeyFor(
   // The trim id must belong to this model's generation, by exact prefix.
   const trimId = input.trimId ?? '';
   const prefixMatches = Object.entries(rule.prefixes).filter(([prefix]) => trimId.startsWith(prefix));
-  if (prefixMatches.length === 1) return { bodyKey: prefixMatches[0][1] };
   if (prefixMatches.length > 1) return { reason: 'generation-unverified' };
-
-  // No trim: a year decides only within a verified, unambiguous range.
-  const year = input.year;
-  if (typeof year === 'number' && rule.years?.length) {
-    const hits = rule.years.filter((r) => r.source.trim() && year >= r.from && year <= r.to);
-    if (hits.length === 1) return { bodyKey: hits[0].bodyKey };
+  if (prefixMatches.length === 1) {
+    const target = prefixMatches[0][1];
+    // A generation with a mid-cycle facelift: the year picks the exterior.
+    return typeof target === 'string' ? { bodyKey: target } : byYear(target, input.year);
   }
-  return { reason: 'generation-unverified' };
+
+  // No (or another) trim: a year decides only within a verified range.
+  return byYear(rule.years ?? [], input.year);
+}
+
+/** The one verified, sourced range containing `year`; anything else (no year,
+ *  no range, a year two ranges claim, a year between ranges) is unresolved. */
+function byYear(
+  ranges: VerifiedYearRange[],
+  year: number | null | undefined,
+): { bodyKey: string } | { reason: PlaceholderReason } {
+  if (typeof year !== 'number') return { reason: 'generation-unverified' };
+  const hits = ranges.filter((r) => r.source.trim() && year >= r.from && year <= r.to);
+  return hits.length === 1 ? { bodyKey: hits[0].bodyKey } : { reason: 'generation-unverified' };
 }
 
 /**

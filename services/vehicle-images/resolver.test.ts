@@ -40,6 +40,9 @@ function approvedFixture(): VehicleImageManifest {
     models: {
       ...CHEVROLET_IMAGE_MANIFEST.models,
       cobalt: { kind: 'trim-prefix', prefixes: { 'cobalt-p4-': 'cobalt-a' } },
+      // A plain trim-only rule: these fixture tests are about matching and
+      // paint, not the real Malibu's facelift years.
+      malibu: { kind: 'trim-prefix', prefixes: { 'malibu-1-': 'malibu-gen1', 'malibu-2-': 'malibu-gen2' } },
     },
   };
 }
@@ -53,13 +56,13 @@ describe('the shipped Chevrolet manifest', () => {
     expect(validateManifest(CHEVROLET_IMAGE_MANIFEST)).toEqual([]);
   });
 
-  test('only the Cobalt, Gentra and Nexia 3 have images; every other live model shows the placeholder', () => {
+  test('only the Cobalt, Gentra, Nexia 3, Spark and Malibu have images; every other live model shows the placeholder', () => {
     for (const modelId of LIVE_CHEVROLET_MODEL_IDS) {
       const result = resolveVehicleImage(chevy(modelId, { trimId: `${modelId}-x`, year: 2020, colorHex: '#F4F5F7' }));
-      expect(result.kind).toBe(['cobalt', 'gentra', 'nexia-3'].includes(modelId) ? 'image' : 'placeholder');
+      expect(result.kind).toBe(['cobalt', 'gentra', 'nexia-3', 'spark', 'malibu'].includes(modelId) ? 'image' : 'placeholder');
     }
     const withImages = CHEVROLET_IMAGE_MANIFEST.bodies.filter((b) => Object.keys(b.assets).length > 0);
-    expect(withImages.map((b) => b.key)).toEqual(['cobalt-gen2', 'nexia-r3', 'gentra']);
+    expect(withImages.map((b) => b.key)).toEqual(['cobalt-gen2', 'malibu-gen2-facelift', 'nexia-r3', 'gentra', 'spark-m300']);
   });
 
   test('every Cobalt trim, and a Cobalt with no or an unknown trim, is the one pre-restyle body', () => {
@@ -118,6 +121,75 @@ describe('id schemes', () => {
     expect(resolveVehicleImage({ brandId: 'make_chevrolet', modelId: 'model_nexia', trimId: 'trim_ls' })).toEqual({ kind: 'placeholder', reason: 'generation-unverified' });
     expect(resolveVehicleImage({ brandId: 'make_kia', modelId: 'model_cobalt' })).toEqual({ kind: 'placeholder', reason: 'unsupported-make' });
     expect(resolveVehicleImage({ brandId: 'chevrolet_make', modelId: 'cobalt' })).toEqual({ kind: 'placeholder', reason: 'unsupported-make' });
+  });
+});
+
+describe('Spark M300', () => {
+  test('every Spark record shows the M300 image, whatever its trim id says (the backend mislabels it M400)', () => {
+    for (const trimId of ['spark-m400-ls', undefined, 'unknown']) {
+      expect(resolveVehicleImage(chevy('spark', { trimId }))).toMatchObject({ kind: 'image', bodyKey: 'spark-m300' });
+    }
+    expect(resolveVehicleImage({ brandId: 'make_chevrolet', modelId: 'model_chevrolet_spark' })).toMatchObject({ bodyKey: 'spark-m300' });
+  });
+
+  test('the Spark image never appears for the other small cars', () => {
+    for (const modelId of ['chevrolet-matiz', 'damas', 'labo', 'nexia-1']) {
+      const r = resolveVehicleImage(chevy(modelId));
+      expect(r.kind === 'image' && r.bodyKey === 'spark-m300').toBe(false);
+    }
+  });
+});
+
+describe('years and trims that do not change the exterior', () => {
+  const malibu = (extra: Record<string, unknown>) => resolveVehicleImage(chevy('malibu', extra));
+
+  test('a facelift Malibu shows its image for 2020 onwards, with any or no trim', () => {
+    for (const year of [2020, 2022, 2024]) {
+      for (const trimId of [undefined, '', 'malibu-2-lt', 'malibu-2-premier', 'trim_ltz', 'unknown']) {
+        expect(malibu({ year, trimId })).toMatchObject({ kind: 'image', bodyKey: 'malibu-gen2-facelift' });
+      }
+    }
+  });
+
+  test('2019 is ambiguous in Uzbekistan (both fronts were sold), so it stays the silhouette', () => {
+    expect(malibu({ year: 2019 })).toEqual({ kind: 'placeholder', reason: 'generation-unverified' });
+    expect(malibu({ year: 2019, trimId: 'malibu-2-lt' })).toEqual({ kind: 'placeholder', reason: 'generation-unverified' });
+  });
+
+  test('the pre-facelift Malibu 2 and Malibu 1 never borrow the facelift image', () => {
+    expect(malibu({ year: 2017, trimId: 'malibu-2-lt' })).toEqual({ kind: 'placeholder', reason: 'body-unverified', bodyType: 'sedan' });
+    expect(malibu({ year: 2017 })).toEqual({ kind: 'placeholder', reason: 'generation-unverified' });
+    // The trim names the generation; the year can't move a Malibu 1 onto the newer body.
+    expect(malibu({ year: 2022, trimId: 'malibu-1-ltz' })).toEqual({ kind: 'placeholder', reason: 'body-unverified', bodyType: 'sedan' });
+    expect(malibu({})).toEqual({ kind: 'placeholder', reason: 'generation-unverified' });
+  });
+
+  test('a saved colour keeps the white facelift image, flagged as unmatched', () => {
+    expect(malibu({ year: 2022, colorHex: '#14161A' })).toMatchObject({ bodyKey: 'malibu-gen2-facelift', paint: 'white', paintMatched: false });
+    expect(malibu({ year: 2022, colorHex: '#F4F5F7' })).toMatchObject({ paint: 'white', paintMatched: true });
+  });
+
+  test('Cobalt, Gentra and Nexia 3 resolve across every year', () => {
+    for (let year = 2013; year <= 2026; year++) {
+      expect(resolveVehicleImage(chevy('cobalt', { year }))).toMatchObject({ bodyKey: 'cobalt-gen2' });
+      expect(resolveVehicleImage(chevy('gentra', { year }))).toMatchObject({ bodyKey: 'gentra' });
+      expect(resolveVehicleImage(chevy('nexia-3', { year }))).toMatchObject({ bodyKey: 'nexia-r3' });
+    }
+  });
+
+  test('the two Trackers never share an image, and unknown models stay unknown', () => {
+    expect(resolveVehicleImage(chevy('tracker', { year: 2023 })).kind).toBe('placeholder');
+    expect(resolveVehicleImage(chevy('tracker-2', { year: 2018 })).kind).toBe('placeholder');
+    expect(resolveVehicleImage(chevy('malibu-3', { year: 2022 }))).toEqual({ kind: 'placeholder', reason: 'unknown-model' });
+  });
+
+  test('the Malibu image never leaks to another model', () => {
+    for (const modelId of LIVE_CHEVROLET_MODEL_IDS.filter((id) => id !== 'malibu')) {
+      for (const trimId of ['malibu-2-lt', undefined]) {
+        const r = resolveVehicleImage(chevy(modelId, { trimId, year: 2022 }));
+        expect(r.kind === 'image' && r.bodyKey === 'malibu-gen2-facelift').toBe(false);
+      }
+    }
   });
 });
 

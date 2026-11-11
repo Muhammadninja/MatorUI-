@@ -1,6 +1,8 @@
 import cobaltGen2White from '@/assets/vehicles/chevrolet/cobalt-gen2/white.webp';
 import gentraWhite from '@/assets/vehicles/chevrolet/gentra/white.webp';
+import malibuGen2FaceliftWhite from '@/assets/vehicles/chevrolet/malibu-gen2-facelift/white.webp';
 import nexiaR3White from '@/assets/vehicles/chevrolet/nexia-r3/white.webp';
+import sparkM300White from '@/assets/vehicles/chevrolet/spark-m300/white.webp';
 
 import type { PaintKey } from './paint';
 
@@ -47,8 +49,10 @@ export type VerifiedYearRange = { from: number; to: number; bodyKey: string; sou
 export type ModelRule =
   /** Every record of this model is one body. */
   | { kind: 'body'; bodyKey: string }
-  /** The generation is encoded in the backend trim id (`malibu-2-lt`). */
-  | { kind: 'trim-prefix'; prefixes: Record<string, string>; years?: VerifiedYearRange[] }
+  /** The generation is encoded in the backend trim id (`malibu-2-lt`). A
+   *  prefix names one body, or verified year ranges when the generation had a
+   *  facelift. `years` resolves a record with no (or an unrecognised) trim. */
+  | { kind: 'trim-prefix'; prefixes: Record<string, string | VerifiedYearRange[]>; years?: VerifiedYearRange[] }
   /** Known, deliberately unresolved: always the neutral placeholder. */
   | { kind: 'placeholder'; reason: PlaceholderReason };
 
@@ -67,6 +71,11 @@ export type VehicleImageManifest = {
   models: Record<string, ModelRule>;
 };
 
+/** UzAuto's facelifted Malibu went on sale in August–September 2019
+ *  (kun.uz/en/news/2019/08/16, spot.uz/ru/2019/08/16/malibu); GM's global
+ *  facelift is model year 2019. Asset matrix section 18. */
+const MALIBU_FACELIFT_SOURCE = 'UzAuto Malibu facelift sales Aug-Sep 2019 (Kun.uz, Spot.uz)';
+
 const body = (
   key: string,
   bodyType: BodyType,
@@ -74,7 +83,7 @@ const body = (
 ): VehicleBody => ({ key, bodyType, verified: false, assets: {}, ...(note ? { note } : {}) });
 
 /**
- * Chevrolet, all 25 live models. Only the Cobalt, Gentra and Nexia 3 have images; every
+ * Chevrolet, all 25 live models. Only the Cobalt, Gentra, Nexia 3, Spark and Malibu (facelift) have images; every
  * other vehicle resolves to the placeholder until its image is approved. The
  * Explore hero keeps its own decorative copy of the Cobalt artwork.
  */
@@ -91,7 +100,13 @@ export const CHEVROLET_IMAGE_MANIFEST: VehicleImageManifest = {
       assets: { white: cobaltGen2White },
     },
     body('malibu-gen1', 'sedan', 'Backend trims malibu-1-*.'),
-    body('malibu-gen2', 'sedan', 'Backend trims malibu-2-*.'),
+    body('malibu-gen2', 'sedan', '9th generation before its facelift: 2016–2018 in Uzbekistan.'),
+    {
+      ...body('malibu-gen2-facelift', 'sedan', '9th generation facelift (new grille, lamps, bumper).'),
+      // PREVIEW, pending owner approval: owner-supplied candidate, Vision subject lift (section 18).
+      verified: true,
+      assets: { white: malibuGen2FaceliftWhite },
+    },
     body('nexia-n150', 'sedan', 'Backend model `nexia` with trims nexia-2-*.'),
     {
       ...body('nexia-r3', 'sedan', 'Backend model `nexia` with trims nexia-3-*; sold as Ravon Nexia R3.'),
@@ -109,7 +124,12 @@ export const CHEVROLET_IMAGE_MANIFEST: VehicleImageManifest = {
       verified: true,
       assets: { white: gentraWhite },
     },
-    body('spark-m300', 'hatchback', 'Uzbek Spark is the M300 (Ravon R2); the backend trim id says M400.'),
+    {
+      ...body('spark-m300', 'hatchback', 'Uzbek Spark is the M300 (Ravon R2); the backend trim id says M400.'),
+      // PREVIEW, pending owner approval: owner-supplied cutout with real alpha (section 16).
+      verified: true,
+      assets: { white: sparkM300White },
+    },
     body('tracker-gen3', 'suv', 'Backend model `tracker` (trim tracker-3-premier).'),
     body('tracker-gen2', 'suv', 'Backend model `tracker-2`; same display name as `tracker`.'),
     body('captiva', 'suv', 'Which Captiva body "Captiva 5" is: unverified.'),
@@ -128,7 +148,19 @@ export const CHEVROLET_IMAGE_MANIFEST: VehicleImageManifest = {
   ],
   models: {
     cobalt: { kind: 'body', bodyKey: 'cobalt-gen2' },
-    malibu: { kind: 'trim-prefix', prefixes: { 'malibu-1-': 'malibu-gen1', 'malibu-2-': 'malibu-gen2' } },
+    // Facelift on sale in Uzbekistan from Aug–Sep 2019; the pre-facelift car was
+    // still sold earlier that year, so model year 2019 stays unresolved.
+    malibu: {
+      kind: 'trim-prefix',
+      prefixes: {
+        'malibu-1-': 'malibu-gen1',
+        'malibu-2-': [
+          { from: 2016, to: 2018, bodyKey: 'malibu-gen2', source: MALIBU_FACELIFT_SOURCE },
+          { from: 2020, to: 2099, bodyKey: 'malibu-gen2-facelift', source: MALIBU_FACELIFT_SOURCE },
+        ],
+      },
+      years: [{ from: 2020, to: 2099, bodyKey: 'malibu-gen2-facelift', source: MALIBU_FACELIFT_SOURCE }],
+    },
     nexia: { kind: 'trim-prefix', prefixes: { 'nexia-2-': 'nexia-n150', 'nexia-3-': 'nexia-r3' } },
     'nexia-1': { kind: 'body', bodyKey: 'nexia-n100' },
     // Not yet verified as the same car as `nexia` + nexia-2-* trims.
