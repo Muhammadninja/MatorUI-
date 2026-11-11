@@ -4,13 +4,13 @@ import { ScrollView } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { WheelLoader } from '@/components/shared/wheel-loader';
-import { AlertCircle, MapPin } from 'lucide-react-native';
+import { AlertCircle, MapPin, Plus } from 'lucide-react-native';
 
 import AddressFormSheet, {
   type AddressFormValues,
 } from '@/components/screens-components/account/address-form-sheet';
 import { AppButton } from '@/components/shared/app-button';
-import { AppSettingsHeader } from '@/components/shared/app-settings-header';
+import { AppSettingsHeader, HEADER_ACTION_SIZE } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
@@ -97,26 +97,26 @@ export default function ShippingAddressesScreen() {
     [setDefaultAddress, toast, t],
   );
 
+  // The same round 36pt target as the back button, so the title sits on the
+  // screen's center line with room to stay at full size. A text pill here
+  // squeezed the title into the gap between two unequal buttons.
   const addButton = (
     <AppPressableView
+      testID="addresses-add"
+      center
+      rounded={999}
       androidRipple={false}
       onPress={openAdd}
       accessibilityRole="button"
       accessibilityLabel={t('addresses.addNew')}
+      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
       style={{
+        width: HEADER_ACTION_SIZE,
+        height: HEADER_ACTION_SIZE,
         backgroundColor: tokens.brandBg,
-        borderRadius: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 9,
       }}
     >
-      <AppText
-        family="accent"
-        weight="bold"
-        style={{ fontSize: 12, color: tokens.onBrand }}
-      >
-        {t('addresses.addShort')}
-      </AppText>
+      <Plus size={18} strokeWidth={2.4} color={tokens.onBrand} />
     </AppPressableView>
   );
 
@@ -156,6 +156,13 @@ export default function ShippingAddressesScreen() {
           >
             {t('addresses.emptyText')}
           </AppText>
+          {/* The header's plus has no words, so the empty list names the action. */}
+          <AppButton
+            testID="addresses-empty-add"
+            title={t('addresses.addNew')}
+            size="sm"
+            onPress={openAdd}
+          />
         </AppView>
       ) : (
         <ScrollView
