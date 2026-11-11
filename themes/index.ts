@@ -183,6 +183,13 @@ export const lightTokens: ThemeTokens = {
   vehicleBannerBorder: '#C5E3E1',
   onVehicleBanner: '#18181B',
   vehicleBannerMuted: '#61616B',
+  // Explore's add-a-car hero: a mint wash with soft teal curves behind the car.
+  garageHeroFrom: '#EEF9F7',
+  garageHeroTo: '#D5EFEB',
+  garageHeroShape: 'rgba(0, 166, 160, 0.10)',
+  garageHeroShapeStrong: 'rgba(0, 166, 160, 0.18)',
+  garageHeroBorder: '#C5E3E1',
+  garageHeroShadow: 'rgba(11, 16, 20, 0.16)',
   onPhotoAccent: '#007F86',
   onPhotoMuted: '#61616B',
   photoShimmer: '#f1f1f1',
@@ -279,6 +286,14 @@ export const darkTokens: ThemeTokens = {
   vehicleBannerBorder: '#2C373F',
   onVehicleBanner: '#F5F7F8',
   vehicleBannerMuted: '#9BA8AF',
+  // Explore's add-a-car hero: charcoal easing into deep teal, curves kept
+  // faint so the white car and the copy carry the contrast.
+  garageHeroFrom: '#171E23',
+  garageHeroTo: '#113130',
+  garageHeroShape: 'rgba(0, 166, 160, 0.10)',
+  garageHeroShapeStrong: 'rgba(52, 198, 190, 0.16)',
+  garageHeroBorder: '#24403F',
+  garageHeroShadow: 'rgba(0, 0, 0, 0.42)',
   onPhotoAccent: '#007F86',
   onPhotoMuted: '#61616B',
   photoShimmer: '#E6EAEC',
