@@ -124,6 +124,15 @@ export type ThemeTokens = {
   /** Vehicle name, supporting text and "change" action on `vehicleBanner`. */
   onVehicleBanner: string;
   vehicleBannerMuted: string;
+  /** Explore's add-a-car hero: gradient ends, the soft curves behind the car,
+   *  its hairline, and the ground shadow under the car. Copy on it uses
+   *  `onVehicleBanner` / `vehicleBannerMuted`. */
+  garageHeroFrom: string;
+  garageHeroTo: string;
+  garageHeroShape: string;
+  garageHeroShapeStrong: string;
+  garageHeroBorder: string;
+  garageHeroShadow: string;
   /** Accent and quiet ink for controls drawn ON a product photo, which stays
    *  white in both themes (the favourite heart). Teal at text weight, because
    *  dark `brand` is too light against white. */

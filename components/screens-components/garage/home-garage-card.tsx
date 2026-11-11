@@ -1,10 +1,14 @@
 import { router } from 'expo-router';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useWindowDimensions } from 'react-native';
 
+import GarageAddHero, {
+  GarageHeroCard,
+  type GarageHeroVisual,
+} from '@/components/screens-components/garage/garage-add-hero';
 import GarageBrandBadge from '@/components/screens-components/garage/garage-brand-badge';
-import { AppButton } from '@/components/shared/app-button';
+import { carBodyForVehicle } from '@/components/screens-components/garage/car-body';
+import type { CarBody } from '@/components/shared/mator-icons';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useActiveVehicle } from '@/contexts/active-vehicle.context';
@@ -18,6 +22,8 @@ import {
   getTrim,
 } from '@/services/uz-vehicle-catalog';
 import type { Vehicle } from '@/services/garage-service';
+import type { BodyType } from '@/services/vehicle-images/manifest';
+import { resolveVehicleImage } from '@/services/vehicle-images/resolver';
 import { triggerHaptic } from '@/utils/haptics';
 
 /** Reserved while the persisted vehicle hydrates, so nothing below the card
@@ -71,6 +77,38 @@ function summarize(
   return { name, spec, make, model } satisfies VehicleSummary;
 }
 
+const SILHOUETTE: Record<BodyType, CarBody> = {
+  sedan: 'sedan',
+  hatchback: 'hatchback',
+  suv: 'suv',
+  mpv: 'suv',
+  microvan: 'suv',
+  pickup: 'truck',
+};
+
+/**
+ * The selected vehicle's picture: an approved image of exactly this model and
+ * generation, else a neutral silhouette. Never the empty state's decorative
+ * Cobalt. Reads the garage row when loaded, else the persisted fitment ids.
+ */
+function heroVisual(
+  active: ReturnType<typeof useActiveVehicle>['currentActiveVehicle'],
+  vehicle: Vehicle | undefined,
+): GarageHeroVisual {
+  const resolved = resolveVehicleImage({
+    brandId: vehicle?.brandId || active?.fitment.brandId,
+    modelId: vehicle?.modelId || active?.fitment.modelId,
+    trimId: vehicle?.trimId ?? active?.fitment.trimId,
+    year: vehicle?.year,
+    colorHex: vehicle?.colorHex,
+  });
+  if (resolved.kind === 'image') return { kind: 'image', source: resolved.source };
+  const body = resolved.bodyType
+    ? SILHOUETTE[resolved.bodyType]
+    : carBodyForVehicle({ modelId: vehicle?.modelId || active?.fitment.modelId, model: vehicle?.model ?? '' });
+  return { kind: 'placeholder', body };
+}
+
 /**
  * The selected-vehicle banner at the top of Explore. It states which car is selected and
  * nothing about compatibility: choosing a car does not establish that a part
@@ -81,7 +119,6 @@ function summarize(
  * `/vehicle-parts` list the Garage hero's "shop parts" opens.
  */
 function HomeGarageCard() {
-  const { fontScale } = useWindowDimensions();
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const { currentActiveVehicle, isHydrating } = useActiveVehicle();
@@ -112,9 +149,6 @@ function HomeGarageCard() {
     });
   };
 
-  // At large text the row stacks, or the name breaks mid-word beside "change".
-  const stacked = fontScale >= 1.3;
-
   if (isHydrating) {
     return (
       <AppView
@@ -129,74 +163,41 @@ function HomeGarageCard() {
     );
   }
 
+  // No car yet: the Cobalt hero, opening the same Garage destination.
+  if (!summary) return <GarageAddHero onPress={openGarage} />;
+
   return (
-    <AppView
+    <GarageHeroCard
       testID="home-garage-card"
-      rounded={16}
-      colorName="vehicleBanner"
-      borderWidth={1}
-      borderName="vehicleBannerBorder"
-      p="lg"
-      gap="md"
+      visual={heroVisual(currentActiveVehicle, vehicle)}
+      action={{ testID: 'home-garage-shop-parts', title: t('explore.shopParts'), onPress: shopParts }}
     >
-      {/* The name's column flexes and wraps; "change" keeps its own fixed space, so
-       *  they can't collide however long the name or narrow the phone. */}
-      <AppView row={!stacked} align={stacked ? 'flex-start' : 'center'} gap="md">
-        {summary?.make ? <GarageBrandBadge make={summary.make} size={LOGO_CHIP_SIZE} /> : null}
-
-        <AppView style={stacked ? { alignSelf: 'stretch' } : { flex: 1, minWidth: 0 }}>
-          <AppText textVariant="h4" weight="bold" style={{ color: tokens.onVehicleBanner }}>
-            {summary ? summary.name : t('explore.addVehicleTitle')}
-          </AppText>
-          {summary ? (
-            summary.spec ? (
-              <AppText textVariant="bodySm" style={{ color: tokens.vehicleBannerMuted }}>
-                {summary.spec}
-              </AppText>
-            ) : null
-          ) : (
-            <AppText textVariant="bodySm" style={{ color: tokens.vehicleBannerMuted }}>
-              {t('explore.addVehicleBody')}
-            </AppText>
-          )}
-        </AppView>
-
-        {summary ? (
-          <AppPressableView
-            onPress={openGarage}
-            androidRipple={false}
-            pressedOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel={t('explore.changeVehicleAccessibility', { name: summary.name })}
-            center
-            style={{
-              alignSelf: 'flex-start',
-              flexShrink: 0,
-              minHeight: 48,
-              minWidth: 48,
-              marginTop: stacked ? 0 : -12,
-            }}
-          >
-            <AppText
-              textVariant="bodySm"
-              weight="semibold"
-              style={{ color: tokens.brandText, textDecorationLine: 'underline' }}
-            >
-              {t('explore.changeVehicle')}
-            </AppText>
-          </AppPressableView>
-        ) : null}
-      </AppView>
-
-      <AppButton
-        testID={summary ? 'home-garage-shop-parts' : 'home-garage-add-vehicle'}
-        title={summary ? t('explore.shopParts') : t('explore.addVehicleAction')}
-        kind="brand"
-        size="lg"
-        fullWidth
-        onPress={summary ? shopParts : openGarage}
-      />
-    </AppView>
+      {summary.make ? <GarageBrandBadge make={summary.make} size={LOGO_CHIP_SIZE} /> : null}
+      <AppText textVariant="h4" weight="bold" style={{ color: tokens.onVehicleBanner }}>
+        {summary.name}
+      </AppText>
+      {summary.spec ? (
+        <AppText textVariant="bodySm" style={{ color: tokens.vehicleBannerMuted }}>
+          {summary.spec}
+        </AppText>
+      ) : null}
+      <AppPressableView
+        onPress={openGarage}
+        androidRipple={false}
+        pressedOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={t('explore.changeVehicleAccessibility', { name: summary.name })}
+        style={{ alignSelf: 'flex-start', minHeight: 48, minWidth: 48, justifyContent: 'center' }}
+      >
+        <AppText
+          textVariant="bodySm"
+          weight="semibold"
+          style={{ color: tokens.brandText, textDecorationLine: 'underline' }}
+        >
+          {t('explore.changeVehicle')}
+        </AppText>
+      </AppPressableView>
+    </GarageHeroCard>
   );
 }
 
