@@ -1,5 +1,6 @@
 import cobaltGen2White from '@/assets/vehicles/chevrolet/cobalt-gen2/white.webp';
 import gentraWhite from '@/assets/vehicles/chevrolet/gentra/white.webp';
+import nexiaR3White from '@/assets/vehicles/chevrolet/nexia-r3/white.webp';
 
 import type { PaintKey } from './paint';
 
@@ -73,7 +74,7 @@ const body = (
 ): VehicleBody => ({ key, bodyType, verified: false, assets: {}, ...(note ? { note } : {}) });
 
 /**
- * Chevrolet, all 25 live models. Only the Cobalt and Gentra have images; every
+ * Chevrolet, all 25 live models. Only the Cobalt, Gentra and Nexia 3 have images; every
  * other vehicle resolves to the placeholder until its image is approved. The
  * Explore hero keeps its own decorative copy of the Cobalt artwork.
  */
@@ -96,6 +97,9 @@ export const CHEVROLET_IMAGE_MANIFEST: VehicleImageManifest = {
       ...body('nexia-r3', 'sedan', 'Backend model `nexia` with trims nexia-3-*; sold as Ravon Nexia R3.'),
       // Same car as the separate "Nexia 3" record (Aveo T250 sedan; section 11).
       sharedBy: ['nexia-3'],
+      // Owner-approved 2026-11-10: replacement candidate, Vision subject lift (section 15).
+      verified: true,
+      assets: { white: nexiaR3White },
     },
     body('nexia-n100', 'sedan', 'Backend model `nexia-1`.'),
     body('lacetti-j200', 'sedan'),

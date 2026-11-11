@@ -53,13 +53,13 @@ describe('the shipped Chevrolet manifest', () => {
     expect(validateManifest(CHEVROLET_IMAGE_MANIFEST)).toEqual([]);
   });
 
-  test('only the Cobalt and Gentra have images; every other live model shows the placeholder', () => {
+  test('only the Cobalt, Gentra and Nexia 3 have images; every other live model shows the placeholder', () => {
     for (const modelId of LIVE_CHEVROLET_MODEL_IDS) {
       const result = resolveVehicleImage(chevy(modelId, { trimId: `${modelId}-x`, year: 2020, colorHex: '#F4F5F7' }));
-      expect(result.kind).toBe(modelId === 'cobalt' || modelId === 'gentra' ? 'image' : 'placeholder');
+      expect(result.kind).toBe(['cobalt', 'gentra', 'nexia-3'].includes(modelId) ? 'image' : 'placeholder');
     }
     const withImages = CHEVROLET_IMAGE_MANIFEST.bodies.filter((b) => Object.keys(b.assets).length > 0);
-    expect(withImages.map((b) => b.key)).toEqual(['cobalt-gen2', 'gentra']);
+    expect(withImages.map((b) => b.key)).toEqual(['cobalt-gen2', 'nexia-r3', 'gentra']);
   });
 
   test('every Cobalt trim, and a Cobalt with no or an unknown trim, is the one pre-restyle body', () => {
@@ -80,9 +80,11 @@ describe('the shipped Chevrolet manifest', () => {
   });
 
   test('Nexia 3 is one body for both backend records; Nexia generations never mix', () => {
-    // No image yet: both records reach the same body and report it as unverified.
-    expect(resolveVehicleImage(chevy('nexia-3'))).toEqual({ kind: 'placeholder', reason: 'body-unverified', bodyType: 'sedan' });
-    expect(resolveVehicleImage(chevy('nexia', { trimId: 'nexia-3-ls' }))).toEqual({ kind: 'placeholder', reason: 'body-unverified', bodyType: 'sedan' });
+    // Both records reach the same R3 image; the N150 (nexia-2-*) never does.
+    expect(resolveVehicleImage(chevy('nexia-3'))).toMatchObject({ kind: 'image', bodyKey: 'nexia-r3' });
+    expect(resolveVehicleImage(chevy('nexia', { trimId: 'nexia-3-ls' }))).toMatchObject({ kind: 'image', bodyKey: 'nexia-r3' });
+    expect(resolveVehicleImage(chevy('nexia', { trimId: 'nexia-2-dlx' }))).toEqual({ kind: 'placeholder', reason: 'body-unverified', bodyType: 'sedan' });
+    expect(resolveVehicleImage(chevy('nexia-1')).kind).toBe('placeholder');
     expect(resolveVehicleImage(chevy('nexia', { trimId: 'nexia-9-zz' }))).toEqual({ kind: 'placeholder', reason: 'generation-unverified' });
   });
 });

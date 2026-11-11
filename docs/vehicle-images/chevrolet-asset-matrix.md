@@ -415,3 +415,14 @@ Automated QA passing is not approval; every result was inspected on white, charc
 - **Nexia 3: rejected.** The bumper-corner halo is fixed, but the roof's white top surface blends into the backdrop. The cleanup thinned it and left a detached sliver above the roof line.
 - **Spark: rejected.** The rail gaps opened, but the enclosed roof paint under both rails got speckled holes (5,923 interior pixels changed).
 - **Conclusion:** where white paint meets a near-white backdrop with no visible edge, the outline can't be recovered from these files. Nexia 3 and Spark need a re-export with real transparency, or retouching by hand in an image editor.
+
+## 15. Replacement candidates: Nexia 3 and Spark (2026-11-10)
+
+**Files:** `~/Downloads/White Chevrolet Nexia 3 Isolated Cutout.png` and `…/White Chevrolet Spark Hatchback Cutout.png` (identical untracked copies in the main checkout's `assets/cars-2d/`).
+- Both are 1774×887 **RGB with no alpha**, with the checkerboard baked into the pixels.
+- Both were processed from copies. The originals' SHA-256 hashes are unchanged.
+
+| Car | Identity | Vision subject lift | Result |
+|---|---|---|---|
+| Nexia 3 | Aveo T250 sedan: 4 doors, T250 grille and bumper, Chevrolet badge. Matches §11. | 0 interior holes. Roof, lamps, glass and wheels intact. Edge halo removed by the same edge-only refinement as the Gentra (0 interior pixels changed). | **Preview, pending owner approval.** 1200×600 WebP, 68 KB; QA pass. Mapped for `nexia` + `nexia-3-*` and `nexia-3`. |
+| Spark | M300 facelift front (≈2013+), 5-door, roof rails. Matches §11 (M300). | **Checkerboard kept** inside the gaps under both roof rails (968 enclosed px). Faint halo at the front corner. | **Rejected.** The candidate contains a baked checkerboard where the background shows through the rails; segmentation counts it as part of the car. |
