@@ -17,6 +17,11 @@ vi.mock('@/services/orders-api', () => ({ ordersTransport: {
   listOrders: state.orders, getOrder: state.order, listAddresses: state.addresses,
   listPaymentMethods: state.payments, getShippingQuote: state.shipping, createOrder: state.createOrder,
 } }));
+vi.mock('@/services/order-attempt-storage', () => ({
+  loadPendingOrderAttempt: vi.fn(async () => null),
+  savePendingOrderAttempt: vi.fn(async () => undefined),
+  clearPendingOrderAttempt: vi.fn(async () => undefined),
+}));
 vi.mock('@/services/notifications-service', () => ({ notificationsTransport: {
   list: state.notifications, markRead: state.markRead, markAllRead: state.markAllRead,
 } }));

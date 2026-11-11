@@ -65,7 +65,7 @@ test('failed order creation is not automatically retried by React Query', async 
 });
 
 test('a refused total preserves the machine-readable code without weakening submission guards', async () => {
-  const refusal = Object.assign(new Error('Total changed'), { code: 'ORDER_TOTAL_CHANGED' });
+  const refusal = Object.assign(new Error('Total changed'), { status: 409, code: 'ORDER_TOTAL_CHANGED' });
   state.createOrder.mockRejectedValueOnce(refusal);
   const get = await renderOrder();
   await act(async () => { expect(await get().placeOrder(input)).toBeNull(); });
@@ -73,6 +73,23 @@ test('a refused total preserves the machine-readable code without weakening subm
   expect(state.createOrder).toHaveBeenCalledTimes(1);
   await act(async () => get().reset());
   expect(get()).toMatchObject({ phase: 'idle', error: null, errorCode: null });
+});
+
+test('a definitive refusal clears its attempt so corrected checkout uses a new key', async () => {
+  state.createOrder.mockRejectedValueOnce(
+    Object.assign(new Error('Stock changed'), { status: 409, code: 'PART_UNAVAILABLE' }),
+  ).mockResolvedValueOnce({ orderId: 'corrected-order', eta: 'unit', totalLabel: '2 UZS' });
+  const get = await renderOrder();
+  await act(async () => { await get().placeOrder(input); });
+  const refusedKey = (state.createOrder.mock.calls[0]![0] as CreateOrderInput).idempotencyKey;
+  expect(state.pendingAttempt).toBeNull();
+
+  await act(async () => {
+    await get().placeOrder({ ...input, items: [{ productId: 'unit-part', quantity: 2 }] });
+  });
+  const corrected = state.createOrder.mock.calls[1]![0] as CreateOrderInput;
+  expect(corrected.items).toEqual([{ productId: 'unit-part', quantity: 2 }]);
+  expect(corrected.idempotencyKey).not.toBe(refusedKey);
 });
 
 test('empty cart never reaches the order transport', async () => {

@@ -64,6 +64,19 @@ function errorCodeOf(error: unknown): string | null {
   return typeof code === 'string' ? code : null;
 }
 
+/**
+ * These 409 responses mean the backend rejected this order before creating it.
+ * Other conflicts can mean an idempotency replay is still running or that a key
+ * was reused, so keep the recovery record for those until the backend confirms.
+ */
+function isDefinitiveOrderRefusal(error: unknown): boolean {
+  const code = errorCodeOf(error);
+  if (['ORDER_TOTAL_CHANGED', 'PART_UNAVAILABLE', 'DELIVERY_PRICE_CHANGED', 'DELIVERY_QUOTE_STALE'].includes(code ?? '')) return true;
+  const status = (error as { status?: unknown } | null)?.status;
+  if (status === 400 || status === 422) return true;
+  return false;
+}
+
 // ── useOrders (list) ───────────────────────────────────────────────────
 
 export type OrderListState = 'idle' | 'loading' | 'success' | 'empty' | 'error';
@@ -252,9 +265,19 @@ export function useCreateOrder(): UseCreateOrderValue {
       const completed = recovered ? { ...result, recoveredAttempt: attemptInput } : result;
       setSnapshot({ ownerId, attempt, phase: 'success', error: null, errorCode: null, result: completed });
       return completed;
-    }, (error: unknown) => {
+    }).catch(async (error: unknown) => {
       if (session.current === attempt && canRead()) {
-        setSnapshot({ ownerId, attempt, phase: 'error', error: error instanceof Error ? error.message : 'Order failed', errorCode: errorCodeOf(error), errorDetails: errorDetailsOf(error), result: null });
+        if (isDefinitiveOrderRefusal(error)) {
+          try {
+            await clearPendingOrderAttempt(ownerId!);
+            if (session.current === attempt && canRead()) attempt.key = undefined;
+          } catch {
+            // If durable cleanup fails, keep the key and fail closed on retry.
+          }
+        }
+        if (session.current === attempt && canRead()) {
+          setSnapshot({ ownerId, attempt, phase: 'error', error: error instanceof Error ? error.message : 'Order failed', errorCode: errorCodeOf(error), errorDetails: errorDetailsOf(error), result: null });
+        }
       }
       return null;
     }).finally(() => { if (attempt.pending === pending) attempt.pending = null; });

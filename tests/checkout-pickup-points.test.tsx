@@ -85,6 +85,11 @@ vi.mock('@/services/payments-service', () => ({
 }));
 vi.mock('@/utils/haptics', () => ({ triggerHaptic: vi.fn() }));
 vi.mock('@/services/orders-api', () => ({ ordersTransport: transport }));
+vi.mock('@/services/order-attempt-storage', () => ({
+  loadPendingOrderAttempt: vi.fn(async () => null),
+  savePendingOrderAttempt: vi.fn(async () => undefined),
+  clearPendingOrderAttempt: vi.fn(async () => undefined),
+}));
 vi.mock('@/services/delivery-map', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/services/delivery-map')>();
   return { ...actual, isMapAvailable: () => availability.map };

@@ -77,6 +77,11 @@ vi.mock('@/services/garage-service', () => ({ default: { getPrimary: () => null 
 vi.mock('@/services/payments-service', () => ({ paymentsTransport: { startPayment } }));
 vi.mock('@/utils/haptics', () => ({ triggerHaptic: vi.fn() }));
 vi.mock('@/services/orders-api', () => ({ ordersTransport: transport }));
+vi.mock('@/services/order-attempt-storage', () => ({
+  loadPendingOrderAttempt: vi.fn(async () => null),
+  savePendingOrderAttempt: vi.fn(async () => undefined),
+  clearPendingOrderAttempt: vi.fn(async () => undefined),
+}));
 vi.mock('@/services/pending-payment-storage', () => ({
   loadPendingPayment: vi.fn(async () => stored.record),
   savePendingPayment: vi.fn(async (_: unknown, record: Record<string, string>) => {
