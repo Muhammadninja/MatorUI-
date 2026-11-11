@@ -1,6 +1,6 @@
 import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
-import { Bell, ChevronDown, ChevronUp, Search } from 'lucide-react-native';
+import { Bell, ChevronRight, ChevronUp, Search } from 'lucide-react-native';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -93,7 +93,7 @@ export default function ExploreScreen() {
   // Three equal columns with exact gaps, whatever the phone's width.
   const tileWidth = Math.floor((windowWidth - SCREEN_GUTTER * 2 - GRID_GAP * 2) / 3);
   const [categoriesExpanded, setCategoriesExpanded] = useState(false);
-  const CategoriesChevron = categoriesExpanded ? ChevronUp : ChevronDown;
+  const CategoriesChevron = categoriesExpanded ? ChevronUp : ChevronRight;
 
   // Collapsing removes content the user may be scrolled past, so the offset is
   // corrected once the shorter content has been measured.
@@ -152,7 +152,12 @@ export default function ExploreScreen() {
   // root id to the root's whole subtree. The subcategory step belongs to the
   // make → model flow (the systems screen), and a car in the Garage doesn't
   // change this grid — it carries no vehicle context.
+  // A quick double tap would push the category screen twice.
+  const lastCategoryOpen = useRef(0);
   const openCategory = useCallback((id: string, label: string) => {
+    const now = Date.now();
+    if (now - lastCategoryOpen.current < 800) return;
+    lastCategoryOpen.current = now;
     triggerHaptic('selection');
     router.push({ pathname: '/category', params: { cat: id, label } });
   }, []);
@@ -377,16 +382,43 @@ export default function ExploreScreen() {
         )}
 
         {/* ── Shop by category ── */}
-        <AppText
-          textVariant="h4"
-          weight="bold"
-          style={{ marginTop: 12 }}
+        <AppView
+          testID="explore-categories-heading"
+          row
+          align="center"
+          justify="space-between"
+          gap={8}
           onLayout={(e) => {
             categoriesHeadingY.current = e.nativeEvent.layout.y;
           }}
         >
-          {t('explore.shopByCategory')}
-        </AppText>
+          <AppText textVariant="h4" weight="bold" style={{ flexShrink: 1 }}>
+            {t('explore.shopByCategory')}
+          </AppText>
+          {/* "All categories" opens the rest of the grid in place; the same
+           *  control collapses it again. */}
+          {categoriesState === 'success' && categories.length > INITIAL_CATEGORY_COUNT ? (
+            <AppPressableView
+              testID="explore-toggle-categories"
+              onPress={toggleCategories}
+              accessibilityRole="button"
+              accessibilityLabel={t(
+                categoriesExpanded ? 'explore.showFewerCategories' : 'explore.showAllCategories',
+              )}
+              accessibilityState={{ expanded: categoriesExpanded }}
+              androidRipple={false}
+            >
+              {/* minHeight sits inside the Pressable: on the pressable's own
+               *  style it would reach only the wrapper, not the touch area. */}
+              <AppView row center gap={2} style={{ minHeight: 44, paddingLeft: 8 }}>
+                <AppText weight="medium" style={{ fontSize: 15, lineHeight: 20, color: tokens.brandText }}>
+                  {t(categoriesExpanded ? 'explore.collapseCategories' : 'explore.allCategories')}
+                </AppText>
+                <CategoriesChevron size={18} strokeWidth={2.2} color={tokens.brandText} />
+              </AppView>
+            </AppPressableView>
+          ) : null}
+        </AppView>
         {categoriesState === 'loading' ? (
           <CategoryGridSkeleton count={INITIAL_CATEGORY_COUNT} tileWidth={tileWidth} />
         ) : categoriesState === 'error' ? (
@@ -421,31 +453,6 @@ export default function ExploreScreen() {
                 ),
               )}
             </AppView>
-            {categories.length > INITIAL_CATEGORY_COUNT ? (
-              <AppPressableView
-                testID="explore-toggle-categories"
-                onPress={toggleCategories}
-                accessibilityRole="button"
-                accessibilityLabel={t(
-                  categoriesExpanded ? 'explore.showFewerCategories' : 'explore.showAllCategories',
-                )}
-                accessibilityState={{ expanded: categoriesExpanded }}
-                androidRipple={false}
-                style={{ alignSelf: 'center' }}
-              >
-                {/* minHeight sits inside the Pressable: on the pressable's own
-                 *  style it would reach only the wrapper, not the touch area. */}
-                <AppView row center gap={4} style={{ minHeight: 48, paddingHorizontal: 12 }}>
-                  <AppText
-                    weight="medium"
-                    style={{ fontSize: 15, lineHeight: 20, color: tokens.brandText }}
-                  >
-                    {t(categoriesExpanded ? 'explore.collapseCategories' : 'explore.allCategories')}
-                  </AppText>
-                  <CategoriesChevron size={18} strokeWidth={2.2} color={tokens.brand} />
-                </AppView>
-              </AppPressableView>
-            ) : null}
           </>
         )}
       </ScrollView>

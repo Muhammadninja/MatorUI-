@@ -426,3 +426,48 @@ Automated QA passing is not approval; every result was inspected on white, charc
 |---|---|---|---|
 | Nexia 3 | Aveo T250 sedan: 4 doors, T250 grille and bumper, Chevrolet badge. Matches §11. | 0 interior holes. Roof, lamps, glass and wheels intact. Edge halo removed by the same edge-only refinement as the Gentra (0 interior pixels changed). | **Preview, pending owner approval.** 1200×600 WebP, 68 KB; QA pass. Mapped for `nexia` + `nexia-3-*` and `nexia-3`. |
 | Spark | M300 facelift front (≈2013+), 5-door, roof rails. Matches §11 (M300). | **Checkerboard kept** inside the gaps under both roof rails (968 enclosed px). Faint halo at the front corner. | **Rejected.** The candidate contains a baked checkerboard where the background shows through the rails; segmentation counts it as part of the car. |
+
+## 16. Spark M300 replacement (2026-11-10)
+
+**File:** `~/Downloads/White Chevrolet Spark Hatchback Cutout (1).png` (identical copy in the main checkout's `assets/cars-2d/`).
+- 1774×887 **RGBA with real alpha**: 44.9% transparent, 0.95% partly transparent edge pixels, max border alpha 5.
+- No background removal was needed.
+
+**Inspection on teal, white and magenta:**
+- The gaps under both roof rails are genuinely transparent (6,423 enclosed transparent pixels, all of them the rail gaps).
+- No checkerboard or halo.
+- Windows, mirror, headlight corner and wheels are crisp.
+- **Identity:** M300 facelift, 5-door, two-part grille, Chevrolet badge.
+- The candidate still has roof rails (the owner had planned a rail-less version), but their gaps are clean.
+
+**Result:** preview, pending owner approval. 1200×600 WebP, 92 KB; QA pass (width 75.7%, height-limited at 98%). Every `spark` record maps to it, whatever the M400-labelled trim id says.
+
+## 17. Empty-garage hero: red Corvette C8 (2026-11-10, pending owner approval)
+
+**Asset:** `~/Downloads/Red Chevrolet Corvette C8 Cutout.png`, 1536×1024 RGBA with real alpha (76% clear, max border alpha 1).
+- Edges are clean: roof, mirror, wing, headlight, wheels with red calipers.
+- No checkerboard; crossed-flags badge, no bowtie.
+- It carries its own soft **contact shadow** (4.4% semi-transparent pixels). The asset QA flags this as "likely shadow"; it is intentional, so the card's drawn ground shadow is switched off for this artwork.
+
+**App file:** `assets/hero/corvette-c8-red.webp`, 1200×600, 146 KB.
+- It lives outside `assets/vehicles/` and is **not** in the vehicle-image manifest. It is decorative only: never resolved, selected, saved or used for fitment.
+
+**Button:** opens `/garage?add=1`. The Garage screen runs its existing `startAdd` once, which sends guests to sign-in and opens the make/model/year sheet for signed-in users.
+
+## 18. Malibu facelift and year resolution (2026-11-10, pending owner approval)
+
+**Asset:** `~/Downloads/White Chevrolet Malibu Cutaway.png` (`Cutaway-2` is the identical file).
+- RGB with a baked checkerboard; cut out with Vision subject lift, then the edge-only refinement (0 interior pixels changed).
+- Shows the **9th-generation facelift**: slim lamps, two-tier grille, LED daytime lights in the bumper.
+- `malibu-gen2-facelift/white.webp`: 1200×600, 62 KB; QA pass.
+
+**Years:**
+- GM's facelift is model year 2019; UzAuto sold it from Aug–Sep 2019 ([Kun.uz](https://kun.uz/en/news/2019/08/16/uzauto-motors-launches-sales-of-updated-malibu-model), [Spot.uz](https://www.spot.uz/ru/2019/08/16/malibu/)).
+- 2020 onwards → facelift image.
+- 2016–2018 → pre-facelift body (no image).
+- **2019 → silhouette**, because both fronts were sold that year.
+- A `malibu-1-*` trim always means Malibu 1, whatever the year. A missing or unrecognised trim falls back to the year.
+
+**Resolver:** a trim prefix can now map to verified year ranges within a generation (for facelifts). Strict make/model matching is unchanged.
+
+**Garage screen:** the active hero and list rows show the manufacturer logo only (owner-approved), so the resolver drives the Explore card alone.

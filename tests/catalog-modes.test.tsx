@@ -324,8 +324,9 @@ describe('A. home grid without a picked model', () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
       const scroller = r.root.find((n) => is(n, 'scroll') && Boolean(n.props.onContentSizeChange));
+      // The heading row (title + "All categories") is what's measured.
       const heading = r.root.find(
-        (n) => is(n, 'text') && n.props.children === 'explore.shopByCategory',
+        (n) => is(n, 'view') && n.props.testID === 'explore-categories-heading',
       );
       await act(async () => {
         scroller.props.onLayout({ nativeEvent: { layout: { height: 700 } } });
@@ -399,6 +400,9 @@ describe('A. home grid without a picked model', () => {
   test('a system tile opens all of its parts at once — no subcategory step', async () => {
     const r = await render(<ExploreScreen />);
     await expandCategories(r);
+    // Each press is a separate, unhurried tap (the double-tap guard is below).
+    let clock = Date.now();
+    const now = vi.spyOn(Date, 'now').mockImplementation(() => (clock += 1000));
     for (const tile of r.root.findAll((n) => is(n, 'tile'))) {
       push.mockReset();
       await press(tile);
@@ -411,8 +415,19 @@ describe('A. home grid without a picked model', () => {
         params: { cat: id.id, label: tile.props.label },
       });
     }
+    now.mockRestore();
     // Never asked the tree for children, never pushed the subcategory screen.
     expect(childLookups()).toEqual([]);
+  });
+
+  test('a rapid double tap opens the category once', async () => {
+    const r = await render(<ExploreScreen />);
+    const [first, second] = r.root.findAll((n) => is(n, 'tile'));
+    push.mockReset();
+    await press(first);
+    await press(first);
+    await press(second);
+    expect(push).toHaveBeenCalledTimes(1);
   });
 
   test('the listing asks for the whole system, with no car scoping it', async () => {
