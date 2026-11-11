@@ -199,7 +199,8 @@ export function GarageHeroCard({
           testID={action.testID}
           title={action.title}
           kind="brand"
-          size="lg"
+          // The empty-state action is secondary to the artwork: one size down.
+          size={emptyGarage ? 'md' : 'lg'}
           fullWidth={stacked}
           style={stacked ? undefined : { alignSelf: 'flex-start' }}
           onPress={action.onPress}
