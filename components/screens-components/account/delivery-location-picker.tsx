@@ -14,7 +14,7 @@ import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useAddressSuggestions } from '@/hooks/use-address-suggestions';
-import { useAppLocation } from '@/hooks/use-app-location/use-app-location';
+import { useAppLocation, type LocationFailure } from '@/hooks/use-app-location/use-app-location';
 import { useDeliveryCoverage } from '@/hooks/use-delivery-coverage';
 import { isWithinCoverage } from '@/services/delivery-coverage';
 import {
@@ -96,7 +96,7 @@ function PickerContent({
   const [closeEnough, setCloseEnough] = useState(
     !mapAvailable || isCloseEnoughToChoose(startRegion),
   );
-  const [locateFailed, setLocateFailed] = useState(false);
+  const [locateFailure, setLocateFailure] = useState<LocationFailure | null>(null);
   const [typed, setTyped] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
@@ -138,7 +138,7 @@ function PickerContent({
     lastRegion.current = null;
     setSelected(point);
     setCloseEnough(!mapAvailable || delta <= MAX_CONFIRM_DELTA);
-    setLocateFailed(false);
+    setLocateFailure(null);
     mapRef.current?.animateToRegion(regionAround(point, delta), MOVE_MS);
     // If the buyer cuts the move short it never arrives, and there may be no further report.
     // What the map last said is then where the marker is, so that has to count.
@@ -171,10 +171,10 @@ function PickerContent({
   };
 
   const useMyLocation = async () => {
-    setLocateFailed(false);
+    setLocateFailure(null);
     const coords = await location.requestAndGetPosition();
     if (coords) moveTo({ lat: coords.latitude, lng: coords.longitude }, STREET_DELTA);
-    else setLocateFailed(true);
+    else setLocateFailure(location.lastFailure?.() ?? 'unavailable');
   };
 
   const pickSuggestion = (suggestion: AddressSuggestion) => {
@@ -310,9 +310,9 @@ function PickerContent({
       </AppView>
 
       <AppView px={20} gap={10} style={{ paddingTop: 12, paddingBottom: Math.max(insets.bottom, 16) }}>
-        {locateFailed ? (
-          <AppText family="default" style={{ fontSize: 12.5, color: tokens.error }}>
-            {t('account.locationFailed')}
+        {locateFailure ? (
+          <AppText testID="delivery-map-locate-failed" family="default" style={{ fontSize: 12.5, color: tokens.error }}>
+            {t(locateFailure === 'denied' ? 'account.locationDenied' : 'account.locationUnavailable')}
           </AppText>
         ) : outsideCoverage ? (
           <AppText testID="delivery-map-outside" family="default" style={{ fontSize: 13, color: tokens.error }}>
