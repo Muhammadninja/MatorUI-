@@ -71,7 +71,9 @@ vi.mock('@/components/screens-components/account/address-form-sheet', () => ({
   default: () => null,
 }));
 vi.mock('@/contexts/theme.context', () => ({ useThemeContext: () => ({ tokens: {} }) }));
-vi.mock('@/contexts/user.context', () => ({ useUserContext: () => ({ profile: null }) }));
+vi.mock('@/contexts/user.context', () => ({ useUserContext: () => ({
+  profile: { id: 'user_a' }, isAuthenticated: true, isHydrating: false,
+}) }));
 vi.mock('@/services/pending-payment-storage', () => ({
   loadPendingPayment: vi.fn(async () => null),
   savePendingPayment: vi.fn(async () => undefined),

@@ -105,7 +105,7 @@ function GateSheet({
           </AppText>
           <AppText
             family="default"
-            style={{ fontSize: 13.5, lineHeight: 20, color: tokens.textMuted, textAlign: 'center', maxWidth: 300 }}
+            style={{ fontSize: 14, lineHeight: 20, color: tokens.textMuted, textAlign: 'center', maxWidth: 300 }}
           >
             {body}
           </AppText>

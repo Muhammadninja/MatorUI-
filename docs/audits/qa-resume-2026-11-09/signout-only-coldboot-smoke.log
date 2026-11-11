@@ -1,0 +1,19 @@
+Mator mock server → http://localhost:8080
+Point EXPO_PUBLIC_API_BASE_URL at this host, then run: maestro test .maestro/  (cart/orders: commerce.mjs)
+[mock] GET /
+[mock] POST /__e2e/reset
+[mock] GET /v1/reference/categories
+[mock] GET /v1/reference/makes
+[mock] GET /v1/app/config
+[mock] GET /v1/reference/makes
+[mock] GET /v1/app/config
+[mock] GET /v1/reference/categories
+[mock] GET /v1/reference/categories
+[mock] GET /v1/reference/makes
+[mock] GET /v1/app/config
+[mock] GET /v1/reference/makes
+[mock] GET /v1/app/config
+[mock] GET /v1/reference/categories
+[mock] GET /v1/reference/categories
+[mock] GET /v1/reference/makes
+[mock] GET /v1/app/config

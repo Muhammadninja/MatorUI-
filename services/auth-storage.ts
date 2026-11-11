@@ -1,21 +1,7 @@
-/**
- * Persistence for the auth session.
- *
- * DUAL-BACKED: written to BOTH `expo-secure-store` (iOS Keychain / Android
- * Keystore — encrypted) AND `@react-native-async-storage/async-storage`
- * (plaintext file in the app sandbox). SecureStore is preferred on read, but
- * some iOS release builds silently fail to persist keychain items across cold
- * launches (the write "succeeds" but the value is gone next launch) — which
- * logged users out on every restart. AsyncStorage persists reliably (the same
- * store already survives launches for the garage / likes / language), so it is
- * the fallback that guarantees the session survives.
- *
- * Security note: the refresh token in the AsyncStorage copy is NOT encrypted at
- * rest. Acceptable here — accounts are phone-OTP only (no password to steal),
- * the token still rotates, and SecureStore remains the primary encrypted store.
- *
- * All functions swallow I/O errors and return `null` rather than throw, so a
- * corrupt entry can't crash the auth flow on cold boot.
+/** Session persistence uses atomic envelopes in encrypted and fallback storage.
+ * Revisions choose the newest complete copy if one store fails during rotation.
+ * Legacy split SecureStore keys remain readable for migration only.
+ * The existing AsyncStorage fallback remains plaintext in the app sandbox.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -30,6 +16,7 @@ import { debugLog } from '@/services/debug-log';
 const KEY_ACCESS = 'auth_v2_access';
 const KEY_REFRESH = 'auth_v2_refresh';
 const KEY_META = 'auth_v2_meta';
+const KEY_SESSION = 'auth_v3_session';
 
 // AsyncStorage keys allow any string (colons are fine here) — the reliable copy.
 const ASYNC_KEY = 'auth:v2:session';
@@ -46,102 +33,116 @@ export type AuthSession = {
   expiresAt?: number;
 };
 
-type Envelope = AuthSession & { v: number };
+type Envelope = AuthSession & { v: number; revision?: number; writtenAt?: number };
+let lastRevision = 0;
+let storageTail: Promise<unknown> = Promise.resolve();
 
-function isEnvelope(value: unknown): value is Envelope {
-  if (!value || typeof value !== 'object') return false;
-  const e = value as Partial<Envelope>;
-  return (
-    typeof e.v === 'number' &&
-    typeof e.accessToken === 'string' &&
-    typeof e.refreshToken === 'string'
-  );
+// A sign-out queued after a save must finish after every write from that save.
+function serialized<T>(operation: () => Promise<T>): Promise<T> {
+  const result = storageTail.then(operation, operation);
+  storageTail = result.then(() => undefined, () => undefined);
+  return result;
 }
 
-/** Parse a JSON envelope string into a session, or null if invalid/mismatched. */
-function parseEnvelope(raw: string | null): AuthSession | null {
+function isRevision(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+function parseEnvelope(raw: string | null): Envelope | null {
   if (!raw) return null;
   try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!isEnvelope(parsed) || parsed.v !== SCHEMA) return null;
-    const { v: _v, ...session } = parsed;
-    return session;
-  } catch {
-    return null;
-  }
+    const value = JSON.parse(raw) as Partial<Envelope> | null;
+    if (!value || value.v !== SCHEMA || typeof value.accessToken !== 'string' ||
+        !value.accessToken || typeof value.refreshToken !== 'string' || !value.refreshToken) return null;
+    // eea9b09 used writtenAt for the same monotonic ordering. Read both forms
+    // so upgrading never prefers an older encrypted copy after a failed write.
+    const revision = isRevision(value.revision) ? value.revision
+      : isRevision(value.writtenAt) ? value.writtenAt : undefined;
+    if (revision === undefined && (value.revision !== undefined || value.writtenAt !== undefined)) return null;
+    return { ...value, revision } as Envelope;
+  } catch { return null; }
 }
 
-export async function loadAuthSession(): Promise<AuthSession | null> {
-  // 1) SecureStore split keys (encrypted, preferred).
-  try {
-    const [accessToken, refreshToken, metaRaw] = await Promise.all([
-      SecureStore.getItemAsync(KEY_ACCESS),
-      SecureStore.getItemAsync(KEY_REFRESH),
-      SecureStore.getItemAsync(KEY_META),
-    ]);
-    if (accessToken && refreshToken) {
+async function readCopies(): Promise<{ secure: Envelope | null; fallback: Envelope | null }> {
+  const [secureRaw, fallbackRaw] = await Promise.all([
+    SecureStore.getItemAsync(KEY_SESSION).catch(() => null),
+    AsyncStorage.getItem(ASYNC_KEY).catch(() => null),
+  ]);
+  const secure = parseEnvelope(secureRaw);
+  const fallback = parseEnvelope(fallbackRaw);
+  lastRevision = Math.max(lastRevision, secure?.revision ?? 0, fallback?.revision ?? 0);
+  return { secure, fallback };
+}
+
+function sessionFrom(envelope: Envelope): AuthSession {
+  return {
+    accessToken: envelope.accessToken,
+    refreshToken: envelope.refreshToken,
+    ...(envelope.expiresAt !== undefined ? { expiresAt: envelope.expiresAt } : {}),
+  };
+}
+
+export function loadAuthSession(): Promise<AuthSession | null> {
+  return serialized(async () => {
+    const { secure, fallback } = await readCopies();
+    // Prefer encrypted storage only when its revision is at least as recent.
+    // A legacy fallback has revision zero and wins over potentially mixed split keys.
+    const newest = secure && (!fallback || (secure.revision ?? 0) >= (fallback.revision ?? 0))
+      ? secure : fallback;
+    if (newest) return sessionFrom(newest);
+    try {
+      const [accessToken, refreshToken, metaRaw] = await Promise.all([
+        SecureStore.getItemAsync(KEY_ACCESS), SecureStore.getItemAsync(KEY_REFRESH), SecureStore.getItemAsync(KEY_META),
+      ]);
+      if (!accessToken || !refreshToken) return null;
       let expiresAt: number | undefined;
       if (metaRaw) {
-        const meta = JSON.parse(metaRaw) as { v?: number; expiresAt?: number };
-        if (meta.v === SCHEMA) expiresAt = meta.expiresAt;
+        try {
+          const meta = JSON.parse(metaRaw) as { v?: number; expiresAt?: number };
+          if (meta.v === SCHEMA) expiresAt = meta.expiresAt;
+        } catch { /* Tokens remain usable if only legacy metadata is corrupt. */ }
       }
-      debugLog('auth', 'loadAuthSession → SecureStore (split keys)');
-      return { accessToken, refreshToken, expiresAt };
+      return { accessToken, refreshToken, ...(expiresAt !== undefined ? { expiresAt } : {}) };
+    } catch {
+      debugLog('auth', 'loadAuthSession failed');
+      return null;
     }
-  } catch (err) {
-    debugLog('auth', 'loadAuthSession → SecureStore read failed', { message: (err as Error)?.message });
-  }
-
-  // 2) AsyncStorage fallback (the copy that survives when the keychain doesn't).
-  try {
-    const fallback = parseEnvelope(await AsyncStorage.getItem(ASYNC_KEY));
-    if (fallback) {
-      debugLog('auth', 'loadAuthSession → AsyncStorage fallback');
-      return fallback;
-    }
-  } catch (err) {
-    debugLog('auth', 'loadAuthSession → AsyncStorage read failed', { message: (err as Error)?.message });
-  }
-
-  debugLog('auth', 'loadAuthSession → no persisted session');
-  return null;
+  });
 }
 
-export async function saveAuthSession(session: AuthSession): Promise<void> {
-  const envelope = JSON.stringify({ v: SCHEMA, ...session });
+export function saveAuthSession(session: AuthSession): Promise<void> {
+  // Snapshot caller-owned data before waiting behind an earlier storage operation.
+  const snapshot = { ...session };
+  return serialized(async () => {
+    await readCopies();
+    lastRevision = Math.max(lastRevision + 1, Date.now());
+    // Keep writtenAt in new copies for compatible rollback to eea9b09.
+    const envelope = JSON.stringify({ ...snapshot, v: SCHEMA, revision: lastRevision, writtenAt: lastRevision });
+    let saved = false;
+    try {
+      await AsyncStorage.setItem(ASYNC_KEY, envelope);
+      saved = true;
+    } catch { debugLog('auth', 'saveAuthSession fallback write failed'); }
+    try {
+      // One encrypted write prevents access/refresh tokens from different rotations.
+      await SecureStore.setItemAsync(KEY_SESSION, envelope);
+      saved = true;
+    } catch { debugLog('auth', 'saveAuthSession encrypted write failed'); }
+    if (saved) {
+      await Promise.all([KEY_ACCESS, KEY_REFRESH, KEY_META].map((key) =>
+        SecureStore.deleteItemAsync(key).catch(() => undefined)));
+    }
+  });
+}
 
-  // 1) AsyncStorage FIRST — the reliable store. Persistence must never depend
-  //    solely on the keychain, which can silently drop values in release builds.
-  try {
-    await AsyncStorage.setItem(ASYNC_KEY, envelope);
-    debugLog('auth', 'saveAuthSession → AsyncStorage OK');
-  } catch (err) {
-    debugLog('auth', 'saveAuthSession → AsyncStorage FAILED', { message: (err as Error)?.message });
-  }
-
-  // 2) SecureStore (encrypted, split keys) — best effort on top.
-  try {
-    const meta = JSON.stringify({ v: SCHEMA, expiresAt: session.expiresAt });
+export function clearAuthSession(): Promise<void> {
+  return serialized(async () => {
     await Promise.all([
-      SecureStore.setItemAsync(KEY_ACCESS, session.accessToken),
-      SecureStore.setItemAsync(KEY_REFRESH, session.refreshToken),
-      SecureStore.setItemAsync(KEY_META, meta),
+      ...[KEY_SESSION, KEY_ACCESS, KEY_REFRESH, KEY_META].map((key) =>
+        SecureStore.deleteItemAsync(key).catch(() => undefined)),
+      AsyncStorage.removeItem(ASYNC_KEY).catch(() => undefined),
     ]);
-    debugLog('auth', 'saveAuthSession → SecureStore OK');
-  } catch (err) {
-    debugLog('auth', 'saveAuthSession → SecureStore FAILED (AsyncStorage fallback covers it)', {
-      message: (err as Error)?.message,
-    });
-  }
-}
-
-export async function clearAuthSession(): Promise<void> {
-  await Promise.all([
-    SecureStore.deleteItemAsync(KEY_ACCESS).catch(() => undefined),
-    SecureStore.deleteItemAsync(KEY_REFRESH).catch(() => undefined),
-    SecureStore.deleteItemAsync(KEY_META).catch(() => undefined),
-    AsyncStorage.removeItem(ASYNC_KEY).catch(() => undefined),
-  ]);
+  });
 }
 
 // ── In-memory cache ────────────────────────────────────────────────────

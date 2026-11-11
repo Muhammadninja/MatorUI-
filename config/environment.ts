@@ -28,3 +28,16 @@ export function allowLocalDevOtp(): boolean {
     return host === 'localhost' || host === '[::1]' || /^127\./.test(host);
   } catch { return false; }
 }
+
+
+/** Bundled test builds are allowed HTTP only with their separate identity.
+ * Production manifests cannot opt into this exception with an env marker alone.
+ */
+export function isDedicatedE2EApp(): boolean {
+  const config = Constants.expoConfig;
+  const env = getAppEnvironment();
+  return config?.extra?.e2e === true &&
+    config.android?.package === 'com.mator.e2e' && config.scheme === 'mator-e2e' &&
+    config.updates?.enabled === false && env.name === 'local' &&
+    env.apiBaseUrl === 'http://127.0.0.1:8080' && !env.allowDevOtp && !env.httpDomains;
+}

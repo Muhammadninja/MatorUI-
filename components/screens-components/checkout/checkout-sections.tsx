@@ -52,8 +52,8 @@ export function SummaryRow({
 }) {
   return (
     <AppView row justify="space-between" testID={testID}>
-      <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted }}>{label}</AppText>
-      <AppText family="accent" weight="semibold" style={{ fontSize: 13.5, color: tokens.text }}>{value}</AppText>
+      <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted }}>{label}</AppText>
+      <AppText family="accent" weight="semibold" style={{ fontSize: 14, color: tokens.text }}>{value}</AppText>
     </AppView>
   );
 }
@@ -143,7 +143,7 @@ export function DeliverySection({
         <SectionLabel tokens={tokens}>{t('checkout.deliveryAddress')}</SectionLabel>
         {addr && canChange ? (
           <AppPressableView onPress={onChange} accessibilityRole="button" accessibilityLabel={t('checkout.changeAddress')}>
-            <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.text }}>{t('checkout.change')}</AppText>
+            <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.brandText }}>{t('checkout.change')}</AppText>
           </AppPressableView>
         ) : null}
       </AppView>
@@ -167,7 +167,7 @@ export function DeliverySection({
             </AppView>
           </AppView>
           <AppView row gap={18} style={{ marginTop: 2 }}>
-            <LinkAction label={t('checkout.addNew')} onPress={onAdd} color={tokens.text} />
+            <LinkAction label={t('checkout.addNew')} onPress={onAdd} color={tokens.brandText} />
             <LinkAction label={t('checkout.skipForNow')} onPress={onSkip} color={tokens.textMuted} />
           </AppView>
         </>
@@ -175,15 +175,15 @@ export function DeliverySection({
         <>
           <AppView row align="center" gap={10}>
             <MapPin size={18} strokeWidth={2} color={tokens.text} />
-            <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted, flex: 1 }}>
+            <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted, flex: 1 }}>
               {t('checkout.noAddressPickup')}
             </AppText>
           </AppView>
-          <LinkAction label={t('checkout.addAnAddress')} onPress={onAdd} color={tokens.text} />
+          <LinkAction label={t('checkout.addAnAddress')} onPress={onAdd} color={tokens.brandText} />
         </>
       ) : (
         <>
-          <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted }}>
+          <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted }}>
             {t('checkout.addAddressOrPickup')}
           </AppText>
           <AppView row gap={10}>
@@ -212,10 +212,10 @@ function RadioMark({ tokens, selected }: { tokens: Tokens; selected: boolean }) 
         height: 22,
         borderWidth: selected ? 0 : 1.5,
         borderColor: tokens.border,
-        backgroundColor: selected ? tokens.text : 'transparent',
+        backgroundColor: selected ? tokens.brand : 'transparent',
       }}
     >
-      {selected ? <Check size={14} strokeWidth={3} color={tokens.background} /> : null}
+      {selected ? <Check size={14} strokeWidth={3} color={tokens.onBrand} /> : null}
     </AppView>
   );
 }
@@ -244,13 +244,13 @@ export function PaymentRow({
       colorName="card"
       borderWidth={1}
       borderName={selected ? undefined : 'border'}
-      style={selected ? { borderWidth: 1.5, borderColor: tokens.text } : undefined}
+      style={selected ? { borderWidth: 1.5, borderColor: tokens.brand } : undefined}
     >
       <AppView row align="center" gap={12}>
         <Icon size={20} strokeWidth={2} color={tokens.text} />
         <AppView flex={1}>
           <AppText family="default" weight="semibold" style={{ fontSize: 15, color: tokens.text }}>{t(option.labelKey)}</AppText>
-          <AppText family="default" style={{ fontSize: 12.5, color: tokens.textMuted, marginTop: 1 }}>{t(option.descriptionKey)}</AppText>
+          <AppText family="default" style={{ fontSize: 12, color: tokens.textMuted, marginTop: 1 }}>{t(option.descriptionKey)}</AppText>
         </AppView>
         <RadioMark tokens={tokens} selected={selected} />
       </AppView>
@@ -293,7 +293,7 @@ function DeliveryOptionRow({
       p={12}
       borderWidth={1}
       borderName={selected ? undefined : 'border'}
-      style={selected ? { borderWidth: 1.5, borderColor: tokens.text } : undefined}
+      style={selected ? { borderWidth: 1.5, borderColor: tokens.brand } : undefined}
     >
       <AppView row align="center" gap={12}>
         <AppText family="default" weight="semibold" style={{ fontSize: 15, color: tokens.text, flex: 1 }}>
@@ -372,7 +372,7 @@ export function DeliveryOptionsCard({
           {courier.state === 'loading' ? (
             <AppView row align="center" gap={8}>
               <WheelLoader size={18} color={tokens.text} />
-              <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted, flex: 1 }}>
+              <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted, flex: 1 }}>
                 {t('checkout.deliveryCalculating')}
               </AppText>
             </AppView>

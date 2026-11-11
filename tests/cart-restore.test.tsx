@@ -6,22 +6,24 @@
 import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, expect, test, vi } from 'vitest';
-import { MockCartTransport, type CartSnapshot } from '@/services/cart-api';
+import type { CartSnapshot } from '@/services/cart-api';
+import { MockCartTransport } from '@/tests/support/transports/cart-api';
 
 const state = vi.hoisted(() => ({
   authenticated: true,
+  owner: 'user-a',
+  epoch: 0,
   transport: null as unknown as Record<string, any>,
 }));
 vi.mock('@/contexts/user.context', () => ({
   useUserContext: () => ({
     isAuthenticated: state.authenticated,
-    profile: state.authenticated ? { id: 'user-a' } : null,
+    profile: state.authenticated ? { id: state.owner } : null,
   }),
 }));
-vi.mock('@/services/cart-api', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/services/cart-api')>();
+vi.mock('@/services/api-client', () => ({ getAuthRequestEpoch: () => state.epoch }));
+vi.mock('@/services/cart-api', () => {
   return {
-    ...actual,
     cartTransport: new Proxy(
       {},
       {
@@ -83,10 +85,85 @@ const restore = async () => {
 
 beforeEach(() => {
   state.authenticated = true;
+  state.owner = 'user-a';
+  state.epoch = 0;
   state.transport = new MockCartTransport({
     items: SNAPSHOT.items.map((i) => ({ ...i })),
     appliedPromoCode: null,
   }) as unknown as Record<string, any>;
+});
+
+test.each(['resolve', 'reject'] as const)(
+  'a pending restore stops after an owner switch when the first add %s',
+  async (outcome) => {
+    const tree = await render();
+    consumed();
+    let resolve!: (item: typeof SNAPSHOT.items[number]) => void;
+    let reject!: (error: Error) => void;
+    const pending = new Promise<typeof SNAPSHOT.items[number]>((done, fail) => {
+      resolve = done;
+      reject = fail;
+    });
+    const addA = vi.fn(() => pending);
+    state.transport.addItem = addA;
+    let restoring!: Promise<unknown>;
+    await act(async () => { restoring = value.restoreCart(); });
+    expect(addA).toHaveBeenCalledOnce();
+
+    const next = new MockCartTransport({ items: [], appliedPromoCode: null });
+    const addB = vi.spyOn(next, 'addItem');
+    const promoB = vi.spyOn(next, 'applyPromo');
+    const fetchB = vi.spyOn(next, 'fetch');
+    state.transport = next as unknown as Record<string, any>;
+    state.owner = 'user-b';
+    state.epoch++;
+    await act(async () => {
+      tree.update(createElement(CartProvider, null, createElement(Probe)));
+    });
+    const readsBeforeOldAnswer = fetchB.mock.calls.length;
+    await act(async () => {
+      if (outcome === 'resolve') resolve(SNAPSHOT.items[0]);
+      else reject(new Error('previous session ended'));
+      await restoring;
+    });
+    expect(addB).not.toHaveBeenCalled();
+    expect(promoB).not.toHaveBeenCalled();
+    expect(fetchB).toHaveBeenCalledTimes(readsBeforeOldAnswer);
+    expect(value.items).toEqual([]);
+    expect((await next.fetch()).items).toEqual([]);
+    await act(async () => tree.unmount());
+  },
+);
+
+test('an auth invalidation stops restore before React has cleaned up the old owner', async () => {
+  const tree = await render();
+  consumed();
+  let answer!: (snapshot: CartSnapshot) => void;
+  state.transport.fetch = vi.fn(() => new Promise<CartSnapshot>((resolve) => { answer = resolve; }));
+  const add = vi.spyOn(state.transport, 'addItem');
+  let restoring!: Promise<unknown>;
+  await act(async () => { restoring = value.restoreCart(); });
+  state.epoch++;
+  await act(async () => {
+    answer({ items: [], appliedPromoCode: null });
+    await restoring;
+  });
+  expect(add).not.toHaveBeenCalled();
+  expect(state.transport.fetch).toHaveBeenCalledOnce();
+  await act(async () => tree.unmount());
+});
+
+test('a retained restore action cannot start reads or writes after auth invalidation', async () => {
+  const tree = await render();
+  consumed();
+  const retained = value.restoreCart;
+  const fetch = vi.spyOn(state.transport, 'fetch');
+  const add = vi.spyOn(state.transport, 'addItem');
+  state.epoch++;
+  await act(async () => { await retained(); });
+  expect(fetch).not.toHaveBeenCalled();
+  expect(add).not.toHaveBeenCalled();
+  await act(async () => tree.unmount());
 });
 
 test('puts every line back on the server, at the right quantities', async () => {

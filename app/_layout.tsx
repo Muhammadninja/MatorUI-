@@ -65,6 +65,8 @@ import { LikesProvider } from '@/contexts/likes.context';
 import { SearchUIProvider } from '@/contexts/search-ui.context';
 import { ThemeProvider as AppThemeProvider, useThemeContext } from '@/contexts/theme.context';
 import { UserProvider } from '@/contexts/user.context';
+import { E2EStartupObserver } from '@/hooks/use-e2e-startup-trace';
+import { useE2EStartupMount } from '@/hooks/use-e2e-startup-mount';
 import { createNavigationTheme } from '@/themes';
 
 export {
@@ -125,6 +127,7 @@ function RootLayoutNav() {
           <QueryClientProvider client={queryClient}>
             <LanguageProvider>
               <UserProvider>
+                <E2EStartupObserver />
                 <CartProvider>
                   <LikesProvider>
                     <ActiveVehicleProvider>
@@ -149,6 +152,7 @@ function RootLayoutNav() {
 }
 
 function RootNavigation() {
+  useE2EStartupMount('root-navigation');
   const colorScheme = useColorScheme();
   const { scheme, tokens } = useThemeContext();
   const resolvedScheme = scheme ?? (colorScheme === 'dark' ? 'dark' : 'light');
@@ -219,6 +223,15 @@ function RootNavigation() {
           <Stack.Screen name="index" options={{ headerShown: false, gestureEnabled: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false, gestureEnabled: false }} />
           <Stack.Screen
+            name="sourcing/offer/[id]"
+            options={{
+              headerShown: false,
+              animation: 'slide_from_right',
+              gestureEnabled: true,
+              gestureDirection: 'horizontal',
+            }}
+          />
+          <Stack.Screen
             name="vin-finder"
             options={{
               headerShown: false,
@@ -254,6 +267,15 @@ function RootNavigation() {
           />
           <Stack.Screen
             name="notifications"
+            options={{
+              headerShown: false,
+              animation: 'slide_from_right',
+              gestureEnabled: true,
+              gestureDirection: 'horizontal',
+            }}
+          />
+          <Stack.Screen
+            name="notification-vehicle"
             options={{
               headerShown: false,
               animation: 'slide_from_right',

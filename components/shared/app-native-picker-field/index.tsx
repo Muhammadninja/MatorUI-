@@ -268,7 +268,7 @@ export function AppNativePickerField({
                     <AppText
                       family="default"
                       weight={isSelected ? 'semibold' : undefined}
-                      style={{ flex: 1, fontSize: 15.5, color: tokens.text }}
+                      style={{ flex: 1, fontSize: 16, color: tokens.text }}
                     >
                       {o.label}
                     </AppText>

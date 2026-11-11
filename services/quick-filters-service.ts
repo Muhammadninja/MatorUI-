@@ -1,6 +1,5 @@
 // ── Types ────────────────────────────────────────────────────────────
 
-import { shouldUseHttpTransport } from '@/config/api';
 import { apiClient } from '@/services/api-client';
 
 /**
@@ -55,54 +54,10 @@ export type QuickFiltersListResponse = {
   snapshotVersion: string;
 };
 
-// ── Seed fallback ────────────────────────────────────────────────────
-
-/**
- * Hardcoded seed list — used as both the mock-transport response AND
- * the fallback the UI renders when the API returns 0 items / errors /
- * is still loading on first paint. The chip row never blanks out.
- *
- * Order matches the Uzbekistan market popularity ranking the product
- * team validated. Counts are illustrative; real counts come from the
- * backend's aggregation query (likely
- * `SELECT brand, COUNT(*) FROM parts GROUP BY brand ORDER BY count DESC`).
- *
- * Keep in sync with `mocks/search-page-backend-fields.txt`.
- */
-export const QUICK_FILTERS_SEED: QuickFilterItem[] = [
-  { id: 'qf-cobalt', label: 'Cobalt', slug: 'cobalt', kind: 'brand', count: 1240 },
-  { id: 'qf-byd', label: 'BYD', slug: 'byd', kind: 'brand', count: 882 },
-  { id: 'qf-lacetti', label: 'Lacetti', slug: 'lacetti', kind: 'brand', count: 614 },
-  { id: 'qf-tracker', label: 'Tracker', slug: 'tracker', kind: 'brand', count: 503 },
-  { id: 'qf-leapmotor', label: 'Leapmotor', slug: 'leapmotor', kind: 'brand', count: 297 },
-];
-
-// ── Mock service ─────────────────────────────────────────────────────
-
-export function getQuickFiltersMockResponse(
-  request: QuickFiltersListRequest = {},
-): QuickFiltersListResponse {
-  const limit = typeof request.limit === 'number' ? request.limit : QUICK_FILTERS_SEED.length;
-  return {
-    items: QUICK_FILTERS_SEED.slice(0, Math.max(0, limit)),
-    snapshotVersion: 'mock-quick-filters-v1',
-  };
-}
-
-// ── Transport ────────────────────────────────────────────────────────
-
 const API_BASE = '/v1/search';
-const MOCK_LATENCY_MS = 220;
 
 export interface QuickFiltersTransport {
   list(request: QuickFiltersListRequest): Promise<QuickFiltersListResponse>;
-}
-
-class MockQuickFiltersTransport implements QuickFiltersTransport {
-  async list(request: QuickFiltersListRequest): Promise<QuickFiltersListResponse> {
-    await delay(MOCK_LATENCY_MS, request.signal);
-    return getQuickFiltersMockResponse(request);
-  }
 }
 
 class HttpQuickFiltersTransport implements QuickFiltersTransport {
@@ -118,28 +73,10 @@ class HttpQuickFiltersTransport implements QuickFiltersTransport {
   }
 }
 
-export const quickFiltersTransport: QuickFiltersTransport = shouldUseHttpTransport('search')
-  ? new HttpQuickFiltersTransport()
-  : new MockQuickFiltersTransport();
+export const quickFiltersTransport: QuickFiltersTransport = new HttpQuickFiltersTransport();
 
 export function fetchQuickFilters(
   request: QuickFiltersListRequest = {},
 ): Promise<QuickFiltersListResponse> {
   return quickFiltersTransport.list(request);
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────
-
-function delay(ms: number, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(resolve, ms);
-    if (signal) {
-      const onAbort = () => {
-        clearTimeout(t);
-        reject(new DOMException('Aborted', 'AbortError'));
-      };
-      if (signal.aborted) onAbort();
-      else signal.addEventListener('abort', onAbort, { once: true });
-    }
-  });
 }

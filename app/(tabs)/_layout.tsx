@@ -1,5 +1,5 @@
 import { Link, Tabs } from 'expo-router';
-import { Bell, Car, Search, ShoppingBag, Sparkles, User } from 'lucide-react-native';
+import { Bell, CarFront, Search, ShoppingBag, Sparkles, User } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 
 import AppTabBar from '@/components/shared/app-tab-bar';
@@ -16,7 +16,7 @@ export const unstable_settings = {
 
 const TAB_META = {
   '(explore)': { label: 'Explore', icon: Search, primary: 'explore', emphasized: false },
-  '(garage)': { label: 'Garage', icon: Car, primary: 'garage', emphasized: false },
+  '(garage)': { label: 'Garage', icon: CarFront, primary: 'garage', emphasized: false },
   '(ai-chat)': { label: 'Assistant', icon: Sparkles, primary: 'ai-chat', emphasized: true },
   '(cart)': { label: 'Cart', icon: ShoppingBag, primary: 'cart', emphasized: false },
   '(profile)': { label: 'Profile', icon: User, primary: 'profile', emphasized: false },
@@ -71,10 +71,9 @@ export default function TabLayout() {
                     : meta.label;
                 const Icon = meta.icon;
                 const { emphasized } = meta;
-                // Emphasized center button sits on a dark or teal accent circle,
-                // so its icon stays white for contrast (not the theme-inverted
-                // on-brand color, which would be black in dark).
-                const emphasizedIconColor = tokens.white;
+                // Emphasized center button: white on light's deep teal, page ink
+                // on dark's brighter teal (white there is 3.0:1).
+                const emphasizedIconColor = tokens.onAssistantFab;
 
                 return {
                   key: route.name,

@@ -46,7 +46,9 @@ vi.mock('@/components/shared/app-price', () => ({
 vi.mock('@/components/shared/app-settings-header', () => ({ AppSettingsHeader: () => null }));
 vi.mock('@/components/shared/wheel-loader', () => ({ WheelLoader: host('loader') }));
 vi.mock('@/contexts/theme.context', () => ({ useThemeContext: () => ({ tokens: {} }) }));
-vi.mock('@/contexts/user.context', () => ({ useUserContext: () => ({ profile: { id: 'user_a' } }) }));
+vi.mock('@/contexts/user.context', () => ({ useUserContext: () => ({
+  profile: { id: 'user_a' }, isAuthenticated: true, isHydrating: false,
+}) }));
 vi.mock('@/contexts/cart.context', () => ({
   useCartContext: () => ({ items: cart.items, clearCart, restoreCart: vi.fn() }),
 }));

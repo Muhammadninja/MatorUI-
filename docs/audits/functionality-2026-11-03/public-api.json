@@ -1,0 +1,80 @@
+{
+  "captured_at_utc": "2026-11-03T22:28:19.745624+00:00",
+  "source": "https://api.mator.uz",
+  "authentication": "none",
+  "backend_version": "not exposed by search response; unverified",
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/v1/search",
+      "body": {
+        "query": "фильтр",
+        "sortBy": "price_asc",
+        "limit": 5,
+        "locale": "ru"
+      },
+      "http_status": 200,
+      "total": 19,
+      "nextPageToken": null,
+      "server_duration_ms": 86,
+      "results": [
+        {
+          "id": "part_stock_6012",
+          "price": "UZS 30 000"
+        },
+        {
+          "id": "part_stock_6011",
+          "price": "UZS 32 000"
+        },
+        {
+          "id": "part_stock_3865",
+          "price": "UZS 31 000"
+        },
+        {
+          "id": "part_stock_3864",
+          "price": "UZS 60 000"
+        },
+        {
+          "id": "part_stock_3664",
+          "price": "UZS 60 000"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/v1/search",
+      "body": {
+        "query": "фильтр",
+        "sortBy": "price_desc",
+        "limit": 5,
+        "locale": "ru"
+      },
+      "http_status": 200,
+      "total": 19,
+      "nextPageToken": null,
+      "server_duration_ms": 60,
+      "results": [
+        {
+          "id": "part_stock_6012",
+          "price": "UZS 30 000"
+        },
+        {
+          "id": "part_stock_6011",
+          "price": "UZS 32 000"
+        },
+        {
+          "id": "part_stock_3865",
+          "price": "UZS 31 000"
+        },
+        {
+          "id": "part_stock_3864",
+          "price": "UZS 60 000"
+        },
+        {
+          "id": "part_stock_3664",
+          "price": "UZS 60 000"
+        }
+      ]
+    }
+  ]
+}

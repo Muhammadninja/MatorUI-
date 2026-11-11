@@ -2,10 +2,17 @@ const { environmentFrom } = require('./config/environment-policy.cjs');
 
 module.exports = ({ config }) => {
   const profile = process.env.EAS_BUILD_PROFILE || '';
-  const release = process.env.NODE_ENV === 'production' || ['production', 'preview'].includes(profile);
-  const appEnvironment = environmentFrom(process.env, release);
-  if (profile === 'production' && appEnvironment.name !== 'production') {
+  const e2e = process.env.MATOR_E2E === '1' && profile === 'e2e';
+  if ((process.env.MATOR_E2E === '1' || profile === 'e2e') && !e2e) {
+    throw new Error('Test builds require both MATOR_E2E=1 and EAS_BUILD_PROFILE=e2e.');
+  }
+  const release = process.env.NODE_ENV === 'production' || ['production', 'internal', 'preview'].includes(profile);
+  const appEnvironment = environmentFrom(process.env, release && !e2e);
+  if (['production', 'internal'].includes(profile) && appEnvironment.name !== 'production') {
     throw new Error('The production build profile requires the production environment.');
+  }
+  if (e2e && (appEnvironment.name !== 'local' || appEnvironment.apiBaseUrl !== 'http://127.0.0.1:8080' || appEnvironment.allowDevOtp || appEnvironment.httpDomains)) {
+    throw new Error('E2E requires the isolated loopback mock, all HTTP domains and no development OTP.');
   }
   // The Android map needs this at build time, and crashes without it. Baked into the build,
   // so it is public: restrict it to this app's package and signing certificate in Google
@@ -17,13 +24,21 @@ module.exports = ({ config }) => {
     plugins: [
       ...(config.plugins || []),
       ['react-native-maps', googleMapsKey ? { androidGoogleMapsApiKey: googleMapsKey } : {}],
+      ...(e2e ? ['./plugins/with-e2e-loopback'] : []),
     ],
+    ...(e2e ? {
+      name: 'Mator E2E', scheme: 'mator-e2e',
+      android: { ...config.android, package: 'com.mator.e2e' },
+      ios: { ...config.ios, bundleIdentifier: 'com.mator.e2e' },
+      updates: { enabled: false },
+    } : {}),
     extra: {
       ...config.extra,
       googleMapsConfigured: Boolean(googleMapsKey),
       // Public, resolved once by the launcher/config process. Expo 56's virtual
       // env module can otherwise override shell variables with stale .env files.
       appEnvironment,
+      e2e,
       ...(appEnvironment.name === 'local' ? {
         sentry: { dsn: '', environment: 'local', enableInDev: false },
       } : {}),

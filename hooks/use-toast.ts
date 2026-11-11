@@ -24,6 +24,8 @@ export function useToast() {
         toastService.success(title, opts),
       danger: (title: string, opts?: Omit<ToastInput, 'kind' | 'title'>) =>
         toastService.danger(title, opts),
+      warning: (title: string, opts?: Omit<ToastInput, 'kind' | 'title'>) =>
+        toastService.warning(title, opts),
       info: (title: string, opts?: Omit<ToastInput, 'kind' | 'title'>) =>
         toastService.info(title, opts),
       show: (input: ToastInput) => toastService.show(input),

@@ -26,10 +26,10 @@ function Chip({ label, value }: { label: string; value: string }) {
       borderWidth={1}
       borderName="border"
     >
-      <AppText family="mono" style={{ fontSize: 10.5, letterSpacing: 0.3 }} weight="bold" colorName="text">
+      <AppText family="mono" style={{ fontSize: 11, letterSpacing: 0.3 }} weight="bold" colorName="text">
         {label}
       </AppText>
-      <AppText family="mono" style={{ fontSize: 10.5 }} colorName="textMuted">
+      <AppText family="mono" style={{ fontSize: 11 }} colorName="textMuted">
         {value}
       </AppText>
     </AppView>

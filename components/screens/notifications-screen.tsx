@@ -12,6 +12,7 @@ import {
   type NotificationDayGroup,
 } from '@/components/screens-components/notifications/notification-time';
 import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
+import { AppButton } from '@/components/shared/app-button';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
@@ -22,6 +23,7 @@ import { useThemeContext } from '@/contexts/theme.context';
 import useGarage from '@/hooks/use-garage';
 import { useNotifications } from '@/hooks/use-notifications';
 import { formatCurrency } from '@/services/cart-math';
+import { notificationDestination } from '@/components/screens-components/notifications/notification-destination';
 import { debugLog } from '@/services/debug-log';
 import { toastService } from '@/services/toast-service';
 import { ORDER_STATUS_MACHINE_I18N, formatOrderNo } from '@/services/orders-service';
@@ -187,7 +189,7 @@ function SourcingOfferCard({
       {added ? (
         <AppView row align="center" gap={5} style={{ flexShrink: 0 }}>
           <Check size={15} color={tokens.success} />
-          <AppText family="accent" weight="bold" style={{ fontSize: 12.5, color: tokens.success }}>
+          <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.success }}>
             {t('sourcing.inCart')}
           </AppText>
         </AppView>
@@ -332,9 +334,10 @@ export default function NotificationsScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offerIdsKey]);
 
-  const handleMarkAll = () => {
-    markAllRead();
-    toastService.success(t('notifications.allMarkedRead'));
+  const handleMarkAll = async () => {
+    const confirmed = await markAllRead();
+    if (confirmed === true) toastService.success(t('notifications.allMarkedRead'));
+    else if (confirmed === false) toastService.danger(t('notifications.markReadError'));
   };
 
   // The garage row a vehicle notification is about; null once the car is gone.
@@ -344,43 +347,25 @@ export default function NotificationsScreen() {
   );
 
   /** A row is tappable only when there is somewhere real for it to go. */
-  const hasDestination = (n: NotificationItem) => {
-    if (n.type === 'vehicle_status_updated') return vehicleFor(n) !== null;
-    if (n.type === 'order_status_changed' && n.orderId) return true;
-    return Boolean(n.deeplinkPath);
-  };
+  const destinationFor = (n: NotificationItem) =>
+    notificationDestination(n, vehicleFor(n) !== null);
 
   // Regular (non-offer) notifications: mark read + navigate.
   const openNotification = (n: NotificationItem) => {
     if (n.unread) markRead(n.id);
-    // The backend's vehicle deeplink names a route this app doesn't have; the
-    // vehicle screen takes the id as a param.
-    if (n.type === 'vehicle_status_updated') {
-      const vehicle = vehicleFor(n);
-      if (vehicle) router.push({ pathname: '/vehicle-detail', params: { id: vehicle.id } });
-      return;
-    }
-    // Order-STATUS-change rows go to the order-status (track-order) screen. The
-    // backend's deeplink for these points at the cart's order-confirmation,
-    // which is the wrong destination — the order id in `data` is the real
-    // target. Other order rows (e.g. order_paid) keep their own deeplink.
-    if (n.type === 'order_status_changed' && n.orderId) {
-      router.push(`/track-order?orderId=${encodeURIComponent(n.orderId)}` as never);
-      return;
-    }
-    if (n.deeplinkPath) {
-      try {
-        router.push(n.deeplinkPath as never);
-      } catch (err) {
-        // A bad/renamed backend deeplink can't route — keep the user on the feed,
-        // but LOG the offending path (dev console / EXPO_PUBLIC_DEBUG_API release
-        // logs) so broken deeplinks are detectable instead of a silent dead tap.
-        debugLog('nav', 'notification deeplink failed to route', {
-          path: n.deeplinkPath,
-          type: n.type,
-          message: (err as Error)?.message,
-        });
-      }
+    const destination = destinationFor(n);
+    if (!destination) return;
+    try {
+      router.push(destination as never);
+    } catch (err) {
+      // A bad/renamed backend deeplink can't route — keep the user on the feed,
+      // but LOG the offending path (dev console / EXPO_PUBLIC_DEBUG_API release
+      // logs) so broken deeplinks are detectable instead of a silent dead tap.
+      debugLog('nav', 'notification deeplink failed to route', {
+        path: destination,
+        type: n.type,
+        message: (err as Error)?.message,
+      });
     }
   };
 
@@ -460,7 +445,7 @@ export default function NotificationsScreen() {
       try {
         await rejectSourcingOffer(target, reasonKey);
         setLiveStatus((s) => ({ ...s, [target]: 'DECLINED' }));
-        toastService.info(t('sourcing.offerDeclined'));
+        toastService.success(t('sourcing.offerDeclined'));
       } catch (err) {
         if ((err as { status?: number })?.status === 404) {
           setLiveStatus((s) => ({ ...s, [target]: 'GONE' }));
@@ -539,7 +524,7 @@ export default function NotificationsScreen() {
     );
     const a11yText = [title, body, time].filter(Boolean).join('. ');
 
-    if (!hasDestination(n)) {
+    if (!destinationFor(n)) {
       return (
         <AppView
           accessible
@@ -592,7 +577,7 @@ export default function NotificationsScreen() {
           >
             <AppText
               weight="semibold"
-              style={{ fontSize: 14, lineHeight: 20, color: tokens.brand }}
+              style={{ fontSize: 14, lineHeight: 20, color: tokens.brandText }}
             >
               {t('notifications.markAllRead')}
             </AppText>
@@ -603,6 +588,13 @@ export default function NotificationsScreen() {
       {state === 'loading' ? (
         <AppView flex={1} center>
           <WheelLoader size={28} color={tokens.brand} />
+        </AppView>
+      ) : state === 'error' ? (
+        <AppView flex={1} center px="xl" gap={12} testID="notifications-error">
+          <AppText textVariant="bodySm" align="center" colorName="textMuted">
+            {t('notifications.loadError')}
+          </AppText>
+          <AppButton title={t('common.retry')} kind="secondary" size="sm" onPress={() => { void refresh(); }} />
         </AppView>
       ) : notifications.length === 0 ? (
         // Sits above the optical centre: a little high reads as composed.
@@ -695,7 +687,7 @@ export default function NotificationsScreen() {
             <AppText
               family="heading"
               weight="bold"
-              style={{ fontSize: 15.5, color: tokens.text, marginBottom: 2 }}
+              style={{ fontSize: 16, color: tokens.text, marginBottom: 2 }}
             >
               {t('sourcing.declineReasonTitle')}
             </AppText>
@@ -715,7 +707,7 @@ export default function NotificationsScreen() {
                 <AppText
                   family="default"
                   weight="semibold"
-                  style={{ fontSize: 14.5, color: tokens.text }}
+                  style={{ fontSize: 14, color: tokens.text }}
                 >
                   {r.label}
                 </AppText>

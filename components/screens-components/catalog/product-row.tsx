@@ -6,7 +6,7 @@ import { useWindowDimensions, View, type ViewStyle } from 'react-native';
 import ImageBox from '@/components/screens-components/home/image-box';
 import { AppIconButton } from '@/components/shared/app-icon-button';
 import { splitPrice } from '@/components/shared/app-price';
-import { noBreakDigits } from '@/utils/format-price';
+import { formatSomAmount } from '@/utils/format-price';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import WheelLoader from '@/components/shared/wheel-loader/wheel-loader';
@@ -132,7 +132,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
       // The check couldn't run (offline, mock transport, server error). Say so
       // and reset — never fall back to a fabricated "fits".
       setFitState('idle');
-      toast.info(t('catalog.fitCheckUnavailable'));
+      toast.warning(t('catalog.fitCheckUnavailable'));
       return;
     }
     setFit(result);
@@ -144,7 +144,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
   const { savePct, wasUzs: wasNum } = resolveItemPricing(item, sales);
   const priceAmount = splitPrice(item.price).amount || item.price;
   const priceSize = priceFontSize(priceAmount);
-  const wasLabel = wasNum > 0 ? noBreakDigits(wasNum.toLocaleString('ru-RU')) : null;
+  const wasLabel = wasNum > 0 ? formatSomAmount(wasNum) : null;
 
   const brandEyebrow = (item.brand ?? item.description?.split('·')[0])?.trim();
   const outOfStock = /out of stock/i.test(item.status ?? '');
@@ -176,7 +176,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
   const handleToggleLike = () => {
     triggerHaptic(liked ? 'selection' : 'success');
     const nowLiked = toggleLike(item.id);
-    toast.info(t(nowLiked ? 'itemDetail.savedToFavorites' : 'itemDetail.removedFromFavorites'));
+    toast.success(t(nowLiked ? 'itemDetail.savedToFavorites' : 'itemDetail.removedFromFavorites'));
   };
 
   // ── Add — the cart update is optimistic, so "added" is the feedback and the
@@ -273,8 +273,10 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
           <Heart
             size={20}
             strokeWidth={2.2}
-            color={liked ? tokens.brand : tokens.textMuted}
-            fill={liked ? tokens.brand : 'transparent'}
+            // The photo is white in both themes, so the heart takes the
+            // on-photo inks rather than the page's.
+            color={liked ? tokens.onPhotoAccent : tokens.onPhotoMuted}
+            fill={liked ? tokens.onPhotoAccent : 'transparent'}
           />
         </AppPressableView>
       </AppView>
@@ -375,7 +377,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
             style={{
               fontSize: 12,
               lineHeight: 16,
-              color: fitState === 'checking' ? tokens.textMuted : tokens.brand,
+              color: fitState === 'checking' ? tokens.textMuted : tokens.brandText,
             }}
           >
             {fitState === 'checking'

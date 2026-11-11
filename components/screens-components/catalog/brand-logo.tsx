@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AppText } from '@/components/shared/app-text';
@@ -23,9 +23,11 @@ export type BrandLogoProps = {
   size?: number;
   /** Color for the initial fallback. */
   color?: string;
+  /** Shown instead of the initial when there is no usable logo. */
+  fallback?: ReactNode;
 };
 
-const BrandLogo = ({ logoUrl, name, size = 40, color }: BrandLogoProps) => {
+const BrandLogo = ({ logoUrl, name, size = 40, color, fallback }: BrandLogoProps) => {
   const { t } = useTranslation();
   const [failed, setFailed] = useState(false);
 
@@ -42,6 +44,8 @@ const BrandLogo = ({ logoUrl, name, size = 40, color }: BrandLogoProps) => {
       />
     );
   }
+
+  if (fallback !== undefined) return <>{fallback}</>;
 
   return (
     <AppText family="heading" weight="bold" style={{ fontSize: size * 0.55, color }}>

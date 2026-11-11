@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { ArrowLeft } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TextInput } from 'react-native';
@@ -70,9 +71,25 @@ export default function VinFinderScreen() {
       testID="vin-finder-screen"
       flex={1}
       colorName="background"
-      style={{ paddingTop: insets.top + 24, paddingHorizontal: 20 }}
+      style={{ paddingTop: insets.top + 24, paddingHorizontal: 16 }}
       gap={16}
     >
+      <AppPressableView
+        testID="vin-finder-back"
+        accessibilityRole="button"
+        accessibilityLabel={t('common.back')}
+        onPress={() => {
+          if (router.canGoBack()) router.back();
+          else router.replace('/explore');
+        }}
+        row
+        align="center"
+        gap={8}
+        style={{ minHeight: 48, alignSelf: 'flex-start' }}
+      >
+        <ArrowLeft size={20} color={tokens.text} />
+        <AppText textVariant="bodySm">{t('common.back')}</AppText>
+      </AppPressableView>
       <AppText
         family="heading"
         weight="bold"
@@ -86,11 +103,11 @@ export default function VinFinderScreen() {
 
       {/* VIN input */}
       <AppView
-        rounded={14}
+        rounded={12}
         px={16}
-        colorName="backgroundSecondary"
+        colorName="surface"
         borderWidth={1}
-        borderName="border"
+        borderName="controlBorder"
         style={{ height: 52, justifyContent: 'center' }}
       >
         <TextInput

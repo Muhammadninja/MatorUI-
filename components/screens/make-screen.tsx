@@ -11,6 +11,7 @@ import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
+import { AppButton } from '@/components/shared/app-button';
 import { useMakes, useModels } from '@/hooks/use-vehicle-catalog';
 
 /** Catalog categories the listings are actually bucketed by. */
@@ -27,10 +28,9 @@ export default function MakeScreen() {
 
   const brandId = makeParam ?? '';
   // Live from GET /v1/reference (admin-managed). `makes` resolves the display
-  // name for the hero; `useModels` drives the list. Both fall back to the
-  // bundled catalog on error, so the screen never renders blank.
+  // name for the hero; `useModels` drives the list.
   const { makes } = useMakes();
-  const { state: modelsState, models } = useModels(brandId);
+  const { state: modelsState, models, refresh: refreshModels } = useModels(brandId);
   const make = makes.find((m) => m.id === brandId);
   const label = make?.name ?? makeParam ?? t('make.vehicleFallback');
   const logoUrl = make?.logoUrl ?? null;
@@ -49,7 +49,7 @@ export default function MakeScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
-          paddingHorizontal: 20,
+          paddingHorizontal: 16,
           paddingTop: 4,
           paddingBottom: Math.max(insets.bottom + 24, 40),
           gap: 16,
@@ -94,6 +94,18 @@ export default function MakeScreen() {
         </AppText>
         {loading ? (
           <CategoryRowsSkeleton showIcon={false} count={4} />
+        ) : modelsState === 'error' ? (
+          <AppView gap={12} align="flex-start" style={{ paddingVertical: 12 }}>
+            <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted }}>
+              {t('garage.modelPickerError')}
+            </AppText>
+            <AppButton
+              title={t('common.retry')}
+              kind="secondary"
+              size="sm"
+              onPress={() => void refreshModels()}
+            />
+          </AppView>
         ) : models.length === 0 ? (
           <AppText
             family="default"

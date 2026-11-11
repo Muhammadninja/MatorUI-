@@ -15,12 +15,7 @@ export default function ComposerBlurWrapper({ children }: { children: ReactNode 
   const { tokens } = useThemeContext();
   return (
     <AppView
-      pt="xs"
-      style={{
-        borderTopWidth: 1,
-        borderTopColor: tokens.divider,
-        backgroundColor: tokens.background,
-      }}
+      style={{ backgroundColor: tokens.background }}
     >
       {children}
     </AppView>

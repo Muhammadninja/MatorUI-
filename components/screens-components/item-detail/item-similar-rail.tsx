@@ -52,7 +52,7 @@ export function ItemSimilarRail({ currentId, categoryId, make, model }: ItemSimi
 
   return (
     <AppView gap={11}>
-      <AppText family="heading" weight="bold" style={{ fontSize: 16.5, color: tokens.text }}>
+      <AppText family="heading" weight="bold" style={{ fontSize: 16, color: tokens.text }}>
         {t('itemDetail.similarTitle')}
       </AppText>
       <ScrollView
@@ -101,7 +101,7 @@ function SimilarCard({ item }: { item: CatalogItem }) {
           family="accent"
           weight="bold"
           style={{
-            fontSize: 9.5,
+            fontSize: 10,
             letterSpacing: 0.9,
             color: tokens.textMuted,
             textTransform: 'uppercase',
@@ -113,7 +113,7 @@ function SimilarCard({ item }: { item: CatalogItem }) {
       <AppText
         family="default"
         weight="semibold"
-        style={{ fontSize: 12.5, lineHeight: 16, color: tokens.text }}
+        style={{ fontSize: 12, lineHeight: 16, color: tokens.text }}
       >
         {item.title}
       </AppText>

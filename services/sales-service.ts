@@ -49,15 +49,6 @@ export interface SalesTransport {
   list(signal?: AbortSignal): Promise<Sale[]>;
 }
 
-// ── Mock transport ─────────────────────────────────────────────────────────
-// No offline sales to seed — an empty list simply renders no discount pills,
-// which is the correct "no active campaigns" state.
-class MockSalesTransport implements SalesTransport {
-  async list(): Promise<Sale[]> {
-    return [];
-  }
-}
-
 // ── HTTP transport — real campaigns via GET /v1/sales ──────────────────────
 type ApiSale = {
   id: string;
@@ -105,9 +96,7 @@ class HttpSalesTransport implements SalesTransport {
 }
 
 // ── Singleton ──────────────────────────────────────────────────────────────
-export const salesTransport: SalesTransport = shouldUseHttpTransport('sales')
-  ? new HttpSalesTransport()
-  : new MockSalesTransport();
+export const salesTransport: SalesTransport = new HttpSalesTransport();
 
 export function fetchSales(signal?: AbortSignal): Promise<Sale[]> {
   return salesTransport.list(signal);
@@ -204,10 +193,10 @@ export function resolveItemPricing(
   const backendPct = item.salePercent && item.salePercent > 0 ? item.salePercent : 0;
   const clientSale = resolveItemSale(item, sales);
   const savePct = backendPct > 0 ? Math.round(backendPct) : (clientSale?.percent ?? 0);
-  const amountNum = item.priceUzs ?? (parseInt((item.price ?? '').replace(/\D/g, ''), 10) || 0);
+  const amountNum = item.priceUzs ?? (Number((item.price ?? '').replace(/[^0-9.]/g, '')) || 0);
   const wasUzs =
     backendPct > 0 && item.originalPriceUzs
-      ? Math.round(item.originalPriceUzs)
+      ? item.originalPriceUzs
       : savePct > 0 && amountNum > 0
         ? Math.round(amountNum / (1 - savePct / 100))
         : 0;

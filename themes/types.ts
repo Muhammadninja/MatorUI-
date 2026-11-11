@@ -6,7 +6,7 @@ export type ThemeTokens = {
   onCard: string;
   text: string;
   onBackground: string;
-  /** Muted body/label text per the Mator handoff (#707070 light, #8f8f8f
+  /** Muted body/label text per the Mator handoff (#707070 light, #9BA8AF
    *  dark). Distinct from `gray400`, which is tuned as a neutral ramp step;
    *  `textMuted` is the exact secondary-text value the design spec calls for
    *  (eyebrows, subtitles, captions). */
@@ -31,6 +31,9 @@ export type ThemeTokens = {
   /** Outline of the solid `secondary` button. */
   secondaryBorder: string;
   brand: string;
+  /** Teal for normal-size text: darker than `brand` so it stays readable on
+   *  the page, secondary and pale teal backgrounds. Fills and icons use `brand`. */
+  brandText: string;
   brandBg: string;
   brandPressed: string;
   onBrand: string;
@@ -121,6 +124,25 @@ export type ThemeTokens = {
   /** Vehicle name, supporting text and "change" action on `vehicleBanner`. */
   onVehicleBanner: string;
   vehicleBannerMuted: string;
-  vehicleBannerAction: string;
+  /** Explore's add-a-car hero: gradient ends, the soft curves behind the car,
+   *  its hairline, and the ground shadow under the car. Copy on it uses
+   *  `onVehicleBanner` / `vehicleBannerMuted`. */
+  garageHeroFrom: string;
+  garageHeroTo: string;
+  garageHeroShape: string;
+  garageHeroShapeStrong: string;
+  garageHeroBorder: string;
+  garageHeroShadow: string;
+  /** Accent and quiet ink for controls drawn ON a product photo, which stays
+   *  white in both themes (the favourite heart). Teal at text weight, because
+   *  dark `brand` is too light against white. */
+  onPhotoAccent: string;
+  onPhotoMuted: string;
+  /** Loading pulse inside a white photo box. */
+  photoShimmer: string;
+  /** Fill, icon and active shadow of the tab bar's centre Assistant button. */
+  assistantFab: string;
+  onAssistantFab: string;
+  assistantFabShadow: string;
   [key: string]: string;
 };

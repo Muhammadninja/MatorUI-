@@ -9,7 +9,7 @@
  */
 import { beforeEach, describe, expect, test } from 'vitest';
 
-import { MockChatTransport } from './chat-api';
+import { MockChatTransport } from "@/tests/support/transports/chat-api";
 import type {
   AiChatConversationSummary,
   AiChatSendMessageRequest,

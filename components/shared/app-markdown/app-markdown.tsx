@@ -77,12 +77,12 @@ export function AppMarkdown({ content }: AppMarkdownProps) {
         if (block.kind === 'listItem') {
           return (
             <AppView key={i} row gap={8} style={{ paddingLeft: 4 }}>
-              <AppText family="default" style={{ fontSize: 13.5, lineHeight: 20, color: tokens.textMuted }}>
+              <AppText family="default" style={{ fontSize: 14, lineHeight: 20, color: tokens.textMuted }}>
                 {block.marker}
               </AppText>
               <AppText
                 family="default"
-                style={{ flex: 1, fontSize: 13.5, lineHeight: 20, color: tokens.textMuted }}
+                style={{ flex: 1, fontSize: 14, lineHeight: 20, color: tokens.textMuted }}
               >
                 <InlineSpans spans={block.spans} color={tokens.textMuted} />
               </AppText>
@@ -91,7 +91,7 @@ export function AppMarkdown({ content }: AppMarkdownProps) {
         }
 
         return (
-          <AppText key={i} family="default" style={{ fontSize: 13.5, lineHeight: 20, color: tokens.textMuted }}>
+          <AppText key={i} family="default" style={{ fontSize: 14, lineHeight: 20, color: tokens.textMuted }}>
             <InlineSpans spans={block.spans} color={tokens.textMuted} />
           </AppText>
         );

@@ -88,9 +88,46 @@ describe('release environment boundary', () => {
       expect(config.extra.appEnvironment).toEqual({ name: 'production', apiBaseUrl: 'https://api.mator.uz',
         httpDomains: '', allowDevOtp: false });
       expect(JSON.stringify(config)).not.toContain('must-not-be-public');
+      expect(config.extra.e2e).toBe(false);
+      expect(config.plugins).not.toContain('./plugins/with-e2e-loopback');
     } finally {
       for (const key of Object.keys(process.env)) if (!(key in before)) delete process.env[key];
       Object.assign(process.env, before);
     }
+  });
+});
+
+
+describe('dedicated E2E app boundary', () => {
+  function resolve(overrides: Record<string, string> = {}) {
+    const before = { ...process.env };
+    try {
+      Object.assign(process.env, production, {
+        MATOR_E2E: '1', EAS_BUILD_PROFILE: 'e2e', EXPO_PUBLIC_APP_ENV: 'local',
+        EXPO_PUBLIC_API_BASE_URL: 'http://127.0.0.1:8080',
+      }, overrides);
+      return appConfig({ config: { android: { package: 'com.mator.myapp' }, scheme: 'mator' } });
+    } finally {
+      for (const key of Object.keys(process.env)) if (!(key in before)) delete process.env[key];
+      Object.assign(process.env, before);
+    }
+  }
+  test('creates a distinct loopback-only app with updates disabled', () => {
+    const config = resolve();
+    expect(config.android.package).toBe('com.mator.e2e');
+    expect(config.scheme).toBe('mator-e2e');
+    expect(config.updates.enabled).toBe(false);
+    expect(config.plugins).toContain('./plugins/with-e2e-loopback');
+    expect(config.plugins.some((plugin: unknown) =>
+      Array.isArray(plugin) && plugin[0] === 'react-native-maps')).toBe(true);
+    expect(config.extra.appEnvironment.allowDevOtp).toBe(false);
+  });
+  test.each(['production', 'internal', 'preview', 'development'])('rejects test switch in %s', (profile) => {
+    expect(() => resolve({ EAS_BUILD_PROFILE: profile })).toThrow();
+  });
+  test('rejects missing switch and remote APIs', () => {
+    expect(() => resolve({ MATOR_E2E: '0' })).toThrow();
+    expect(() => resolve({ EXPO_PUBLIC_API_BASE_URL: 'https://api.mator.uz' })).toThrow();
+    expect(() => resolve({ EXPO_PUBLIC_ALLOW_DEV_OTP: 'true' })).toThrow();
   });
 });

@@ -136,6 +136,23 @@ export function useSearch(): UseSearchValue {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const liveQueryRef = useRef<string>('');
+  const generationRef = useRef(0);
+  const pageAbortRef = useRef<AbortController | null>(null);
+  const nextPageTokenRef = useRef<string | null>(null);
+  const isLoadingMoreRef = useRef(false);
+
+  const invalidate = useCallback(() => {
+    generationRef.current += 1;
+    abortRef.current?.abort();
+    pageAbortRef.current?.abort();
+    pageAbortRef.current = null;
+    isLoadingMoreRef.current = false;
+    nextPageTokenRef.current = null;
+    setIsLoadingMore(false);
+    setNextPageToken(null);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = null;
+  }, []);
 
   // Active-vehicle context auto-attached to every outgoing search.
   // Read through a ref so the run() / loadMore() closures always see
@@ -159,8 +176,6 @@ export function useSearch(): UseSearchValue {
   // loadMore) never capture stale values.
   const filtersRef = useRef(filters);
   const sortByRef = useRef(sortBy);
-  const nextPageTokenRef = useRef<string | null>(null);
-  const isLoadingMoreRef = useRef(false);
   useEffect(() => {
     filtersRef.current = filters;
   }, [filters]);
@@ -175,6 +190,8 @@ export function useSearch(): UseSearchValue {
   }, [isLoadingMore]);
 
   const run = useCallback(async (next: string | undefined | null) => {
+    invalidate();
+    const generation = generationRef.current;
     const safe = typeof next === 'string' ? next : '';
     const trimmed = safe.trim();
     liveQueryRef.current = trimmed;
@@ -220,7 +237,7 @@ export function useSearch(): UseSearchValue {
       });
 
       // Late-arrival guard.
-      if (liveQueryRef.current !== trimmed) return;
+      if (generationRef.current !== generation || controller.signal.aborted) return;
 
       setRequestId(response.requestId);
       setResults(response.results);
@@ -241,12 +258,12 @@ export function useSearch(): UseSearchValue {
         (typeof DOMException !== 'undefined' && err instanceof DOMException && err.name === 'AbortError') ||
         (err instanceof Error && err.name === 'AbortError');
       if (isAbort) return;
-      if (liveQueryRef.current !== trimmed) return;
+      if (generationRef.current !== generation || controller.signal.aborted) return;
       const message = err instanceof Error ? err.message : 'Search failed';
       setError(message);
       setState('error');
     }
-  }, []);
+  }, [invalidate]);
 
   // A language switch invalidates everything the server localized for us —
   // result rows' `category`, the facet chips' names, `suggestedCategories`.
@@ -267,6 +284,14 @@ export function useSearch(): UseSearchValue {
     }
   }, [i18n.language, run]);
 
+  const vehicleScope = JSON.stringify(vehicleContext ?? null);
+  const previousVehicleScope = useRef(vehicleScope);
+  useEffect(() => {
+    if (previousVehicleScope.current === vehicleScope) return;
+    previousVehicleScope.current = vehicleScope;
+    if (liveQueryRef.current.length >= MIN_QUERY_LENGTH) void run(liveQueryRef.current);
+  }, [vehicleScope, run]);
+
   const loadMore = useCallback(async () => {
     const token = nextPageTokenRef.current;
     const trimmed = liveQueryRef.current;
@@ -274,10 +299,10 @@ export function useSearch(): UseSearchValue {
     if (isLoadingMoreRef.current) return;
     if (trimmed.length < MIN_QUERY_LENGTH) return;
 
-    // Use a separate controller so an in-flight loadMore doesn't get killed
-    // by the abortRef sweep on the next debounced run() — but we also won't
-    // commit its results if the user's query has since moved on.
+    const generation = generationRef.current;
     const controller = new AbortController();
+    pageAbortRef.current = controller;
+    isLoadingMoreRef.current = true;
     setIsLoadingMore(true);
 
     const reqId = newClientRequestId();
@@ -294,19 +319,20 @@ export function useSearch(): UseSearchValue {
       });
 
       // Drop the page if the user moved on to a different query.
-      if (liveQueryRef.current !== trimmed) return;
+      if (generationRef.current !== generation || controller.signal.aborted) return;
 
       setResults((prev) => {
         // Drop dupes by id in case the server overlaps pages.
         const seen = new Set(prev.map((r) => r.id));
         const merged = [...prev];
         for (const r of response.results) {
-          if (!seen.has(r.id)) merged.push(r);
+          if (!seen.has(r.id)) { seen.add(r.id); merged.push(r); }
         }
         return merged;
       });
       setTotal(response.total);
-      setNextPageToken(response.nextPageToken ?? null);
+      nextPageTokenRef.current = response.nextPageToken ?? null;
+      setNextPageToken(nextPageTokenRef.current);
     } catch (err) {
       const isAbort =
         (typeof DOMException !== 'undefined' && err instanceof DOMException && err.name === 'AbortError') ||
@@ -315,22 +341,29 @@ export function useSearch(): UseSearchValue {
       // Soft-fail pagination — do NOT flip the screen to 'error'. The user
       // already has page 1; surface via console for now (could become a
       // toast later) and leave the token in place so they can retry.
+      if (generationRef.current !== generation || controller.signal.aborted) return;
       if (__DEV__) console.warn('loadMore failed:', err);
     } finally {
-      setIsLoadingMore(false);
+      if (pageAbortRef.current === controller) {
+        pageAbortRef.current = null;
+        isLoadingMoreRef.current = false;
+        setIsLoadingMore(false);
+      }
     }
   }, []);
 
   const setQuery = useCallback(
     (next: string | undefined | null) => {
       const safe = typeof next === 'string' ? next : '';
+      invalidate();
+      liveQueryRef.current = safe.trim();
       setQueryState(safe);
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
         void run(safe);
       }, DEBOUNCE_MS);
     },
-    [run],
+    [run, invalidate],
   );
 
   // When filters or sort change, re-run the current query immediately
@@ -368,7 +401,9 @@ export function useSearch(): UseSearchValue {
   useEffect(() => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
+      generationRef.current += 1;
       abortRef.current?.abort();
+      pageAbortRef.current?.abort();
     };
   }, []);
 

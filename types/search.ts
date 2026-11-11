@@ -25,8 +25,9 @@ export type SearchResult = {
   title: string;
   description: string;
   /**
-   * Display-formatted UZS price ("UZS 369 000"). Live search currently
-   * supplies this string, not a numeric amount.
+   * Display-formatted UZS price ("UZS 369 000"). Live search supplies this
+   * string rounded to whole som, not a numeric amount; the transport replaces
+   * it with the catalog's exact amount when that part is on the catalog page.
    */
   price: string;
   priceLabel: string;
@@ -40,6 +41,10 @@ export type SearchResult = {
    * Wire: `images` (also accepted: `image_url` / `imageUrl` singular).
    */
   images?: string[];
+  /** OEM part number, when the part carries one. */
+  oem?: string;
+  /** GM cross-reference number, when the part carries one. */
+  gm?: string;
   /** Localized category display name — render only, never an identifier. */
   category: string;
   /** Stable category id (wire: `category_id`). Use this for filters, deep

@@ -126,7 +126,7 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
-vi.mock('lucide-react-native', () => ({ Sparkles: () => null }));
+vi.mock('lucide-react-native', () => ({ ArrowLeft: () => null, Sparkles: () => null }));
 vi.mock('@/utils/haptics', () => ({ triggerHaptic: () => {} }));
 vi.mock('@/services/toast-service', () => ({
   toastService: {

@@ -27,35 +27,6 @@ export interface AvatarTransport {
   upload(uri: LocalImageUri, signal?: AbortSignal): Promise<string>;
 }
 
-// ── Mock transport ─────────────────────────────────────────────────────
-// Returns the local URI itself after a short delay, simulating a network
-// round-trip. Good enough for the UI to feel real until the backend lands.
-
-class MockAvatarTransport implements AvatarTransport {
-  async upload(uri: LocalImageUri, signal?: AbortSignal): Promise<string> {
-    await delay(700, signal);
-    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-    // In a real backend the URL would be CDN-served; mock just echoes the
-    // local file URI so the avatar circle can render it immediately.
-    return uri;
-  }
-}
-
-function delay(ms: number, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted) return reject(new DOMException('Aborted', 'AbortError'));
-    const timer = setTimeout(() => {
-      signal?.removeEventListener('abort', onAbort);
-      resolve();
-    }, ms);
-    const onAbort = () => {
-      clearTimeout(timer);
-      reject(new DOMException('Aborted', 'AbortError'));
-    };
-    signal?.addEventListener('abort', onAbort);
-  });
-}
-
 // ── HTTP transport ──────────────────────────────────────────────────────
 //
 // Avatar upload is multipart/form-data. We use `expo-file-system`'s
@@ -64,7 +35,7 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
 // throws "Unsupported FormDataPart implementation". `uploadAsync` streams the
 // file URI natively as a proper multipart part, which is the supported path.
 
-import { getApiBaseUrl, getAuthToken, shouldUseHttpTransport } from '@/config/api';
+import { getApiBaseUrl, getAuthToken } from '@/config/api';
 import * as FileSystem from 'expo-file-system/legacy';
 
 export class HttpAvatarTransport implements AvatarTransport {
@@ -127,9 +98,7 @@ export class HttpAvatarTransport implements AvatarTransport {
 
 // ── Singleton ──────────────────────────────────────────────────────────
 
-export const avatarTransport: AvatarTransport = shouldUseHttpTransport('avatar')
-  ? new HttpAvatarTransport()
-  : new MockAvatarTransport();
+export const avatarTransport: AvatarTransport = new HttpAvatarTransport();
 
 /** Convenience facade so call sites don't need to import the singleton. */
 export function uploadAvatar(uri: LocalImageUri, signal?: AbortSignal): Promise<string> {

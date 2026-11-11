@@ -1,7 +1,7 @@
 import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
-import { Bell, Search } from 'lucide-react-native';
-import { useCallback, useState } from 'react';
+import { Bell, ChevronRight, ChevronUp, Search } from 'lucide-react-native';
+import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Platform,
@@ -29,7 +29,6 @@ import { useCategories } from '@/hooks/use-categories';
 import { useMakes } from '@/hooks/use-vehicle-catalog';
 import { useNotifications } from '@/hooks/use-notifications';
 import { useToast } from '@/hooks/use-toast';
-import { modalService } from '@/services/global-modal-service/global-modal.service';
 import { triggerHaptic } from '@/utils/haptics';
 
 // Soft feather under the header so the frosted panel dissolves into the
@@ -44,6 +43,8 @@ const SCREEN_GUTTER = 16;
 const GRID_GAP = 8;
 /** Category tiles shown before "show all"; every root stays one tap away. */
 const INITIAL_CATEGORY_COUNT = 6;
+/** Space left between the frosted header and the category heading after collapsing. */
+const CATEGORY_HEADING_CLEARANCE = 12;
 
 /**
  * Pure-View replacement for what used to be an SVG linear-gradient. Stacks thin
@@ -92,13 +93,42 @@ export default function ExploreScreen() {
   // Three equal columns with exact gaps, whatever the phone's width.
   const tileWidth = Math.floor((windowWidth - SCREEN_GUTTER * 2 - GRID_GAP * 2) / 3);
   const [categoriesExpanded, setCategoriesExpanded] = useState(false);
+  const CategoriesChevron = categoriesExpanded ? ChevronUp : ChevronRight;
+
+  // Collapsing removes content the user may be scrolled past, so the offset is
+  // corrected once the shorter content has been measured.
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollY = useRef(0);
+  const viewportHeight = useRef(0);
+  const categoriesHeadingY = useRef(0);
+  const settleAfterCollapse = useRef(false);
+
+  const toggleCategories = useCallback(() => {
+    settleAfterCollapse.current = categoriesExpanded;
+    setCategoriesExpanded(!categoriesExpanded);
+  }, [categoriesExpanded]);
+
+  const onContentSizeChange = useCallback(
+    (_width: number, contentHeight: number) => {
+      if (!settleAfterCollapse.current) return;
+      settleAfterCollapse.current = false;
+      const headingOffset =
+        categoriesHeadingY.current - headerHeight - HEADER_FADE - CATEGORY_HEADING_CLEARANCE;
+      // The shortened page often can't scroll far enough to pin the heading.
+      const maxOffset = contentHeight - viewportHeight.current;
+      const target = Math.max(0, Math.min(headingOffset, maxOffset));
+      if (scrollY.current > target) {
+        scrollRef.current?.scrollTo({ y: target, animated: true });
+      }
+    },
+    [headerHeight],
+  );
 
   // "Shop by category" grid — the roots of the category tree with their parts
   // counts, live from GET /v1/reference/categories.
   const { state: categoriesState, categories, refresh: refreshCategories } = useCategories();
-  // "Shop by vehicle" row — live from GET /v1/reference/makes (admin-managed),
-  // falling back to the bundled makes on error so it never renders blank.
-  const { state: makesState, makes } = useMakes();
+  // "Shop by vehicle" row — live from GET /v1/reference/makes (admin-managed).
+  const { state: makesState, makes, refresh: refreshMakes } = useMakes();
   // Unread count drives the red bell indicator — shown only when > 0.
   const { unreadCount } = useNotifications();
 
@@ -107,9 +137,14 @@ export default function ExploreScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    void refreshCategories().finally(() => {
+    // refetch resolves even when the request fails; the result says which.
+    void refreshCategories().then((result) => {
       setRefreshing(false);
-      toast.success(t('explore.pricesStockUpdated'));
+      if ((result as { isError?: boolean } | undefined)?.isError) {
+        toast.danger(t('search.catalogueLoadError'));
+      } else {
+        toast.success(t('explore.pricesStockUpdated'));
+      }
     });
   }, [refreshCategories, toast, t]);
 
@@ -117,23 +152,30 @@ export default function ExploreScreen() {
   // root id to the root's whole subtree. The subcategory step belongs to the
   // make → model flow (the systems screen), and a car in the Garage doesn't
   // change this grid — it carries no vehicle context.
+  // A quick double tap would push the category screen twice.
+  const lastCategoryOpen = useRef(0);
   const openCategory = useCallback((id: string, label: string) => {
+    const now = Date.now();
+    if (now - lastCategoryOpen.current < 800) return;
+    lastCategoryOpen.current = now;
     triggerHaptic('selection');
     router.push({ pathname: '/category', params: { cat: id, label } });
   }, []);
   const openMake = useCallback(
     (brandId: string) => {
       triggerHaptic('selection');
-      // Coming-soon brands are teasers — open a modal instead of navigating to
-      // an empty model list.
+      // Coming-soon brands are teasers — say so in a toast instead of navigating
+      // to an empty model list.
       const make = makes.find((m) => m.id === brandId);
       if (make?.comingSoon) {
-        modalService.openModal('comingSoon', { name: make.name });
+        toast.info(t('modalHost.comingSoonTitleNamed', { name: make.name }), {
+          description: t('modalHost.comingSoonMessage'),
+        });
         return;
       }
       router.push({ pathname: '/make', params: { make: brandId } });
     },
-    [makes],
+    [makes, toast, t],
   );
 
   return (
@@ -229,7 +271,7 @@ export default function ExploreScreen() {
           >
             <Search size={20} strokeWidth={2.2} color={tokens.textMuted} />
             <AppText textVariant="body" colorName="textMuted" style={{ flex: 1 }}>
-              {t('explore.searchPlaceholder')}
+              {t('search.inputPlaceholder')}
             </AppText>
           </AppPressableView>
         </AppView>
@@ -269,7 +311,16 @@ export default function ExploreScreen() {
       ) : null}
 
       <ScrollView
+        ref={scrollRef}
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={(e) => {
+          scrollY.current = e.nativeEvent.contentOffset.y;
+        }}
+        onLayout={(e) => {
+          viewportHeight.current = e.nativeEvent.layout.height;
+        }}
+        onContentSizeChange={onContentSizeChange}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -294,6 +345,18 @@ export default function ExploreScreen() {
         </AppText>
         {makesState === 'loading' ? (
           <BrandRowSkeleton />
+        ) : makesState === 'error' ? (
+          <AppView gap={12} align="flex-start">
+            <AppText textVariant="bodySm" colorName="textMuted">
+              {t('garage.modelPickerError')}
+            </AppText>
+            <AppButton
+              title={t('common.retry')}
+              kind="secondary"
+              size="sm"
+              onPress={() => void refreshMakes()}
+            />
+          </AppView>
         ) : (
           <ScrollView
             horizontal
@@ -319,9 +382,43 @@ export default function ExploreScreen() {
         )}
 
         {/* ── Shop by category ── */}
-        <AppText textVariant="h4" weight="bold" style={{ marginTop: 12 }}>
-          {t('explore.shopByCategory')}
-        </AppText>
+        <AppView
+          testID="explore-categories-heading"
+          row
+          align="center"
+          justify="space-between"
+          gap={8}
+          onLayout={(e) => {
+            categoriesHeadingY.current = e.nativeEvent.layout.y;
+          }}
+        >
+          <AppText textVariant="h4" weight="bold" style={{ flexShrink: 1 }}>
+            {t('explore.shopByCategory')}
+          </AppText>
+          {/* "All categories" opens the rest of the grid in place; the same
+           *  control collapses it again. */}
+          {categoriesState === 'success' && categories.length > INITIAL_CATEGORY_COUNT ? (
+            <AppPressableView
+              testID="explore-toggle-categories"
+              onPress={toggleCategories}
+              accessibilityRole="button"
+              accessibilityLabel={t(
+                categoriesExpanded ? 'explore.showFewerCategories' : 'explore.showAllCategories',
+              )}
+              accessibilityState={{ expanded: categoriesExpanded }}
+              androidRipple={false}
+            >
+              {/* minHeight sits inside the Pressable: on the pressable's own
+               *  style it would reach only the wrapper, not the touch area. */}
+              <AppView row center gap={2} style={{ minHeight: 44, paddingLeft: 8 }}>
+                <AppText weight="medium" style={{ fontSize: 15, lineHeight: 20, color: tokens.brandText }}>
+                  {t(categoriesExpanded ? 'explore.collapseCategories' : 'explore.allCategories')}
+                </AppText>
+                <CategoriesChevron size={18} strokeWidth={2.2} color={tokens.brandText} />
+              </AppView>
+            </AppPressableView>
+          ) : null}
+        </AppView>
         {categoriesState === 'loading' ? (
           <CategoryGridSkeleton count={INITIAL_CATEGORY_COUNT} tileWidth={tileWidth} />
         ) : categoriesState === 'error' ? (
@@ -356,18 +453,6 @@ export default function ExploreScreen() {
                 ),
               )}
             </AppView>
-            {categories.length > INITIAL_CATEGORY_COUNT ? (
-              <AppButton
-                testID="explore-toggle-categories"
-                title={t(
-                  categoriesExpanded ? 'explore.showFewerCategories' : 'explore.showAllCategories',
-                )}
-                kind="secondary"
-                size="lg"
-                fullWidth
-                onPress={() => setCategoriesExpanded((v) => !v)}
-              />
-            ) : null}
           </>
         )}
       </ScrollView>

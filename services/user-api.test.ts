@@ -13,7 +13,9 @@ vi.mock('@/config/api', () => ({
   shouldUseHttpTransport: () => false,
 }));
 
-import { userTransport } from './user-api';
+import { MockUserTransport } from '@/tests/support/transports/user-api';
+import type { UserTransport } from './user-api';
+const userTransport: UserTransport = new MockUserTransport();
 
 describe('user-api mock', () => {
   test('getMe returns the seed profile shape', async () => {

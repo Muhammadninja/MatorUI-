@@ -1,3 +1,5 @@
+import type { OrderPricing } from '@/services/order-pricing';
+
 /**
  * Orders domain — types only. Pure module so it can be imported from
  * service, transport, hooks, screens, and tests without dragging a
@@ -105,7 +107,7 @@ export type OrderItem = {
   id: string;
   title: string;
   quantity: number;
-  /** Display-formatted price string ("$1,240"). Server-issued. */
+  /** Formatted server unit price; confirmed row totals live in OrderDetail.pricing. */
   price: string;
   /** Optional product image URL. */
   imageUrl?: string;
@@ -199,6 +201,8 @@ export type OrderDetail = {
   items: OrderItem[];
   /** Display-formatted grand total ("$2,170.00"). */
   totalLabel: string;
+  /** Source amounts and validation; missing values remain unknown. */
+  pricing?: OrderPricing;
   /** Each part of the total, as stored on the order. Absent when the source states none. */
   charges?: OrderCharges | null;
   /** The backend's own word for the status (`pending_payment`, `paid`, …), before it is
@@ -305,6 +309,10 @@ export type CreateOrderInput = {
    *  authoritatively and MAY ignore this; the mock echoes it so the
    *  just-placed order's confirmation/track total isn't blank. */
   totalLabel?: string;
+  /** Sent as `Idempotency-Key`. The same key is reused when the buyer retries
+   *  the same order after a failure, so a request whose response was lost
+   *  can't create a second order on a backend that honors the header. */
+  idempotencyKey?: string;
 };
 
 /**
@@ -327,6 +335,8 @@ export type CreateOrderResult = {
   eta: string;
   /** Pre-formatted grand total for the receipt. */
   totalLabel: string;
+  /** Original checkout payload when this response resolves a stored attempt. */
+  recoveredAttempt?: Omit<CreateOrderInput, 'totalLabel' | 'idempotencyKey'>;
 };
 
 // ── Address search ─────────────────────────────────────────────────────

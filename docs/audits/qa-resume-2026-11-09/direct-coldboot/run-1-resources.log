@@ -1,0 +1,10 @@
+2026-11-10T00:23:35.760Z
+MemTotal:        4015044 kB
+MemFree:          533748 kB
+MemAvailable:    1891472 kB
+SwapTotal:       3011276 kB
+SwapFree:        2434764 kB
+CPU usage from 291449ms to 291011ms ago (2026-11-09 19:18:44.697 to 2026-11-09 19:18:45.135):
+  73% 577/system_server: 52% user + 20% kernel / faults: 23795 minor 328 major
+53% TOTAL: 15% user + 11% kernel + 12% iowait + 13% irq + 1.1% softirq
+

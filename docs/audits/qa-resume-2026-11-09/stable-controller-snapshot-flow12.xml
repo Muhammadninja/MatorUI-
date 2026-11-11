@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="Pixel_9_API_35" tests="1" failures="1" time="81.0">
+    <testcase id="flow-12-favorites-isolation" name="flow-12-favorites-isolation" classname="flow-12-favorites-isolation" file=".maestro/flows/flow-12-favorites-isolation.yaml" time="81.0" status="ERROR">
+      <properties>
+        <property name="tags" value="favorites, isolated"/>
+      </properties>
+      <failure>Element not found: Text matching regex: Log in to your account</failure>
+    </testcase>
+  </testsuite>
+</testsuites>

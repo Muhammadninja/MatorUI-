@@ -120,7 +120,7 @@ export default function CatalogSystemsScreen() {
         )}
         ListEmptyComponent={state === 'loading' ? <CategoryRowsSkeleton /> : null}
         contentContainerStyle={{
-          paddingHorizontal: 20,
+          paddingHorizontal: 16,
           paddingTop: 4,
           paddingBottom: Math.max(insets.bottom + 24, 40),
         }}

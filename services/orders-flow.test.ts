@@ -7,7 +7,8 @@
  */
 import { describe, expect, test } from 'vitest';
 
-import { MockOrdersTransport, MOCK_SEED, asList } from './orders-api';
+import { asList } from "@/services/orders-api";
+import { MockOrdersTransport, MOCK_SEED } from "@/tests/support/transports/orders-api";
 import type { CreateOrderInput } from './orders-service';
 
 const BASE_INPUT: CreateOrderInput = {

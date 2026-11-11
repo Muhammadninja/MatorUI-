@@ -75,7 +75,7 @@ function CartItemCard({
             center
             rounded={999}
             pressedOpacity={0.6}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
             accessibilityRole="button"
             accessibilityLabel={t('cart.removeItemFromCart', { title: item.title })}
             style={{ width: 26, height: 26 }}

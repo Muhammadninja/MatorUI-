@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 
 import PasswordlessAuthScreen from '@/components/screens-components/auth/passwordless-auth-screen';
+import { useE2EStartupMount } from '@/hooks/use-e2e-startup-mount';
 
 /**
  * Auth route — a single unified phone-OTP bottom sheet (there is no separate
@@ -8,6 +9,7 @@ import PasswordlessAuthScreen from '@/components/screens-components/auth/passwor
  * `transparentModal` over whatever triggered it (see `app/(auth)/_layout.tsx`).
  */
 export default function SignInRoute() {
+  useE2EStartupMount('sign-in-route');
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />

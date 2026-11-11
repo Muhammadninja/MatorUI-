@@ -70,7 +70,9 @@ vi.mock('@/components/shared/wheel-loader', () => ({ WheelLoader: host('loader')
 vi.mock('@/components/shared/app-map', () => ({ default: host('map') }));
 vi.mock('@/components/screens-components/account/address-form-sheet', () => ({ default: () => null }));
 vi.mock('@/contexts/theme.context', () => ({ useThemeContext: () => ({ tokens: {} }) }));
-vi.mock('@/contexts/user.context', () => ({ useUserContext: () => ({ profile: { id: 'user_a' } }) }));
+vi.mock('@/contexts/user.context', () => ({ useUserContext: () => ({
+  profile: { id: 'user_a' }, isAuthenticated: true, isHydrating: false,
+}) }));
 vi.mock('@/services/garage-service', () => ({ default: { getPrimary: () => null } }));
 vi.mock('@/services/payments-service', () => ({ paymentsTransport: { startPayment } }));
 vi.mock('@/utils/haptics', () => ({ triggerHaptic: vi.fn() }));

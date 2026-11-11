@@ -34,20 +34,31 @@ export const PAYMENT_POLL = {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** What the backend says about this order now. A failed read says nothing either way. */
-export async function readOrderPaymentState(orderId: string): Promise<OrderPaymentState> {
+export async function readOrderPaymentState(
+  orderId: string,
+  isCurrent: () => boolean = () => true,
+): Promise<OrderPaymentState> {
+  if (!isCurrent()) return 'unknown';
   try {
     const order = await ordersTransport.getOrder(orderId);
+    if (!isCurrent()) return 'unknown';
     return order ? orderPaymentState(order.serverStatus) : 'closed';
   } catch {
     return 'unknown';
   }
 }
 
-async function waitForSettlement(orderId: string, reads: number): Promise<OrderPaymentState> {
+async function waitForSettlement(
+  orderId: string,
+  reads: number,
+  isCurrent: () => boolean,
+): Promise<OrderPaymentState> {
   let state: OrderPaymentState = 'unknown';
   for (let read = 0; read < reads; read += 1) {
+    if (!isCurrent()) return 'unknown';
     if (read > 0) await sleep(PAYMENT_POLL.delayMs);
-    state = await readOrderPaymentState(orderId);
+    if (!isCurrent()) return 'unknown';
+    state = await readOrderPaymentState(orderId, isCurrent);
     if (state === 'settled' || state === 'closed') return state;
   }
   return state;
@@ -58,20 +69,28 @@ function errorCodeOf(error: unknown): string | null {
   return typeof code === 'string' ? code : null;
 }
 
-export async function payOrder(orderId: string): Promise<PaymentOutcome> {
+export async function payOrder(
+  orderId: string,
+  isCurrent: () => boolean = () => true,
+): Promise<PaymentOutcome> {
+  const stale: PaymentOutcome = { kind: 'failed', reason: 'cancelled' };
+  if (!isCurrent()) return stale;
   const returnUrl = Linking.createURL('payment-return');
 
   let start;
   try {
     start = await paymentsTransport.startPayment({ orderId, provider: 'payme', returnUrl });
   } catch (error) {
+    if (!isCurrent()) return stale;
     // A refusal can also mean the order has moved on: paid on an earlier attempt, or
     // expired. Its own status says which, before this is called a failure.
-    const state = await readOrderPaymentState(orderId);
+    const state = await readOrderPaymentState(orderId, isCurrent);
+    if (!isCurrent()) return stale;
     if (state === 'settled') return { kind: 'paid' };
     if (state === 'closed') return { kind: 'closed' };
     return { kind: 'failed', reason: paymentRefusalReason(errorCodeOf(error)) };
   }
+  if (!isCurrent()) return stale;
   if (start.status === 'unsupported') return { kind: 'no_online_step' };
 
   let returned = false;
@@ -81,11 +100,14 @@ export async function payOrder(orderId: string): Promise<PaymentOutcome> {
   } catch {
     // The page could not be shown or crashed. The status below still decides.
   }
+  if (!isCurrent()) return stale;
 
   const state = await waitForSettlement(
     orderId,
     returned ? PAYMENT_POLL.readsAfterReturn : PAYMENT_POLL.readsAfterDismiss,
+    isCurrent,
   );
+  if (!isCurrent()) return stale;
   if (state === 'settled') return { kind: 'paid' };
   if (state === 'closed') return { kind: 'closed' };
   return { kind: 'failed', reason: returned ? 'unconfirmed' : 'cancelled' };

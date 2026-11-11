@@ -56,6 +56,22 @@
         "buildType": "apk"
       }
     },
+    "internal": {
+      "extends": "production",
+      "distribution": "internal",
+      "channel": "internal",
+      "autoIncrement": false,
+      "env": {
+        "EXPO_PUBLIC_SENTRY_ENV": "internal"
+      },
+      "ios": {
+        "simulator": false,
+        "resourceClass": "m-medium"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "production": {
       "autoIncrement": true,
       "channel": "production",

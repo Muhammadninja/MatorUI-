@@ -56,22 +56,6 @@ export interface PaymentsTransport {
   startPayment(input: StartPaymentInput, signal?: AbortSignal): Promise<StartPaymentResult>;
 }
 
-// ── Mock transport ─────────────────────────────────────────────────────
-//
-// No real gateway on mocks — report `unsupported` so mock/dev checkout flows
-// straight to the confirmation screen exactly as it does today, never opening
-// a dead browser tab.
-class MockPaymentsTransport implements PaymentsTransport {
-  async startPayment(): Promise<StartPaymentResult> {
-    await delay(150);
-    return { status: 'unsupported' };
-  }
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 // ── HTTP transport ─────────────────────────────────────────────────────
 
 /** Shape of `POST /v1/payments/:provider/invoices` (snake_case from NestJS). */
@@ -109,8 +93,6 @@ class HttpPaymentsTransport implements PaymentsTransport {
 
 // ── Singleton ──────────────────────────────────────────────────────────
 
-export const paymentsTransport: PaymentsTransport = shouldUseHttpTransport('orders')
-  ? new HttpPaymentsTransport()
-  : new MockPaymentsTransport();
+export const paymentsTransport: PaymentsTransport = new HttpPaymentsTransport();
 
 export default paymentsTransport;

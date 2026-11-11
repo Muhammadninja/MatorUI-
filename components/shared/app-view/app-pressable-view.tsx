@@ -194,6 +194,16 @@ const AppPressableViewBase = forwardRef<React.ElementRef<typeof Pressable>, AppP
     // stretch in flex-row parents with default `alignItems: 'stretch'`
     // (e.g. chips in a horizontal ScrollView blow up to screen height).
     // Use `fillContainer` to opt in to filling explicitly.
+    // A pressable given its own size must be tappable across all of it, or an
+    // icon in a 48-unit button only responds on the icon. Only applies when the
+    // wrapper's size is explicit, so a chip still hugs its content.
+    const flatStyle = StyleSheet.flatten(style as ViewStyle | undefined);
+    const hasOwnSize =
+      flatStyle?.width != null ||
+      flatStyle?.height != null ||
+      flatStyle?.minWidth != null ||
+      flatStyle?.minHeight != null;
+
     const innerLayout = useMemo<ViewStyle>(() => {
       const flexbox = composeFlexbox({ row, center, align, justify, wrap, flex, grow, shrink });
       const out: ViewStyle = { ...flexbox };
@@ -374,6 +384,7 @@ const AppPressableViewBase = forwardRef<React.ElementRef<typeof Pressable>, AppP
             // (Outer Animated.View keeps the chrome — bg/border/rounded/padding.)
             // Only fill the wrapper when explicitly requested via `fillContainer`.
             fillContainer ? { flex: 1, width: '100%', height: '100%' } : null,
+            hasOwnSize ? { alignSelf: 'stretch', flexGrow: 1 } : null,
             innerLayout,
             pressed && !pressedBackgroundColor
               ? pressedScale && pressedScale !== 1

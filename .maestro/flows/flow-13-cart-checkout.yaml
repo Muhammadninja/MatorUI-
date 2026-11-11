@@ -1,0 +1,316 @@
+appId: com.mator.e2e
+name: flow-13-cart-checkout
+tags:
+  - cart
+  - checkout
+  - isolated
+---
+# Disposable test app and loopback mock only. A = +998900000001, B = +998900000002.
+# Prices: cabin filter 65 730.24 (fractional), fuel filter 48 250. Every order
+# adds 25 000 courier delivery and a 5 000 service fee.
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "English, English"
+    timeout: 30000
+- tapOn: "English, English"
+- tapOn: "Continue"
+- extendedWaitUntil:
+    visible:
+      id: explore-search-entry
+    timeout: 30000
+- extendedWaitUntil:
+    notVisible: Skip
+    timeout: 30000
+- waitForAnimationToEnd
+
+# ── Guest starts empty ───────────────────────────────────────────────────────
+- runFlow: ../subflows/cart-open-tab.yaml
+- assertVisible: "Your cart is empty for now"
+
+# ── A: add, rapid quantity taps, exact fractional totals ─────────────────────
+- runFlow:
+    file: ../subflows/favorites-sign-in.yaml
+    env:
+      PHONE: '+998900000001'
+- runFlow:
+    file: ../subflows/cart-add-from-catalog.yaml
+    env:
+      PART_ID: mann-cabin-filter
+      PRICE_PATTERN: '.*65.730\.24.*'
+- assertVisible: "1 item"
+- assertVisible: '.*70.730\.24.*'
+- tapOn:
+    id: cart-qty-mann-cabin-filter-inc
+    retryTapIfNoChange: false
+- tapOn:
+    id: cart-qty-mann-cabin-filter-inc
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible: "3 items"
+    timeout: 10000
+- assertVisible: '.*197.190\.72.*'
+- assertVisible: '.*202.190\.72.*'
+- retry:
+    maxRetries: 3
+    commands:
+      - waitForAnimationToEnd
+      - runScript: ../scripts/e2e-state.js
+      - assertTrue: ${output.cart.aCabin === 3}
+
+# ── Failed write rolls back; retrying the same change succeeds ───────────────
+- runScript:
+    file: ../scripts/e2e-fault.js
+    env:
+      METHOD: PATCH
+      FAULT_PATH: /v1/cart/items/
+      MODE: fail
+- tapOn:
+    id: cart-qty-mann-cabin-filter-inc
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible: "Cart was rolled back. Try again."
+    timeout: 10000
+- extendedWaitUntil:
+    visible: "3 items"
+    timeout: 10000
+- runScript: ../scripts/e2e-state.js
+- assertTrue: ${output.cart.aCabin === 3}
+- tapOn:
+    id: cart-qty-mann-cabin-filter-inc
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible: "4 items"
+    timeout: 10000
+- assertVisible: '.*262.920\.96.*'
+- retry:
+    maxRetries: 3
+    commands:
+      - waitForAnimationToEnd
+      - runScript: ../scripts/e2e-state.js
+      - assertTrue: ${output.cart.aCabin === 4}
+
+# ── Delayed write: the UI updates at once, the server catches up ─────────────
+- runScript:
+    file: ../scripts/e2e-fault.js
+    env:
+      METHOD: PATCH
+      FAULT_PATH: /v1/cart/items/
+      MODE: delay
+      MS: '5000'
+- tapOn:
+    id: cart-qty-mann-cabin-filter-dec
+    retryTapIfNoChange: false
+- assertVisible: "3 items"
+- runScript:
+    file: ../scripts/e2e-state.js
+    env:
+      NOSETTLE: 'true'
+- assertTrue: ${output.cart.aCabin === 4}
+- retry:
+    maxRetries: 3
+    commands:
+      - waitForAnimationToEnd
+      - runScript: ../scripts/e2e-state.js
+      - assertTrue: ${output.cart.aCabin === 3}
+- assertVisible: "3 items"
+
+# ── Add a second item, then remove it ────────────────────────────────────────
+- runFlow:
+    file: ../subflows/cart-add-from-catalog.yaml
+    env:
+      PART_ID: mann-fuel-filter
+      PRICE_PATTERN: '.*48.250.*'
+- extendedWaitUntil:
+    visible: "4 items"
+    timeout: 10000
+- assertVisible: '.*250.440\.72.*'
+- tapOn:
+    id: cart-remove-mann-fuel-filter
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    notVisible:
+      id: cart-item-mann-fuel-filter
+    timeout: 10000
+- assertVisible: "3 items"
+- assertVisible: '.*202.190\.72.*'
+- retry:
+    maxRetries: 3
+    commands:
+      - waitForAnimationToEnd
+      - runScript: ../scripts/e2e-state.js
+      - assertTrue: ${output.cart.aFuel === 0 && output.cart.aCabin === 3 && output.cart.aLines === 1}
+
+# ── Cold launch keeps A's cart ───────────────────────────────────────────────
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: explore-search-entry
+    timeout: 30000
+- extendedWaitUntil:
+    notVisible: Skip
+    timeout: 30000
+- waitForAnimationToEnd
+- runFlow: ../subflows/cart-open-tab.yaml
+- extendedWaitUntil:
+    visible:
+      id: cart-item-mann-cabin-filter
+    timeout: 15000
+- assertVisible: "3 items"
+- assertVisible: '.*202.190\.72.*'
+- assertNotVisible:
+    id: cart-item-mann-fuel-filter
+
+# ── A's cart is invisible to guest and B; B's stays out of A's ───────────────
+- runFlow: ../subflows/cart-sign-out.yaml
+- runFlow: ../subflows/cart-open-tab.yaml
+- assertVisible: "Your cart is empty for now"
+- assertNotVisible:
+    id: cart-item-mann-cabin-filter
+- runFlow:
+    file: ../subflows/favorites-sign-in.yaml
+    env:
+      PHONE: '+998900000002'
+- runFlow: ../subflows/cart-open-tab.yaml
+- assertVisible: "Your cart is empty for now"
+- runFlow:
+    file: ../subflows/cart-add-from-catalog.yaml
+    env:
+      PART_ID: mann-fuel-filter
+      PRICE_PATTERN: '.*48.250.*'
+- assertVisible: "1 item"
+- assertNotVisible:
+    id: cart-item-mann-cabin-filter
+- retry:
+    maxRetries: 3
+    commands:
+      - waitForAnimationToEnd
+      - runScript: ../scripts/e2e-state.js
+      - assertTrue: ${output.cart.bFuel === 1 && output.cart.bCabin === 0 && output.cart.aCabin === 3 && output.cart.aFuel === 0}
+- runFlow: ../subflows/cart-sign-out.yaml
+- runFlow: ../subflows/cart-open-tab.yaml
+- assertVisible: "Your cart is empty for now"
+- runFlow:
+    file: ../subflows/favorites-sign-in.yaml
+    env:
+      PHONE: '+998900000001'
+- runFlow: ../subflows/cart-open-tab.yaml
+- extendedWaitUntil:
+    visible:
+      id: cart-item-mann-cabin-filter
+    timeout: 15000
+- assertVisible: "3 items"
+- assertNotVisible:
+    id: cart-item-mann-fuel-filter
+
+# ── Checkout shows the same exact amounts ────────────────────────────────────
+- tapOn:
+    id: cart-checkout-btn
+- extendedWaitUntil:
+    visible:
+      id: checkout-screen
+    timeout: 15000
+- extendedWaitUntil:
+    visible: "Home"
+    timeout: 15000
+- tapOn: "Cash"
+- assertVisible: '.*Place order.*227.190\.72.*'
+- scrollUntilVisible:
+    element: "Service fee"
+    direction: DOWN
+- assertVisible: '.*197.190\.72.*'
+- runScript: ../scripts/e2e-state.js
+- assertTrue: ${output.orders.a === 0}
+
+# ── Failure before the server commits: no order ──────────────────────────────
+- runScript:
+    file: ../scripts/e2e-fault.js
+    env:
+      METHOD: POST
+      FAULT_PATH: /v1/orders
+      MODE: fail
+- tapOn:
+    id: checkout-place-order-btn
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible: 'Request failed \(503\)\.'
+    timeout: 15000
+- assertVisible:
+    id: checkout-place-order-btn
+    enabled: true
+- runScript: ../scripts/e2e-state.js
+- assertTrue: ${output.orders.a === 0}
+
+# ── Slow failure with a rapid second tap: one request, still no order ───────
+- runScript:
+    file: ../scripts/e2e-fault.js
+    env:
+      METHOD: POST
+      FAULT_PATH: /v1/orders
+      MODE: fail
+      MS: '5000'
+- tapOn:
+    id: checkout-place-order-btn
+    retryTapIfNoChange: false
+- tapOn:
+    id: checkout-place-order-btn
+    retryTapIfNoChange: false
+- assertVisible: "Placing order…"
+- extendedWaitUntil:
+    visible: 'Request failed \(503\)\.'
+    timeout: 15000
+- runScript: ../scripts/e2e-state.js
+- assertTrue: ${output.orders.a === 0 && output.orders.requests === 2}
+
+# ── Lost response after the server commits ───────────────────────────────────
+# Android's HTTP stack may resend the POST by itself when the connection closes
+# without a response; otherwise the buyer sees the error and taps again. Either
+# way the same Idempotency-Key must yield one order.
+- runScript:
+    file: ../scripts/e2e-fault.js
+    env:
+      METHOD: POST
+      FAULT_PATH: /v1/orders
+      MODE: drop
+- tapOn:
+    id: checkout-place-order-btn
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible: '(Network request failed\.|Order placed)'
+    timeout: 20000
+- runFlow:
+    when:
+      visible: 'Network request failed\.'
+    commands:
+      - runScript: ../scripts/e2e-state.js
+      - assertTrue: ${output.orders.a === 1}
+      - tapOn:
+          id: checkout-place-order-btn
+          retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible:
+      id: order-confirmation-screen
+    timeout: 30000
+- extendedWaitUntil:
+    visible: '.*227.190\.72.*'
+    timeout: 15000
+- runScript: ../scripts/e2e-state.js
+- assertTrue: ${output.orders.a === 1 && output.orders.b === 0}
+- assertTrue: ${output.orders.aTotal === '227190.72'}
+- assertTrue: ${output.orders.keys === 1 && output.orders.unkeyed === 0}
+# 503, slow 503 (one request for two taps), lost response, then one resend.
+- assertTrue: ${output.orders.requests === 4 && output.orders.posts === 2}
+- takeScreenshot: cart-checkout-confirmation
+
+# ── The placed order empties A's cart only ───────────────────────────────────
+- retry:
+    maxRetries: 3
+    commands:
+      - waitForAnimationToEnd
+      - runScript: ../scripts/e2e-state.js
+      - assertTrue: ${output.cart.aLines === 0 && output.cart.bFuel === 1}
+- openLink: mator-e2e://cart
+- extendedWaitUntil:
+    visible: "Your cart is empty for now"
+    timeout: 15000

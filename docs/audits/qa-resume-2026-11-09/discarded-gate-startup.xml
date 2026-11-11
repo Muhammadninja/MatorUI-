@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="Pixel_9_API_35" tests="1" failures="1" time="70.0">
+    <testcase id="focused-fresh-startup-stress" name="focused-fresh-startup-stress" classname="focused-fresh-startup-stress" file="/tmp/mator-startup-stress.yaml" time="70.0" status="ERROR">
+      <failure>Assertion is false: "English, English" is visible</failure>
+    </testcase>
+  </testsuite>
+</testsuites>

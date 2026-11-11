@@ -14,6 +14,7 @@ import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useCartContext } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import { toastService } from '@/services/toast-service';
+import { formatSomAmount } from '@/utils/format-price';
 import {
   acceptSourcingOffer,
   fetchSourcingOffer,
@@ -51,7 +52,7 @@ function buildRejectReasons(t: TFn): { key: SourcingOfferDeclineReason; label: s
 /** 250000 → "250 000 сум". */
 function formatSom(price?: number): string | null {
   if (typeof price !== 'number' || !Number.isFinite(price)) return null;
-  return `${price.toLocaleString('ru-RU').replace(/ /g, ' ')} сум`;
+  return `${formatSomAmount(price)} сум`;
 }
 
 type Tokens = ReturnType<typeof useThemeContext>['tokens'];
@@ -67,7 +68,7 @@ function Chip({ label, tokens }: { label: string; tokens: Tokens }) {
         backgroundColor: tokens.brandSoft,
       }}
     >
-      <AppText family="accent" weight="semibold" style={{ fontSize: 12, color: tokens.brand }}>
+      <AppText family="accent" weight="semibold" style={{ fontSize: 12, color: tokens.brandText }}>
         {label}
       </AppText>
     </AppView>
@@ -161,7 +162,7 @@ function RejectButton({
       }}
     >
       <X size={15} color={tokens.textMuted} />
-      <AppText family="accent" weight="semibold" style={{ fontSize: 14.5, color: tokens.textMuted }}>
+      <AppText family="accent" weight="semibold" style={{ fontSize: 14, color: tokens.textMuted }}>
         {t('sourcing.doesNotFit')}
       </AppText>
     </AppPressableView>
@@ -240,7 +241,7 @@ export default function SourcingOfferScreen() {
       await rejectSourcingOffer(offer.id, reason);
       setStatus('DECLINED');
       setRejectOpen(false);
-      toastService.info(t('sourcing.offerDeclined'));
+      toastService.success(t('sourcing.offerDeclined'));
       router.back();
     } catch {
       toastService.danger(t('sourcing.declineFailed'));
@@ -348,7 +349,7 @@ export default function SourcingOfferScreen() {
                     backgroundColor: tokens.brandSoft,
                   }}
                 >
-                  <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.brand, marginBottom: 3 }}>
+                  <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.brandText, marginBottom: 3 }}>
                     {t('sourcing.sellerNote')}
                   </AppText>
                   <AppText family="default" style={{ fontSize: 14, color: tokens.text, lineHeight: 20 }}>
@@ -394,14 +395,14 @@ export default function SourcingOfferScreen() {
             ) : status === 'DECLINED' ? (
               <AppText
                 family="default"
-                style={{ fontSize: 13.5, color: tokens.textMuted, textAlign: 'center', paddingVertical: 8 }}
+                style={{ fontSize: 14, color: tokens.textMuted, textAlign: 'center', paddingVertical: 8 }}
               >
                 {t('sourcing.youDeclined')}
               </AppText>
             ) : (
               <AppText
                 family="default"
-                style={{ fontSize: 13.5, color: tokens.textMuted, textAlign: 'center', paddingVertical: 8 }}
+                style={{ fontSize: 14, color: tokens.textMuted, textAlign: 'center', paddingVertical: 8 }}
               >
                 {t('sourcing.offerNoLongerValid')}
               </AppText>
@@ -465,7 +466,7 @@ export default function SourcingOfferScreen() {
             {busy === 'reject' ? (
               <WheelLoader size={18} color={tokens.background} />
             ) : (
-              <AppText family="accent" weight="bold" style={{ fontSize: 15.5, color: tokens.background }}>
+              <AppText family="accent" weight="bold" style={{ fontSize: 16, color: tokens.background }}>
                 {t('sourcing.decline')}
               </AppText>
             )}

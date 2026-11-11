@@ -6,17 +6,8 @@
 # single unified phone-OTP bottom sheet (no separate sign-up) presented as a
 # transparentModal, so the triggering screen stays visible behind the scrim.
 #
-# Two phases in the sheet:
-#   1. phone — the phone field ships PRE-FILLED with a demo number, so we just
-#      tap "Next" (no typing → sidesteps the keyboard-controller quirk).
-#   2. otp   — the mock returns a `devCode` that the sheet AUTO-FILLS into the
-#      code field, so we just tap "Agree & continue" (that single tap is also
-#      the legal acceptance — there are no consent checkboxes to tick).
-# On success the sheet does router.back(). We wait for it to disappear so the
-# caller can safely tap the (now-authenticated) screen beneath it.
-#
-# testIDs: sign-in-screen · auth-phone-field · auth-send-code-btn · auth-verify-btn.
-# ─────────────────────────────────────────────────────────────────────────────
+# Enters the synthetic account and OTP explicitly. The app starts with an empty
+# phone field; bundled builds never consume devCode. Success dismisses the sheet.
 appId: com.fotih12.mator
 ---
 - assertVisible:
@@ -24,14 +15,22 @@ appId: com.fotih12.mator
 # Let the sheet transition settle so the button is hittable.
 - waitForAnimationToEnd:
     timeout: 2000
-# Phase 1 — send the code (phone pre-filled).
+# Phase 1 — enter the mock's deterministic account (the app never seeds a phone).
+- tapOn:
+    id: "auth-phone-field"
+- inputText: "+998900000001"
+# Send the code.
 - tapOn:
     id: "auth-send-code-btn"
-# Phase 2 — wait for the OTP phase, then verify (code auto-filled from devCode).
+# Phase 2 — enter the mock-only OTP, then verify.
 - extendedWaitUntil:
     visible:
       id: "auth-verify-btn"
     timeout: 8000
+- tapOn:
+    id: "auth-otp-field"
+- eraseText
+- inputText: "123456"
 - tapOn:
     id: "auth-verify-btn"
 # Auth done → the sheet dismisses. Wait for it to be gone before returning.

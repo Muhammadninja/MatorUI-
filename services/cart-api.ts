@@ -1,15 +1,6 @@
 import type { CartCharges, CartItem, PromoResult } from '@/services/cart-math';
 
-/**
- * Transport contract for the cart. The provider mutates local state
- * optimistically, then calls one of these methods. On rejection the
- * provider rolls the local state back and surfaces the error.
- *
- * Mirrors the `GarageTransport` pattern: implement once for mock
- * (already done — `MockCartTransport`), once for HTTP (stub below),
- * then swap by changing the constant `cartTransport` export at the
- * bottom of this file.
- */
+/** Live HTTP transport and public contracts. Test doubles live under tests/support. */
 
 export type CartSnapshot = {
   items: CartItem[];
@@ -44,126 +35,6 @@ export interface CartTransport {
   removePromo(): Promise<void>;
 }
 
-// ── Mock transport ───────────────────────────────────────────────────
-
-/**
- * Simulated network latency in ms. 0 keeps the mock behavior identical to
- * the previous local-only provider; bump this in dev to inspect mid-flight
- * UI states (`pendingIds`, optimistic rollback toasts, etc.).
- */
-const MOCK_LATENCY_MS = 0;
-
-/**
- * Probability (0-1) that any mock mutation rejects, used to exercise the
- * provider's rollback path during development. Default 0 (never fails).
- */
-const MOCK_FAILURE_RATE = 0;
-
-function delay(ms: number): Promise<void> {
-  if (ms <= 0) return Promise.resolve();
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function maybeFail(operation: string): void {
-  if (MOCK_FAILURE_RATE > 0 && Math.random() < MOCK_FAILURE_RATE) {
-    throw new Error(`MockCartTransport: simulated failure on ${operation}`);
-  }
-}
-
-export class MockCartTransport implements CartTransport {
-  private items: CartItem[];
-  private appliedPromoCode: string | null;
-
-  constructor(seed?: CartSnapshot) {
-    this.items = seed ? [...seed.items] : [];
-    this.appliedPromoCode = seed?.appliedPromoCode ?? null;
-  }
-
-  async fetch(): Promise<CartSnapshot> {
-    await delay(MOCK_LATENCY_MS);
-    return {
-      items: [...this.items],
-      appliedPromoCode: this.appliedPromoCode,
-      charges: this.charges(),
-    };
-  }
-
-  /** Mock only: no fee. The real one is the backend's, and the app holds no tariff. */
-  charges(): CartCharges {
-    const subtotal = this.items.reduce(
-      (sum, item) => sum + (Number(item.price.replace(/[^0-9.]/g, '')) || 0) * item.quantity,
-      0,
-    );
-    return { subtotal, discount: 0, serviceFee: 0, total: subtotal };
-  }
-
-  async addItem(input: AddItemInput): Promise<CartItem> {
-    await delay(MOCK_LATENCY_MS);
-    maybeFail('addItem');
-    const existing = this.items.find((i) => i.id === input.productId);
-    if (existing) {
-      existing.quantity += input.quantity ?? 1;
-      return { ...existing };
-    }
-    const created: CartItem = {
-      id: input.productId,
-      title: input.title,
-      description: input.description,
-      price: input.price,
-      priceLabel: input.priceLabel,
-      badge: input.badge,
-      status: input.status,
-      imageUrl: input.imageUrl,
-      quantity: input.quantity ?? 1,
-    };
-    this.items.push(created);
-    return { ...created };
-  }
-
-  async updateQuantity(itemId: string, quantity: number): Promise<CartItem | null> {
-    await delay(MOCK_LATENCY_MS);
-    maybeFail('updateQuantity');
-    if (quantity <= 0) {
-      this.items = this.items.filter((i) => i.id !== itemId);
-      return null;
-    }
-    const item = this.items.find((i) => i.id === itemId);
-    if (!item) throw new Error(`Cart item ${itemId} not found`);
-    item.quantity = quantity;
-    return { ...item };
-  }
-
-  async removeItem(itemId: string): Promise<void> {
-    await delay(MOCK_LATENCY_MS);
-    maybeFail('removeItem');
-    this.items = this.items.filter((i) => i.id !== itemId);
-  }
-
-  async clear(): Promise<void> {
-    await delay(MOCK_LATENCY_MS);
-    maybeFail('clear');
-    this.items = [];
-    this.appliedPromoCode = null;
-  }
-
-  async applyPromo(code: string, _subtotal: number): Promise<PromoResult> {
-    await delay(MOCK_LATENCY_MS);
-    maybeFail('applyPromo');
-    // The mock defers to the same evaluatePromoCode the client used.
-    // A real server replaces this with its own rules + state.
-    const { evaluatePromoCode } = await import('./cart-math');
-    const result = evaluatePromoCode(code, _subtotal);
-    if (result.ok) this.appliedPromoCode = result.promo.code;
-    return result;
-  }
-
-  async removePromo(): Promise<void> {
-    await delay(MOCK_LATENCY_MS);
-    maybeFail('removePromo');
-    this.appliedPromoCode = null;
-  }
-}
-
 // ── HTTP transport (live /v1/cart, auth-gated) ───────────────────────
 
 /**
@@ -186,7 +57,6 @@ export class MockCartTransport implements CartTransport {
  * is unchanged) and keep an internal `part_id → line_id` map — rebuilt
  * from every response — to translate update/remove onto the right line.
  */
-import { shouldUseHttpTransport } from '@/config/api';
 import { apiClient } from '@/services/api-client';
 import { PROMO_CODES } from '@/services/cart-math';
 
@@ -406,6 +276,4 @@ export class HttpCartTransport implements CartTransport {
 // ── Singleton ────────────────────────────────────────────────────────
 
 /** Flips automatically based on `EXPO_PUBLIC_API_BASE_URL`. */
-export const cartTransport: CartTransport = shouldUseHttpTransport('cart')
-  ? new HttpCartTransport()
-  : new MockCartTransport();
+export const cartTransport: CartTransport = new HttpCartTransport();

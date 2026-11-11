@@ -6,6 +6,7 @@ import { ScrollView } from 'react-native';
 import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { OrderLinePrice, OrderPriceBreakdown } from '@/components/screens-components/orders/order-price-breakdown';
 import { OrderChargeRows } from '@/components/screens-components/checkout/checkout-sections';
 import { AppButton } from '@/components/shared/app-button';
 import { AppPrice } from '@/components/shared/app-price';
@@ -196,7 +197,7 @@ export default function OrderConfirmationScreen() {
           />
 
           {/* Line items */}
-          {order.items.map((line) => (
+          {order.items.map((line, index) => (
             <AppView
               key={line.id}
               row
@@ -207,19 +208,28 @@ export default function OrderConfirmationScreen() {
                 family="default"
                 style={{ fontSize: 13, color: tokens.textMuted, flex: 1 }}
               >
-                {line.title} × {line.quantity}
+                {line.title}{line.quantity > 0 ? ` × ${line.quantity}` : ''}
               </AppText>
-              <AppText
-                family="accent"
-                weight="semibold"
-                style={{ fontSize: 13, color: tokens.text }}
-              >
-                {line.price}
-              </AppText>
+              {order.pricing ? (
+                <OrderLinePrice line={order.pricing.lines[index]} />
+              ) : (
+                <AppText family="accent" weight="semibold" style={{ fontSize: 13, color: tokens.text }}>
+                  {line.price}
+                </AppText>
+              )}
             </AppView>
           ))}
 
-          {order.charges ? (
+          {order.pricing ? (
+            <AppView style={{ marginTop: 10 }}>
+              <AppView style={{ height: 1, backgroundColor: tokens.divider, marginBottom: 10 }} />
+              <OrderPriceBreakdown
+                pricing={order.pricing}
+                hideZeroServiceFee
+                deliveryLabel={t('checkout.deliveryPriceLabel')}
+              />
+            </AppView>
+          ) : order.charges ? (
             <AppView testID="order-confirmation-charges" gap={6} style={{ marginTop: 6 }}>
               <AppView style={{ height: 1, backgroundColor: tokens.divider, marginBottom: 6 }} />
               <OrderChargeRows tokens={tokens} charges={order.charges} formatCurrency={formatCurrency} />
