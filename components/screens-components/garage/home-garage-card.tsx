@@ -22,7 +22,7 @@ import {
 } from '@/services/uz-vehicle-catalog';
 import type { Vehicle } from '@/services/garage-service';
 import type { BodyType } from '@/services/vehicle-images/manifest';
-import { parseHex } from '@/services/vehicle-images/paint';
+import { nearestSwatch } from '@/utils/vehicle-color';
 import { resolveVehicleImage } from '@/services/vehicle-images/resolver';
 import { triggerHaptic } from '@/utils/haptics';
 
@@ -93,7 +93,7 @@ const SILHOUETTE: Record<BodyType, CarBody> = {
 function heroVisual(
   active: ReturnType<typeof useActiveVehicle>['currentActiveVehicle'],
   vehicle: Vehicle | undefined,
-): GarageHeroVisual & { shownInWhite?: boolean } {
+): GarageHeroVisual {
   const resolved = resolveVehicleImage({
     brandId: vehicle?.brandId || active?.fitment.brandId,
     modelId: vehicle?.modelId || active?.fitment.modelId,
@@ -101,12 +101,7 @@ function heroVisual(
     year: vehicle?.year,
     colorHex: vehicle?.colorHex,
   });
-  if (resolved.kind === 'image') {
-    // The car has a real saved colour the image doesn't show (another paint, or
-    // one outside the eight): say so rather than let white pass as their colour.
-    const shownInWhite = !resolved.paintMatched && parseHex(vehicle?.colorHex) !== null;
-    return { kind: 'image', source: resolved.source, shownInWhite };
-  }
+  if (resolved.kind === 'image') return { kind: 'image', source: resolved.source };
   const body = resolved.bodyType
     ? SILHOUETTE[resolved.bodyType]
     : carBodyForVehicle({ modelId: vehicle?.modelId || active?.fitment.modelId, model: vehicle?.model ?? '' });
@@ -133,6 +128,10 @@ function HomeGarageCard() {
   const vehicle =
     currentActiveVehicle?.vehicle ?? vehicles.find((v) => v.id === currentActiveVehicle?.vehicleId);
   const summary = isHydrating ? null : summarize(currentActiveVehicle, vehicle);
+  // The saved colour, named as the Garage screen names it. It's the car's real
+  // colour even when the picture is the white fallback.
+  const colorName = vehicle?.colorHex ? t(nearestSwatch(vehicle.colorHex).labelKey) : '';
+  const spec = [summary?.spec, colorName].filter(Boolean).join(' · ');
 
   const openGarage = () => {
     triggerHaptic('selection');
@@ -167,8 +166,15 @@ function HomeGarageCard() {
     );
   }
 
-  // No car yet: the Cobalt hero, opening the same Garage destination.
-  if (!summary) return <GarageAddHero onPress={openGarage} />;
+  // No car yet: the decorative empty-garage hero.
+  if (!summary) {
+    // The Garage screen's own add flow (auth gate first for guests).
+    const addVehicle = () => {
+      triggerHaptic('selection');
+      router.navigate('/garage?add=1');
+    };
+    return <GarageAddHero onPress={addVehicle} />;
+  }
 
   const visual = heroVisual(currentActiveVehicle, vehicle);
 
@@ -181,14 +187,9 @@ function HomeGarageCard() {
       <AppText textVariant="h4" weight="bold" style={{ color: tokens.onVehicleBanner }}>
         {summary.name}
       </AppText>
-      {summary.spec ? (
+      {spec ? (
         <AppText textVariant="bodySm" style={{ color: tokens.vehicleBannerMuted }}>
-          {summary.spec}
-        </AppText>
-      ) : null}
-      {visual.kind === 'image' && visual.shownInWhite ? (
-        <AppText testID="home-garage-image-in-white" textVariant="caption" style={{ color: tokens.vehicleBannerMuted }}>
-          {t('explore.vehicleImageInWhite')}
+          {spec}
         </AppText>
       ) : null}
       <AppPressableView

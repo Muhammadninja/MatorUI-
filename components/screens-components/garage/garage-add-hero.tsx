@@ -1,7 +1,8 @@
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import { memo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useWindowDimensions, type LayoutChangeEvent } from 'react-native';
+import { Pressable, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Defs, Ellipse, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { AppButton } from '@/components/shared/app-button';
@@ -10,8 +11,10 @@ import { AppView } from '@/components/shared/app-view';
 import { CarIcon, type CarBody } from '@/components/shared/mator-icons';
 import { useThemeContext } from '@/contexts/theme.context';
 import type { VehicleImageSource } from '@/services/vehicle-images/manifest';
+import { triggerHaptic } from '@/utils/haptics';
 
-const COBALT = require('@/assets/cars-2d/chevrolet-cobalt-white.png');
+import emptyGarageArt from '@/assets/hero/corvette-c8-red.webp';
+
 /** Vehicle images are 2:1: the car spans ~82% of the width, tyres on the
  *  bottom edge (docs/vehicle-images/chevrolet-asset-matrix.md §10). */
 const CAR_ASPECT = 2;
@@ -19,6 +22,8 @@ const PADDING = 16;
 const RADIUS = 16;
 /** Explore's horizontal gutter, used until the card reports its own width. */
 const PAGE_GUTTER = 16;
+/** Visible Corvette artwork bounds in its transparent 1200×600 source image. */
+const ART_BOUNDS = { left: 117 / 1200, top: 220 / 600, right: 1084 / 1200, bottom: 596 / 600 };
 
 /** What the hero's 2:1 car slot shows. */
 export type GarageHeroVisual =
@@ -29,8 +34,14 @@ export type GarageHeroVisual =
 
 type GarageHeroCardProps = {
   testID: string;
-  /** Omitted only by the empty state, which shows the decorative Cobalt. */
-  visual?: GarageHeroVisual;
+  visual: GarageHeroVisual;
+  /** Empty-state-only artwork/layout refinements; selected-vehicle cards keep their geometry. */
+  emptyGarage?: boolean;
+  /** Draw the card's soft ground shadow under the car. Off for artwork that
+   *  brings its own contact shadow. */
+  groundShadow?: boolean;
+  /** Optional image action; used only by the decorative empty-state Corvette. */
+  onImagePress?: () => void;
   /** Copy column: title, supporting text, and any inline action. */
   children: ReactNode;
   action: { testID: string; title: string; onPress: () => void };
@@ -44,8 +55,17 @@ type GarageHeroCardProps = {
  * both, so the button keeps its full label and touch size on the narrowest
  * iPhone instead of squeezing into the copy's column.
  */
-export function GarageHeroCard({ testID, visual, children, action }: GarageHeroCardProps) {
+export function GarageHeroCard({
+  testID,
+  visual,
+  groundShadow = true,
+  emptyGarage = false,
+  onImagePress,
+  children,
+  action,
+}: GarageHeroCardProps) {
   const { tokens } = useThemeContext();
+  const { t } = useTranslation();
   const { width: windowWidth, fontScale } = useWindowDimensions();
   const [measured, setMeasured] = useState<{ width: number; height: number } | null>(null);
 
@@ -54,13 +74,19 @@ export function GarageHeroCard({ testID, visual, children, action }: GarageHeroC
   // At large text the copy needs the full width; the car moves above it.
   const stacked = fontScale >= 1.3;
 
-  const carWidth = Math.round(width * (stacked ? 0.66 : 0.54));
+  const carWidth = Math.round(width * (stacked ? 0.66 : emptyGarage ? 0.66 : 0.54));
   const carHeight = Math.round(carWidth / CAR_ASPECT);
-  // Bleed slightly past the right edge so the car reads as parked in the card.
-  const carRight = -Math.round(width * 0.05);
-  const carTop = stacked ? PADDING / 2 : PADDING + 4;
-  const copyWidth = stacked ? width - PADDING * 2 : Math.round(width * 0.5) - PADDING;
-  const isPlaceholder = visual?.kind === 'placeholder';
+  // Nudge the empty-state Corvette right and up without scaling the artwork.
+  const carRight = -Math.round(width * (emptyGarage && !stacked ? 0.077 : 0.05));
+  const carTop = stacked ? PADDING / 2 : PADDING + (emptyGarage ? 3 : 4);
+  const copyWidth = stacked
+    ? width - PADDING * 2
+    : Math.round(width * (emptyGarage ? 0.55 : 0.5)) - PADDING;
+  const isPlaceholder = visual.kind === 'placeholder';
+  // Preserve the approved empty-card height as the car artwork grows.
+  const copyMinHeight = emptyGarage && !stacked
+    ? Math.round(width * 0.54 / CAR_ASPECT) + 4
+    : carTop + carHeight - PADDING;
 
   const onLayout = (event: LayoutChangeEvent) => {
     const { width: w, height: h } = event.nativeEvent.layout;
@@ -99,13 +125,13 @@ export function GarageHeroCard({ testID, visual, children, action }: GarageHeroC
           </Defs>
           <Rect x={0} y={0} width={width} height={height} fill="url(#garage-hero-wash)" />
           {/* Soft curves behind the car: one broad arc, one sweep rising from the bottom. */}
-          <Circle cx={width * 0.8} cy={carTop + carHeight * 0.55} r={carHeight * 0.95} fill={tokens.garageHeroShape} />
+          <Circle cx={width * (emptyGarage ? 0.84 : 0.8)} cy={carTop + carHeight * 0.55} r={carHeight * 0.95} fill={tokens.garageHeroShape} />
           <Path
             d={`M ${width * 0.3} ${height} C ${width * 0.52} ${height * 0.62}, ${width * 0.78} ${height * 0.5}, ${width} ${height * 0.42} L ${width} ${height} Z`}
             fill={tokens.garageHeroShapeStrong}
           />
           {/* A silhouette casts no shadow: it isn't a car standing in the scene. */}
-          {isPlaceholder ? null : (
+          {isPlaceholder || !groundShadow ? null : (
             <Ellipse cx={groundX} cy={groundY} rx={carWidth * 0.46} ry={carHeight * 0.1} fill="url(#garage-hero-ground)" />
           )}
         </Svg>
@@ -121,19 +147,51 @@ export function GarageHeroCard({ testID, visual, children, action }: GarageHeroC
         >
           <CarIcon body={visual.body} size={Math.round(carHeight * 1.5)} color={tokens.vehicleBannerMuted} />
         </AppView>
+      ) : emptyGarage && onImagePress ? (
+        <Pressable
+          testID={`${testID}-vehicle-image-pressable`}
+          accessibilityRole="button"
+          accessibilityLabel={t('nav.garage')}
+          onPress={onImagePress}
+          style={({ pressed }) => ({
+            position: 'absolute',
+            top: carTop + carHeight * ART_BOUNDS.top,
+            right: carRight + carWidth * (1 - ART_BOUNDS.right),
+            width: carWidth * (ART_BOUNDS.right - ART_BOUNDS.left),
+            height: carHeight * (ART_BOUNDS.bottom - ART_BOUNDS.top),
+            opacity: pressed ? 0.8 : 1,
+          })}
+        >
+          <Image
+            testID={`${testID}-vehicle-image`}
+            source={visual.source}
+            contentFit="contain"
+            style={{
+              position: 'absolute',
+              left: -carWidth * ART_BOUNDS.left,
+              top: -carHeight * ART_BOUNDS.top,
+              width: carWidth,
+              height: carHeight,
+              opacity: 0.96,
+            }}
+            accessibilityIgnoresInvertColors
+            accessible={false}
+            pointerEvents="none"
+          />
+        </Pressable>
       ) : (
         <Image
-          testID={visual ? `${testID}-vehicle-image` : undefined}
-          source={visual?.kind === 'image' ? visual.source : COBALT}
+          testID={`${testID}-vehicle-image`}
+          source={visual.source}
           contentFit="contain"
-          style={{ position: 'absolute', top: carTop, right: carRight, width: carWidth, height: carHeight }}
+          style={{ position: 'absolute', top: carTop, right: carRight, width: carWidth, height: carHeight, opacity: emptyGarage ? 0.96 : 1 }}
           accessibilityIgnoresInvertColors
           accessible={false}
         />
       )}
 
-      <AppView p="lg" gap="lg" style={stacked ? { paddingTop: carTop + carHeight + 8 } : undefined}>
-        <AppView gap="xs" style={{ width: copyWidth, minHeight: stacked ? undefined : carTop + carHeight - PADDING }}>
+      <AppView p="lg" gap={emptyGarage ? 'md' : 'lg'} style={stacked ? { paddingTop: carTop + carHeight + 8 } : undefined}>
+        <AppView gap="xs" style={{ width: copyWidth, minHeight: stacked ? undefined : copyMinHeight }}>
           {children}
         </AppView>
 
@@ -152,17 +210,26 @@ export function GarageHeroCard({ testID, visual, children, action }: GarageHeroC
 }
 
 /**
- * Explore's empty garage state. The Cobalt here is decorative artwork for
- * "add your car", not a picture of anyone's vehicle, so it is never passed
- * through the vehicle image resolver.
+ * Explore's empty garage state. The red Corvette C8 is decorative artwork for
+ * "start your garage", never a picture of anyone's vehicle: it is not passed
+ * through the vehicle image resolver and is never saved, selected or used for
+ * fitment. Its cutout carries its own contact shadow.
  */
 function GarageAddHero({ onPress }: { onPress: () => void }) {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
+  const openGarage = () => {
+    triggerHaptic('selection');
+    router.navigate('/garage');
+  };
 
   return (
     <GarageHeroCard
       testID="home-garage-card"
+      visual={{ kind: 'image', source: emptyGarageArt }}
+      groundShadow={false}
+      emptyGarage
+      onImagePress={openGarage}
       action={{ testID: 'home-garage-add-vehicle', title: t('explore.addVehicleAction'), onPress }}
     >
       <AppText textVariant="h4" weight="bold" style={{ color: tokens.onVehicleBanner }}>
