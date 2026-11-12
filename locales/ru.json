@@ -481,7 +481,17 @@
     "viewOrder": "Посмотреть заказ",
     "startNewOrder": "Оформить заказ заново",
     "unpaidOrderExpires": "Неоплаченный заказ отменится автоматически.",
-    "deliveryErrorCourierOff": "Доставка курьером пока недоступна. Можно забрать заказ самовывозом."
+    "deliveryErrorCourierOff": "Доставка курьером пока недоступна. Можно забрать заказ самовывозом.",
+    "reviewAddress": "Адрес",
+    "reviewPickupPoint": "Пункт выдачи",
+    "reviewItems": "Состав заказа",
+    "reviewItemsCount_one": "{{count}} позиция",
+    "reviewItemsCount_few": "{{count}} позиции",
+    "reviewItemsCount_many": "{{count}} позиций",
+    "reviewItemsCount_other": "{{count}} позиции",
+    "reviewChooseAddress": "Выберите адрес",
+    "reviewPickupMore": "ещё {{count}}",
+    "retryPaymentShort": "Оплатить заказ"
   },
   "orderConfirmation": {
     "loadErrorTitle": "Не удалось загрузить заказ",

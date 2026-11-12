@@ -40,6 +40,8 @@ const { host, transport, cart, availability } = vi.hoisted(() => {
 });
 
 vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, ScrollView: host('scroll'), Image: host('image') }));
+// The choice sheets render their content in place, so every choice stays reachable here.
+vi.mock('@/components/shared/app-bottom-sheet', () => ({ AppBottomSheet: host('sheet') }));
 vi.mock('expo-linking', () => ({ createURL: () => 'mator://payment-return' }));
 vi.mock('expo-router', () => ({ router: { back: vi.fn(), push: vi.fn(), replace: vi.fn() } }));
 vi.mock('expo-web-browser', () => ({ openAuthSessionAsync: vi.fn() }));
@@ -54,6 +56,8 @@ vi.mock('lucide-react-native', () => ({
   CreditCard: () => null,
   MapPin: () => null,
   Wallet: () => null,
+  ChevronRight: () => null,
+  X: () => null,
 }));
 vi.mock('@/components/shared/app-view', () => ({
   AppView: host('view'),
@@ -172,6 +176,14 @@ describe('Checkout: where to collect the order', () => {
       .map((n) => n.children.filter((c) => typeof c === 'string' || typeof c === 'number').join(''))
       .map(nbsp);
   const allText = () => textsOf(renderer.root).join(' | ');
+  /** The texts inside one element: a review row, or the footer's total. */
+  const within = (testID: string) =>
+    renderer.root
+      .find((node) => typeof node.type === 'string' && node.props.testID === testID)
+      .findAll((node) => node.type === 'text')
+      .flatMap((node) => node.children.filter((c): c is string => typeof c === 'string'))
+      .map(nbsp)
+      .join(' | ');
   const cards = () => hosts('checkout-pickup-point');
   const maps = () => renderer.root.findAll((node) => node.type === 'map');
   const press = async (node: ReactTestInstance) => {
@@ -268,7 +280,8 @@ describe('Checkout: where to collect the order', () => {
 
     expect(cards()).toHaveLength(1);
     expect(maps()).toHaveLength(1);
-    expect(allText().split('Toshkent, Bunyodkor shoh ko‘chasi 12')).toHaveLength(2);
+    // Once in the pickup details (the review row names it too, outside the sheet).
+    expect(within('checkout-sheet-delivery').split('Toshkent, Bunyodkor shoh ko‘chasi 12')).toHaveLength(2);
     expect(hosts('checkout-pickup-item').map((n) => textsOf(n).join(''))).toEqual([
       'Колодки × 2',
       'Ремень × 1',

@@ -42,6 +42,8 @@ const { host, transport, cart, startPayment, openAuthSessionAsync, replace, push
 });
 
 vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, ScrollView: host('scroll'), Image: host('image') }));
+// The choice sheets render their content in place, so every choice stays reachable here.
+vi.mock('@/components/shared/app-bottom-sheet', () => ({ AppBottomSheet: host('sheet') }));
 vi.mock('expo-linking', () => ({ createURL: () => 'mator://payment-return' }));
 vi.mock('expo-router', () => ({ router: { back: vi.fn(), push, replace } }));
 vi.mock('expo-web-browser', () => ({ openAuthSessionAsync }));
@@ -56,6 +58,8 @@ vi.mock('lucide-react-native', () => ({
   CreditCard: () => null,
   MapPin: () => null,
   Wallet: () => null,
+  ChevronRight: () => null,
+  X: () => null,
 }));
 vi.mock('@/components/shared/app-view', () => ({
   AppView: host('view'),
@@ -142,6 +146,14 @@ describe('Paying for an order at checkout', () => {
 
   const allText = () =>
     renderer.root
+      .findAll((node) => node.type === 'text')
+      .flatMap((node) => node.children.filter((c): c is string => typeof c === 'string'))
+      .map(nbsp)
+      .join(' | ');
+  /** The texts inside one element: a review row, or the footer's total. */
+  const within = (testID: string) =>
+    renderer.root
+      .find((node) => typeof node.type === 'string' && node.props.testID === testID)
       .findAll((node) => node.type === 'text')
       .flatMap((node) => node.children.filter((c): c is string => typeof c === 'string'))
       .map(nbsp)
@@ -282,7 +294,8 @@ describe('Paying for an order at checkout', () => {
     test('the button pays that order, at what it charges', async () => {
       await placeWithPayme();
 
-      expect(nbsp(String(button().props.title))).toBe("Повторить оплату · 232 500 so'm");
+      expect(nbsp(String(button().props.title))).toBe('Оплатить заказ');
+      expect(within('checkout-total')).toContain("232 500 so'm");
       expect(button().props.disabled).toBe(false);
       expect(allText()).toContain('Колодки');
       expect(allText()).toContain("232 500 so'm");
@@ -395,7 +408,8 @@ describe('Paying for an order at checkout', () => {
 
       expect(exists('checkout-payment-failed')).toBe(false);
       expect(allText()).toContain('Курьер Mator | 32 500 сум');
-      expect(nbsp(String(button().props.title))).toBe('Оформить заказ · 232 500 сум');
+      expect(nbsp(String(button().props.title))).toBe('Оформить заказ');
+    expect(within('checkout-total')).toContain('232 500 сум');
       expect(transport.createOrder).toHaveBeenCalledTimes(1);
       expect(stored.record).toBeNull();
     });

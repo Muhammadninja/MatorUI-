@@ -127,6 +127,7 @@ export function DeliverySection({
   onChange,
   onAdd,
   onSkip,
+  bare = false,
 }: {
   tokens: Tokens;
   addr: Address | null;
@@ -135,13 +136,15 @@ export function DeliverySection({
   onChange: () => void;
   onAdd: () => void;
   onSkip: () => void;
+  /** Inside a sheet that already names it: no card frame and no section label. */
+  bare?: boolean;
 }) {
   const { t } = useTranslation();
   const addressLine = addr ? formatAddressLine(addr) : '';
   return (
-    <AppView rounded={16} p={16} colorName="card" borderWidth={1} borderName="border" gap={10}>
-      <AppView row align="center" justify="space-between">
-        <SectionLabel tokens={tokens}>{t('checkout.deliveryAddress')}</SectionLabel>
+    <AppView {...(bare ? {} : { rounded: 16, p: 16, colorName: 'card' as const, borderWidth: 1, borderName: 'border' as const })} gap={10}>
+      <AppView row align="center" justify={bare ? 'flex-end' : 'space-between'}>
+        {bare ? null : <SectionLabel tokens={tokens}>{t('checkout.deliveryAddress')}</SectionLabel>}
         {addr && canChange ? (
           <AppPressableView onPress={onChange} accessibilityRole="button" accessibilityLabel={t('checkout.changeAddress')}>
             <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.brandText }}>{t('checkout.change')}</AppText>
@@ -353,8 +356,11 @@ export function DeliveryOptionsCard({
   onEditAddress,
   formatCurrency,
   pickupDetails,
+  bare = false,
 }: {
   tokens: Tokens;
+  /** Inside a sheet that already names it: no card frame and no section label. */
+  bare?: boolean;
   /** What the order would be placed with. */
   delivery: CheckoutDelivery;
   /** What the backend says about the courier, or null with no address: then only pickup. */
@@ -378,8 +384,12 @@ export function DeliveryOptionsCard({
         : null;
   const action = courier?.state === 'refused' ? quoteErrorAction(courier.code) : null;
   return (
-    <AppView testID="checkout-delivery-card" rounded={16} p={16} colorName="card" borderWidth={1} borderName="border" gap={10}>
-      <SectionLabel tokens={tokens}>{t('checkout.shipping')}</SectionLabel>
+    <AppView
+      testID="checkout-delivery-card"
+      {...(bare ? {} : { rounded: 16, p: 16, colorName: 'card' as const, borderWidth: 1, borderName: 'border' as const })}
+      gap={10}
+    >
+      {bare ? null : <SectionLabel tokens={tokens}>{t('checkout.shipping')}</SectionLabel>}
 
       <DeliveryOptionRow
         tokens={tokens}
@@ -390,7 +400,7 @@ export function DeliveryOptionsCard({
         selected={pickupChosen}
         onPress={() => onChooseMethod('pickup')}
       />
-      {pickupChosen ? pickupDetails : null}
+      {pickupChosen && !bare ? pickupDetails : null}
 
       {courier ? (
         <AppView testID="checkout-delivery-courier" gap={8}>
@@ -427,6 +437,8 @@ export function DeliveryOptionsCard({
           ) : null}
         </AppView>
       ) : null}
+      {/* In a sheet both choices come first; where to collect follows them. */}
+      {pickupChosen && bare ? pickupDetails : null}
     </AppView>
   );
 }

@@ -9,16 +9,19 @@ import AddressFormSheet, {
   type AddressFormValues,
 } from '@/components/screens-components/account/address-form-sheet';
 import {
-  DeliveryOptionsCard,
-  DeliverySection,
   LinkAction,
   NO_PRICE_YET,
   OrderChargeRows,
+  PaymentOptionMark,
   PaymentRetryCard,
-  PaymentRow,
-  SectionLabel,
+  SummaryRow,
 } from '@/components/screens-components/checkout/checkout-sections';
-import { PickupPoints } from '@/components/screens-components/checkout/pickup-points';
+import { ReviewRow } from '@/components/screens-components/checkout/checkout-review';
+import {
+  CheckoutChoiceSheets,
+  reviewSummaries,
+  type CheckoutSheetName,
+} from '@/components/screens-components/checkout/checkout-choice-sheets';
 import { StockShortagePanel } from '@/components/screens-components/checkout/stock-shortage-panel';
 import { OrderLinePrice } from '@/components/screens-components/orders/order-price-breakdown';
 import { AppButton } from '@/components/shared/app-button';
@@ -45,7 +48,6 @@ import {
   useUpdateAddress,
 } from '@/hooks/use-orders';
 import { usePickupPoints } from '@/hooks/use-pickup-points';
-import { parsePrice } from '@/services/cart-math';
 import {
   checkoutTotal,
   courierOffer,
@@ -121,6 +123,9 @@ export default function CheckoutScreen() {
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('courier');
   const [sheetVisible, setSheetVisible] = useState(false);
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
+  // One choice sheet at a time; closing it leaves every selection as it was.
+  const [openSheet, setOpenSheet] = useState<CheckoutSheetName | null>(null);
+  const closeSheet = () => setOpenSheet(null);
 
   const addrItems = addresses.items;
   const defaultAddr = useMemo(
@@ -238,7 +243,9 @@ export default function CheckoutScreen() {
     chooseAddress(addrItems[(curIdx + 1) % addrItems.length]!.id);
   };
 
+  // The address form is a sheet of its own, so a choice sheet closes before it opens.
   const openAddressForm = (address: Address | null) => {
+    setOpenSheet(null);
     setEditingAddress(address);
     setSheetVisible(true);
   };
@@ -298,6 +305,19 @@ export default function CheckoutScreen() {
     create.reset();
   };
 
+  const { deliveryReview, addressReview } = reviewSummaries({
+    t,
+    formatCurrency,
+    addr,
+    addressSkipped,
+    delivery,
+    courier,
+    pickup,
+    onOpen: setOpenSheet,
+  });
+  const paymentOption = PAYMENT_OPTIONS.find((o) => o.id === paymentType);
+  const productsSubtotal = settledCharges?.subtotal ?? totals.subtotal;
+
   if (addresses.state === 'loading') {
     return (
       <AppView flex={1} colorName="background" center>
@@ -342,64 +362,74 @@ export default function CheckoutScreen() {
             />
           ) : (
             <>
-              {/* Delivery address (skipping it means collecting the order) */}
-              <DeliverySection
-                tokens={tokens}
-                addr={addr}
-                skipped={addressSkipped}
-                canChange={addrItems.length > 1}
-                onChange={cycleAddress}
-                onAdd={() => openAddressForm(null)}
-                onSkip={() => {
-                  setAddressSkipped(true);
-                  setSelectedAddressId(null);
-                  create.reset();
-                }}
-              />
-
-              {/* Payment method — Payme / Terminal / Cash */}
-              <AppView gap={10}>
-                <SectionLabel tokens={tokens}>{t('checkout.payment')}</SectionLabel>
-                {PAYMENT_OPTIONS.map((opt) => (
-                  <PaymentRow
-                    key={opt.id}
-                    option={opt}
-                    selected={paymentType === opt.id}
-                    onPress={() => setPaymentType(opt.id)}
-                    tokens={tokens}
-                  />
-                ))}
+              {/* The review: one compact row per choice, each opening its own sheet. */}
+              <AppView testID="checkout-review" rounded={16} colorName="card" borderWidth={1} borderName="border" style={{ paddingHorizontal: 16 }}>
+                <ReviewRow
+                  tokens={tokens}
+                  testID="checkout-review-delivery"
+                  label={t('checkout.shipping')}
+                  divider={false}
+                  {...deliveryReview}
+                  onPress={() => setOpenSheet(addr || addressSkipped ? 'delivery' : 'address')}
+                />
+                <ReviewRow tokens={tokens} testID="checkout-review-address" {...addressReview} />
+                <ReviewRow
+                  tokens={tokens}
+                  testID="checkout-review-payment"
+                  label={t('checkout.payment')}
+                  value={
+                    paymentOption?.logo ? (
+                      <PaymentOptionMark option={paymentOption} width={56} iconSize={18} color={tokens.text} />
+                    ) : (
+                      t(paymentOption?.labelKey ?? 'checkout.payment')
+                    )
+                  }
+                  onPress={() => setOpenSheet('payment')}
+                />
+                <ReviewRow
+                  tokens={tokens}
+                  testID="checkout-review-items"
+                  label={t('checkout.reviewItems')}
+                  value={t('checkout.reviewItemsCount', { count: items.length })}
+                  detail={formatCurrency(productsSubtotal)}
+                  onPress={() => setOpenSheet('items')}
+                />
               </AppView>
 
-              {/* Delivery — pickup or Mator's courier: the price and nothing else about the trip */}
-              {addr || addressSkipped ? (
-                <DeliveryOptionsCard
-                  tokens={tokens}
-                  delivery={delivery}
-                  courier={courier}
-                  onChooseMethod={(method) => {
-                    setDeliveryMethod(method);
-                    create.reset();
-                  }}
-                  onRetry={shipping.refresh}
-                  onEditAddress={() => openAddressForm(addr)}
-                  formatCurrency={formatCurrency}
-                  pickupDetails={
-                    <PickupPoints
-                      tokens={tokens}
-                      state={pickup.state}
-                      points={pickup.points}
-                      onRetry={pickup.refresh}
-                    />
-                  }
-                />
-              ) : null}
+              {/* What the order adds on top: Mator's fee, and a discount when there is one. */}
+              <AppView gap={8} style={{ paddingHorizontal: 4 }}>
+                {(settledCharges?.discount ?? totals.discount) > 0 ? (
+                  <SummaryRow
+                    label={t('checkout.discount')}
+                    value={`−${formatCurrency(settledCharges?.discount ?? totals.discount)}`}
+                    tokens={tokens}
+                  />
+                ) : null}
+                {settledCharges?.serviceFee !== 0 ? (
+                  <SummaryRow
+                    testID="order-service-fee"
+                    label={t('checkout.serviceFee')}
+                    value={settledCharges ? formatCurrency(settledCharges.serviceFee) : NO_PRICE_YET}
+                    tokens={tokens}
+                  />
+                ) : null}
+                {!charges && cartSettled && cartError ? (
+                  <AppView testID="checkout-charges-unavailable" row align="center" gap={8}>
+                    <AlertCircle size={16} strokeWidth={2} color={tokens.error} />
+                    <AppText family="default" style={{ fontSize: 12, color: tokens.error, flex: 1 }}>
+                      {t('checkout.totalsUnavailable')}
+                    </AppText>
+                    <LinkAction label={t('common.retry')} onPress={() => void refreshCart()} color={tokens.brandText} />
+                  </AppView>
+                ) : null}
+              </AppView>
             </>
           )}
 
-          {/* Order summary: what the unpaid order holds, or what this order would */}
-          <AppText family="heading" weight="bold" style={{ fontSize: 16, color: tokens.text, marginTop: 4 }}>{t('checkout.orderSummary')}</AppText>
+          {/* An unpaid order keeps what it was placed with: its own lines and charges. */}
           {payment.pending ? (
+            <>
+              <AppText family="heading" weight="bold" style={{ fontSize: 16, color: tokens.text, marginTop: 4 }}>{t('checkout.orderSummary')}</AppText>
             <AppView gap={10}>
               {(payment.order?.items ?? []).map((line, index) => (
                 <AppView key={line.id} row justify="space-between">
@@ -427,48 +457,8 @@ export default function CheckoutScreen() {
                 <AppPrice value={payment.order?.totalLabel ?? payment.pending.totalLabel} size={18} color={tokens.text} />
               </AppView>
             </AppView>
-          ) : (
-            <AppView gap={10}>
-              {items.map((item) => (
-                <AppView key={item.id} row justify="space-between">
-                  <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted, flex: 1 }}>
-                    {item.title} × {item.quantity}
-                  </AppText>
-                  <AppText family="accent" weight="semibold" style={{ fontSize: 14, color: tokens.text }}>
-                    {formatCurrency(parsePrice(item.price) * item.quantity)}
-                  </AppText>
-                </AppView>
-              ))}
-              <AppView style={{ height: 1, backgroundColor: tokens.divider, marginVertical: 4 }} />
-              <OrderChargeRows
-                tokens={tokens}
-                formatCurrency={formatCurrency}
-                charges={{
-                  subtotal: settledCharges?.subtotal ?? totals.subtotal,
-                  discount: settledCharges?.discount ?? totals.discount,
-                  serviceFee: settledCharges ? settledCharges.serviceFee : null,
-                  delivery: delivery.fee,
-                }}
-              />
-              {!charges && cartSettled && cartError ? (
-                <AppView testID="checkout-charges-unavailable" row align="center" gap={8}>
-                  <AlertCircle size={16} strokeWidth={2} color={tokens.error} />
-                  <AppText family="default" style={{ fontSize: 12, color: tokens.error, flex: 1 }}>
-                    {t('checkout.totalsUnavailable')}
-                  </AppText>
-                  <LinkAction label={t('common.retry')} onPress={() => void refreshCart()} color={tokens.brandText} />
-                </AppView>
-              ) : null}
-              <AppView row justify="space-between">
-                <AppText family="accent" weight="bold" style={{ fontSize: 16, color: tokens.text }}>{t('checkout.total')}</AppText>
-                <AppPrice
-                  value={grandTotal === null ? NO_PRICE_YET : formatCurrency(grandTotal)}
-                  size={18}
-                  color={tokens.text}
-                />
-              </AppView>
-            </AppView>
-          )}
+            </>
+          ) : null}
 
           {shortages.length > 0 ? (
             <StockShortagePanel
@@ -492,21 +482,35 @@ export default function CheckoutScreen() {
       </ScrollView>
 
       {/* Sticky place order */}
-      <AppView testID="checkout-footer" colorName="background" px="lg" style={{ paddingTop: 14, paddingBottom: checkoutFooterBottom(insets.bottom, Platform.OS), borderTopWidth: 1, borderTopColor: tokens.divider }}>
+      <AppView testID="checkout-footer" colorName="background" px="lg" gap={12} style={{ paddingTop: 12, paddingBottom: checkoutFooterBottom(insets.bottom, Platform.OS), borderTopWidth: 1, borderTopColor: tokens.divider }}>
+        <AppView row align="center" justify="space-between" gap={12}>
+          <AppText family="default" weight="medium" style={{ fontSize: 14, color: tokens.textMuted, flexShrink: 1 }}>
+            {t('checkout.total')}
+          </AppText>
+          <AppView testID="checkout-total">
+          <AppPrice
+            value={
+              payment.pending
+                ? payment.order?.totalLabel ?? payment.pending.totalLabel
+                : grandTotal === null
+                  ? NO_PRICE_YET
+                  : formatCurrency(grandTotal)
+            }
+            size={20}
+            color={tokens.text}
+          />
+          </AppView>
+        </AppView>
         <AppButton
           testID="checkout-place-order-btn"
           title={
             payment.phase === 'paying'
               ? t('checkout.payingOrder')
               : payment.pending
-                ? t('checkout.retryPayment', {
-                    total: payment.order?.totalLabel ?? payment.pending.totalLabel,
-                  })
+                ? t('checkout.retryPaymentShort')
                 : create.phase === 'placing'
                   ? t('checkout.placingOrder')
-                  : grandTotal === null
-                    ? t('checkout.placeOrderNoTotal')
-                    : t('checkout.placeOrder', { total: formatCurrency(grandTotal) })
+                  : t('checkout.placeOrderNoTotal')
           }
           kind="brand"
           size="lg"
@@ -522,6 +526,39 @@ export default function CheckoutScreen() {
           onPress={payment.pending ? payment.retry : placeOrder}
         />
       </AppView>
+
+      {/* An unpaid order's choices were made when it was placed: nothing to change here. */}
+      {payment.pending ? null : (
+      <CheckoutChoiceSheets
+        open={openSheet}
+        onClose={closeSheet}
+        tokens={tokens}
+        addr={addr}
+        addressSkipped={addressSkipped}
+        canChangeAddress={addrItems.length > 1}
+        onCycleAddress={cycleAddress}
+        onAddAddress={() => openAddressForm(null)}
+        onEditAddress={() => openAddressForm(addr)}
+        onSkipAddress={() => {
+          setAddressSkipped(true);
+          setSelectedAddressId(null);
+          create.reset();
+        }}
+        delivery={delivery}
+        courier={courier}
+        onChooseMethod={(method) => {
+          setDeliveryMethod(method);
+          create.reset();
+        }}
+        onRetryQuote={shipping.refresh}
+        pickup={pickup}
+        paymentType={paymentType}
+        onChoosePayment={setPaymentType}
+        items={items}
+        productsSubtotal={productsSubtotal}
+        formatCurrency={formatCurrency}
+      />
+      )}
 
       <AddressFormSheet
         visible={sheetVisible}

@@ -473,7 +473,15 @@
     "viewOrder": "View order",
     "startNewOrder": "Place the order again",
     "unpaidOrderExpires": "An unpaid order is cancelled automatically.",
-    "deliveryErrorCourierOff": "Courier delivery isn’t available yet. You can pick the order up instead."
+    "deliveryErrorCourierOff": "Courier delivery isn’t available yet. You can pick the order up instead.",
+    "reviewAddress": "Address",
+    "reviewPickupPoint": "Pickup point",
+    "reviewItems": "Order items",
+    "reviewItemsCount_one": "{{count}} item",
+    "reviewItemsCount_other": "{{count}} items",
+    "reviewChooseAddress": "Choose an address",
+    "reviewPickupMore": "{{count}} more",
+    "retryPaymentShort": "Pay for order"
   },
   "orderConfirmation": {
     "loadErrorTitle": "Couldn't load your order",

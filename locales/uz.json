@@ -473,7 +473,15 @@
     "viewOrder": "Buyurtmani koʻrish",
     "startNewOrder": "Qayta rasmiylashtirish",
     "unpaidOrderExpires": "Toʻlanmagan buyurtma avtomatik bekor qilinadi.",
-    "deliveryErrorCourierOff": "Kuryer orqali yetkazib berish hozircha mavjud emas. Buyurtmani oʻzingiz olib ketishingiz mumkin."
+    "deliveryErrorCourierOff": "Kuryer orqali yetkazib berish hozircha mavjud emas. Buyurtmani oʻzingiz olib ketishingiz mumkin.",
+    "reviewAddress": "Manzil",
+    "reviewPickupPoint": "Olib ketish joyi",
+    "reviewItems": "Buyurtma tarkibi",
+    "reviewItemsCount_one": "{{count}} ta pozitsiya",
+    "reviewItemsCount_other": "{{count}} ta pozitsiya",
+    "reviewChooseAddress": "Manzilni tanlang",
+    "reviewPickupMore": "yana {{count}} ta",
+    "retryPaymentShort": "Buyurtmani toʻlash"
   },
   "orderConfirmation": {
     "loadErrorTitle": "Buyurtmani yuklab boʻlmadi",
