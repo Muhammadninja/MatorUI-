@@ -40,7 +40,7 @@ async function setup(options = {}) {
   const pipeline = createVehicleImagePipeline({
     dataDir, adminToken, requestToken, autoRun: false, retryDelayMs: 0,
     generationEnabled: options.generationEnabled ?? Boolean(options.provider), ...options,
-    cloudinaryPublicationEnabled: options.cloudinaryPublicationEnabled ?? Boolean(options.assetStore),
+    publicationEnabled: options.publicationEnabled ?? true,
   });
   await pipeline.initialize();
   return { pipeline, dataDir };

@@ -193,7 +193,7 @@ export function createVehicleImagePipeline({
   requestToken = null,
   provider = null,
   generationEnabled = false,
-  cloudinaryPublicationEnabled = false,
+  publicationEnabled = false,
   autoRun = false,
   imageValidator = defaultImageValidator,
   assetStore = null,
@@ -668,6 +668,8 @@ export function createVehicleImagePipeline({
       (item) => item.id === candidateId && item.status === 'pending',
     );
     if (!candidate) throw Object.assign(new Error('pending candidate not found'), { status: 404 });
+    if (decision === 'approve' && !publicationEnabled)
+      throw Object.assign(new Error('image publication is disabled'), { status: 503 });
     const request = db.requests.find((item) => item.id === candidate.requestId);
     if (!request) throw Object.assign(new Error('request not found'), { status: 404 });
     if (decision === 'approve' && publishInProgress.has(request.identityKey))
@@ -675,7 +677,7 @@ export function createVehicleImagePipeline({
     if (decision === 'approve') publishInProgress.add(request.identityKey);
     try {
       let publishedAsset = null;
-      if (decision === 'approve' && cloudinaryPublicationEnabled && assetStore) {
+      if (decision === 'approve' && assetStore) {
         const prior = db.published.filter((item) => item.identityKey === request.identityKey);
         const version = Math.max(0, ...prior.map((item) => item.version)) + 1;
         const bytes = await readFile(path.join(privateDir, candidate.id));

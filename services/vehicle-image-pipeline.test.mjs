@@ -10,8 +10,8 @@ import { processGeneratedImage } from './vehicle-image-processing.mjs';
 import { buildVehicleImagePrompt, OpenAIImageProvider } from './vehicle-image-provider.mjs';
 import { createCloudinaryAssetStore } from './vehicle-image-cloudinary-store.mjs';
 import {
-  isVehicleImageCloudinaryPublicationEnabled,
   isVehicleImageGenerationEnabled,
+  isVehicleImagePublicationEnabled,
 } from './vehicle-image-env.mjs';
 
 const dirs = [];
@@ -45,7 +45,7 @@ async function setup(options = {}) {
     retryDelayMs: 0,
     autoRun: false,
     generationEnabled: options.generationEnabled ?? Boolean(options.provider),
-    cloudinaryPublicationEnabled: options.cloudinaryPublicationEnabled ?? Boolean(options.assetStore),
+    publicationEnabled: options.publicationEnabled ?? true,
     ...options,
   });
   await pipeline.initialize();
@@ -77,17 +77,17 @@ describe('vehicle image pipeline', () => {
     expect(isVehicleImageGenerationEnabled('false')).toBe(false);
     expect(isVehicleImageGenerationEnabled('TRUE')).toBe(false);
     expect(isVehicleImageGenerationEnabled('true')).toBe(true);
-    expect(isVehicleImageCloudinaryPublicationEnabled(undefined)).toBe(false);
-    expect(isVehicleImageCloudinaryPublicationEnabled('false')).toBe(false);
-    expect(isVehicleImageCloudinaryPublicationEnabled('TRUE')).toBe(false);
-    expect(isVehicleImageCloudinaryPublicationEnabled('true')).toBe(true);
+    expect(isVehicleImagePublicationEnabled(undefined)).toBe(false);
+    expect(isVehicleImagePublicationEnabled('false')).toBe(false);
+    expect(isVehicleImagePublicationEnabled('TRUE')).toBe(false);
+    expect(isVehicleImagePublicationEnabled('true')).toBe(true);
   });
 
-  it('keeps candidate approval local while Cloudinary publication is disabled', async () => {
+  it('refuses candidate approval and publication while publication is disabled', async () => {
     const publish = vi.fn();
     const { pipeline } = await setup({
       assetStore: { publish },
-      cloudinaryPublicationEnabled: false,
+      publicationEnabled: false,
     });
     const result = await pipeline.submitRequest({ make: 'BYD', model: 'Han', year: 2024 });
     const candidate = await pipeline.uploadCandidate(
@@ -95,10 +95,11 @@ describe('vehicle image pipeline', () => {
       { contentType: 'image/png', bytes: await fixtureImage() },
       true,
     );
-    const approved = await pipeline.decideCandidate(candidate.id, 'approve', true);
-    expect(approved.status).toBe('approved');
+    await expect(pipeline.decideCandidate(candidate.id, 'approve', true))
+      .rejects.toMatchObject({ status: 503 });
     expect(publish).not.toHaveBeenCalled();
-    expect(pipeline.resolve(result.request.identityKey).url).toMatch(/^\/published\//);
+    expect(candidate.status).toBe('pending');
+    expect(pipeline.resolve(result.request.identityKey)).toBeNull();
   });
 
   it('records canonical requests without provider calls, including admin processing and restart', async () => {
@@ -106,11 +107,14 @@ describe('vehicle image pipeline', () => {
     dirs.push(dataDir);
     const requestToken = 'server-to-server-request-token-for-disabled-generation-tests';
     const generate = vi.fn();
+    const publish = vi.fn();
     const pipeline = createVehicleImagePipeline({
       dataDir,
       adminToken: token,
       requestToken,
       provider: { generate },
+      assetStore: { publish },
+      publicationEnabled: false,
     });
     await pipeline.initialize();
     const identity = {
@@ -141,6 +145,30 @@ describe('vehicle image pipeline', () => {
       method: 'POST', url: '/admin/jobs/process',
     });
     expect(unauthorizedAdmin.status).toBe(403);
+
+    const candidateUpload = await invokeServer(pipeline.server(), {
+      method: 'POST',
+      url: `/admin/requests/${encodeURIComponent(first.body.requestId)}/candidates`,
+      token,
+      body: {
+        contentType: 'image/png',
+        data: (await fixtureImage()).toString('base64'),
+      },
+    });
+    expect(candidateUpload.status).toBe(201);
+    const unauthorizedApproval = await invokeServer(pipeline.server(), {
+      method: 'POST',
+      url: `/admin/candidates/${encodeURIComponent(candidateUpload.body.id)}/approve`,
+      token: requestToken,
+    });
+    expect(unauthorizedApproval.status).toBe(403);
+    const disabledApproval = await invokeServer(pipeline.server(), {
+      method: 'POST',
+      url: `/admin/candidates/${encodeURIComponent(candidateUpload.body.id)}/approve`,
+      token,
+    });
+    expect(disabledApproval.status).toBe(503);
+    expect(publish).not.toHaveBeenCalled();
 
     const response = await invokeServer(pipeline.server(), {
       method: 'POST', url: '/admin/jobs/process', token: token,

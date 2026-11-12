@@ -3,8 +3,8 @@ import { createVehicleImagePipeline } from '../services/vehicle-image-pipeline.m
 import { createImageProvider } from '../services/vehicle-image-provider.mjs';
 import { createCloudinaryAssetStore } from '../services/vehicle-image-cloudinary-store.mjs';
 import {
-  isVehicleImageCloudinaryPublicationEnabled,
   isVehicleImageGenerationEnabled,
+  isVehicleImagePublicationEnabled,
   loadVehicleImageEnv,
 } from '../services/vehicle-image-env.mjs';
 
@@ -18,8 +18,8 @@ if (!requestToken || requestToken.length < 32)
 const generationEnabled = isVehicleImageGenerationEnabled(
   process.env.VEHICLE_IMAGE_GENERATION_ENABLED,
 );
-const cloudinaryPublicationEnabled = isVehicleImageCloudinaryPublicationEnabled(
-  process.env.VEHICLE_IMAGE_CLOUDINARY_PUBLICATION_ENABLED,
+const publicationEnabled = isVehicleImagePublicationEnabled(
+  process.env.VEHICLE_IMAGE_PUBLICATION_ENABLED,
 );
 const pipeline = createVehicleImagePipeline({
   dataDir: path.resolve(process.env.VEHICLE_IMAGE_DATA_DIR ?? '/var/lib/mator-vehicle-images'),
@@ -27,8 +27,8 @@ const pipeline = createVehicleImagePipeline({
   requestToken,
   provider: generationEnabled ? createImageProvider() : null,
   generationEnabled,
-  assetStore: cloudinaryPublicationEnabled ? createCloudinaryAssetStore() : null,
-  cloudinaryPublicationEnabled,
+  assetStore: publicationEnabled ? createCloudinaryAssetStore() : null,
+  publicationEnabled,
   autoRun: generationEnabled,
   maxAttempts: 3,
   jobTimeoutMs: 180_000,
