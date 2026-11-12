@@ -8,8 +8,9 @@ import Svg, { Circle, Defs, Ellipse, LinearGradient, Path, RadialGradient, Rect,
 import { AppButton } from '@/components/shared/app-button';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
-import { CarIcon, type CarBody } from '@/components/shared/mator-icons';
 import { useThemeContext } from '@/contexts/theme.context';
+import VehicleImagePlaceholder from '@/components/screens-components/garage/vehicle-image-placeholder';
+import type { VehicleImageStatus } from '@/services/vehicle-images/image-status';
 import type { VehicleImageSource } from '@/services/vehicle-images/manifest';
 import { triggerHaptic } from '@/utils/haptics';
 
@@ -31,8 +32,8 @@ const ART_BOUNDS = { left: 117 / 1200, top: 220 / 600, right: 1084 / 1200, botto
 export type GarageHeroVisual =
   /** An approved image of this exact vehicle (from the vehicle image resolver). */
   | { kind: 'image'; source: VehicleImageSource }
-  /** A neutral body silhouette: no approved image for this vehicle. */
-  | { kind: 'placeholder'; body: CarBody };
+  /** No approved image yet: the universal placeholder, with the pipeline's status when known. */
+  | { kind: 'placeholder'; status?: VehicleImageStatus | null };
 
 type GarageHeroCardProps = {
   testID: string;
@@ -154,14 +155,14 @@ export function GarageHeroCard({
       ) : null}
 
       {isPlaceholder ? (
-        <AppView
-          testID={`${testID}-vehicle-placeholder`}
-          center
-          style={{ position: 'absolute', top: carTop, right: carRight + width * 0.05, width: carWidth, height: carHeight, opacity: 0.55 }}
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-        >
-          <CarIcon body={visual.body} size={Math.round(carHeight * 1.5)} color={tokens.vehicleBannerMuted} />
+        // In the car's own slot, so the card keeps its size and layout.
+        <AppView style={{ position: 'absolute', top: carTop, right: carRight }}>
+          <VehicleImagePlaceholder
+            testID={`${testID}-vehicle-placeholder`}
+            width={carWidth}
+            height={carHeight}
+            status={visual.status}
+          />
         </AppView>
       ) : emptyGarage && onImagePress ? (
         <Pressable

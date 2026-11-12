@@ -1071,5 +1071,9 @@
     "useMyLocation": "Joylashuvimni koʻrsatish",
     "unavailable": "Bu qurilmada xarita mavjud emas. Manzilni yuqoridagi qidiruv orqali toping.",
     "zoomIn": "Joyni aniq koʻrsatish uchun xaritani yaqinlashtiring."
+  },
+  "vehicleImage": {
+    "preparing": "Rasm tayyorlanmoqda",
+    "unavailable": "Hozircha rasm yoʻq"
   }
 }

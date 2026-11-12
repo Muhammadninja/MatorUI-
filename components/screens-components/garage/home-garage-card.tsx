@@ -7,8 +7,6 @@ import GarageAddHero, {
   GarageHeroCard,
   type GarageHeroVisual,
 } from '@/components/screens-components/garage/garage-add-hero';
-import { carBodyForVehicle } from '@/components/screens-components/garage/car-body';
-import type { CarBody } from '@/components/shared/mator-icons';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useActiveVehicle } from '@/contexts/active-vehicle.context';
@@ -22,7 +20,6 @@ import {
   getTrim,
 } from '@/services/uz-vehicle-catalog';
 import type { Vehicle } from '@/services/garage-service';
-import type { BodyType } from '@/services/vehicle-images/manifest';
 import { nearestSwatch } from '@/utils/vehicle-color';
 import { resolveVehicleImage } from '@/services/vehicle-images/resolver';
 import { triggerHaptic } from '@/utils/haptics';
@@ -77,19 +74,13 @@ function summarize(
   return { name, spec, make, model } satisfies VehicleSummary;
 }
 
-const SILHOUETTE: Record<BodyType, CarBody> = {
-  sedan: 'sedan',
-  hatchback: 'hatchback',
-  suv: 'suv',
-  mpv: 'suv',
-  microvan: 'suv',
-  pickup: 'truck',
-};
-
 /**
  * The selected vehicle's picture: an approved image of exactly this model and
- * generation, else a neutral silhouette. Never the empty state's decorative
- * Cobalt. Reads the garage row when loaded, else the persisted fitment ids.
+ * generation, else the universal placeholder until one is approved. Never the
+ * empty state's decorative car, and never a stand-in model. Reads the garage row
+ * when loaded, else the persisted fitment ids. When the Asset Registry is
+ * connected, its status for this vehicle goes on the placeholder; an approved
+ * image then arrives through the resolver and replaces it.
  */
 function heroVisual(
   active: ReturnType<typeof useActiveVehicle>['currentActiveVehicle'],
@@ -103,10 +94,7 @@ function heroVisual(
     colorHex: vehicle?.colorHex,
   });
   if (resolved.kind === 'image') return { kind: 'image', source: resolved.source };
-  const body = resolved.bodyType
-    ? SILHOUETTE[resolved.bodyType]
-    : carBodyForVehicle({ modelId: vehicle?.modelId || active?.fitment.modelId, model: vehicle?.model ?? '' });
-  return { kind: 'placeholder', body };
+  return { kind: 'placeholder' };
 }
 
 /**

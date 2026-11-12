@@ -1071,5 +1071,9 @@
     "useMyLocation": "Show my location",
     "unavailable": "The map isn’t available on this device. Find the address with the search above.",
     "zoomIn": "Zoom in to mark the exact place."
+  },
+  "vehicleImage": {
+    "preparing": "Image in preparation",
+    "unavailable": "No image yet"
   }
 }
