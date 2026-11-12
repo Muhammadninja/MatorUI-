@@ -2,7 +2,7 @@
 # FLOW 11 — Add a vehicle by make / model / year  (Garage, stepped picker sheet)
 #
 # Covers the route rebuilt in Sep 2026: every unlabelled "add" affordance opens
-# a three-step sheet over the PLATFORM's own picker (make → model → year), and
+# a three-step sheet over searchable lists (make → model → year), and
 # only an explicitly VIN-labelled control reaches the VIN screen. Flow 01 covers
 # the VIN route; nothing covered this one.
 #
@@ -12,16 +12,16 @@
 # (`services/uz-vehicle-catalog.ts`), so the sheet fills from
 # UZ_BRANDS[0] = Chevrolet and UZ_MODELS[0] = Cobalt.
 #
-# Why no scrolling of the wheel: opening a field COMMITS the row the picker
-# centres (`AppNativePickerField`), so the first option is selected by the tap
-# that opens it. Three taps of "Continue" therefore produce
-# `Chevrolet · Cobalt · <current year>` with no gesture Maestro cannot make.
+# Tapping a make or a model row answers it and moves to the next step; the year
+# row is chosen, then Save. Rows are matched by their label, so the fixture make
+# and model are tapped by name, and the first year row is the current year.
 #
 # Guests are gated: `startAdd` routes to /sign-in?gate=1 BEFORE the sheet opens,
 # so the sheet is reached on the second tap, after auth.
 #
-# testIDs: vehicle-make-picker · vehicle-model-picker · vehicle-year-picker ·
-#          picker-step-next · picker-step-back · use-vin-instead
+# testIDs: vehicle-make-list · vehicle-model-list · vehicle-year-list (rows:
+#          <list>-option-<id>, search: <list>-search) · picker-step-next ·
+#          picker-step-back · use-vin-instead · picker-not-found-link
 # ─────────────────────────────────────────────────────────────────────────────
 appId: com.fotih12.mator
 env:
@@ -44,45 +44,38 @@ env:
 - tapOn: "By model and year"
 - extendedWaitUntil:
     visible:
-      id: "vehicle-make-picker"
+      id: "vehicle-make-list"
     timeout: 8000
 
 # ── Assert: step one asks for the make ALONE, and nothing is pre-selected ────
 - assertVisible: "Pick your car's brand"
 - assertNotVisible:
-    id: "vehicle-model-picker"
+    id: "vehicle-model-list"
 - assertNotVisible:
-    id: "vehicle-year-picker"
+    id: "vehicle-year-list"
 # The escape hatch to the precise route is offered here and only here.
 - assertVisible:
     id: "use-vin-instead"
 - takeScreenshot: artifacts/flow-11-step-make
 
-# ── Act 2: make → model → year, one tap to open each, one to continue ────────
-- tapOn:
-    id: "vehicle-make-picker"
-- assertVisible: "${FIXTURE_MAKE}"
-- tapOn:
-    id: "picker-step-next"
+# ── Act 2: make → model → year; a make or model row answers and moves on ────
+- tapOn: "${FIXTURE_MAKE}"
 
 - extendedWaitUntil:
     visible:
-      id: "vehicle-model-picker"
+      id: "vehicle-model-list"
     timeout: 8000
 # The answer so far rides along next to the back arrow.
 - assertVisible: "${FIXTURE_MAKE}"
-- tapOn:
-    id: "vehicle-model-picker"
-- assertVisible: "${FIXTURE_MODEL}"
-- tapOn:
-    id: "picker-step-next"
+- tapOn: "${FIXTURE_MODEL}"
 
 - extendedWaitUntil:
     visible:
-      id: "vehicle-year-picker"
+      id: "vehicle-year-list"
     timeout: 8000
 - tapOn:
-    id: "vehicle-year-picker"
+    id: "vehicle-year-list-option-.*"
+    index: 0
 - takeScreenshot: artifacts/flow-11-step-year
 - tapOn:
     id: "picker-step-next"
@@ -90,7 +83,7 @@ env:
 # ── Assert: the car is in the garage and is the one being shopped for ────────
 - extendedWaitUntil:
     notVisible:
-      id: "vehicle-year-picker"
+      id: "vehicle-year-list"
     timeout: 10000
 - extendedWaitUntil:
     visible: "${FIXTURE_MODEL}"

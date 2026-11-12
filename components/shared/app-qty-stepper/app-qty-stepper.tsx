@@ -17,6 +17,9 @@ export type QtyStepperProps = {
   /** Control size — `md` (48px) on Item Detail, `sm` (36px) in Cart. */
   size?: 'sm' | 'md';
   disabled?: boolean;
+  /** `outline` (default): bordered on the card. `soft`: a borderless grey fill, for
+   *  rows that sit straight on the surface (Cart). */
+  tone?: 'outline' | 'soft';
   /** When set, the − / + buttons expose `${testID}-dec` / `${testID}-inc`
    *  testIDs (for E2E). */
   testID?: string;
@@ -34,6 +37,7 @@ export default function AppQtyStepper({
   max,
   size = 'md',
   disabled = false,
+  tone = 'outline',
   testID,
 }: QtyStepperProps) {
   const { t } = useTranslation();
@@ -77,7 +81,14 @@ export default function AppQtyStepper({
   );
 
   return (
-    <AppView row align="center" rounded={12} colorName="card" borderWidth={1} borderName="controlBorder">
+    <AppView
+      row
+      align="center"
+      rounded={12}
+      colorName={tone === 'soft' ? 'backgroundSecondary' : 'card'}
+      borderWidth={tone === 'soft' ? 0 : 1}
+      borderName={tone === 'soft' ? undefined : 'controlBorder'}
+    >
       {button('dec', canDec, onDecrement)}
       <AppText
         weight="semibold"

@@ -43,7 +43,9 @@ const { host, transport, cart, sheet, replace } = vi.hoisted(() => {
   };
 });
 
-vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, ScrollView: host('scroll') }));
+vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, ScrollView: host('scroll'), Image: host('image') }));
+// The choice sheets render their content in place, so every choice stays reachable here.
+vi.mock('@/components/shared/app-bottom-sheet', () => ({ AppBottomSheet: host('sheet') }));
 vi.mock('expo-linking', () => ({ createURL: () => 'mator://payment-return' }));
 vi.mock('expo-router', () => ({ router: { back: vi.fn(), push: vi.fn(), replace } }));
 vi.mock('expo-web-browser', () => ({ openAuthSessionAsync: vi.fn() }));
@@ -58,6 +60,8 @@ vi.mock('lucide-react-native', () => ({
   CreditCard: () => null,
   MapPin: () => null,
   Wallet: () => null,
+  ChevronRight: () => null,
+  X: () => null,
 }));
 vi.mock('@/components/shared/app-view', () => ({
   AppView: host('view'),
@@ -229,6 +233,14 @@ describe('Checkout delivery', () => {
       .flatMap((node) => node.children.filter((c): c is string => typeof c === 'string'))
       .map(nbsp);
   const allText = () => texts().join(' | ');
+  /** The texts inside one element: a review row, or the footer's total. */
+  const within = (testID: string) =>
+    renderer.root
+      .find((node) => typeof node.type === 'string' && node.props.testID === testID)
+      .findAll((node) => node.type === 'text')
+      .flatMap((node) => node.children.filter((c): c is string => typeof c === 'string'))
+      .map(nbsp)
+      .join(' | ');
   const button = () =>
     renderer.root.find((node) => node.props.testID === 'checkout-place-order-btn');
   const press = async (node: ReactTestInstance) => {
@@ -288,13 +300,37 @@ describe('Checkout delivery', () => {
     act(() => renderer.unmount());
   });
 
+  test('the review is one row per choice; the items row counts lines, not units', async () => {
+    await mount();
+
+    // One line of two pads is one position, priced for both.
+    expect(within('checkout-review-items')).toContain('1 позиция');
+    expect(within('checkout-review-items')).toContain('200 000 сум');
+    expect(within('checkout-review-delivery')).toContain('Курьер Mator');
+    expect(within('checkout-review-address')).toContain('Дом');
+
+    // Each row opens its own sheet, and closing it opens none.
+    const sheetOf = (testID: string) =>
+      renderer.root.find(
+        (node) => String(node.type) === 'sheet' && node.findAll((n) => n.props.testID === testID).length > 0,
+      );
+    expect(sheetOf('checkout-sheet-items').props.visible).toBe(false);
+    await press(hostWith('checkout-review-items'));
+    expect(sheetOf('checkout-sheet-items').props.visible).toBe(true);
+    expect(sheetOf('checkout-sheet-payment').props.visible).toBe(false);
+    await press(hostWith('checkout-sheet-items-close'));
+    expect(sheetOf('checkout-sheet-items').props.visible).toBe(false);
+    await press(hostWith('checkout-review-payment'));
+    expect(sheetOf('checkout-sheet-payment').props.visible).toBe(true);
+  });
+
   test('shows exactly the delivery price, and adds it to the total', async () => {
     await mount();
 
     expect(courierRow()).toBe('Курьер Mator | 32 500 сум');
-    expect(allText()).toContain('Стоимость доставки | 32 500 сум');
+    expect(within('checkout-review-delivery')).toContain('32 500 сум');
     expect(button().props.disabled).toBe(false);
-    expect(nbsp(String(button().props.title))).toContain('232 500 сум');
+    expect(within('checkout-total')).toContain('232 500 сум');
     expect(texts().filter((t) => t === '232 500 сум')).toHaveLength(1);
   });
 
@@ -316,11 +352,11 @@ describe('Checkout delivery', () => {
 
     expect(chosen(PICKUP)).toBe(true);
     expect(courierRow()).toBe('Курьер Mator | 32 500 сум');
-    expect(allText()).toContain('Стоимость доставки | Бесплатно');
-    expect(nbsp(String(button().props.title))).toContain('200 000 сум');
+    expect(within('checkout-review-delivery')).toContain('Бесплатно');
+    expect(within('checkout-total')).toContain('200 000 сум');
 
     await choose(COURIER);
-    expect(nbsp(String(button().props.title))).toContain('232 500 сум');
+    expect(within('checkout-total')).toContain('232 500 сум');
   });
 
   test('says nothing else about the trip', async () => {
@@ -341,7 +377,9 @@ describe('Checkout delivery', () => {
 
     expect(courierRow()).toContain('Считаем стоимость доставки…');
     expect(courierRow()).not.toContain('Бесплатно');
-    expect(allText()).toContain('Стоимость доставки | —');
+    // The review says it is being worked out; the total has no figure yet.
+    expect(within('checkout-review-delivery')).toContain('Считаем стоимость доставки…');
+    expect(within('checkout-total')).toContain('—');
     expect(button().props.disabled).toBe(true);
 
     await placeOrder();
@@ -385,9 +423,11 @@ describe('Checkout delivery', () => {
 
       expect(courierRow()).toContain(words);
       expect(allText()).not.toContain('server words');
-      // Never free: the courier row shows no price, and the order summary none either.
+      // Never free: the courier row shows no price, the review says why, and the total has none.
       expect(courierRow()).not.toContain('Бесплатно');
-      expect(allText()).toContain('Стоимость доставки | —');
+      expect(within('checkout-review-delivery')).toContain(words);
+      expect(within('checkout-review-delivery')).not.toContain('Бесплатно');
+      expect(within('checkout-total')).toContain('—');
       expect(button().props.disabled).toBe(true);
       expect(nbsp(String(button().props.title))).toBe('Оформить заказ');
     });
@@ -565,7 +605,7 @@ describe('Checkout delivery', () => {
       await press(pressable('Изменить адрес'));
 
       expect(courierRow()).toBe('Курьер Mator | 9 000 сум');
-      expect(nbsp(String(button().props.title))).toContain('209 000 сум');
+      expect(within('checkout-total')).toContain('209 000 сум');
     });
 
     test('other lines in the cart, another quote', async () => {
@@ -646,7 +686,7 @@ describe('Checkout delivery', () => {
 
       expect(allText()).toContain('Сумма заказа изменилась');
       expect(courierRow()).toBe('Курьер Mator | 40 000 сум');
-      expect(nbsp(String(button().props.title))).toContain('240 000 сум');
+      expect(within('checkout-total')).toContain('240 000 сум');
       expect(cart.clearCart).not.toHaveBeenCalled();
 
       await placeOrder();

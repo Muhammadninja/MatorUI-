@@ -8,8 +8,9 @@ import Svg, { Circle, Defs, Ellipse, LinearGradient, Path, RadialGradient, Rect,
 import { AppButton } from '@/components/shared/app-button';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
-import { CarIcon, type CarBody } from '@/components/shared/mator-icons';
 import { useThemeContext } from '@/contexts/theme.context';
+import VehicleImagePlaceholder from '@/components/screens-components/garage/vehicle-image-placeholder';
+import type { VehicleImageStatus } from '@/services/vehicle-images/image-status';
 import type { VehicleImageSource } from '@/services/vehicle-images/manifest';
 import { triggerHaptic } from '@/utils/haptics';
 
@@ -22,6 +23,10 @@ const PADDING = 16;
 const RADIUS = 16;
 /** Explore's horizontal gutter, used until the card reports its own width. */
 const PAGE_GUTTER = 16;
+/** Space between a selected car's bumper and the card's right edge, in pt. */
+const SELECTED_CAR_EDGE_GAP = 8;
+/** How much lower than an approved image the placeholder car sits, in pt. */
+const PLACEHOLDER_DROP = 6;
 /** Visible Corvette artwork bounds in its transparent 1200×600 source image. */
 const ART_BOUNDS = { left: 117 / 1200, top: 220 / 600, right: 1084 / 1200, bottom: 596 / 600 };
 
@@ -29,8 +34,8 @@ const ART_BOUNDS = { left: 117 / 1200, top: 220 / 600, right: 1084 / 1200, botto
 export type GarageHeroVisual =
   /** An approved image of this exact vehicle (from the vehicle image resolver). */
   | { kind: 'image'; source: VehicleImageSource }
-  /** A neutral body silhouette: no approved image for this vehicle. */
-  | { kind: 'placeholder'; body: CarBody };
+  /** No approved image yet: the universal placeholder, with the pipeline's status when known. */
+  | { kind: 'placeholder'; status?: VehicleImageStatus | null };
 
 type GarageHeroCardProps = {
   testID: string;
@@ -76,8 +81,11 @@ export function GarageHeroCard({
 
   const carWidth = Math.round(width * (stacked ? 0.66 : emptyGarage ? 0.66 : 0.54));
   const carHeight = Math.round(carWidth / CAR_ASPECT);
-  // Nudge the empty-state Corvette right and up without scaling the artwork.
-  const carRight = -Math.round(width * (emptyGarage && !stacked ? 0.077 : 0.05));
+  // Nudge the empty-state Corvette right and up without scaling the artwork. A
+  // selected car keeps ~8pt between its bumper and the card's edge.
+  const carRight = emptyGarage && !stacked
+    ? -Math.round(width * 0.077)
+    : -Math.round(width * 0.05) + SELECTED_CAR_EDGE_GAP;
   const carTop = stacked ? PADDING / 2 : PADDING + (emptyGarage ? 3 : 4);
   const copyWidth = stacked
     ? width - PADDING * 2
@@ -93,9 +101,10 @@ export function GarageHeroCard({
     if (!measured || measured.width !== w || measured.height !== h) setMeasured({ width: w, height: h });
   };
 
-  // Where the car's tyres meet the ground, for the soft shadow.
+  // Where the car's tyres meet the ground, for the soft shadow. Every approved
+  // cutout ends at its tyres (~99.7% of the frame) and spans 9.5–90.5% of its width.
   const groundX = width + carRight - carWidth / 2;
-  const groundY = carTop + carHeight * 0.92;
+  const groundY = carTop + carHeight * 0.975;
 
   return (
     <AppView
@@ -122,6 +131,12 @@ export function GarageHeroCard({
               <Stop offset="0" stopColor={tokens.garageHeroShadow} />
               <Stop offset="1" stopColor={tokens.garageHeroShadow} stopOpacity={0} />
             </RadialGradient>
+            {/* The tight contact shadow right under the tyres: dense core, quick falloff. */}
+            <RadialGradient id="garage-hero-contact" cx="50%" cy="50%" rx="50%" ry="50%">
+              <Stop offset="0" stopColor={tokens.garageHeroShadow} />
+              <Stop offset="0.55" stopColor={tokens.garageHeroShadow} stopOpacity={0.6} />
+              <Stop offset="1" stopColor={tokens.garageHeroShadow} stopOpacity={0} />
+            </RadialGradient>
           </Defs>
           <Rect x={0} y={0} width={width} height={height} fill="url(#garage-hero-wash)" />
           {/* Soft curves behind the car: one broad arc, one sweep rising from the bottom. */}
@@ -132,20 +147,25 @@ export function GarageHeroCard({
           />
           {/* A silhouette casts no shadow: it isn't a car standing in the scene. */}
           {isPlaceholder || !groundShadow ? null : (
-            <Ellipse cx={groundX} cy={groundY} rx={carWidth * 0.46} ry={carHeight * 0.1} fill="url(#garage-hero-ground)" />
+            <>
+              {/* A faint ambient pool the width of the car, then the contact shadow. */}
+              <Ellipse cx={groundX} cy={groundY} rx={carWidth * 0.42} ry={carHeight * 0.06} fill="url(#garage-hero-ground)" opacity={0.6} />
+              <Ellipse cx={groundX} cy={groundY} rx={carWidth * 0.36} ry={carHeight * 0.028} fill="url(#garage-hero-contact)" />
+            </>
           )}
         </Svg>
       ) : null}
 
       {isPlaceholder ? (
-        <AppView
-          testID={`${testID}-vehicle-placeholder`}
-          center
-          style={{ position: 'absolute', top: carTop, right: carRight + width * 0.05, width: carWidth, height: carHeight, opacity: 0.55 }}
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-        >
-          <CarIcon body={visual.body} size={Math.round(carHeight * 1.5)} color={tokens.vehicleBannerMuted} />
+        // In the car's own slot, sat a little lower so the ghost car rests on the
+        // card; the card keeps its size and layout.
+        <AppView style={{ position: 'absolute', top: carTop + PLACEHOLDER_DROP, right: carRight }}>
+          <VehicleImagePlaceholder
+            testID={`${testID}-vehicle-placeholder`}
+            width={carWidth}
+            height={carHeight}
+            status={visual.status}
+          />
         </AppView>
       ) : emptyGarage && onImagePress ? (
         <Pressable

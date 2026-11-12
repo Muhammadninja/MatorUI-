@@ -1,6 +1,7 @@
 import { AlertCircle, Check, MapPin } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Image } from 'react-native';
 
 import { AppButton } from '@/components/shared/app-button';
 import { AppText } from '@/components/shared/app-text';
@@ -44,16 +45,21 @@ export function SummaryRow({
   value,
   tokens,
   testID,
+  valueColor,
+  valueSize = 14,
 }: {
   label: string;
   value: string;
   tokens: Tokens;
   testID?: string;
+  /** Defaults to the text colour. */
+  valueColor?: string;
+  valueSize?: number;
 }) {
   return (
-    <AppView row justify="space-between" testID={testID}>
+    <AppView row align="center" justify="space-between" testID={testID}>
       <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted }}>{label}</AppText>
-      <AppText family="accent" weight="semibold" style={{ fontSize: 14, color: tokens.text }}>{value}</AppText>
+      <AppText family="accent" weight="semibold" style={{ fontSize: valueSize, color: valueColor ?? tokens.text }}>{value}</AppText>
     </AppView>
   );
 }
@@ -126,6 +132,7 @@ export function DeliverySection({
   onChange,
   onAdd,
   onSkip,
+  bare = false,
 }: {
   tokens: Tokens;
   addr: Address | null;
@@ -134,13 +141,15 @@ export function DeliverySection({
   onChange: () => void;
   onAdd: () => void;
   onSkip: () => void;
+  /** Inside a sheet that already names it: no card frame and no section label. */
+  bare?: boolean;
 }) {
   const { t } = useTranslation();
   const addressLine = addr ? formatAddressLine(addr) : '';
   return (
-    <AppView rounded={16} p={16} colorName="card" borderWidth={1} borderName="border" gap={10}>
-      <AppView row align="center" justify="space-between">
-        <SectionLabel tokens={tokens}>{t('checkout.deliveryAddress')}</SectionLabel>
+    <AppView {...(bare ? {} : { rounded: 16, p: 16, colorName: 'card' as const, borderWidth: 1, borderName: 'border' as const })} gap={10}>
+      <AppView row align="center" justify={bare ? 'flex-end' : 'space-between'}>
+        {bare ? null : <SectionLabel tokens={tokens}>{t('checkout.deliveryAddress')}</SectionLabel>}
         {addr && canChange ? (
           <AppPressableView onPress={onChange} accessibilityRole="button" accessibilityLabel={t('checkout.changeAddress')}>
             <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.brandText }}>{t('checkout.change')}</AppText>
@@ -201,6 +210,37 @@ export function DeliverySection({
 
 // ── Payment row (selectable) ───────────────────────────────────────────
 
+/** A payment method's mark: its provider logo when it has one, else its icon,
+ *  centred in a fixed-width column so the labels beside it line up. */
+export function PaymentOptionMark({
+  option,
+  width,
+  iconSize,
+  color,
+}: {
+  option: PaymentOption;
+  width: number;
+  iconSize: number;
+  color: string;
+}) {
+  const Icon = option.icon;
+  return (
+    <AppView center style={{ width, flexShrink: 0 }}>
+      {option.logo ? (
+        <Image
+          testID={`payment-logo-${option.id}`}
+          source={option.logo.source}
+          accessibilityIgnoresInvertColors
+          resizeMode="contain"
+          style={{ width, height: width / option.logo.aspectRatio }}
+        />
+      ) : (
+        <Icon size={iconSize} strokeWidth={2} color={color} />
+      )}
+    </AppView>
+  );
+}
+
 /** The round mark a selectable row shows: filled with a tick when chosen. */
 function RadioMark({ tokens, selected }: { tokens: Tokens; selected: boolean }) {
   return (
@@ -231,7 +271,6 @@ export function PaymentRow({
   onPress: () => void;
   tokens: Tokens;
 }) {
-  const Icon = option.icon;
   const { t } = useTranslation();
   return (
     <AppPressableView
@@ -247,10 +286,13 @@ export function PaymentRow({
       style={selected ? { borderWidth: 1.5, borderColor: tokens.brand } : undefined}
     >
       <AppView row align="center" gap={12}>
-        <Icon size={20} strokeWidth={2} color={tokens.text} />
+        <PaymentOptionMark option={option} width={68} iconSize={20} color={tokens.text} />
         <AppView flex={1}>
-          <AppText family="default" weight="semibold" style={{ fontSize: 15, color: tokens.text }}>{t(option.labelKey)}</AppText>
-          <AppText family="default" style={{ fontSize: 12, color: tokens.textMuted, marginTop: 1 }}>{t(option.descriptionKey)}</AppText>
+          {/* A provider logo already names the method; the label stays for screen readers. */}
+          {option.logo ? null : (
+            <AppText family="default" weight="semibold" style={{ fontSize: 15, color: tokens.text }}>{t(option.labelKey)}</AppText>
+          )}
+          <AppText family="default" style={{ fontSize: 12, color: tokens.textMuted, marginTop: option.logo ? 0 : 1 }}>{t(option.descriptionKey)}</AppText>
         </AppView>
         <RadioMark tokens={tokens} selected={selected} />
       </AppView>
@@ -319,8 +361,11 @@ export function DeliveryOptionsCard({
   onEditAddress,
   formatCurrency,
   pickupDetails,
+  bare = false,
 }: {
   tokens: Tokens;
+  /** Inside a sheet that already names it: no card frame and no section label. */
+  bare?: boolean;
   /** What the order would be placed with. */
   delivery: CheckoutDelivery;
   /** What the backend says about the courier, or null with no address: then only pickup. */
@@ -344,8 +389,12 @@ export function DeliveryOptionsCard({
         : null;
   const action = courier?.state === 'refused' ? quoteErrorAction(courier.code) : null;
   return (
-    <AppView testID="checkout-delivery-card" rounded={16} p={16} colorName="card" borderWidth={1} borderName="border" gap={10}>
-      <SectionLabel tokens={tokens}>{t('checkout.shipping')}</SectionLabel>
+    <AppView
+      testID="checkout-delivery-card"
+      {...(bare ? {} : { rounded: 16, p: 16, colorName: 'card' as const, borderWidth: 1, borderName: 'border' as const })}
+      gap={10}
+    >
+      {bare ? null : <SectionLabel tokens={tokens}>{t('checkout.shipping')}</SectionLabel>}
 
       <DeliveryOptionRow
         tokens={tokens}
@@ -356,7 +405,7 @@ export function DeliveryOptionsCard({
         selected={pickupChosen}
         onPress={() => onChooseMethod('pickup')}
       />
-      {pickupChosen ? pickupDetails : null}
+      {pickupChosen && !bare ? pickupDetails : null}
 
       {courier ? (
         <AppView testID="checkout-delivery-courier" gap={8}>
@@ -393,6 +442,8 @@ export function DeliveryOptionsCard({
           ) : null}
         </AppView>
       ) : null}
+      {/* In a sheet both choices come first; where to collect follows them. */}
+      {pickupChosen && bare ? pickupDetails : null}
     </AppView>
   );
 }

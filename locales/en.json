@@ -395,7 +395,10 @@
     "checkout": "Checkout",
     "free": "Free",
     "orderSummary": "Order summary",
-    "deliveryAtCheckout": "At checkout"
+    "deliveryAtCheckout": "At checkout",
+    "summaryItems": "Items",
+    "deliveryCalculatedAtCheckout": "Calculated at checkout",
+    "totalWithoutDelivery": "Total excl. delivery"
   },
   "checkout": {
     "pickup": "Pickup",
@@ -403,7 +406,7 @@
     "pickupPointsTitle": "Where to collect your order",
     "pickupPointsLoading": "Loading the pickup address…",
     "pickupPointsError": "Could not load the pickup address.",
-    "pickupPointNotSpecified": "The pickup point has not been specified yet",
+    "pickupPointNotSpecified": "The pickup address is being confirmed",
     "pickupAddressNotSpecified": "The address has not been specified yet",
     "pickupLocationNotSpecified": "The map location has not been specified yet",
     "pickupLandmark": "Landmark: {{landmark}}",
@@ -470,7 +473,16 @@
     "viewOrder": "View order",
     "startNewOrder": "Place the order again",
     "unpaidOrderExpires": "An unpaid order is cancelled automatically.",
-    "deliveryErrorCourierOff": "Courier delivery isn’t available yet. You can pick the order up instead."
+    "deliveryErrorCourierOff": "Courier delivery isn’t available yet. You can pick the order up instead.",
+    "reviewAddress": "Address",
+    "reviewPickupPoint": "Pickup point",
+    "reviewItems": "Order items",
+    "reviewItemsCount_one": "{{count}} item",
+    "reviewItemsCount_other": "{{count}} items",
+    "reviewChooseAddress": "Choose an address",
+    "reviewPickupMore": "{{count}} more",
+    "retryPaymentShort": "Pay for order",
+    "pickupOpenMap": "Open in Maps"
   },
   "orderConfirmation": {
     "loadErrorTitle": "Couldn't load your order",
@@ -494,7 +506,10 @@
     "startShopping": "Start shopping",
     "orderAccessibility": "Order {{id}}, {{status}}",
     "dateItems_one": "{{date}} · {{count}} item",
-    "dateItems_other": "{{date}} · {{count}} items"
+    "dateItems_other": "{{date}} · {{count}} items",
+    "autoCancelIn": "Cancels in {{time}}",
+    "autoCancelling": "Cancelling…",
+    "autoCancelA11y": "Cancels automatically in {{time}}"
   },
   "trackOrder": {
     "unitPrice": "Unit price",
@@ -515,7 +530,11 @@
     "cancelKeep": "Keep order",
     "cancelConfirm": "Cancel order",
     "cancelRefused": "This order can no longer be cancelled from the app.",
-    "cancelFailed": "The order could not be cancelled. Please try again."
+    "cancelFailed": "The order could not be cancelled. Please try again.",
+    "autoCancelTitle": "Waiting for confirmation",
+    "autoCancelBody": "If the order isn't paid or confirmed in time, it is cancelled automatically.",
+    "autoCancelExpired": "Time is up. The order is being cancelled.",
+    "autoCancelA11y": "{{time}} left before the order is cancelled"
   },
   "explore": {
     "pricesStockUpdated": "Prices & stock updated",
@@ -833,7 +852,7 @@
     "fitsShowLess": "Show fewer",
     "fitConfirmed": "Fits your vehicle",
     "fitNotCompatible": "Does not fit your vehicle",
-    "fitUnknown": "Compatibility data unavailable",
+    "fitUnknown": "Compatibility not confirmed",
     "deliveryCostAtCheckout": "The delivery cost is calculated at checkout"
   },
   "sourcing": {
@@ -1031,8 +1050,10 @@
   },
   "vehicleParts": {
     "bestsellers": "Bestsellers",
-    "fallbackTitle": "Parts that fit",
-    "emptyBody": "We don't have parts listed for your {{vehicle}} yet. Check back soon."
+    "fallbackTitle": "For my model",
+    "emptyBody": "We don't have parts listed for your {{vehicle}} yet. Check back soon.",
+    "forMyModel": "For my model",
+    "forMyModelA11y": "Filter: for my model, {{model}}"
   },
   "legal": {
     "loading": "Loading document…",
@@ -1053,5 +1074,18 @@
     "useMyLocation": "Show my location",
     "unavailable": "The map isn’t available on this device. Find the address with the search above.",
     "zoomIn": "Zoom in to mark the exact place."
+  },
+  "vehicleImage": {
+    "preparing": "Image in preparation",
+    "unavailable": "No image yet"
+  },
+  "vehiclePicker": {
+    "searchMake": "Search makes",
+    "searchModel": "Search models",
+    "noMatches": "Nothing found",
+    "notFoundAction": "Can't find your car?",
+    "notFoundTitle": "Can't find your car?",
+    "notFoundBodyVin": "The catalog is growing. Add your car by VIN and we will identify its make, model and year exactly.",
+    "notFoundBody": "The catalog is growing. Tell us which car to add, or add yours by VIN."
   }
 }

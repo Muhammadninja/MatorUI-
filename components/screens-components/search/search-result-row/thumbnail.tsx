@@ -5,31 +5,37 @@ import { useThemeContext } from '@/contexts/theme.context';
 
 import { RADIUS_MEDIA } from '../radii';
 
-const THUMB_SIZE = 104;
 const THUMB_PADDING = 6;
+/** The tile sits this far inside the card's top, left and bottom edges. */
+export const THUMB_INSET = 8;
 
 export type ThumbnailProps = {
   /** Accessibility label — the part name. */
   alt: string;
   /** Real product photo. Omitted/empty → the neutral no-photo placeholder. */
   uri?: string;
+  /** Tile width; the tile is at least this tall and stretches with the card. */
+  width: number;
 };
 
-export default function Thumbnail({ alt, uri }: ThumbnailProps) {
+export default function Thumbnail({ alt, uri, width }: ThumbnailProps) {
   const { tokens } = useThemeContext();
   const placeholder = (
     <PartImagePlaceholder label={alt} width="100%" height="100%" backgroundColor="transparent" />
   );
 
   return (
-    // The same white tile and padding for every result, in both themes; `contain`
-    // keeps each product's own proportions inside it, because catalog photos come
-    // in every aspect ratio and cropping would cut the part in half.
+    // A rounded tile inset in the card. White, because most catalog photos carry
+    // a baked-in white ground that would show as a box on any other colour;
+    // `contain` keeps each product's proportions instead of cutting it in half.
     <AppView
       style={{
-        width: THUMB_SIZE,
-        height: THUMB_SIZE,
+        width,
+        minHeight: width,
+        alignSelf: 'stretch',
         flexShrink: 0,
+        margin: THUMB_INSET,
+        marginRight: 0,
         padding: THUMB_PADDING,
         overflow: 'hidden',
         borderRadius: RADIUS_MEDIA,
@@ -41,7 +47,7 @@ export default function Thumbnail({ alt, uri }: ThumbnailProps) {
           source={uri}
           width="100%"
           height="100%"
-          targetWidth={THUMB_SIZE}
+          targetWidth={width}
           contentFit="contain"
           placeholderColor="transparent"
           fallback={placeholder}

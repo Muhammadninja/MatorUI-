@@ -1,6 +1,6 @@
 import React from 'react';
 import { router } from 'expo-router';
-import { AlertCircle, PackageOpen } from 'lucide-react-native';
+import { AlertCircle, PackageOpen, Timer } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { RefreshControl, ScrollView } from 'react-native';
 
@@ -12,7 +12,9 @@ import { AppPrice } from '@/components/shared/app-price';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
+import { useOrderCancelWindow } from '@/hooks/use-order-cancel-window';
 import { useOrders } from '@/hooks/use-orders';
+import { formatCountdown } from '@/services/order-cancel-window';
 import {
   formatOrderNo,
   ORDER_LIST_STATUS_I18N,
@@ -158,6 +160,8 @@ const OrderCard = React.memo(function OrderCard({ order }: { order: OrderListRow
         {order.summary}
       </AppText>
 
+      <OrderCountdownChip order={order} />
+
       {/* Bottom row: date · N items + total */}
       <AppView row wrap align="center" justify="space-between" style={{ marginTop: 6 }}>
         <AppText
@@ -171,3 +175,45 @@ const OrderCard = React.memo(function OrderCard({ order }: { order: OrderListRow
     </AppPressableView>
   );
 });
+
+// ── Countdown chip ────────────────────────────────────────────────────────────
+
+/** Time left before an unconfirmed order is cancelled. Renders nothing for an
+ *  order with no window, and cancels the order when it reaches zero. */
+function OrderCountdownChip({ order }: { order: OrderListRow }) {
+  const { t } = useTranslation();
+  const { tokens } = useThemeContext();
+  const { remainingMs, expired } = useOrderCancelWindow(order.id, order);
+  if (remainingMs === null) return null;
+
+  const time = formatCountdown(remainingMs);
+  return (
+    <AppView
+      testID="order-countdown"
+      row
+      align="center"
+      gap={6}
+      accessible
+      accessibilityLabel={
+        expired ? t('orderHistory.autoCancelling') : t('orderHistory.autoCancelA11y', { time })
+      }
+      style={{
+        alignSelf: 'flex-start',
+        marginTop: 8,
+        backgroundColor: tokens.warningSoft,
+        borderRadius: 999,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+      }}
+    >
+      <Timer size={14} strokeWidth={2.2} color={tokens.warning} />
+      <AppText
+        family="accent"
+        weight="bold"
+        style={{ fontSize: 12, color: tokens.warning, fontVariant: ['tabular-nums'] }}
+      >
+        {expired ? t('orderHistory.autoCancelling') : t('orderHistory.autoCancelIn', { time })}
+      </AppText>
+    </AppView>
+  );
+}

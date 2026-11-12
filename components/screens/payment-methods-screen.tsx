@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
+import { PaymentOptionMark } from '@/components/screens-components/checkout/checkout-sections';
 import { PAYMENT_OPTIONS } from '@/constants/payment-options';
 import { useThemeContext } from '@/contexts/theme.context';
 
@@ -29,7 +30,6 @@ export default function PaymentMethodsScreen() {
         </AppText>
 
         {PAYMENT_OPTIONS.map((opt) => {
-          const Icon = opt.icon;
           return (
             <AppView
               key={opt.id}
@@ -42,14 +42,25 @@ export default function PaymentMethodsScreen() {
               borderWidth={1}
               borderName="border"
             >
-              <AppView center rounded={12} colorName="backgroundSecondary" style={{ width: 44, height: 44 }}>
-                <Icon size={22} strokeWidth={2} color={tokens.text} />
-              </AppView>
+              {opt.logo ? (
+                <PaymentOptionMark option={opt} width={76} iconSize={22} color={tokens.text} />
+              ) : (
+                <AppView center rounded={12} colorName="backgroundSecondary" style={{ width: 56, height: 44 }}>
+                  <PaymentOptionMark option={opt} width={56} iconSize={22} color={tokens.text} />
+                </AppView>
+              )}
               <AppView flex={1}>
-                <AppText family="heading" weight="bold" style={{ fontSize: 16, color: tokens.text }}>
-                  {t(opt.labelKey)}
-                </AppText>
-                <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted, marginTop: 2 }}>
+                {/* A provider logo already names the method. */}
+                {opt.logo ? null : (
+                  <AppText family="heading" weight="bold" style={{ fontSize: 16, color: tokens.text }}>
+                    {t(opt.labelKey)}
+                  </AppText>
+                )}
+                <AppText
+                  family="default"
+                  accessibilityLabel={opt.logo ? `${t(opt.labelKey)}. ${t(opt.descriptionKey)}` : undefined}
+                  style={{ fontSize: 13, color: tokens.textMuted, marginTop: opt.logo ? 0 : 2 }}
+                >
                   {t(opt.descriptionKey)}
                 </AppText>
               </AppView>

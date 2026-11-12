@@ -399,7 +399,10 @@
     "checkout": "Оформить заказ",
     "free": "Бесплатно",
     "orderSummary": "Сводка заказа",
-    "deliveryAtCheckout": "При оформлении"
+    "deliveryAtCheckout": "При оформлении",
+    "summaryItems": "Товары",
+    "deliveryCalculatedAtCheckout": "Рассчитаем при оформлении",
+    "totalWithoutDelivery": "Итого без доставки"
   },
   "checkout": {
     "pickup": "Самовывоз",
@@ -407,7 +410,7 @@
     "pickupPointsTitle": "Где забрать заказ",
     "pickupPointsLoading": "Загружаем адрес самовывоза…",
     "pickupPointsError": "Не удалось загрузить адрес самовывоза.",
-    "pickupPointNotSpecified": "Точка самовывоза пока не указана",
+    "pickupPointNotSpecified": "Адрес пункта выдачи уточняется",
     "pickupAddressNotSpecified": "Адрес пока не указан",
     "pickupLocationNotSpecified": "Точка на карте пока не указана",
     "pickupLandmark": "Ориентир: {{landmark}}",
@@ -478,7 +481,18 @@
     "viewOrder": "Посмотреть заказ",
     "startNewOrder": "Оформить заказ заново",
     "unpaidOrderExpires": "Неоплаченный заказ отменится автоматически.",
-    "deliveryErrorCourierOff": "Доставка курьером пока недоступна. Можно забрать заказ самовывозом."
+    "deliveryErrorCourierOff": "Доставка курьером пока недоступна. Можно забрать заказ самовывозом.",
+    "reviewAddress": "Адрес",
+    "reviewPickupPoint": "Пункт выдачи",
+    "reviewItems": "Состав заказа",
+    "reviewItemsCount_one": "{{count}} позиция",
+    "reviewItemsCount_few": "{{count}} позиции",
+    "reviewItemsCount_many": "{{count}} позиций",
+    "reviewItemsCount_other": "{{count}} позиции",
+    "reviewChooseAddress": "Выберите адрес",
+    "reviewPickupMore": "ещё {{count}}",
+    "retryPaymentShort": "Оплатить заказ",
+    "pickupOpenMap": "Открыть на карте"
   },
   "orderConfirmation": {
     "loadErrorTitle": "Не удалось загрузить заказ",
@@ -504,7 +518,10 @@
     "dateItems_one": "{{date}} · {{count}} товар",
     "dateItems_few": "{{date}} · {{count}} товара",
     "dateItems_many": "{{date}} · {{count}} товаров",
-    "dateItems_other": "{{date}} · {{count}} товаров"
+    "dateItems_other": "{{date}} · {{count}} товаров",
+    "autoCancelIn": "Отмена через {{time}}",
+    "autoCancelling": "Отменяем…",
+    "autoCancelA11y": "Автоматическая отмена через {{time}}"
   },
   "trackOrder": {
     "unitPrice": "Цена за единицу",
@@ -525,7 +542,11 @@
     "cancelKeep": "Не отменять",
     "cancelConfirm": "Отменить заказ",
     "cancelRefused": "Этот заказ уже нельзя отменить из приложения.",
-    "cancelFailed": "Не удалось отменить заказ. Попробуйте ещё раз."
+    "cancelFailed": "Не удалось отменить заказ. Попробуйте ещё раз.",
+    "autoCancelTitle": "Ожидает подтверждения",
+    "autoCancelBody": "Если заказ не оплатить или не подтвердить вовремя, он отменится автоматически.",
+    "autoCancelExpired": "Время вышло. Заказ отменяется.",
+    "autoCancelA11y": "До отмены заказа осталось {{time}}"
   },
   "explore": {
     "pricesStockUpdated": "Цены и наличие обновлены",
@@ -851,7 +872,7 @@
     "fitsShowLess": "Свернуть",
     "fitConfirmed": "Подходит для вашего автомобиля",
     "fitNotCompatible": "Не подходит для вашего автомобиля",
-    "fitUnknown": "Нет данных о совместимости",
+    "fitUnknown": "Совместимость не установлена",
     "deliveryCostAtCheckout": "Стоимость доставки рассчитается при оформлении заказа"
   },
   "sourcing": {
@@ -1051,8 +1072,10 @@
   },
   "vehicleParts": {
     "bestsellers": "Хиты продаж",
-    "fallbackTitle": "Подходящие запчасти",
-    "emptyBody": "Для {{vehicle}} пока нет запчастей. Загляните позже."
+    "fallbackTitle": "По моей модели",
+    "emptyBody": "Для {{vehicle}} пока нет запчастей. Загляните позже.",
+    "forMyModel": "По моей модели",
+    "forMyModelA11y": "Фильтр: по моей модели, {{model}}"
   },
   "legal": {
     "loading": "Загрузка документа…",
@@ -1073,5 +1096,18 @@
     "useMyLocation": "Показать моё местоположение",
     "unavailable": "Карта на этом устройстве недоступна. Найдите адрес через поиск выше.",
     "zoomIn": "Приблизьте карту, чтобы точно указать место."
+  },
+  "vehicleImage": {
+    "preparing": "Изображение готовится",
+    "unavailable": "Изображения пока нет"
+  },
+  "vehiclePicker": {
+    "searchMake": "Поиск марки",
+    "searchModel": "Поиск модели",
+    "noMatches": "Ничего не найдено",
+    "notFoundAction": "Не нашли автомобиль?",
+    "notFoundTitle": "Не нашли автомобиль?",
+    "notFoundBodyVin": "Каталог пополняется. Добавьте автомобиль по VIN — мы определим марку, модель и год точно.",
+    "notFoundBody": "Каталог пополняется. Сообщите, какой автомобиль добавить, или добавьте его по VIN."
   }
 }

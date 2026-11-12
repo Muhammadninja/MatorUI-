@@ -39,7 +39,9 @@ const { host, transport, cart, availability } = vi.hoisted(() => {
   };
 });
 
-vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, ScrollView: host('scroll') }));
+vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, ScrollView: host('scroll'), Image: host('image') }));
+// The choice sheets render their content in place, so every choice stays reachable here.
+vi.mock('@/components/shared/app-bottom-sheet', () => ({ AppBottomSheet: host('sheet') }));
 vi.mock('expo-linking', () => ({ createURL: () => 'mator://payment-return' }));
 vi.mock('expo-router', () => ({ router: { back: vi.fn(), push: vi.fn(), replace: vi.fn() } }));
 vi.mock('expo-web-browser', () => ({ openAuthSessionAsync: vi.fn() }));
@@ -54,6 +56,8 @@ vi.mock('lucide-react-native', () => ({
   CreditCard: () => null,
   MapPin: () => null,
   Wallet: () => null,
+  ChevronRight: () => null,
+  X: () => null,
 }));
 vi.mock('@/components/shared/app-view', () => ({
   AppView: host('view'),
@@ -172,6 +176,14 @@ describe('Checkout: where to collect the order', () => {
       .map((n) => n.children.filter((c) => typeof c === 'string' || typeof c === 'number').join(''))
       .map(nbsp);
   const allText = () => textsOf(renderer.root).join(' | ');
+  /** The texts inside one element: a review row, or the footer's total. */
+  const within = (testID: string) =>
+    renderer.root
+      .find((node) => typeof node.type === 'string' && node.props.testID === testID)
+      .findAll((node) => node.type === 'text')
+      .flatMap((node) => node.children.filter((c): c is string => typeof c === 'string'))
+      .map(nbsp)
+      .join(' | ');
   const cards = () => hosts('checkout-pickup-point');
   const maps = () => renderer.root.findAll((node) => node.type === 'map');
   const press = async (node: ReactTestInstance) => {
@@ -218,7 +230,7 @@ describe('Checkout: where to collect the order', () => {
     act(() => renderer.unmount());
   });
 
-  test("one dealer's part: its name, address, landmark and pin, and the goods to collect", async () => {
+  test("one dealer's part: its name, address, landmark, pin and a way to open it, in a sheet of its own", async () => {
     await mount();
     await skipAddress();
 
@@ -230,8 +242,13 @@ describe('Checkout: where to collect the order', () => {
       'Driver’s Village',
       'Toshkent, Bunyodkor shoh ko‘chasi 12',
       'Ориентир: Mega Planet qarshisida',
-      'Колодки × 2',
+      'Открыть на карте',
     ]);
+    // The goods are the order's sheet's; the delivery picker holds only the two ways.
+    expect(within('checkout-sheet-pickup')).not.toContain('Колодки');
+    expect(within('checkout-sheet-items')).toContain('Колодки');
+    expect(within('checkout-sheet-delivery')).not.toContain('Колодки');
+    expect(within('checkout-sheet-delivery')).not.toContain('Driver’s Village');
     // The dealer's own point, exactly, on the existing map: one pin, nothing else on it.
     const [map] = maps();
     expect(maps()).toHaveLength(1);
@@ -245,7 +262,6 @@ describe('Checkout: where to collect the order', () => {
     expect(map!.props.initialRegion).toMatchObject({ latitude: 41.2851, longitude: 69.2045 });
     expect(map!.props.scrollEnabled).toBe(false);
     expect(map!.props.zoomEnabled).toBe(false);
-    expect(allText()).toContain('Где забрать заказ');
     expect(hosts('checkout-pickup-gap')).toHaveLength(0);
   });
 
@@ -268,11 +284,13 @@ describe('Checkout: where to collect the order', () => {
 
     expect(cards()).toHaveLength(1);
     expect(maps()).toHaveLength(1);
-    expect(allText().split('Toshkent, Bunyodkor shoh ko‘chasi 12')).toHaveLength(2);
-    expect(hosts('checkout-pickup-item').map((n) => textsOf(n).join(''))).toEqual([
-      'Колодки × 2',
-      'Ремень × 1',
-    ]);
+    // Once in the pickup details (the review row names it too, outside the sheet).
+    expect(within('checkout-sheet-pickup').split('Toshkent, Bunyodkor shoh ko‘chasi 12')).toHaveLength(2);
+    // Every part in the order's sheet, one place so one flat list.
+    expect(hosts('checkout-pickup-item')).toHaveLength(0);
+    expect(hosts('checkout-items-group')).toHaveLength(0);
+    expect(within('checkout-sheet-items')).toContain('Колодки');
+    expect(within('checkout-sheet-items')).toContain('Ремень');
   });
 
   test("two dealers: a place each, with only that dealer's goods and pin", async () => {
@@ -290,13 +308,19 @@ describe('Checkout: where to collect the order', () => {
       'Driver’s Village',
       'Toshkent, Bunyodkor shoh ko‘chasi 12',
       'Ориентир: Mega Planet qarshisida',
-      'Колодки × 2',
+      'Открыть на карте',
     ]);
     expect(textsOf(avto!)).toEqual([
       'Avto Ehtiyot',
       'Sergeli avtobozori, 3-qator 25',
-      'Фильтр × 1',
+      'Открыть на карте',
     ]);
+    // In the order's sheet, each place's own goods under it.
+    const groups = hosts('checkout-items-group');
+    expect(groups).toHaveLength(2);
+    expect(textsOf(groups[0]!).join(' ')).toContain('Колодки');
+    expect(textsOf(groups[0]!).join(' ')).not.toContain('Фильтр');
+    expect(textsOf(groups[1]!).join(' ')).toContain('Фильтр');
     expect(maps().map((map) => map.props.markers[0].coordinate)).toEqual([
       { latitude: 41.2851, longitude: 69.2045 },
       { latitude: 41.2263, longitude: 69.219 },
@@ -323,12 +347,12 @@ describe('Checkout: where to collect the order', () => {
 
       expect(maps()).toHaveLength(0);
       expect(hosts('checkout-pickup-coordinates')).toHaveLength(0);
-      expect(textsOf(host1('checkout-pickup-gap'))).toEqual(['Точка самовывоза пока не указана']);
+      expect(textsOf(host1('checkout-pickup-gap'))).toEqual(['Адрес пункта выдачи уточняется']);
       expect(textsOf(host1('checkout-pickup-point'))).toEqual([
         'Driver’s Village',
-        'Точка самовывоза пока не указана',
-        'Колодки × 2',
+        'Адрес пункта выдачи уточняется',
       ]);
+      expect(hosts('checkout-pickup-open-map')).toHaveLength(0);
     });
 
     test('an address with no coordinates: the address, no pin, and that the map point is missing', async () => {

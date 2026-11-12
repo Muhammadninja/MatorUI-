@@ -157,6 +157,12 @@ export type OrderListRow = {
   total: string;
   /** Short headline of the order ("Garrett GTX3582R + 2 items"). */
   summary: string;
+  /** Backend's own status word, for the cancel window. Absent from older sources. */
+  serverStatus?: string;
+  /** ISO creation time, as the server sent it. */
+  createdAt?: string;
+  /** ISO time the server will expire an unpaid order, when it says. */
+  expiresAt?: string;
 };
 
 export type OrderListPage = {
@@ -212,6 +218,10 @@ export type OrderDetail = {
   /** How the order is being paid, when the backend says. Cash and terminal orders wait in
    *  `pending_payment` too, for an operator, so the status alone cannot tell. */
   paymentType?: PaymentType | null;
+  /** ISO creation time, as the server sent it. Starts the 20-minute cancel window. */
+  createdAt?: string;
+  /** ISO time the server will expire an unpaid order, when it says. */
+  expiresAt?: string;
 };
 
 export type PaymentMethod = {

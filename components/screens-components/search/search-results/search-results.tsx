@@ -5,7 +5,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SearchResultRow from '@/components/screens-components/search/search-result-row';
 import AppList from '@/components/shared/app-list';
 import { AppView } from '@/components/shared/app-view';
-import { useThemeContext } from '@/contexts/theme.context';
 import type { SearchResult, SearchState } from '@/types/search';
 import { openItemDetail } from '@/utils/nav';
 
@@ -44,22 +43,8 @@ export type SearchResultsProps = {
   onFilterPress?: () => void;
 };
 
-/** Hairline on the row's white surface, starting at the text column. */
-function RowSeparator() {
-  const { tokens } = useThemeContext();
-  return (
-    <AppView colorName="card">
-      <AppView
-        style={{
-          height: 1,
-          marginLeft: 20 + 104 + 12,
-          marginRight: 20,
-          backgroundColor: tokens.divider,
-        }}
-      />
-    </AppView>
-  );
-}
+/** Space under each result card, inside the item so the list measures it. */
+const CARD_SPACING = 10;
 
 /**
  * Search results surface. Owns only state routing + the success list;
@@ -90,7 +75,9 @@ export default function SearchResults({
 
   const renderItem = useCallback(
     ({ item }: { item: SearchResult }) => (
-      <SearchResultRow result={item} query={query} onPress={handleOpen} />
+      <AppView style={{ paddingBottom: CARD_SPACING }}>
+        <SearchResultRow result={item} query={query} onPress={handleOpen} />
+      </AppView>
     ),
     [query, handleOpen],
   );
@@ -129,7 +116,6 @@ export default function SearchResults({
         onEndReachedThreshold={0.5}
         contentContainerStyle={{ paddingTop: topInset, paddingBottom: insets.bottom + 16 }}
         keyboardShouldPersistTaps="handled"
-        ItemSeparatorComponent={RowSeparator}
         ListHeaderComponent={
           <ResultsHeader
             query={query}

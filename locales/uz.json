@@ -395,7 +395,10 @@
     "checkout": "Buyurtma berish",
     "free": "Bepul",
     "orderSummary": "Buyurtma xulosasi",
-    "deliveryAtCheckout": "Rasmiylashtirishda"
+    "deliveryAtCheckout": "Rasmiylashtirishda",
+    "summaryItems": "Mahsulotlar",
+    "deliveryCalculatedAtCheckout": "Rasmiylashtirishda hisoblanadi",
+    "totalWithoutDelivery": "Yetkazib berishsiz jami"
   },
   "checkout": {
     "pickup": "Olib ketish",
@@ -403,7 +406,7 @@
     "pickupPointsTitle": "Buyurtmani qayerdan olish mumkin",
     "pickupPointsLoading": "Olib ketish manzili yuklanmoqda…",
     "pickupPointsError": "Olib ketish manzilini yuklab boʻlmadi.",
-    "pickupPointNotSpecified": "Olib ketish nuqtasi hali koʻrsatilmagan",
+    "pickupPointNotSpecified": "Olib ketish manzili aniqlanmoqda",
     "pickupAddressNotSpecified": "Manzil hali koʻrsatilmagan",
     "pickupLocationNotSpecified": "Xaritadagi nuqta hali koʻrsatilmagan",
     "pickupLandmark": "Moʻljal: {{landmark}}",
@@ -470,7 +473,16 @@
     "viewOrder": "Buyurtmani koʻrish",
     "startNewOrder": "Qayta rasmiylashtirish",
     "unpaidOrderExpires": "Toʻlanmagan buyurtma avtomatik bekor qilinadi.",
-    "deliveryErrorCourierOff": "Kuryer orqali yetkazib berish hozircha mavjud emas. Buyurtmani oʻzingiz olib ketishingiz mumkin."
+    "deliveryErrorCourierOff": "Kuryer orqali yetkazib berish hozircha mavjud emas. Buyurtmani oʻzingiz olib ketishingiz mumkin.",
+    "reviewAddress": "Manzil",
+    "reviewPickupPoint": "Olib ketish joyi",
+    "reviewItems": "Buyurtma tarkibi",
+    "reviewItemsCount_one": "{{count}} ta pozitsiya",
+    "reviewItemsCount_other": "{{count}} ta pozitsiya",
+    "reviewChooseAddress": "Manzilni tanlang",
+    "reviewPickupMore": "yana {{count}} ta",
+    "retryPaymentShort": "Buyurtmani toʻlash",
+    "pickupOpenMap": "Xaritada ochish"
   },
   "orderConfirmation": {
     "loadErrorTitle": "Buyurtmani yuklab boʻlmadi",
@@ -494,7 +506,10 @@
     "startShopping": "Xaridni boshlash",
     "orderAccessibility": "Buyurtma {{id}}, {{status}}",
     "dateItems_one": "{{date}} · {{count}} ta mahsulot",
-    "dateItems_other": "{{date}} · {{count}} ta mahsulot"
+    "dateItems_other": "{{date}} · {{count}} ta mahsulot",
+    "autoCancelIn": "Bekor qilinishiga {{time}}",
+    "autoCancelling": "Bekor qilinmoqda…",
+    "autoCancelA11y": "{{time}} dan soʻng avtomatik bekor qilinadi"
   },
   "trackOrder": {
     "unitPrice": "Bir dona narxi",
@@ -515,7 +530,11 @@
     "cancelKeep": "Bekor qilmaslik",
     "cancelConfirm": "Bekor qilish",
     "cancelRefused": "Bu buyurtmani endi ilovadan bekor qilib boʻlmaydi.",
-    "cancelFailed": "Buyurtmani bekor qilib boʻlmadi. Qayta urinib koʻring."
+    "cancelFailed": "Buyurtmani bekor qilib boʻlmadi. Qayta urinib koʻring.",
+    "autoCancelTitle": "Tasdiqlash kutilmoqda",
+    "autoCancelBody": "Buyurtma oʻz vaqtida toʻlanmasa yoki tasdiqlanmasa, avtomatik bekor qilinadi.",
+    "autoCancelExpired": "Vaqt tugadi. Buyurtma bekor qilinmoqda.",
+    "autoCancelA11y": "Buyurtma bekor qilinishiga {{time}} qoldi"
   },
   "explore": {
     "pricesStockUpdated": "Narx va mavjudlik yangilandi",
@@ -833,7 +852,7 @@
     "fitsShowLess": "Yigʻish",
     "fitConfirmed": "Avtomobilingizga mos",
     "fitNotCompatible": "Avtomobilingizga mos emas",
-    "fitUnknown": "Moslik haqida maʼlumot yoʻq",
+    "fitUnknown": "Moslik tasdiqlanmagan",
     "deliveryCostAtCheckout": "Yetkazib berish narxi buyurtmani rasmiylashtirishda hisoblanadi"
   },
   "sourcing": {
@@ -1031,8 +1050,10 @@
   },
   "vehicleParts": {
     "bestsellers": "Kop sotilganlar",
-    "fallbackTitle": "Mos keladigan qismlar",
-    "emptyBody": "{{vehicle}} uchun hozircha qismlar yoʻq. Keyinroq qarang."
+    "fallbackTitle": "Mening modelim uchun",
+    "emptyBody": "{{vehicle}} uchun hozircha qismlar yoʻq. Keyinroq qarang.",
+    "forMyModel": "Mening modelim uchun",
+    "forMyModelA11y": "Filtr: mening modelim uchun, {{model}}"
   },
   "legal": {
     "loading": "Hujjat yuklanmoqda…",
@@ -1053,5 +1074,18 @@
     "useMyLocation": "Joylashuvimni koʻrsatish",
     "unavailable": "Bu qurilmada xarita mavjud emas. Manzilni yuqoridagi qidiruv orqali toping.",
     "zoomIn": "Joyni aniq koʻrsatish uchun xaritani yaqinlashtiring."
+  },
+  "vehicleImage": {
+    "preparing": "Rasm tayyorlanmoqda",
+    "unavailable": "Hozircha rasm yoʻq"
+  },
+  "vehiclePicker": {
+    "searchMake": "Markani qidirish",
+    "searchModel": "Modelni qidirish",
+    "noMatches": "Hech narsa topilmadi",
+    "notFoundAction": "Avtomobilingiz topilmadimi?",
+    "notFoundTitle": "Avtomobilingiz topilmadimi?",
+    "notFoundBodyVin": "Katalog toʻldirilmoqda. Avtomobilni VIN orqali qoʻshing — markasi, modeli va yilini aniq aniqlaymiz.",
+    "notFoundBody": "Katalog toʻldirilmoqda. Qaysi avtomobilni qoʻshishni bizga yozing yoki uni VIN orqali qoʻshing."
   }
 }

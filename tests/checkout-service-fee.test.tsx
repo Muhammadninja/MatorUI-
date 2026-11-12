@@ -46,7 +46,9 @@ const { host, transport, cart, replace } = vi.hoisted(() => {
   };
 });
 
-vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, ScrollView: host('scroll') }));
+vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, ScrollView: host('scroll'), Image: host('image') }));
+// The choice sheets render their content in place, so every choice stays reachable here.
+vi.mock('@/components/shared/app-bottom-sheet', () => ({ AppBottomSheet: host('sheet') }));
 vi.mock('expo-linking', () => ({ createURL: () => 'mator://payment-return' }));
 vi.mock('expo-router', () => ({ router: { back: vi.fn(), push: vi.fn(), replace } }));
 vi.mock('expo-web-browser', () => ({ openAuthSessionAsync: vi.fn() }));
@@ -61,6 +63,8 @@ vi.mock('lucide-react-native', () => ({
   CreditCard: () => null,
   MapPin: () => null,
   Wallet: () => null,
+  ChevronRight: () => null,
+  X: () => null,
 }));
 vi.mock('@/components/shared/app-view', () => ({
   AppView: host('view'),
@@ -148,6 +152,14 @@ describe('The service fee at checkout', () => {
       .flatMap((node) => node.children.filter((c): c is string => typeof c === 'string'))
       .map(nbsp);
   const allText = () => texts().join(' | ');
+  /** The texts inside one element: a review row, or the footer's total. */
+  const within = (testID: string) =>
+    renderer.root
+      .find((node) => typeof node.type === 'string' && node.props.testID === testID)
+      .findAll((node) => node.type === 'text')
+      .flatMap((node) => node.children.filter((c): c is string => typeof c === 'string'))
+      .map(nbsp)
+      .join(' | ');
   const button = () =>
     renderer.root.find((node) => node.props.testID === 'checkout-place-order-btn');
   const feeRow = () => renderer.root.findAll((node) => node.props.testID === 'order-service-fee');
@@ -197,9 +209,10 @@ describe('The service fee at checkout', () => {
 
     expect(allText()).toContain('Стоимость запчастей | 600 000 сум');
     expect(allText()).toContain('Сервисный сбор | 20 000 сум');
-    expect(allText()).toContain('Стоимость доставки | 25 000 сум');
+    expect(within('checkout-review-delivery')).toContain('25 000 сум');
     expect(allText()).toContain('Итого к оплате | 645 000 сум');
-    expect(nbsp(String(button().props.title))).toBe('Оформить заказ · 645 000 сум');
+    expect(nbsp(String(button().props.title))).toBe('Оформить заказ');
+    expect(within('checkout-total')).toContain('645 000 сум');
     expect(button().props.disabled).toBe(false);
   });
 
@@ -227,7 +240,8 @@ describe('The service fee at checkout', () => {
 
     expect(feeRow()).toHaveLength(0);
     expect(allText()).not.toContain('Сервисный сбор');
-    expect(nbsp(String(button().props.title))).toBe('Оформить заказ · 115 000 сум');
+    expect(nbsp(String(button().props.title))).toBe('Оформить заказ');
+    expect(within('checkout-total')).toContain('115 000 сум');
   });
 
   test('pickup: the parts and the fee, and no delivery cost', async () => {
@@ -235,8 +249,9 @@ describe('The service fee at checkout', () => {
 
     await press(pressable('Самовывоз, Бесплатно'));
 
-    expect(allText()).toContain('Стоимость доставки | Бесплатно');
-    expect(nbsp(String(button().props.title))).toBe('Оформить заказ · 620 000 сум');
+    expect(within('checkout-review-delivery')).toContain('Бесплатно');
+    expect(nbsp(String(button().props.title))).toBe('Оформить заказ');
+    expect(within('checkout-total')).toContain('620 000 сум');
     await press(button());
     expect(transport.createOrder.mock.calls[0]![0]).toMatchObject({
       shippingOptionKey: 'pickup',
