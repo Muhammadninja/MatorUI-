@@ -25,6 +25,8 @@ import { resolveVehicleImage } from '@/services/vehicle-images/resolver';
 import { chooseVehicleVisual } from '@/services/vehicle-images/vehicle-visual';
 import type { VehicleImageState } from '@/services/vehicle-images/image-status';
 import { useVehicleImage } from '@/hooks/use-vehicle-image';
+import { pictureModelId } from '@/services/vehicle-images/generation';
+import VehicleGenerationChoice from '@/components/screens-components/garage/vehicle-generation-choice';
 import { triggerHaptic } from '@/utils/haptics';
 
 /** Reserved while the persisted vehicle hydrates, so nothing below the card
@@ -83,7 +85,8 @@ function summarize(
  * else the universal placeholder, saying "preparing" or "no image yet" from the
  * backend's `vehicle_image` status. Never the empty state's decorative car, and
  * never a stand-in model. Reads the garage row when loaded, else the persisted
- * fitment ids.
+ * fitment ids. A generic model is pictured as the generation the backend resolved
+ * it to; until then it stays the placeholder.
  */
 function heroVisual(
   active: ReturnType<typeof useActiveVehicle>['currentActiveVehicle'],
@@ -92,7 +95,7 @@ function heroVisual(
 ): GarageHeroVisual {
   const resolved = resolveVehicleImage({
     brandId: vehicle?.brandId || active?.fitment.brandId,
-    modelId: vehicle?.modelId || active?.fitment.modelId,
+    modelId: pictureModelId(vehicle?.modelId || active?.fitment.modelId, vehicle?.generation),
     trimId: vehicle?.trimId ?? active?.fitment.trimId,
     year: vehicle?.year,
     colorHex: vehicle?.colorHex,
@@ -172,7 +175,7 @@ function HomeGarageCard() {
 
   const visual = heroVisual(currentActiveVehicle, vehicle, image);
 
-  return (
+  const card = (
     <GarageHeroCard
       testID="home-garage-card"
       visual={visual}
@@ -204,6 +207,16 @@ function HomeGarageCard() {
         </AppView>
       </AppPressableView>
     </GarageHeroCard>
+  );
+
+  // A year two generations share: the backend's options, under the card.
+  return vehicle?.generation?.status === 'choice_required' ? (
+    <AppView gap="sm">
+      {card}
+      <VehicleGenerationChoice vehicle={vehicle} />
+    </AppView>
+  ) : (
+    card
   );
 }
 

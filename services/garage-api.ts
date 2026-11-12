@@ -30,6 +30,7 @@ import type {
   VehicleTransmission,
 } from '@/services/garage-service';
 import { colorEnumToHex, colorHexToEnum } from '@/utils/vehicle-color';
+import { parseVehicleGeneration } from '@/services/vehicle-images/generation';
 import { parseVehicleImage, type VehicleImageState } from '@/services/vehicle-images/image-status';
 
 const API_BASE = '/v1/garage';
@@ -74,6 +75,8 @@ type ServerVehicle = {
   } | null;
   /** Phase 3E: { status: pending|approved|unavailable, url, version, reason }. */
   vehicle_image?: unknown;
+  /** { status: resolved|choice_required|unresolved, source, model, options }. */
+  generation?: unknown;
   created_at: string;
   updated_at?: string;
 };
@@ -98,7 +101,9 @@ type ServerVehicleCreatePayload = {
   fuel_type?: VehicleFuelType;
 };
 
-type ServerVehiclePatchPayload = Partial<ServerVehicleCreatePayload>;
+type ServerVehiclePatchPayload = Partial<ServerVehicleCreatePayload> & {
+  variant_model_id?: string | null;
+};
 
 /**
  * Server → client adapter. Flattens nested make/model/trim/engine
@@ -140,6 +145,7 @@ export function toClientVehicle(raw: ServerVehicle): Vehicle {
     registrationRegionCode: raw.registration_region_code ?? undefined,
     model3d: raw.model_3d ? mapModel3d(raw.model_3d) : undefined,
     image: parseVehicleImage(raw.vehicle_image),
+    generation: parseVehicleGeneration(raw.generation),
   };
 }
 
@@ -228,6 +234,7 @@ export function toServerVehiclePatchPayload(
   if (patch.mileage !== undefined) out.mileage_km = patch.mileage;
   if (patch.nickname !== undefined) out.nickname = patch.nickname;
   if (patch.fuelType !== undefined) out.fuel_type = patch.fuelType;
+  if (patch.variantModelId !== undefined) out.variant_model_id = patch.variantModelId;
   return out;
 }
 
