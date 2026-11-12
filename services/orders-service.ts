@@ -105,6 +105,8 @@ export type OrderStep = {
 
 export type OrderItem = {
   id: string;
+  /** The catalog part (or service) the line is for; null when the backend names none. */
+  productId?: string | null;
   title: string;
   quantity: number;
   /** Formatted server unit price; confirmed row totals live in OrderDetail.pricing. */
@@ -228,6 +230,8 @@ export type OrderDetail = {
   expiresAt?: string;
   /** The server has suspended expiry (an open Payme transaction): no countdown. */
   expirySuspended?: boolean;
+  /** ISO time the order was delivered, as the server sent it; absent before delivery. */
+  deliveredAt?: string;
 };
 
 export type PaymentMethod = {

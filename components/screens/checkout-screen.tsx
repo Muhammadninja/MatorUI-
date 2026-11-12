@@ -470,6 +470,18 @@ export default function CheckoutScreen() {
             />
           ) : null}
 
+          {/* The return conditions, readable before the buyer pays. */}
+          <AppView testID="checkout-refund-policy" row align="center" gap={6} style={{ flexWrap: 'wrap' }}>
+            <AppText family="default" style={{ fontSize: 12, color: tokens.textMuted }}>
+              {t('checkout.refundPolicyPrefix')}
+            </AppText>
+            <LinkAction
+              label={t('checkout.refundPolicyLink')}
+              onPress={() => router.push('/return-policy')}
+              color={tokens.brandText}
+            />
+          </AppView>
+
           {create.error ? (
             <AppView row align="center" gap={8}>
               <AlertCircle size={16} strokeWidth={2} color={tokens.error} />

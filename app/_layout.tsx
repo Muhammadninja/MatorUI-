@@ -294,6 +294,15 @@ function RootNavigation() {
               gestureDirection: 'horizontal',
             }}
           />
+          <Stack.Screen
+            name="return-policy"
+            options={{
+              headerShown: false,
+              animation: 'slide_from_right',
+              gestureEnabled: true,
+              gestureDirection: 'horizontal',
+            }}
+          />
           {/* Shared destinations pushed from multiple tabs (Profile + Garage).
               Root-hosted so `back` returns to the origin tab, not Profile. */}
           <Stack.Screen

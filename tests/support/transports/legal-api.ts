@@ -55,15 +55,28 @@ function delay(ms: number): Promise<void> {
 export class MockLegalTransport implements LegalTransport {
   private accepted = new Map<LegalDocumentType, number>();
 
-  constructor(private docs: LegalDocument[] = [
-    mockDoc('TERMS_OF_USE', 1, 'Terms of Use'),
-    mockDoc('PRIVACY_POLICY', 1, 'Privacy Policy'),
-    mockDoc('PERSONAL_DATA_CONSENT', 1, 'Personal Data Consent'),
-  ]) {}
+  constructor(
+    private docs: LegalDocument[] = [
+      mockDoc('TERMS_OF_USE', 1, 'Terms of Use'),
+      mockDoc('PRIVACY_POLICY', 1, 'Privacy Policy'),
+      mockDoc('PERSONAL_DATA_CONSENT', 1, 'Personal Data Consent'),
+    ],
+    /** Served only by getCurrentDocument, never by the consent list — as on the backend. */
+    private informational: LegalDocument[] = [
+      { ...mockDoc('REFUND_POLICY', 1, 'Refund & Returns Policy'), is_required: false },
+    ],
+  ) {}
 
   async getDocuments(): Promise<LegalDocumentsResponse> {
     await delay(MOCK_LATENCY_MS);
     return { documents: [...this.docs] };
+  }
+
+  async getCurrentDocument(type: LegalDocumentType): Promise<LegalDocument> {
+    await delay(MOCK_LATENCY_MS);
+    const found = [...this.docs, ...this.informational].find((d) => d.type === type);
+    if (!found) throw new Error(`MockLegalTransport: no ${type} in force`);
+    return found;
   }
 
   async getDocument(type: LegalDocumentType, version: number): Promise<LegalDocument> {

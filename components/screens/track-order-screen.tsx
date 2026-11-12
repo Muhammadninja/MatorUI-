@@ -354,6 +354,23 @@ export default function TrackOrderScreen() {
             )}
           </AppView>
 
+          {/* Only a delivered order: before that, cancellation applies (above). Opens
+              the return conditions and support — no request is created in the app. */}
+          {order.serverStatus === 'delivered' ? (
+            <AppButton
+              testID="track-order-return-btn"
+              title={t('trackOrder.returnConditions')}
+              kind="secondary"
+              variant="outline"
+              size="md"
+              fullWidth
+              onPress={() => {
+                triggerHaptic('selection');
+                router.push({ pathname: '/return-policy', params: { orderId: order.id } });
+              }}
+            />
+          ) : null}
+
           {/* Timeline */}
           <AppView style={{ paddingLeft: 4 }}>
             {order.steps.map((step, i) => {

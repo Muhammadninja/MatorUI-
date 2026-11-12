@@ -94,7 +94,8 @@
     "deleteAccountConfirm": "Ha, oʻchirilsin",
     "accountDeleteFailedToast": "Akkauntni oʻchirib boʻlmadi. Qayta urinib koʻring.",
     "privacy": "Maxfiylik siyosati",
-    "personalDataConsent": "Shaxsiy maʼlumotlarni qayta ishlashga rozilik"
+    "personalDataConsent": "Shaxsiy maʼlumotlarni qayta ishlashga rozilik",
+    "refundPolicy": "Qaytarish shartlari"
   },
   "orderStatus": {
     "list": {
@@ -482,7 +483,9 @@
     "reviewChooseAddress": "Manzilni tanlang",
     "reviewPickupMore": "yana {{count}} ta",
     "retryPaymentShort": "Buyurtmani toʻlash",
-    "pickupOpenMap": "Xaritada ochish"
+    "pickupOpenMap": "Xaritada ochish",
+    "refundPolicyPrefix": "Toʻlovdan oldin tanishib chiqing:",
+    "refundPolicyLink": "qaytarish va pulni qaytarish shartlari"
   },
   "orderConfirmation": {
     "loadErrorTitle": "Buyurtmani yuklab boʻlmadi",
@@ -534,7 +537,8 @@
     "autoCancelTitle": "Tasdiqlash kutilmoqda",
     "autoCancelBody": "Buyurtma oʻz vaqtida toʻlanmasa yoki tasdiqlanmasa, avtomatik bekor qilinadi.",
     "autoCancelExpired": "Toʻlov vaqti tugadi. Buyurtma holati tez orada yangilanadi.",
-    "autoCancelA11y": "Buyurtma bekor qilinishiga {{time}} qoldi"
+    "autoCancelA11y": "Buyurtma bekor qilinishiga {{time}} qoldi",
+    "returnConditions": "Qaytarish shartlari"
   },
   "explore": {
     "pricesStockUpdated": "Narx va mavjudlik yangilandi",
@@ -1063,7 +1067,8 @@
     "types": {
       "TERMS_OF_USE": "Foydalanish shartlari",
       "PRIVACY_POLICY": "Maxfiylik siyosati",
-      "PERSONAL_DATA_CONSENT": "Shaxsiy maʼlumotlarga rozilik"
+      "PERSONAL_DATA_CONSENT": "Shaxsiy maʼlumotlarga rozilik",
+      "REFUND_POLICY": "Qaytarish va pulni qaytarish siyosati"
     }
   },
   "deliveryMap": {
@@ -1087,5 +1092,34 @@
     "notFoundTitle": "Avtomobilingiz topilmadimi?",
     "notFoundBodyVin": "Katalog toʻldirilmoqda. Avtomobilni VIN orqali qoʻshing — markasi, modeli va yilini aniq aniqlaymiz.",
     "notFoundBody": "Katalog toʻldirilmoqda. Qaysi avtomobilni qoʻshishni bizga yozing yoki uni VIN orqali qoʻshing."
+  },
+  "returnPolicy": {
+    "title": "Qaytarish shartlari",
+    "order": "Buyurtma",
+    "receivedOn": "Qabul qilingan: {{date}}",
+    "chooseItem": "Qaysi tovarni qaytarmoqchisiz?",
+    "orderLoadError": "Buyurtmani yuklab boʻlmadi.",
+    "windowTitle": "{{days}} kun — lozim darajadagi sifatli, qaytarish uchun yaroqli tovarlar uchun",
+    "windowUntil": "Bunday tovarni qonunchilikda belgilangan istisnolarni hisobga olgan holda {{date}} (shu kunni ham qoʻshib) qadar qaytarish mumkin.",
+    "windowPassed": "Lozim darajadagi sifatli tovarni qaytarish muddati {{date}} kuni tugagan.",
+    "windowNoDate": "Muddat qonunchilikda belgilangan istisnolarni hisobga olgan holda tovar olingan kundan boshlab hisoblanadi.",
+    "defectTitle": "Nuqsonli tovarlar — kafolat va qonuniy muddatlarga muvofiq",
+    "defectBody": "Nuqson, shikastlanish yoki buyurtmaga mos kelmaslik boʻyicha {{days}} kundan keyin ham qoʻllab-quvvatlash xizmatiga murojaat qiling.",
+    "supportTitle": "Qoʻllab-quvvatlash xizmatiga murojaat",
+    "supportBody": "Qaytarishni rasmiylashtirish uchun jamoamizga murojaat qiling.",
+    "supportBodyOrder": "Qaytarishni rasmiylashtirish uchun jamoamizga murojaat qiling. Buyurtma raqami va tovar xabarda allaqachon koʻrsatiladi.",
+    "telegram": "Telegramʼda yozish",
+    "call": "Qoʻngʻiroq qilish: {{phone}}",
+    "email": "Pochtaga yozish",
+    "callHint": "Qoʻngʻiroq qilganda buyurtma raqamini ayting: {{orderNo}}.",
+    "supportUnavailable": "Qoʻllab-quvvatlash kontaktlari hozircha mavjud emas. Keyinroq urinib koʻring.",
+    "noRequestNote": "Ilovada ariza yaratilmaydi: qaytarishni qoʻllab-quvvatlash xizmati rasmiylashtiradi.",
+    "openFailed": "Ilovani ochib boʻlmadi. Biz bilan bogʻlaning: {{contact}}",
+    "messageOrder": "Assalomu alaykum! Tovarni qaytarmoqchiman.\nBuyurtma: {{orderNo}}\nBuyurtma ID: {{orderId}}",
+    "messageProduct": "Tovar: {{productName}}\nTovar ID: {{productId}}",
+    "messageProductNoId": "Tovar: {{productName}}",
+    "messageGeneral": "Assalomu alaykum! Tovarni qaytarish boʻyicha savolim bor.",
+    "emailSubject": "{{orderNo}} buyurtma boʻyicha qaytarish",
+    "emailSubjectGeneral": "Tovarni qaytarish boʻyicha savol"
   }
 }

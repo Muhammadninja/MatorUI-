@@ -94,7 +94,8 @@
     "deleteAccountConfirm": "Delete account",
     "accountDeleteFailedToast": "Couldn't delete your account. Please try again.",
     "privacy": "Privacy Policy",
-    "personalDataConsent": "Personal Data Consent"
+    "personalDataConsent": "Personal Data Consent",
+    "refundPolicy": "Return conditions"
   },
   "orderStatus": {
     "list": {
@@ -482,7 +483,9 @@
     "reviewChooseAddress": "Choose an address",
     "reviewPickupMore": "{{count}} more",
     "retryPaymentShort": "Pay for order",
-    "pickupOpenMap": "Open in Maps"
+    "pickupOpenMap": "Open in Maps",
+    "refundPolicyPrefix": "Before you pay, see the",
+    "refundPolicyLink": "refund and returns conditions"
   },
   "orderConfirmation": {
     "loadErrorTitle": "Couldn't load your order",
@@ -534,7 +537,8 @@
     "autoCancelTitle": "Waiting for confirmation",
     "autoCancelBody": "If the order isn't paid or confirmed in time, it is cancelled automatically.",
     "autoCancelExpired": "Payment time is up. The order status will update shortly.",
-    "autoCancelA11y": "{{time}} left before the order is cancelled"
+    "autoCancelA11y": "{{time}} left before the order is cancelled",
+    "returnConditions": "Return conditions"
   },
   "explore": {
     "pricesStockUpdated": "Prices & stock updated",
@@ -1063,7 +1067,8 @@
     "types": {
       "TERMS_OF_USE": "Terms & Conditions",
       "PRIVACY_POLICY": "Privacy Policy",
-      "PERSONAL_DATA_CONSENT": "Personal Data Consent"
+      "PERSONAL_DATA_CONSENT": "Personal Data Consent",
+      "REFUND_POLICY": "Refund & Returns Policy"
     }
   },
   "deliveryMap": {
@@ -1087,5 +1092,34 @@
     "notFoundTitle": "Can't find your car?",
     "notFoundBodyVin": "The catalog is growing. Add your car by VIN and we will identify its make, model and year exactly.",
     "notFoundBody": "The catalog is growing. Tell us which car to add, or add yours by VIN."
+  },
+  "returnPolicy": {
+    "title": "Return conditions",
+    "order": "Order",
+    "receivedOn": "Received: {{date}}",
+    "chooseItem": "Which product do you want to return?",
+    "orderLoadError": "Couldn't load the order.",
+    "windowTitle": "{{days}} days — for eligible products in proper condition",
+    "windowUntil": "You can return such a product until {{date}} inclusive, subject to the exceptions set by law.",
+    "windowPassed": "The period for returning a product in proper condition ended on {{date}}.",
+    "windowNoDate": "The period runs from the day you receive the product, subject to the exceptions set by law.",
+    "defectTitle": "Defective products — within warranty and statutory periods",
+    "defectBody": "For a defect, damage or a product that doesn't match your order, contact support even after {{days}} days.",
+    "supportTitle": "Contact support",
+    "supportBody": "Contact our team to arrange a return.",
+    "supportBodyOrder": "Contact our team to arrange a return. Your order number and product will already be in the message.",
+    "telegram": "Message us on Telegram",
+    "call": "Call {{phone}}",
+    "email": "Send an email",
+    "callHint": "When you call, give your order number {{orderNo}}.",
+    "supportUnavailable": "Support contacts are unavailable right now. Please try again later.",
+    "noRequestNote": "No request is created in the app: support will arrange the return.",
+    "openFailed": "Couldn't open the app. Contact us: {{contact}}",
+    "messageOrder": "Hello! I'd like to return a product.\nOrder: {{orderNo}}\nOrder ID: {{orderId}}",
+    "messageProduct": "Product: {{productName}}\nProduct ID: {{productId}}",
+    "messageProductNoId": "Product: {{productName}}",
+    "messageGeneral": "Hello! I have a question about returning a product.",
+    "emailSubject": "Return for order {{orderNo}}",
+    "emailSubjectGeneral": "Question about a return"
   }
 }
