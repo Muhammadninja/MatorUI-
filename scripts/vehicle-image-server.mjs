@@ -2,7 +2,10 @@ import path from 'node:path';
 import { createVehicleImagePipeline } from '../services/vehicle-image-pipeline.mjs';
 import { createImageProvider } from '../services/vehicle-image-provider.mjs';
 import { createCloudinaryAssetStore } from '../services/vehicle-image-cloudinary-store.mjs';
-import { loadVehicleImageEnv } from '../services/vehicle-image-env.mjs';
+import {
+  isVehicleImageGenerationEnabled,
+  loadVehicleImageEnv,
+} from '../services/vehicle-image-env.mjs';
 
 await loadVehicleImageEnv();
 const adminToken = process.env.VEHICLE_IMAGE_ADMIN_TOKEN;
@@ -11,13 +14,17 @@ if (!adminToken || adminToken.length < 32)
 const requestToken = process.env.VEHICLE_IMAGE_REQUEST_TOKEN;
 if (!requestToken || requestToken.length < 32)
   throw new Error('VEHICLE_IMAGE_REQUEST_TOKEN must contain at least 32 characters');
+const generationEnabled = isVehicleImageGenerationEnabled(
+  process.env.VEHICLE_IMAGE_GENERATION_ENABLED,
+);
 const pipeline = createVehicleImagePipeline({
   dataDir: path.resolve(process.env.VEHICLE_IMAGE_DATA_DIR ?? '/var/lib/mator-vehicle-images'),
   adminToken,
   requestToken,
-  provider: createImageProvider(),
+  provider: generationEnabled ? createImageProvider() : null,
+  generationEnabled,
   assetStore: createCloudinaryAssetStore(),
-  autoRun: true,
+  autoRun: generationEnabled,
   maxAttempts: 3,
   jobTimeoutMs: 180_000,
 });

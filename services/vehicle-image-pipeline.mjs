@@ -192,7 +192,8 @@ export function createVehicleImagePipeline({
   adminToken,
   requestToken = null,
   provider = null,
-  autoRun = true,
+  generationEnabled = false,
+  autoRun = false,
   imageValidator = defaultImageValidator,
   assetStore = null,
   maxAttempts = 3,
@@ -254,7 +255,7 @@ export function createVehicleImagePipeline({
       if (error.code !== 'ENOENT') throw error;
       await persist();
     }
-    if (provider && autoRun) queueMicrotask(() => void runQueuedJobs());
+    if (provider && generationEnabled && autoRun) queueMicrotask(() => void runQueuedJobs());
     initialized = true;
   }
 
@@ -356,7 +357,7 @@ export function createVehicleImagePipeline({
       !ADMIN_ONLY_TERMINAL_JOB_STATES.has(previousJob?.status)
     ) job = createJob(request);
     await persist();
-    if (job && provider && autoRun) queueMicrotask(() => void runQueuedJobs());
+    if (job && provider && generationEnabled && autoRun) queueMicrotask(() => void runQueuedJobs());
     return {
       request,
       duplicate,
@@ -400,7 +401,7 @@ export function createVehicleImagePipeline({
       !ADMIN_ONLY_TERMINAL_JOB_STATES.has(previousJob?.status)
     ) job = createJob(request);
     await persist();
-    if (job && provider && autoRun) queueMicrotask(() => void runQueuedJobs());
+    if (job && provider && generationEnabled && autoRun) queueMicrotask(() => void runQueuedJobs());
     return {
       request,
       duplicate,
@@ -631,7 +632,7 @@ export function createVehicleImagePipeline({
   }
 
   async function runQueuedJobs() {
-    if (!provider) return;
+    if (!provider || !generationEnabled) return false;
     if (workerPromise) return workerPromise;
     workerPromise = (async () => {
       while (true) {
@@ -642,7 +643,8 @@ export function createVehicleImagePipeline({
     })().finally(() => {
       workerPromise = null;
     });
-    return workerPromise;
+    await workerPromise;
+    return true;
   }
 
   async function regenerateRequest(requestId, authorized) {
@@ -653,7 +655,7 @@ export function createVehicleImagePipeline({
       throw Object.assign(new Error('generation is already active'), { status: 409 });
     const job = createJob(request, true);
     await persist();
-    if (provider && autoRun) queueMicrotask(() => void runQueuedJobs());
+    if (provider && generationEnabled && autoRun) queueMicrotask(() => void runQueuedJobs());
     return job;
   }
 

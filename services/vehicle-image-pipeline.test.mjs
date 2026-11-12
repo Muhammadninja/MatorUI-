@@ -3,11 +3,13 @@ import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { Readable } from 'node:stream';
 import sharp from 'sharp';
 import { createVehicleImagePipeline, vehicleIdentityKey } from './vehicle-image-pipeline.mjs';
 import { processGeneratedImage } from './vehicle-image-processing.mjs';
 import { buildVehicleImagePrompt, OpenAIImageProvider } from './vehicle-image-provider.mjs';
 import { createCloudinaryAssetStore } from './vehicle-image-cloudinary-store.mjs';
+import { isVehicleImageGenerationEnabled } from './vehicle-image-env.mjs';
 
 const dirs = [];
 const token = 'local-admin-token-for-tests';
@@ -39,16 +41,80 @@ async function setup(options = {}) {
     adminToken: token,
     retryDelayMs: 0,
     autoRun: false,
+    generationEnabled: options.generationEnabled ?? Boolean(options.provider),
     ...options,
   });
   await pipeline.initialize();
   return { pipeline, dataDir };
+}
+function invokeServer(server, { method, url, token }) {
+  return new Promise((resolve) => {
+    const request = Readable.from([]);
+    request.method = method;
+    request.url = url;
+    request.headers = token ? { authorization: `Bearer ${token}` } : {};
+    const response = {
+      writeHead(status) { this.status = status; },
+      end(raw) { resolve({ status: this.status, body: raw ? JSON.parse(raw) : null }); },
+    };
+    server.emit('request', request, response);
+  });
 }
 afterEach(async () => {
   await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 
 describe('vehicle image pipeline', () => {
+  it('defaults paid generation to off and requires the exact explicit opt-in', () => {
+    expect(isVehicleImageGenerationEnabled(undefined)).toBe(false);
+    expect(isVehicleImageGenerationEnabled('false')).toBe(false);
+    expect(isVehicleImageGenerationEnabled('TRUE')).toBe(false);
+    expect(isVehicleImageGenerationEnabled('true')).toBe(true);
+  });
+
+  it('records canonical requests without provider calls, including admin processing and restart', async () => {
+    const dataDir = await mkdtemp(path.join(os.tmpdir(), 'vehicle-image-disabled-generation-'));
+    dirs.push(dataDir);
+    const requestToken = 'server-to-server-request-token-for-disabled-generation-tests';
+    const generate = vi.fn();
+    const pipeline = createVehicleImagePipeline({
+      dataDir,
+      adminToken: token,
+      requestToken,
+      provider: { generate },
+    });
+    await pipeline.initialize();
+    const identity = {
+      makeId: 'daewoo', modelId: 'nexia', modelYear: 2016,
+      generationId: 'nexia-2', faceliftId: null, bodyType: null, trimId: null,
+    };
+    const vehicle = { manufacturer: 'Daewoo', model: 'Nexia', generation: 'Nexia 2' };
+    const first = await pipeline.submitCanonicalRequest({ identity, vehicle });
+    const duplicate = await pipeline.submitCanonicalRequest({ identity, vehicle });
+    expect(first.job.status).toBe('queued');
+    expect(duplicate.duplicate).toBe(true);
+    expect(duplicate.job).toBeNull();
+
+    await pipeline.runQueuedJobs();
+    const response = await invokeServer(pipeline.server(), {
+      method: 'POST', url: '/admin/jobs/process', token: token,
+    });
+    expect(response.status).toBe(200);
+    expect(generate).not.toHaveBeenCalled();
+
+    const restartedProvider = { generate: vi.fn() };
+    const restarted = createVehicleImagePipeline({
+      dataDir,
+      adminToken: token,
+      requestToken,
+      provider: restartedProvider,
+    });
+    await restarted.initialize();
+    await restarted.runQueuedJobs();
+    expect(restarted.listPending(true)[0].job.status).toBe('queued');
+    expect(restartedProvider.generate).not.toHaveBeenCalled();
+  });
+
   it('reports health only after the persistent registry is initialized', async () => {
     const dataDir = await mkdtemp(path.join(os.tmpdir(), 'vehicle-image-health-'));
     dirs.push(dataDir);
