@@ -219,7 +219,9 @@ tags:
 - tapOn: "Cash"
 - tapOn:
     id: checkout-sheet-payment-close
-- assertVisible: '.*Place order.*227.190\.72.*'
+- assertVisible:
+    id: checkout-place-order-btn
+- assertVisible: '.*227.190\.72.*'
 - scrollUntilVisible:
     element: "Service fee"
     direction: DOWN
