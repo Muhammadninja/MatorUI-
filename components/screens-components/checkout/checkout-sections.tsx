@@ -286,7 +286,7 @@ export function PaymentRow({
       style={selected ? { borderWidth: 1.5, borderColor: tokens.brand } : undefined}
     >
       <AppView row align="center" gap={12}>
-        <PaymentOptionMark option={option} width={48} iconSize={20} color={tokens.text} />
+        <PaymentOptionMark option={option} width={68} iconSize={20} color={tokens.text} />
         <AppView flex={1}>
           {/* A provider logo already names the method; the label stays for screen readers. */}
           {option.logo ? null : (

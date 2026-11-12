@@ -379,7 +379,7 @@ export default function CheckoutScreen() {
                   label={t('checkout.payment')}
                   value={
                     paymentOption?.logo ? (
-                      <PaymentOptionMark option={paymentOption} width={56} iconSize={18} color={tokens.text} />
+                      <PaymentOptionMark option={paymentOption} width={76} iconSize={18} color={tokens.text} />
                     ) : (
                       t(paymentOption?.labelKey ?? 'checkout.payment')
                     )

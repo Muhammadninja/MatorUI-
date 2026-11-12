@@ -43,7 +43,7 @@ export default function PaymentMethodsScreen() {
               borderName="border"
             >
               {opt.logo ? (
-                <PaymentOptionMark option={opt} width={56} iconSize={22} color={tokens.text} />
+                <PaymentOptionMark option={opt} width={76} iconSize={22} color={tokens.text} />
               ) : (
                 <AppView center rounded={12} colorName="backgroundSecondary" style={{ width: 56, height: 44 }}>
                   <PaymentOptionMark option={opt} width={56} iconSize={22} color={tokens.text} />
