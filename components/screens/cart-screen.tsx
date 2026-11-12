@@ -144,15 +144,18 @@ export default function CartScreen() {
     );
   }
 
+  // Light mode sits on plain white, with soft grey only for tiles and controls.
+  const surface = scheme === 'dark' ? 'background' : 'surface';
+  const dimWhileUpdating = { opacity: charges && updating ? 0.55 : 1 };
+
   return (
-    <AppView flex={1} colorName="background" testID="cart-screen">
+    <AppView flex={1} colorName={surface} testID="cart-screen">
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
           paddingTop: insets.top + 8,
           paddingHorizontal: 16,
-          paddingBottom: 16,
-          gap: 8,
+          paddingBottom: 24,
         }}
         refreshControl={
           <RefreshControl
@@ -163,17 +166,18 @@ export default function CartScreen() {
           />
         }
       >
-        <AppView style={{ paddingTop: 8, paddingBottom: 4 }}>
+        {/* Title and count share a baseline; the count is the quieter of the two. */}
+        <AppView row wrap align="baseline" gap={8} style={{ paddingTop: 8, paddingBottom: 8 }}>
           <AppText textVariant="h3" weight="bold" colorName="text" accessibilityRole="header">
             {t('cart.title')}
           </AppText>
-          <AppText textVariant="bodySm" colorName="textMuted">
+          <AppText testID="cart-item-count" textVariant="bodySm" colorName="textMuted">
             {t('cart.itemCount', { count: itemCount })}
           </AppText>
         </AppView>
 
         {error ? (
-          <AppView row align="center" gap={8}>
+          <AppView row align="center" gap={8} style={{ paddingBottom: 8 }}>
             <AlertCircle size={16} strokeWidth={2} color={tokens.error} />
             <AppText textVariant="bodySm" style={{ flex: 1, color: tokens.error }}>
               {error}
@@ -181,29 +185,30 @@ export default function CartScreen() {
           </AppView>
         ) : null}
 
-        {items.map((item) => {
+        {items.map((item, index) => {
           const pending = pendingIds.has(item.id);
           return (
             <AppView
               key={item.id}
               testID={`cart-item-${item.id}`}
               row
-              gap="md"
-              rounded={12}
-              colorName="card"
-              borderWidth={1}
-              borderName="border"
-              style={{ padding: 12, opacity: pending ? 0.55 : 1 }}
+              gap={14}
+              style={{
+                paddingVertical: 14,
+                borderTopWidth: index === 0 ? 0 : 1,
+                borderTopColor: tokens.divider,
+                opacity: pending ? 0.55 : 1,
+              }}
             >
-              <AppView style={{ width: 72, alignSelf: 'flex-start' }}>
+              <AppView style={{ width: 78, alignSelf: 'flex-start' }}>
                 <ImageBox
                   label={item.title}
                   uri={item.imageUrl}
-                  height={72}
-                  radius={8}
+                  height={78}
+                  radius={14}
                   contentFit="contain"
-                  backgroundColor={tokens.white}
-                  targetWidth={72}
+                  backgroundColor={tokens.backgroundSecondary}
+                  targetWidth={78}
                   small
                 />
               </AppView>
@@ -213,13 +218,7 @@ export default function CartScreen() {
                   <AppText
                     family="default"
                     weight="semibold"
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      fontSize: 14,
-                      lineHeight: 20,
-                      color: tokens.text,
-                    }}
+                    style={{ flex: 1, minWidth: 0, fontSize: 14, lineHeight: 20, color: tokens.text }}
                   >
                     {item.title}
                   </AppText>
@@ -232,7 +231,7 @@ export default function CartScreen() {
                     center
                     accessibilityRole="button"
                     accessibilityLabel={t('cart.removeItem', { title: item.title })}
-                    style={{ width: 48, height: 48, margin: -12, marginLeft: 0, flexShrink: 0 }}
+                    style={{ width: 48, height: 48, margin: -14, marginLeft: 0, flexShrink: 0 }}
                   >
                     <Trash2 size={18} strokeWidth={2} color={tokens.textMuted} />
                   </AppPressableView>
@@ -268,6 +267,7 @@ export default function CartScreen() {
                     onIncrement={() => incrementItem(item.id)}
                     onDecrement={() => decrementItem(item.id)}
                     size="sm"
+                    tone="soft"
                   />
                 </AppView>
               </AppView>
@@ -275,19 +275,18 @@ export default function CartScreen() {
           );
         })}
 
-        {/* The cost breakdown follows the items; only the total and checkout stay
-         *  fixed, and the scroll view ends above them so nothing is covered. */}
+        {/* The breakdown follows the items under a thin rule; only the total and
+         *  checkout stay pinned, and the scroll view ends above them. */}
         <AppView
           testID="cart-summary"
-          rounded={16}
-          colorName="card"
-          borderWidth={1}
-          borderName="border"
-          gap="sm"
-          style={{ padding: 16, marginTop: 8, opacity: charges && updating ? 0.55 : 1 }}
+          gap={8}
+          style={[
+            { paddingTop: 16, borderTopWidth: 1, borderTopColor: tokens.divider },
+            dimWhileUpdating,
+          ]}
         >
           <SummaryRow
-            label={t('cart.subtotal')}
+            label={t('cart.summaryItems')}
             value={formatCurrency(charges ? charges.subtotal : totals.subtotal)}
             tokens={tokens}
           />
@@ -302,6 +301,7 @@ export default function CartScreen() {
             <SummaryRow
               label={t('cart.serviceFee')}
               value={t('cart.deliveryAtCheckout')}
+              muted
               tokens={tokens}
             />
           ) : charges.serviceFee > 0 ? (
@@ -313,32 +313,30 @@ export default function CartScreen() {
           ) : null}
           <SummaryRow
             label={t('cart.shipping')}
-            value={t('cart.deliveryAtCheckout')}
+            value={t('cart.deliveryCalculatedAtCheckout')}
+            muted
             tokens={tokens}
           />
         </AppView>
       </ScrollView>
 
-      {/* Fixed above the tab bar, which owns the bottom safe area. */}
+      {/* Pinned above the tab bar, which owns the bottom safe area. Delivery is
+       *  priced at checkout, so the total here says it leaves delivery out. */}
       <AppView
-        colorName={scheme === 'dark' ? 'background' : 'surface'}
+        testID="cart-footer"
+        colorName={surface}
         px="lg"
-        gap="sm"
-        style={{
-          paddingTop: 12,
-          paddingBottom: 12,
-          borderTopWidth: 1,
-          borderTopColor: tokens.divider,
-        }}
+        gap={12}
+        style={{ paddingTop: 12, paddingBottom: 12, borderTopWidth: 1, borderTopColor: tokens.divider }}
       >
         <AppView row align="center" justify="space-between" gap="sm">
-          <AppText textVariant="bodySm" weight="medium" colorName="textMuted">
-            {t('cart.total')}
+          <AppText textVariant="bodySm" weight="medium" colorName="textMuted" style={{ flexShrink: 1 }}>
+            {t('cart.totalWithoutDelivery')}
           </AppText>
-          <AppView style={{ opacity: charges && updating ? 0.55 : 1 }}>
+          <AppView testID="cart-total" style={dimWhileUpdating}>
             <AppPrice
               value={formatCurrency(charges ? charges.total : totals.total)}
-              size={20}
+              size={22}
               color={tokens.text}
             />
           </AppView>
@@ -359,24 +357,34 @@ export default function CartScreen() {
 function SummaryRow({
   label,
   value,
+  muted = false,
   tokens,
 }: {
   label: string;
   value: string;
+  /** A note in place of an amount ("calculated at checkout"). */
+  muted?: boolean;
   tokens: ReturnType<typeof useThemeContext>['tokens'];
 }) {
   return (
-    <AppView row justify="space-between" gap="md">
+    <AppView row align="flex-start" justify="space-between" gap="md">
       <AppText
         family="default"
-        style={{ flex: 1, fontSize: 14, lineHeight: 20, color: tokens.textMuted }}
+        style={{ flexShrink: 1, fontSize: 14, lineHeight: 20, color: tokens.textMuted }}
       >
         {label}
       </AppText>
       <AppText
-        family="accent"
-        weight="semibold"
-        style={{ fontSize: 14, lineHeight: 20, color: tokens.text, fontVariant: ['tabular-nums'] }}
+        family={muted ? 'default' : 'accent'}
+        weight={muted ? 'regular' : 'semibold'}
+        style={{
+          flexShrink: 1,
+          textAlign: 'right',
+          fontSize: 14,
+          lineHeight: 20,
+          color: muted ? tokens.textMuted : tokens.text,
+          fontVariant: ['tabular-nums'],
+        }}
       >
         {value}
       </AppText>

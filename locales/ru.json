@@ -399,7 +399,10 @@
     "checkout": "Оформить заказ",
     "free": "Бесплатно",
     "orderSummary": "Сводка заказа",
-    "deliveryAtCheckout": "При оформлении"
+    "deliveryAtCheckout": "При оформлении",
+    "summaryItems": "Товары",
+    "deliveryCalculatedAtCheckout": "Рассчитаем при оформлении",
+    "totalWithoutDelivery": "Итого без доставки"
   },
   "checkout": {
     "pickup": "Самовывоз",

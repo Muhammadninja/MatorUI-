@@ -395,7 +395,10 @@
     "checkout": "Checkout",
     "free": "Free",
     "orderSummary": "Order summary",
-    "deliveryAtCheckout": "At checkout"
+    "deliveryAtCheckout": "At checkout",
+    "summaryItems": "Items",
+    "deliveryCalculatedAtCheckout": "Calculated at checkout",
+    "totalWithoutDelivery": "Total excl. delivery"
   },
   "checkout": {
     "pickup": "Pickup",

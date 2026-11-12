@@ -395,7 +395,10 @@
     "checkout": "Buyurtma berish",
     "free": "Bepul",
     "orderSummary": "Buyurtma xulosasi",
-    "deliveryAtCheckout": "Rasmiylashtirishda"
+    "deliveryAtCheckout": "Rasmiylashtirishda",
+    "summaryItems": "Mahsulotlar",
+    "deliveryCalculatedAtCheckout": "Rasmiylashtirishda hisoblanadi",
+    "totalWithoutDelivery": "Yetkazib berishsiz jami"
   },
   "checkout": {
     "pickup": "Olib ketish",
