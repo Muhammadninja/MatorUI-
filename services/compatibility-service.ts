@@ -18,6 +18,28 @@ export type CompatibilityStatus =
   | 'NOT_COMPATIBLE'
   | 'UNCERTAIN';
 
+export type CompatibilityVerdict = 'compatible' | 'incompatible' | 'unknown';
+
+/** Use the backend status as the verdict; its badge copy is legacy and may
+ * incorrectly tell customers to check a VIN when fitment data is simply absent. */
+export function compatibilityVerdict(status: CompatibilityStatus | string): CompatibilityVerdict {
+  if (status === 'EXACT_MATCH' || status === 'UNIVERSAL') return 'compatible';
+  if (status === 'NOT_COMPATIBLE') return 'incompatible';
+  return 'unknown';
+}
+
+/** The badge's words for a status. A universal part says so rather than claiming
+ *  a confirmed fit for this car; anything unconfirmed says exactly that. */
+export function compatibilityLabelKey(status: CompatibilityStatus | string): string {
+  if (status === 'UNIVERSAL') return 'catalog.universalFit';
+  const verdict = compatibilityVerdict(status);
+  return verdict === 'compatible'
+    ? 'itemDetail.fitConfirmed'
+    : verdict === 'incompatible'
+      ? 'itemDetail.fitNotCompatible'
+      : 'itemDetail.fitUnknown';
+}
+
 export type CompatibilityColor = 'green' | 'red' | 'yellow';
 
 export type CompatibilityResult = {

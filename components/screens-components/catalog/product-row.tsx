@@ -17,7 +17,12 @@ import { useUserContext } from '@/contexts/user.context';
 import { useActiveSales } from '@/hooks/use-sales';
 import { useToast } from '@/hooks/use-toast';
 import type { CatalogItem } from '@/services/catalog-service';
-import { checkCompatibility, type CompatibilityResult } from '@/services/compatibility-service';
+import {
+  checkCompatibility,
+  compatibilityLabelKey,
+  compatibilityVerdict,
+  type CompatibilityResult,
+} from '@/services/compatibility-service';
 import { resolveItemPricing } from '@/services/sales-service';
 import { triggerHaptic } from '@/utils/haptics';
 
@@ -172,10 +177,12 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
         })
       : null;
 
+  // The verdict comes from the API's status; the server's badge copy is legacy.
+  const fitVerdict = fit ? compatibilityVerdict(fit.status) : null;
   const fitTone =
-    fit?.badge.color === 'green'
+    fitVerdict === 'compatible'
       ? { color: tokens.success, bg: tokens.successSoft, Icon: Check }
-      : fit?.badge.color === 'red'
+      : fitVerdict === 'incompatible'
         ? { color: tokens.error, bg: tokens.errorSoft, Icon: X }
         : { color: tokens.warning, bg: tokens.warningSoft, Icon: CircleAlert };
 
@@ -359,7 +366,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
         />
       ) : fitState === 'answered' && fit ? (
         <FitBadge
-          label={fit.badge.text}
+          label={t(compatibilityLabelKey(fit.status))}
           color={fitTone.color}
           bg={fitTone.bg}
           Icon={fitTone.Icon}

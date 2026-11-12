@@ -872,7 +872,7 @@
     "fitsShowLess": "Свернуть",
     "fitConfirmed": "Подходит для вашего автомобиля",
     "fitNotCompatible": "Не подходит для вашего автомобиля",
-    "fitUnknown": "Нет данных о совместимости",
+    "fitUnknown": "Совместимость не установлена",
     "deliveryCostAtCheckout": "Стоимость доставки рассчитается при оформлении заказа"
   },
   "sourcing": {
@@ -1072,8 +1072,10 @@
   },
   "vehicleParts": {
     "bestsellers": "Хиты продаж",
-    "fallbackTitle": "Подходящие запчасти",
-    "emptyBody": "Для {{vehicle}} пока нет запчастей. Загляните позже."
+    "fallbackTitle": "По моей модели",
+    "emptyBody": "Для {{vehicle}} пока нет запчастей. Загляните позже.",
+    "forMyModel": "По моей модели",
+    "forMyModelA11y": "Фильтр: по моей модели, {{model}}"
   },
   "legal": {
     "loading": "Загрузка документа…",

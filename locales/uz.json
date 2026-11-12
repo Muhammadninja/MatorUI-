@@ -852,7 +852,7 @@
     "fitsShowLess": "Yigʻish",
     "fitConfirmed": "Avtomobilingizga mos",
     "fitNotCompatible": "Avtomobilingizga mos emas",
-    "fitUnknown": "Moslik haqida maʼlumot yoʻq",
+    "fitUnknown": "Moslik tasdiqlanmagan",
     "deliveryCostAtCheckout": "Yetkazib berish narxi buyurtmani rasmiylashtirishda hisoblanadi"
   },
   "sourcing": {
@@ -1050,8 +1050,10 @@
   },
   "vehicleParts": {
     "bestsellers": "Kop sotilganlar",
-    "fallbackTitle": "Mos keladigan qismlar",
-    "emptyBody": "{{vehicle}} uchun hozircha qismlar yoʻq. Keyinroq qarang."
+    "fallbackTitle": "Mening modelim uchun",
+    "emptyBody": "{{vehicle}} uchun hozircha qismlar yoʻq. Keyinroq qarang.",
+    "forMyModel": "Mening modelim uchun",
+    "forMyModelA11y": "Filtr: mening modelim uchun, {{model}}"
   },
   "legal": {
     "loading": "Hujjat yuklanmoqda…",

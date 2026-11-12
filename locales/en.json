@@ -852,7 +852,7 @@
     "fitsShowLess": "Show fewer",
     "fitConfirmed": "Fits your vehicle",
     "fitNotCompatible": "Does not fit your vehicle",
-    "fitUnknown": "Compatibility data unavailable",
+    "fitUnknown": "Compatibility not confirmed",
     "deliveryCostAtCheckout": "The delivery cost is calculated at checkout"
   },
   "sourcing": {
@@ -1050,8 +1050,10 @@
   },
   "vehicleParts": {
     "bestsellers": "Bestsellers",
-    "fallbackTitle": "Parts that fit",
-    "emptyBody": "We don't have parts listed for your {{vehicle}} yet. Check back soon."
+    "fallbackTitle": "For my model",
+    "emptyBody": "We don't have parts listed for your {{vehicle}} yet. Check back soon.",
+    "forMyModel": "For my model",
+    "forMyModelA11y": "Filter: for my model, {{model}}"
   },
   "legal": {
     "loading": "Loading document…",

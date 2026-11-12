@@ -136,6 +136,28 @@ export default function VehiclePartsScreen() {
         >
           {/* Rows run edge to edge, so the section copy carries its own inset. */}
           <AppView px={16} gap={8}>
+            {/* The list is scoped to the model; each part's own badge says whether
+             *  it is confirmed for this car. */}
+            {model ? (
+              <AppView
+                testID="vehicle-parts-model-chip"
+                row
+                align="center"
+                accessible
+                accessibilityLabel={t('vehicleParts.forMyModelA11y', { model: [make, model].filter(Boolean).join(' ') })}
+                style={{
+                  alignSelf: 'flex-start',
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: RADIUS_PILL,
+                  backgroundColor: tokens.brandSoft,
+                }}
+              >
+                <AppText family="accent" weight="semibold" style={{ fontSize: 13, color: tokens.brandText }}>
+                  {t('vehicleParts.forMyModel')} · {model}
+                </AppText>
+              </AppView>
+            ) : null}
             <AppText
               family="accent"
               weight="bold"
