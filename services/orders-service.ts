@@ -305,6 +305,10 @@ export type CreateOrderInput = {
    *  authoritatively and MAY ignore this; the mock echoes it so the
    *  just-placed order's confirmation/track total isn't blank. */
   totalLabel?: string;
+  /** Sent as the `Idempotency-Key` header, never in the body. Every attempt at one
+   *  checkout carries the same key (see services/order-attempt.ts), so a request whose
+   *  answer was lost cannot place a second order. */
+  idempotencyKey?: string;
 };
 
 /**

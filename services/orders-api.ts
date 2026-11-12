@@ -874,7 +874,10 @@ export class HttpOrdersTransport implements OrdersTransport {
       body.confirmed_total_uzs = input.confirmedTotalUzs;
     }
 
-    const r = await apiClient.post<RawBackendOrder>('/v1/orders', body, { signal });
+    // A header, so the whitelisted body is unchanged. A retry of this request (by the
+    // client below or by the buyer) sends the same key and gets the same order back.
+    const headers = input.idempotencyKey ? { 'Idempotency-Key': input.idempotencyKey } : undefined;
+    const r = await apiClient.post<RawBackendOrder>('/v1/orders', body, { signal, headers });
     return {
       orderId: r.order_id,
       eta: r.status === 'pending_payment' ? 'Awaiting payment' : formatDate(r.created_at),
