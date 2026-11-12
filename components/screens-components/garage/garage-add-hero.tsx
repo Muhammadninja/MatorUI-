@@ -25,6 +25,8 @@ const RADIUS = 16;
 const PAGE_GUTTER = 16;
 /** Space between a selected car's bumper and the card's right edge, in pt. */
 const SELECTED_CAR_EDGE_GAP = 8;
+/** How much lower than an approved image the placeholder car sits, in pt. */
+const PLACEHOLDER_DROP = 6;
 /** Visible Corvette artwork bounds in its transparent 1200×600 source image. */
 const ART_BOUNDS = { left: 117 / 1200, top: 220 / 600, right: 1084 / 1200, bottom: 596 / 600 };
 
@@ -155,8 +157,9 @@ export function GarageHeroCard({
       ) : null}
 
       {isPlaceholder ? (
-        // In the car's own slot, so the card keeps its size and layout.
-        <AppView style={{ position: 'absolute', top: carTop, right: carRight }}>
+        // In the car's own slot, sat a little lower so the ghost car rests on the
+        // card; the card keeps its size and layout.
+        <AppView style={{ position: 'absolute', top: carTop + PLACEHOLDER_DROP, right: carRight }}>
           <VehicleImagePlaceholder
             testID={`${testID}-vehicle-placeholder`}
             width={carWidth}
