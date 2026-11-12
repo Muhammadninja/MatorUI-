@@ -214,6 +214,8 @@ tags:
 - extendedWaitUntil:
     visible: "Home"
     timeout: 15000
+- tapOn:
+    id: checkout-review-payment
 - tapOn: "Cash"
 - assertVisible: '.*Place order.*227.190\.72.*'
 - scrollUntilVisible:
