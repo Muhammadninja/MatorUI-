@@ -4,7 +4,7 @@ import { Animated, Easing } from 'react-native';
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 
-import { RADIUS_MEDIA, RADIUS_PLACEHOLDER, RADIUS_TAG } from './radii';
+import { RADIUS_MEDIA, RADIUS_PLACEHOLDER, RADIUS_SHEET, RADIUS_TAG } from './radii';
 
 const THUMB_WIDTH = 104;
 const THUMB_HEIGHT = 104;
@@ -60,10 +60,13 @@ export default function SearchResultSkeleton() {
       style={{
         opacity,
         backgroundColor: tokens.card,
-        paddingVertical: 16,
-        paddingHorizontal: 20,
-        borderBottomWidth: 1,
-        borderBottomColor: tokens.divider,
+        // The loaded result's card shape: inset, bordered, rounded.
+        marginHorizontal: 16,
+        marginBottom: 10,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: tokens.border,
+        borderRadius: RADIUS_SHEET,
       }}
     >
       <AppView row gap={ROW_GAP} align="stretch">

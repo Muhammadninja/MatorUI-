@@ -1,6 +1,6 @@
 import { memo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Pressable } from 'react-native';
+import { Modal, Pressable, useWindowDimensions } from 'react-native';
 
 import AppImage from '@/components/shared/app-image';
 import { AppText } from '@/components/shared/app-text';
@@ -13,14 +13,18 @@ import { toastService } from '@/services/toast-service';
 import type { SearchResult } from '@/types/search';
 import { triggerHaptic } from '@/utils/haptics';
 
-import { RADIUS_SHEET } from '../radii';
+import { RADIUS_CARD, RADIUS_SHEET } from '../radii';
 import AddToCartButton from './add-to-cart-button';
 import HighlightedTitle from './highlighted-title';
 import LikeButton from './like-button';
 import PriceBlock from './price-block';
-import Thumbnail from './thumbnail';
+import Thumbnail, { THUMB_INSET } from './thumbnail';
 
 const PREVIEW_SIZE = 300;
+/** The list's side gutter; the card's image column is a third of what is left. */
+export const CARD_GUTTER = 16;
+/** Room kept clear of the corner heart at the end of the title. */
+const HEART_CLEARANCE = 36;
 
 export type SearchResultRowProps = {
   result: SearchResult;
@@ -29,7 +33,8 @@ export type SearchResultRowProps = {
 };
 
 /**
- * Horizontal result row: image, title, favorite, price and add to cart. Pure
+ * Horizontal result card: the image in a third of the width, then title, part
+ * numbers, price and «В корзину», with the favourite heart in the corner. Pure
  * composition: every visual block is its own file under `./`. This file owns only
  * the wrapper pressable and the add-to-cart guard. Delivery lives on Item Detail,
  * Cart and Checkout.
@@ -38,6 +43,9 @@ function SearchResultRow({ result, query, onPress }: SearchResultRowProps) {
   const { t } = useTranslation();
   const { tokens, scheme } = useThemeContext();
   const isDark = scheme === 'dark';
+  const { width: windowWidth } = useWindowDimensions();
+  // A third of the card, less the tile's inset from the card's edge.
+  const imageWidth = Math.round((windowWidth - CARD_GUTTER * 2) / 3) - THUMB_INSET;
   const { isLiked, toggleLike } = useLikesContext();
   const { addItem } = useCartContext();
   const liked = isLiked(result.id);
@@ -85,29 +93,31 @@ function SearchResultRow({ result, query, onPress }: SearchResultRowProps) {
       accessibilityRole="button"
       accessibilityLabel={t('search.openItemA11y', { title: result.title })}
       colorName="card"
-      style={{ paddingVertical: 16, paddingHorizontal: 20 }}
+      style={{
+        marginHorizontal: CARD_GUTTER,
+        borderWidth: 1,
+        borderColor: tokens.border,
+        borderRadius: RADIUS_CARD,
+        overflow: 'hidden',
+      }}
     >
-      <AppView row gap={12}>
-        <Thumbnail alt={result.title} uri={image} />
+      <AppView row>
+        <Thumbnail alt={result.title} uri={image} width={imageWidth} />
 
-        <AppView flex={1} gap={4} style={{ minWidth: 0 }}>
-          {/* The heart keeps its own column, so it can't overlap the title. */}
-          <AppView row align="flex-start" gap={4}>
-            <AppView flex={1} style={{ minWidth: 0 }}>
-              <HighlightedTitle text={result.title} query={query} />
-            </AppView>
-            <LikeButton liked={liked} onToggle={() => toggleLike(result.id)} />
+        <AppView flex={1} style={{ minWidth: 0, padding: 12 }}>
+          <AppView style={{ paddingRight: HEART_CLEARANCE }}>
+            <HighlightedTitle text={result.title} query={query} />
           </AppView>
 
           {partNumbers ? (
-            <AppText textVariant="bodyXs" colorName="textMuted">
+            <AppText textVariant="bodyXs" colorName="textMuted" style={{ marginTop: 4 }}>
               {partNumbers}
             </AppText>
           ) : null}
 
-          {/* Pinned to the row's foot, so the button sits at the bottom right. */}
-          <AppView row align="center" justify="space-between" gap={8} style={{ marginTop: 'auto' }}>
-            <AppView flex={1} style={{ minWidth: 0 }}>
+          {/* Title → OEM 4, OEM → price 14, price → button 8. */}
+          <AppView gap={8} style={{ marginTop: 14 }}>
+            <AppView>
               <PriceBlock priceLabel={result.priceLabel} price={result.price} />
               {outOfStock ? (
                 <AppText textVariant="bodyXs" weight="medium" style={{ color: tokens.error }}>
@@ -115,9 +125,22 @@ function SearchResultRow({ result, query, onPress }: SearchResultRowProps) {
                 </AppText>
               ) : null}
             </AppView>
-            <AddToCartButton onPress={handleAddToCart} outOfStock={outOfStock} />
+            <AddToCartButton
+              testID={`search-add-${result.id}`}
+              onPress={handleAddToCart}
+              outOfStock={outOfStock}
+            />
           </AppView>
         </AppView>
+      </AppView>
+
+      {/* Its own target in the card's corner: a tap here never opens the part. */}
+      <AppView style={{ position: 'absolute', top: 2, right: 2 }}>
+        <LikeButton
+          testID={`search-like-${result.id}`}
+          liked={liked}
+          onToggle={() => toggleLike(result.id)}
+        />
       </AppView>
 
       <Modal
