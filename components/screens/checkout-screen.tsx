@@ -496,8 +496,8 @@ export default function CheckoutScreen() {
                   ? NO_PRICE_YET
                   : formatCurrency(grandTotal)
             }
-            size={20}
-            color={tokens.text}
+            size={24}
+            color={tokens.brandText}
           />
           </AppView>
         </AppView>
