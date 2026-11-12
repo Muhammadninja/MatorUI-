@@ -1076,5 +1076,14 @@
   "vehicleImage": {
     "preparing": "Rasm tayyorlanmoqda",
     "unavailable": "Hozircha rasm yoʻq"
+  },
+  "vehiclePicker": {
+    "searchMake": "Markani qidirish",
+    "searchModel": "Modelni qidirish",
+    "noMatches": "Hech narsa topilmadi",
+    "notFoundAction": "Avtomobilingiz topilmadimi?",
+    "notFoundTitle": "Avtomobilingiz topilmadimi?",
+    "notFoundBodyVin": "Katalog toʻldirilmoqda. Avtomobilni VIN orqali qoʻshing — markasi, modeli va yilini aniq aniqlaymiz.",
+    "notFoundBody": "Katalog toʻldirilmoqda. Qaysi avtomobilni qoʻshishni bizga yozing yoki uni VIN orqali qoʻshing."
   }
 }

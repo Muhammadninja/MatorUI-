@@ -1076,5 +1076,14 @@
   "vehicleImage": {
     "preparing": "Image in preparation",
     "unavailable": "No image yet"
+  },
+  "vehiclePicker": {
+    "searchMake": "Search makes",
+    "searchModel": "Search models",
+    "noMatches": "Nothing found",
+    "notFoundAction": "Can't find your car?",
+    "notFoundTitle": "Can't find your car?",
+    "notFoundBodyVin": "The catalog is growing. Add your car by VIN and we will identify its make, model and year exactly.",
+    "notFoundBody": "The catalog is growing. Tell us which car to add, or add yours by VIN."
   }
 }
