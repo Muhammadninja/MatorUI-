@@ -91,19 +91,29 @@ export async function processGeneratedImage(bytes) {
     });
   }
 
-  const output = await sharp(bytes)
-    .resize(OUTPUT_WIDTH - 48, OUTPUT_HEIGHT - 48, {
-      fit: 'contain',
+  const boundsWidth = alphaBounds.right - alphaBounds.left + 1;
+  const boundsHeight = alphaBounds.bottom - alphaBounds.top + 1;
+  const crop = await sharp(bytes)
+    .extract({ ...alphaBounds, width: boundsWidth, height: boundsHeight })
+    .resize(OUTPUT_WIDTH - 120, OUTPUT_HEIGHT - 120, { fit: 'inside' })
+    .png()
+    .toBuffer();
+  const cropMetadata = await sharp(crop).metadata();
+  const output = await sharp({
+    create: {
+      width: OUTPUT_WIDTH,
+      height: OUTPUT_HEIGHT,
+      channels: 4,
       background: { r: 0, g: 0, b: 0, alpha: 0 },
-      withoutEnlargement: false,
-    })
-    .extend({
-      top: 24,
-      bottom: 24,
-      left: 24,
-      right: 24,
-      background: { r: 0, g: 0, b: 0, alpha: 0 },
-    })
+    },
+  })
+    .composite([
+      {
+        input: crop,
+        left: Math.round((OUTPUT_WIDTH - cropMetadata.width) / 2),
+        top: Math.round((OUTPUT_HEIGHT - cropMetadata.height) / 2),
+      },
+    ])
     .webp({ quality: 90, alphaQuality: 100, effort: 4 })
     .toBuffer();
   const outputMetadata = await sharp(output).metadata();

@@ -1,6 +1,24 @@
 const DEFAULT_MODEL = 'gpt-image-2.6-sunburst';
 const API_URL = 'https://api.openai.com/v1/images';
 
+function safeErrorCode(value) {
+  return typeof value === 'string' && /^[A-Za-z0-9_.-]{1,80}$/.test(value) ? value : undefined;
+}
+
+function transportDiagnostics(error) {
+  const cause = error?.cause;
+  return {
+    errorName: safeErrorCode(error?.name),
+    errorCode: safeErrorCode(error?.code),
+    errorErrno: Number.isInteger(error?.errno) ? error.errno : undefined,
+    errorSyscall: safeErrorCode(error?.syscall),
+    causeName: safeErrorCode(cause?.name),
+    causeCode: safeErrorCode(cause?.code),
+    causeErrno: Number.isInteger(cause?.errno) ? cause.errno : undefined,
+    causeSyscall: safeErrorCode(cause?.syscall),
+  };
+}
+
 export function buildVehicleImagePrompt(vehicle) {
   const facts = [
     `Manufacturer: ${vehicle.manufacturer}`,
@@ -10,9 +28,10 @@ export function buildVehicleImagePrompt(vehicle) {
     vehicle.facelift && `Facelift: ${vehicle.facelift}`,
     vehicle.bodyStyle && `Body style: ${vehicle.bodyStyle}`,
     vehicle.trim && `Trim: ${vehicle.trim}`,
+    vehicle.exteriorColor && `Exterior color: ${vehicle.exteriorColor}`,
   ].filter(Boolean);
   return [
-    'Create a photorealistic catalog cutout of this exact production vehicle. Use only the vehicle identity facts listed below; do not invent or infer generation, facelift, body style, trim, or visual specifications that are absent. If the identity cannot be represented confidently from these facts and supplied reference images, return no image and explain that manual identity review is required.',
+    'Create a photorealistic catalog cutout as a provisional candidate for human review. Use only the vehicle identity facts listed below; do not invent or infer generation, facelift, body style, trim, or visual specifications that are absent. If the identity is uncertain from these facts and supplied reference images, do not imply certainty; the candidate will require manual identity review.',
     ...facts,
     'Show the entire vehicle in a consistent front three-quarter view, centered with even scale and generous transparent margin. Transparent background only. No scenery, floor, cast shadow, text, labels, watermark, people, or extra objects. Keep wheels, bumpers, mirrors, roof, and all body edges fully inside the frame.',
   ].join('\n');
@@ -40,7 +59,8 @@ export class OpenAIImageProvider {
     const options = {
       model: this.model,
       prompt,
-      size: '1216x608',
+      // 1536x1024 is a documented standard size; the pipeline crops and normalizes locally.
+      size: '1536x1024',
       quality: 'high',
       background: 'transparent',
       output_format: 'webp',
@@ -68,6 +88,7 @@ export class OpenAIImageProvider {
     }
     const timeout = AbortSignal.timeout(this.timeoutMs);
     const combinedSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+    const startedAt = Date.now();
     let response;
     try {
       response = await this.fetchImpl(endpoint, {
@@ -77,24 +98,71 @@ export class OpenAIImageProvider {
         signal: combinedSignal,
       });
     } catch (error) {
-      if (combinedSignal.aborted) throw new Error('image provider request timed out');
-      throw new Error('image provider request failed');
+      if (combinedSignal.aborted)
+        throw Object.assign(new Error('image provider request timed out'), {
+          providerLatencyMs: Date.now() - startedAt,
+          transportDiagnostics: transportDiagnostics(error),
+        });
+      throw Object.assign(new Error('image provider request failed'), {
+        providerLatencyMs: Date.now() - startedAt,
+        transportDiagnostics: transportDiagnostics(error),
+      });
     }
-    if (!response.ok) throw new Error(`image provider returned HTTP ${response.status}`);
+    const requestId = response.headers?.get?.('x-request-id') ?? undefined;
+    if (!response.ok) {
+      let providerErrorCode;
+      try {
+        const errorPayload = await response.json();
+        const rawCode = errorPayload?.error?.code ?? errorPayload?.error?.type;
+        if (typeof rawCode === 'string' && /^[a-zA-Z0-9_.-]{1,80}$/.test(rawCode))
+          providerErrorCode = rawCode;
+      } catch {
+        // Do not retain or expose a raw provider error body.
+      }
+      throw Object.assign(new Error(`image provider returned HTTP ${response.status}`), {
+        providerLatencyMs: Date.now() - startedAt,
+        providerRequestId: requestId,
+        providerHttpStatus: response.status,
+        providerErrorCode,
+      });
+    }
     let payload;
     try {
       payload = await response.json();
     } catch {
-      throw new Error('image provider returned invalid JSON');
+      throw Object.assign(new Error('image provider returned invalid JSON'), {
+        providerLatencyMs: Date.now() - startedAt,
+        providerRequestId: requestId,
+      });
     }
+    const latencyMs = Date.now() - startedAt;
     const encoded = payload?.data?.[0]?.b64_json;
     if (typeof encoded !== 'string' || encoded.length === 0)
       throw new Error('image provider returned no image');
+    const usage = payload?.usage ?? null;
+    const inputDetails = usage?.input_tokens_details ?? {};
+    const imageInputTokens = Number(inputDetails.image_tokens ?? 0);
+    const textInputTokens = Number(inputDetails.text_tokens ?? usage?.input_tokens ?? 0);
+    const outputTokens = Number(
+      usage?.output_tokens_details?.image_tokens ?? usage?.output_tokens ?? 0,
+    );
+    const rates = this.model.startsWith('gpt-image-2.6-')
+      ? { text: 5, imageInput: 8, imageOutput: 30 }
+      : null;
     return {
       bytes: Buffer.from(encoded, 'base64'),
       contentType: 'image/webp',
       provider: 'openai',
       model: this.model,
+      providerLatencyMs: latencyMs,
+      providerRequestId: requestId,
+      providerUsage: usage,
+      estimatedCostUsd: rates
+        ? (textInputTokens * rates.text +
+            imageInputTokens * rates.imageInput +
+            outputTokens * rates.imageOutput) /
+          1_000_000
+        : null,
     };
   }
 }
