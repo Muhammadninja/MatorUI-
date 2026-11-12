@@ -217,6 +217,8 @@ tags:
 - tapOn:
     id: checkout-review-payment
 - tapOn: "Cash"
+- tapOn:
+    id: checkout-sheet-payment-close
 - assertVisible: '.*Place order.*227.190\.72.*'
 - scrollUntilVisible:
     element: "Service fee"
