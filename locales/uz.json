@@ -508,7 +508,7 @@
     "dateItems_one": "{{date}} · {{count}} ta mahsulot",
     "dateItems_other": "{{date}} · {{count}} ta mahsulot",
     "autoCancelIn": "Bekor qilinishiga {{time}}",
-    "autoCancelling": "Bekor qilinmoqda…",
+    "autoCancelling": "Vaqt tugadi",
     "autoCancelA11y": "{{time}} dan soʻng avtomatik bekor qilinadi"
   },
   "trackOrder": {
@@ -533,7 +533,7 @@
     "cancelFailed": "Buyurtmani bekor qilib boʻlmadi. Qayta urinib koʻring.",
     "autoCancelTitle": "Tasdiqlash kutilmoqda",
     "autoCancelBody": "Buyurtma oʻz vaqtida toʻlanmasa yoki tasdiqlanmasa, avtomatik bekor qilinadi.",
-    "autoCancelExpired": "Vaqt tugadi. Buyurtma bekor qilinmoqda.",
+    "autoCancelExpired": "Toʻlov vaqti tugadi. Buyurtma holati tez orada yangilanadi.",
     "autoCancelA11y": "Buyurtma bekor qilinishiga {{time}} qoldi"
   },
   "explore": {

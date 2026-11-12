@@ -14,6 +14,7 @@ vi.mock('@/services/api-client', () => ({ apiClient: { post: state.post } }));
 vi.mock('@/hooks/use-orders', () => ({
   useOrder: () => ({ state: state.orderState, order: null, refresh: vi.fn() }),
   useCancelOrder: () => ({ mutate: vi.fn(), isPending: false }),
+  useRefreshOrders: () => vi.fn(),
 }));
 // Payment recovery is covered separately; these cases have no order to pay.
 vi.mock('@/hooks/use-order-payment', () => ({ useRecoverPayment: () => ({ paying: false, failure: null, pay: vi.fn() }) }));

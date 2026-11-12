@@ -520,7 +520,7 @@
     "dateItems_many": "{{date}} · {{count}} товаров",
     "dateItems_other": "{{date}} · {{count}} товаров",
     "autoCancelIn": "Отмена через {{time}}",
-    "autoCancelling": "Отменяем…",
+    "autoCancelling": "Время вышло",
     "autoCancelA11y": "Автоматическая отмена через {{time}}"
   },
   "trackOrder": {
@@ -545,7 +545,7 @@
     "cancelFailed": "Не удалось отменить заказ. Попробуйте ещё раз.",
     "autoCancelTitle": "Ожидает подтверждения",
     "autoCancelBody": "Если заказ не оплатить или не подтвердить вовремя, он отменится автоматически.",
-    "autoCancelExpired": "Время вышло. Заказ отменяется.",
+    "autoCancelExpired": "Время на оплату вышло. Статус заказа скоро обновится.",
     "autoCancelA11y": "До отмены заказа осталось {{time}}"
   },
   "explore": {

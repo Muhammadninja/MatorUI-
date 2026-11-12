@@ -142,6 +142,8 @@ export type RawBackendOrder = {
     scheduled_at?: string | null;
   }>;
   expires_at?: string;
+  /** True while an open Payme transaction suspends the backend's expiry. */
+  expiry_suspended?: boolean;
   created_at?: string;
   updated_at?: string;
 };
@@ -274,8 +276,10 @@ export function mapOrderToListRow(o: RawBackendOrder): OrderListRow {
     total: formatUzs(o.total_uzs, o.currency),
     summary: orderSummary(o),
     serverStatus: o.status,
+    paymentType: asPaymentType(o.payment_type),
     createdAt: o.created_at,
     expiresAt: o.expires_at,
+    expirySuspended: o.expiry_suspended === true,
   };
 }
 
@@ -323,6 +327,7 @@ export function mapOrderToDetail(o: RawBackendOrder): OrderDetail {
     paymentType: asPaymentType(o.payment_type),
     createdAt: o.created_at,
     expiresAt: o.expires_at,
+    expirySuspended: o.expiry_suspended === true,
   };
 }
 

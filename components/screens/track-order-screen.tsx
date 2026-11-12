@@ -53,7 +53,7 @@ export default function TrackOrderScreen() {
   const { orderId } = useLocalSearchParams<{ orderId?: string }>();
   const { state, order, refresh } = useOrder(orderId ?? null);
   const recover = useRecoverPayment(orderId, refresh);
-  const { remainingMs, expired, cancel } = useOrderCancelWindow(orderId, order);
+  const { remainingMs, expired, canCancel, cancel } = useOrderCancelWindow(orderId, order);
   const [cancelFailure, setCancelFailure] = useState<string | null>(null);
 
   const askToCancel = () => {
@@ -223,10 +223,11 @@ export default function TrackOrderScreen() {
             </AppView>
           ) : null}
 
-          {/* An unconfirmed order lives 20 minutes: the countdown, and a way to call it off. */}
+          {/* An unpaid online order: time left until the backend's expires_at. Display
+              only; at zero the order is re-read, never cancelled from here. */}
           {remainingMs !== null ? (
             <AppView
-              testID="track-order-cancel"
+              testID="track-order-deadline"
               gap={14}
               style={{
                 backgroundColor: tokens.card,
@@ -262,18 +263,23 @@ export default function TrackOrderScreen() {
                   {formatCountdown(remainingMs)}
                 </AppText>
               </AppView>
-              {!expired ? (
-                <AppButton
-                  testID="track-order-cancel-btn"
-                  title={cancel.isPending ? t('trackOrder.cancelling') : t('trackOrder.cancelOrder')}
-                  kind="error"
-                  variant="outline"
-                  size="md"
-                  fullWidth
-                  disabled={cancel.isPending}
-                  onPress={askToCancel}
-                />
-              ) : null}
+            </AppView>
+          ) : null}
+
+          {/* A cash or terminal order still waiting for an operator can be called off.
+              No timer: the backend decides, and refuses with 409 once it cannot. */}
+          {canCancel ? (
+            <AppView gap={8} testID="track-order-cancel">
+              <AppButton
+                testID="track-order-cancel-btn"
+                title={cancel.isPending ? t('trackOrder.cancelling') : t('trackOrder.cancelOrder')}
+                kind="error"
+                variant="outline"
+                size="md"
+                fullWidth
+                disabled={cancel.isPending}
+                onPress={askToCancel}
+              />
             </AppView>
           ) : null}
           {cancelFailure ? (

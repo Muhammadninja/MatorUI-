@@ -320,6 +320,14 @@ export function useCancelOrder(orderId: string | null | undefined) {
   });
 }
 
+/** Re-read every order query, so what is shown is the backend's current status. */
+export function useRefreshOrders() {
+  const queryClient = useQueryClient();
+  return useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ['orders'] });
+  }, [queryClient]);
+}
+
 // ── useAddresses / usePaymentMethods (read-only collections) ───────────
 
 type CollectionState = 'idle' | 'loading' | 'success' | 'error';

@@ -30,6 +30,7 @@ import type {
   VehicleTransmission,
 } from '@/services/garage-service';
 import { colorEnumToHex, colorHexToEnum } from '@/utils/vehicle-color';
+import { parseVehicleImage, type VehicleImageState } from '@/services/vehicle-images/image-status';
 
 const API_BASE = '/v1/garage';
 
@@ -71,6 +72,8 @@ type ServerVehicle = {
     checksum_sha256: string;
     tuning_variants?: Array<{ id: string; name: string; thumbnail_url: string }>;
   } | null;
+  /** Phase 3E: { status: pending|approved|unavailable, url, version, reason }. */
+  vehicle_image?: unknown;
   created_at: string;
   updated_at?: string;
 };
@@ -136,7 +139,23 @@ export function toClientVehicle(raw: ServerVehicle): Vehicle {
     brandLogoUrl: raw.make?.logo_url ?? undefined,
     registrationRegionCode: raw.registration_region_code ?? undefined,
     model3d: raw.model_3d ? mapModel3d(raw.model_3d) : undefined,
+    image: parseVehicleImage(raw.vehicle_image),
   };
+}
+
+/**
+ * `GET /v1/garage/vehicles/:id/image` → `{ vehicle_id, vehicle_image }`: the image
+ * status, refreshed by the backend from the pipeline when due. Read-only.
+ */
+export async function fetchVehicleImage(
+  id: string,
+  signal?: AbortSignal,
+): Promise<VehicleImageState | undefined> {
+  const raw = await apiClient.get<{ vehicle_image?: unknown }>(
+    `${API_BASE}/vehicles/${encodeURIComponent(id)}/image`,
+    { signal },
+  );
+  return parseVehicleImage(raw?.vehicle_image);
 }
 
 function mapModel3d(raw: NonNullable<ServerVehicle['model_3d']>): VehicleModel3d {
