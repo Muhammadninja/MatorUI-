@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { ArrowLeftRight } from 'lucide-react-native';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -188,7 +189,8 @@ function HomeGarageCard() {
         {summary.name}
       </AppText>
       {spec ? (
-        <AppText textVariant="bodySm" style={{ color: tokens.vehicleBannerMuted }}>
+        // The banner's own ink at 70%: secondary to the name, but readable on the mint.
+        <AppText textVariant="bodySm" style={{ color: `${tokens.onVehicleBanner}B3` }}>
           {spec}
         </AppText>
       ) : null}
@@ -200,13 +202,13 @@ function HomeGarageCard() {
         accessibilityLabel={t('explore.changeVehicleAccessibility', { name: summary.name })}
         style={{ alignSelf: 'flex-start', minHeight: 48, minWidth: 48, justifyContent: 'center' }}
       >
-        <AppText
-          textVariant="bodySm"
-          weight="semibold"
-          style={{ color: tokens.brandText, textDecorationLine: 'underline' }}
-        >
-          {t('explore.changeVehicle')}
-        </AppText>
+        {/* An app action, not a web link: a small swap glyph instead of an underline. */}
+        <AppView row align="center" gap={6}>
+          <ArrowLeftRight size={14} strokeWidth={2.4} color={tokens.brandText} />
+          <AppText textVariant="bodySm" weight="semibold" style={{ color: tokens.brandText }}>
+            {t('explore.changeVehicle')}
+          </AppText>
+        </AppView>
       </AppPressableView>
     </GarageHeroCard>
   );
