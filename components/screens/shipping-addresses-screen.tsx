@@ -148,20 +148,36 @@ export default function ShippingAddressesScreen() {
           <AppButton title={t('common.retry')} kind="secondary" size="sm" onPress={refresh} />
         </AppView>
       ) : addresses.length === 0 ? (
-        <AppView flex={1} center px={20} gap={10}>
-          <MapPin size={30} strokeWidth={2} color={tokens.textMuted} />
-          <AppText
-            family="default"
-            style={{ fontSize: 13, color: tokens.textMuted, textAlign: 'center' }}
+        // Same composition as the empty cart, sitting slightly above centre.
+        <AppView flex={1} center gap={12} px="xl" style={{ paddingBottom: 72 }}>
+          <AppView
+            center
+            rounded={999}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={{ width: 72, height: 72, backgroundColor: tokens.brandSoft }}
           >
-            {t('addresses.emptyText')}
+            <MapPin size={32} strokeWidth={2} color={tokens.brand} />
+          </AppView>
+          <AppText textVariant="h4" weight="bold" colorName="text" align="center">
+            {t('addresses.emptyTitle')}
+          </AppText>
+          <AppText
+            textVariant="bodySm"
+            colorName="textMuted"
+            style={{ textAlign: 'center', maxWidth: 280 }}
+          >
+            {t('addresses.emptySubtitle')}
           </AppText>
           {/* The header's plus has no words, so the empty list names the action. */}
           <AppButton
             testID="addresses-empty-add"
             title={t('addresses.addNew')}
-            size="sm"
+            kind="brand"
+            size="md"
+            fullWidth
             onPress={openAdd}
+            containerStyle={{ marginTop: 12, width: '100%', maxWidth: 320, alignSelf: 'center' }}
           />
         </AppView>
       ) : (
