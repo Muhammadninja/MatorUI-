@@ -46,6 +46,7 @@ export function SummaryRow({
   tokens,
   testID,
   valueColor,
+  valueSize = 14,
 }: {
   label: string;
   value: string;
@@ -53,11 +54,12 @@ export function SummaryRow({
   testID?: string;
   /** Defaults to the text colour. */
   valueColor?: string;
+  valueSize?: number;
 }) {
   return (
-    <AppView row justify="space-between" testID={testID}>
+    <AppView row align="center" justify="space-between" testID={testID}>
       <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted }}>{label}</AppText>
-      <AppText family="accent" weight="semibold" style={{ fontSize: 14, color: valueColor ?? tokens.text }}>{value}</AppText>
+      <AppText family="accent" weight="semibold" style={{ fontSize: valueSize, color: valueColor ?? tokens.text }}>{value}</AppText>
     </AppView>
   );
 }

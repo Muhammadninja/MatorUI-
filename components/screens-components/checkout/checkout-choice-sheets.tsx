@@ -240,6 +240,7 @@ export function CheckoutChoiceSheets({
             label={t('checkout.subtotal')}
             value={formatCurrency(productsSubtotal)}
             valueColor={tokens.brandText}
+            valueSize={18}
             tokens={tokens}
           />
         }
