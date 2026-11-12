@@ -92,6 +92,19 @@ test('a definitive refusal clears its attempt so corrected checkout uses a new k
   expect(corrected.idempotencyKey).not.toBe(refusedKey);
 });
 
+test.each(['IDEMPOTENCY_KEY_REUSED', 'IDEMPOTENCY_KEY_EXPIRED'])('a 409 %s settles the key so the next checkout gets a new one', async (code) => {
+  state.createOrder.mockRejectedValueOnce(Object.assign(new Error('Already placed'), { status: 409, code }))
+    .mockResolvedValueOnce({ orderId: 'next-order', eta: 'unit', totalLabel: '1 UZS' });
+  const get = await renderOrder();
+  await act(async () => { await get().placeOrder(input); });
+  expect(get()).toMatchObject({ phase: 'error', errorCode: code });
+  expect(state.pendingAttempt).toBeNull();
+  await act(async () => get().reset());
+  await act(async () => { await get().placeOrder(input); });
+  expect((state.createOrder.mock.calls[1]![0] as CreateOrderInput).idempotencyKey)
+    .not.toBe((state.createOrder.mock.calls[0]![0] as CreateOrderInput).idempotencyKey);
+});
+
 test('empty cart never reaches the order transport', async () => {
   const get = await renderOrder();
   await act(async () => { expect(await get().placeOrder({ ...input, items: [] })).toBeNull(); });

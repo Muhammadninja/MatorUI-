@@ -72,6 +72,9 @@ function errorCodeOf(error: unknown): string | null {
 function isDefinitiveOrderRefusal(error: unknown): boolean {
   const code = errorCodeOf(error);
   if (['ORDER_TOTAL_CHANGED', 'PART_UNAVAILABLE', 'DELIVERY_PRICE_CHANGED', 'DELIVERY_QUOTE_STALE'].includes(code ?? '')) return true;
+  // The server settled this key (409 REUSED/EXPIRED: an order already exists under it;
+  // 400 INVALID: it can never be accepted). Keeping it would block checkout for good.
+  if (['IDEMPOTENCY_KEY_REUSED', 'IDEMPOTENCY_KEY_EXPIRED', 'INVALID_IDEMPOTENCY_KEY'].includes(code ?? '')) return true;
   const status = (error as { status?: unknown } | null)?.status;
   if (status === 400 || status === 422) return true;
   return false;
