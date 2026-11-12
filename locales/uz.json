@@ -494,7 +494,10 @@
     "startShopping": "Xaridni boshlash",
     "orderAccessibility": "Buyurtma {{id}}, {{status}}",
     "dateItems_one": "{{date}} · {{count}} ta mahsulot",
-    "dateItems_other": "{{date}} · {{count}} ta mahsulot"
+    "dateItems_other": "{{date}} · {{count}} ta mahsulot",
+    "autoCancelIn": "Bekor qilinishiga {{time}}",
+    "autoCancelling": "Bekor qilinmoqda…",
+    "autoCancelA11y": "{{time}} dan soʻng avtomatik bekor qilinadi"
   },
   "trackOrder": {
     "unitPrice": "Bir dona narxi",
@@ -515,7 +518,11 @@
     "cancelKeep": "Bekor qilmaslik",
     "cancelConfirm": "Bekor qilish",
     "cancelRefused": "Bu buyurtmani endi ilovadan bekor qilib boʻlmaydi.",
-    "cancelFailed": "Buyurtmani bekor qilib boʻlmadi. Qayta urinib koʻring."
+    "cancelFailed": "Buyurtmani bekor qilib boʻlmadi. Qayta urinib koʻring.",
+    "autoCancelTitle": "Tasdiqlash kutilmoqda",
+    "autoCancelBody": "Buyurtma oʻz vaqtida toʻlanmasa yoki tasdiqlanmasa, avtomatik bekor qilinadi.",
+    "autoCancelExpired": "Vaqt tugadi. Buyurtma bekor qilinmoqda.",
+    "autoCancelA11y": "Buyurtma bekor qilinishiga {{time}} qoldi"
   },
   "explore": {
     "pricesStockUpdated": "Narx va mavjudlik yangilandi",

@@ -221,18 +221,3 @@ export function paymentFailureTitleKey(reason: PaymentFailureReason): string {
     ? 'checkout.paymentFailedTitle'
     : 'checkout.paymentUnpaidTitle';
 }
-
-/**
- * Can the buyer cancel this order from the app? A cash or terminal order still waiting
- * for an operator. The money for one can only be recorded once it has left that status,
- * so a collected order never qualifies, nor does a shipped or delivered one. The server
- * has the final say and refuses with 409 if things changed.
- */
-export function canCancelOfflineOrder(
-  order: Pick<OrderDetail, 'serverStatus' | 'paymentType'>,
-): boolean {
-  return (
-    order.serverStatus === 'pending_payment' &&
-    (order.paymentType === 'cash' || order.paymentType === 'terminal')
-  );
-}

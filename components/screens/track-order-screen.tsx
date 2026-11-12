@@ -1,5 +1,5 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { AlertCircle } from 'lucide-react-native';
+import { AlertCircle, Timer } from 'lucide-react-native';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, ScrollView } from 'react-native';
@@ -15,11 +15,11 @@ import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useRecoverPayment } from '@/hooks/use-order-payment';
-import { useCancelOrder, useOrder } from '@/hooks/use-orders';
+import { useOrderCancelWindow } from '@/hooks/use-order-cancel-window';
+import { useOrder } from '@/hooks/use-orders';
 import { ApiError } from '@/services/api-client';
 import { formatCurrency } from '@/services/cart-math';
 import {
-  canCancelOfflineOrder,
   isAwaitingOnlinePayment,
   paymentFailureKey,
 } from '@/services/checkout-presentation';
@@ -28,6 +28,7 @@ import {
   ORDER_STATUS_LABEL_I18N,
   ORDER_STEP_I18N,
 } from '@/services/orders-service';
+import { formatCountdown } from '@/services/order-cancel-window';
 import { triggerHaptic } from '@/utils/haptics';
 
 /**
@@ -52,7 +53,7 @@ export default function TrackOrderScreen() {
   const { orderId } = useLocalSearchParams<{ orderId?: string }>();
   const { state, order, refresh } = useOrder(orderId ?? null);
   const recover = useRecoverPayment(orderId, refresh);
-  const cancel = useCancelOrder(orderId);
+  const { remainingMs, expired, cancel } = useOrderCancelWindow(orderId, order);
   const [cancelFailure, setCancelFailure] = useState<string | null>(null);
 
   const askToCancel = () => {
@@ -222,19 +223,57 @@ export default function TrackOrderScreen() {
             </AppView>
           ) : null}
 
-          {/* A cash or terminal order still waiting for an operator can be called off. */}
-          {canCancelOfflineOrder(order) ? (
-            <AppView gap={8} testID="track-order-cancel">
-              <AppButton
-                testID="track-order-cancel-btn"
-                title={cancel.isPending ? t('trackOrder.cancelling') : t('trackOrder.cancelOrder')}
-                kind="secondary"
-                variant="outline"
-                size="lg"
-                fullWidth
-                disabled={cancel.isPending}
-                onPress={askToCancel}
-              />
+          {/* An unconfirmed order lives 20 minutes: the countdown, and a way to call it off. */}
+          {remainingMs !== null ? (
+            <AppView
+              testID="track-order-cancel"
+              gap={14}
+              style={{
+                backgroundColor: tokens.card,
+                borderWidth: 1,
+                borderColor: tokens.border,
+                borderRadius: 16,
+                padding: 16,
+              }}
+            >
+              <AppView row align="center" gap={12}>
+                <AppView
+                  center
+                  rounded={999}
+                  style={{ width: 44, height: 44, backgroundColor: tokens.warningSoft, flexShrink: 0 }}
+                >
+                  <Timer size={22} strokeWidth={2.2} color={tokens.warning} />
+                </AppView>
+                <AppView flex={1} gap={2}>
+                  <AppText family="accent" weight="bold" style={{ fontSize: 15, color: tokens.text }}>
+                    {t('trackOrder.autoCancelTitle')}
+                  </AppText>
+                  <AppText family="default" style={{ fontSize: 12.5, lineHeight: 17, color: tokens.textMuted }}>
+                    {expired ? t('trackOrder.autoCancelExpired') : t('trackOrder.autoCancelBody')}
+                  </AppText>
+                </AppView>
+                <AppText
+                  testID="track-order-countdown"
+                  family="heading"
+                  weight="bold"
+                  accessibilityLabel={t('trackOrder.autoCancelA11y', { time: formatCountdown(remainingMs) })}
+                  style={{ fontSize: 22, color: tokens.warning, fontVariant: ['tabular-nums'], flexShrink: 0 }}
+                >
+                  {formatCountdown(remainingMs)}
+                </AppText>
+              </AppView>
+              {!expired ? (
+                <AppButton
+                  testID="track-order-cancel-btn"
+                  title={cancel.isPending ? t('trackOrder.cancelling') : t('trackOrder.cancelOrder')}
+                  kind="error"
+                  variant="outline"
+                  size="md"
+                  fullWidth
+                  disabled={cancel.isPending}
+                  onPress={askToCancel}
+                />
+              ) : null}
             </AppView>
           ) : null}
           {cancelFailure ? (

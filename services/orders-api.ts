@@ -273,6 +273,9 @@ export function mapOrderToListRow(o: RawBackendOrder): OrderListRow {
     items: totalItemCount(o),
     total: formatUzs(o.total_uzs, o.currency),
     summary: orderSummary(o),
+    serverStatus: o.status,
+    createdAt: o.created_at,
+    expiresAt: o.expires_at,
   };
 }
 
@@ -318,6 +321,8 @@ export function mapOrderToDetail(o: RawBackendOrder): OrderDetail {
     charges: mapOrderCharges(o),
     serverStatus: o.status,
     paymentType: asPaymentType(o.payment_type),
+    createdAt: o.created_at,
+    expiresAt: o.expires_at,
   };
 }
 

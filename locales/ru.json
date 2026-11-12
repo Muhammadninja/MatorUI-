@@ -504,7 +504,10 @@
     "dateItems_one": "{{date}} · {{count}} товар",
     "dateItems_few": "{{date}} · {{count}} товара",
     "dateItems_many": "{{date}} · {{count}} товаров",
-    "dateItems_other": "{{date}} · {{count}} товаров"
+    "dateItems_other": "{{date}} · {{count}} товаров",
+    "autoCancelIn": "Отмена через {{time}}",
+    "autoCancelling": "Отменяем…",
+    "autoCancelA11y": "Автоматическая отмена через {{time}}"
   },
   "trackOrder": {
     "unitPrice": "Цена за единицу",
@@ -525,7 +528,11 @@
     "cancelKeep": "Не отменять",
     "cancelConfirm": "Отменить заказ",
     "cancelRefused": "Этот заказ уже нельзя отменить из приложения.",
-    "cancelFailed": "Не удалось отменить заказ. Попробуйте ещё раз."
+    "cancelFailed": "Не удалось отменить заказ. Попробуйте ещё раз.",
+    "autoCancelTitle": "Ожидает подтверждения",
+    "autoCancelBody": "Если заказ не оплатить или не подтвердить вовремя, он отменится автоматически.",
+    "autoCancelExpired": "Время вышло. Заказ отменяется.",
+    "autoCancelA11y": "До отмены заказа осталось {{time}}"
   },
   "explore": {
     "pricesStockUpdated": "Цены и наличие обновлены",
