@@ -497,7 +497,9 @@ export default function CheckoutScreen() {
                   : formatCurrency(grandTotal)
             }
             size={24}
-            color={tokens.brandText}
+            color={tokens.text}
+            // The one figure the buyer confirms: the heaviest weight on the screen.
+            fontFamily={{ amount: 'Inter_800ExtraBold', affix: 'Inter_700Bold' }}
           />
           </AppView>
         </AppView>
