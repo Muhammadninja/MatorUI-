@@ -12,6 +12,7 @@ import { describe, expect, test } from 'vitest';
 
 import { MockLegalTransport } from "@/tests/support/transports/legal-api";
 import {
+  isConsentDocumentType,
   LEGAL_DOCUMENT_TYPES,
   legalDocumentSlug,
   legalDocumentTypeFromSlug,
@@ -26,7 +27,7 @@ const read = (rel: string): string => readFileSync(join(ROOT, rel), 'utf8');
 const readJson = (rel: string): Record<string, unknown> => JSON.parse(read(rel));
 
 const LOCALES = ['en', 'ru', 'uz'] as const;
-const TYPES = ['TERMS_OF_USE', 'PRIVACY_POLICY', 'PERSONAL_DATA_CONSENT'] as const;
+const TYPES = ['TERMS_OF_USE', 'PRIVACY_POLICY', 'PERSONAL_DATA_CONSENT', 'REFUND_POLICY'] as const;
 
 describe('Settings → Legal', () => {
   const source = read('components/screens/settings-security-screen.tsx');
@@ -39,6 +40,7 @@ describe('Settings → Legal', () => {
     ['/terms', 'TERMS_OF_USE'],
     ['/privacy', 'PRIVACY_POLICY'],
     ['/personal-data-consent', 'PERSONAL_DATA_CONSENT'],
+    ['/return-policy', 'REFUND_POLICY'],
   ])('routes %s for %s', (href) => {
     expect(source).toContain(`'${href}'`);
   });
@@ -121,6 +123,8 @@ describe('no hardcoded legal content', () => {
       'services/legal-api.ts',
       'hooks/use-legal.ts',
       'components/screens/legal-document-screen.tsx',
+      'components/screens-components/legal/legal-document-body.tsx',
+      'components/screens/return-policy-screen.tsx',
       'components/screens-components/auth/passwordless-auth-screen.tsx',
     ]) {
       const source = read(rel);
@@ -131,11 +135,20 @@ describe('no hardcoded legal content', () => {
   });
 
   test('the document screen renders backend content, not local text', () => {
-    const source = read('components/screens/legal-document-screen.tsx');
-    expect(source).toContain('doc!.content');
-    expect(source).toContain('doc!.title');
+    const screen = read('components/screens/legal-document-screen.tsx');
+    expect(screen).toContain('<LegalDocumentBody doc={doc!} />');
+    const body = read('components/screens-components/legal/legal-document-body.tsx');
+    expect(body).toContain('doc.content');
+    expect(body).toContain('doc.title');
     // No i18n-sourced document body.
-    expect(source).not.toMatch(/t\('terms\./);
+    expect(screen).not.toMatch(/t\('terms\./);
+    expect(body).not.toMatch(/t\('terms\./);
+  });
+
+  test('the return policy screen renders the backend document, not local text', () => {
+    const source = read('components/screens/return-policy-screen.tsx');
+    expect(source).toContain("useLegalDocument('REFUND_POLICY')");
+    expect(source).toContain('<LegalDocumentBody doc={policy.document} />');
   });
 });
 
@@ -194,19 +207,20 @@ describe('consent policy', () => {
 });
 
 describe('content_format handling', () => {
-  const screen = read('components/screens/legal-document-screen.tsx');
+  // The rendering is shared by every screen that shows a legal document.
+  const body = read('components/screens-components/legal/legal-document-body.tsx');
 
   test('markdown routes to the Markdown renderer', () => {
-    expect(screen).toContain('MARKDOWN_CONTENT_FORMAT');
-    expect(screen).toContain('<AppMarkdown content={doc!.content} />');
+    expect(body).toContain('MARKDOWN_CONTENT_FORMAT');
+    expect(body).toContain('<AppMarkdown content={doc.content} />');
   });
 
   test('an unknown format falls back to plain text instead of throwing', () => {
     // The ternary must have a non-Markdown branch that still renders content.
-    const branch = screen.slice(screen.indexOf('MARKDOWN_CONTENT_FORMAT'));
+    const branch = body.slice(body.indexOf('MARKDOWN_CONTENT_FORMAT'));
     expect(branch).toContain(') : (');
-    expect(branch).toContain('{doc!.content}');
-    expect(screen).not.toContain('throw new Error');
+    expect(branch).toContain('{doc.content}');
+    expect(body).not.toContain('throw new Error');
   });
 
 });
@@ -232,6 +246,13 @@ describe('legal document type enum', () => {
   test('the mock transport emits exactly those three types', async () => {
     const { documents } = await new MockLegalTransport().getDocuments();
     expect(documents.map((d) => d.type)).toEqual([...LEGAL_DOCUMENT_TYPES]);
+  });
+
+  test('the informational refund policy is never part of the consent set', async () => {
+    expect(LEGAL_DOCUMENT_TYPES).not.toContain('REFUND_POLICY');
+    expect(isConsentDocumentType('REFUND_POLICY')).toBe(false);
+    const refund = await new MockLegalTransport().getCurrentDocument('REFUND_POLICY');
+    expect(refund.is_required).toBe(false);
   });
 
   test('MARKDOWN_CONTENT_FORMAT is the literal the backend sends', () => {

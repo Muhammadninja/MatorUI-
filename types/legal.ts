@@ -10,19 +10,28 @@
  * (see `RawBackendUser` in auth-api.ts).
  */
 
-/** The three documents the app must surface. Route/branch on this — never on
- *  the localized `title`, which changes with Accept-Language. */
+/** Every document type the backend serves. Route/branch on this — never on
+ *  the localized `title`, which changes with Accept-Language.
+ *  `REFUND_POLICY` is informational: it is never accepted and is not part of
+ *  GET /v1/legal/documents (the consent set). */
 export type LegalDocumentType =
   | 'TERMS_OF_USE'
   | 'PRIVACY_POLICY'
-  | 'PERSONAL_DATA_CONSENT';
+  | 'PERSONAL_DATA_CONSENT'
+  | 'REFUND_POLICY';
 
-/** All three types, in the order the UI lists them. */
+/** The consent set: the three documents a user accepts at registration, in
+ *  the order the UI lists them. Never contains an informational document. */
 export const LEGAL_DOCUMENT_TYPES: readonly LegalDocumentType[] = [
   'TERMS_OF_USE',
   'PRIVACY_POLICY',
   'PERSONAL_DATA_CONSENT',
 ] as const;
+
+/** Whether `type` is one of the consent documents served by the list endpoint. */
+export function isConsentDocumentType(type: LegalDocumentType): boolean {
+  return LEGAL_DOCUMENT_TYPES.includes(type);
+}
 
 /** URL segment for a document: `TERMS_OF_USE` → `terms_of_use`
  *  (`/legal/terms_of_use`). */

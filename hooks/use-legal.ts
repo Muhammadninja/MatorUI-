@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useLanguageContext } from '@/contexts/language.context';
+import { ApiError } from '@/services/api-client';
 import { legalTransport } from '@/services/legal-api';
 import type {
   LegalAcceptanceInput,
@@ -25,6 +26,9 @@ export const legalQueryKeys = {
   /** Locale-scoped, so switching language refetches instead of serving the
    *  previous language's cached text (`legal-documents:{locale}`). */
   documents: (locale: string) => ['legal-documents', locale] as const,
+  /** One document in force, by type — same locale scoping as the list. */
+  document: (type: LegalDocumentType, locale: string) =>
+    ['legal-document', type, locale] as const,
   status: () => ['legal', 'status'] as const,
 };
 
@@ -41,12 +45,18 @@ export type UseLegalDocumentsValue = {
   refresh: () => void;
 };
 
-export function useLegalDocuments(): UseLegalDocumentsValue {
+/**
+ * @param enabled false skips the request — for a screen showing a document the
+ *        consent list does not carry. State then stays 'loading'; such a caller
+ *        reads {@link useLegalDocument} instead.
+ */
+export function useLegalDocuments(enabled = true): UseLegalDocumentsValue {
   const { language } = useLanguageContext();
 
   const query = useQuery({
     queryKey: legalQueryKeys.documents(language),
     queryFn: ({ signal }) => legalTransport.getDocuments(signal),
+    enabled,
   });
 
   return useMemo<UseLegalDocumentsValue>(() => {
@@ -64,6 +74,54 @@ export function useLegalDocuments(): UseLegalDocumentsValue {
       documents,
       byType: (type) => documents.find((d) => d.type === type) ?? null,
       error: query.error instanceof Error ? query.error.message : null,
+      refresh: () => {
+        void query.refetch();
+      },
+    };
+  }, [query]);
+}
+
+// ── useLegalDocument ───────────────────────────────────────────────────
+
+export type UseLegalDocumentValue = {
+  /** 'empty' = the backend has no version of this document in force (404). */
+  state: LegalDocumentsState;
+  document: LegalDocument | null;
+  error: string | null;
+  refresh: () => void;
+};
+
+/**
+ * One document in force, by type, from GET /v1/legal/documents/:type — for
+ * an informational document such as REFUND_POLICY, which the consent list
+ * does not carry.
+ */
+export function useLegalDocument(
+  type: LegalDocumentType,
+  enabled = true,
+): UseLegalDocumentValue {
+  const { language } = useLanguageContext();
+
+  const query = useQuery({
+    queryKey: legalQueryKeys.document(type, language),
+    queryFn: ({ signal }) => legalTransport.getCurrentDocument(type, signal),
+    enabled,
+    // A 404 is an answer ("not published"), not a transient failure.
+    retry: (count, err) => !(err instanceof ApiError && err.status === 404) && count < 2,
+  });
+
+  return useMemo<UseLegalDocumentValue>(() => {
+    const notPublished = query.error instanceof ApiError && query.error.status === 404;
+    let state: LegalDocumentsState;
+    if (query.isPending) state = 'loading';
+    else if (notPublished) state = 'empty';
+    else if (query.isError) state = 'error';
+    else state = 'success';
+
+    return {
+      state,
+      document: query.data ?? null,
+      error: !notPublished && query.error instanceof Error ? query.error.message : null,
       refresh: () => {
         void query.refetch();
       },

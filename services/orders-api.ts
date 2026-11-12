@@ -144,6 +144,8 @@ export type RawBackendOrder = {
   expires_at?: string;
   /** True while an open Payme transaction suspends the backend's expiry. */
   expiry_suspended?: boolean;
+  /** When the order was delivered; null before delivery. */
+  delivered_at?: string | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -174,7 +176,7 @@ const DATE_LOCALES: Record<string, string> = { en: 'en-US', ru: 'ru-RU', uz: 'uz
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** ISO → a date in the active language ("Jul 21, 2026" before i18n starts). Empty string on missing/invalid input. */
-function formatDate(iso?: string): string {
+export function formatDate(iso?: string): string {
   if (!iso) return '';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
@@ -316,6 +318,7 @@ export function mapOrderToDetail(o: RawBackendOrder): OrderDetail {
     courier: null,
     items: (o.items ?? []).map((it, i) => ({
       id: it.part_id ?? it.service_id ?? `item_${i}`,
+      productId: it.part_id ?? it.service_id ?? null,
       title: it.title ?? 'Item',
       quantity: pricing.lines[i].quantity ?? 0,
       price: formatUzs(pricing.lines[i].unitPrice),
@@ -328,6 +331,7 @@ export function mapOrderToDetail(o: RawBackendOrder): OrderDetail {
     createdAt: o.created_at,
     expiresAt: o.expires_at,
     expirySuspended: o.expiry_suspended === true,
+    deliveredAt: o.delivered_at ?? undefined,
   };
 }
 

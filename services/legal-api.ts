@@ -6,6 +6,7 @@
  * unified `apiClient`, and a singleton swapped by `shouldUseHttpTransport`.
  *
  *   GET  /v1/legal/documents          → { documents: [...] }        (public)
+ *   GET  /v1/legal/documents/:type  → LegalDocument in force       (public)
  *   GET  /v1/legal/documents/:type/:version → LegalDocument          (public)
  *   GET  /v1/legal/status             → LegalStatusResponse          (auth)
  *   POST /v1/legal/accept             → LegalStatusResponse          (auth)
@@ -35,6 +36,9 @@ export interface LegalTransport {
    *  wrapped `{ documents }` envelope so the cache stores the backend's own
    *  response shape rather than a client-side reduction of it. */
   getDocuments(signal?: AbortSignal): Promise<LegalDocumentsResponse>;
+  /** The version of one document currently in force — for an informational
+   *  document (REFUND_POLICY) that the consent list does not carry. */
+  getCurrentDocument(type: LegalDocumentType, signal?: AbortSignal): Promise<LegalDocument>;
   /** One pinned document version — used by deep links into an older version. */
   getDocument(
     type: LegalDocumentType,
@@ -58,6 +62,13 @@ class HttpLegalTransport implements LegalTransport {
     });
     // Preserve the envelope; only defend against a malformed body.
     return { documents: r?.documents ?? [] };
+  }
+
+  async getCurrentDocument(type: LegalDocumentType, signal?: AbortSignal): Promise<LegalDocument> {
+    return apiClient.get<LegalDocument>(`/v1/legal/documents/${encodeURIComponent(type)}`, {
+      signal,
+      skipAuth: true,
+    });
   }
 
   async getDocument(

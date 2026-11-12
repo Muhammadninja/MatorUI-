@@ -33,6 +33,12 @@ const LEGAL_ROWS = [
     labelKey: 'settings.personalDataConsent',
     href: '/personal-data-consent',
   },
+  {
+    // Informational, never accepted: opens the return conditions screen.
+    type: 'REFUND_POLICY',
+    labelKey: 'settings.refundPolicy',
+    href: '/return-policy',
+  },
 ] as const;
 
 export default function SettingsSecurityScreen() {
