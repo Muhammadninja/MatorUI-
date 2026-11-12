@@ -45,7 +45,13 @@ export class MockUserTransport implements UserTransport {
   async requestPhoneChange(): Promise<PhoneChangeRequest> {
     await delay(300);
     // Mock accepts any 6-digit code; prefill "123456" like the auth mock.
-    return { expiresIn: 300, devCode: '123456' };
+    return {
+      expiresIn: 300,
+      devCode: '123456',
+      currentPhoneOtpRequired: !!this.state.phone,
+      currentPhoneMasked: this.state.phone ?? undefined,
+      devCurrentCode: '654321',
+    };
   }
 
   async confirmPhoneChange(phone: string, otp: string): Promise<PhoneChangeResult> {

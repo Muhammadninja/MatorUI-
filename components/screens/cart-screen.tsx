@@ -24,6 +24,11 @@ import { parsePrice } from '@/services/cart-math';
  *
  * Quantity mutations and removal are optimistic; a row mid-flight to the
  * transport is greyed via `pendingIds`.
+ *
+ * The figures in the breakdown are the server's (`charges`): the cost of the parts, a
+ * discount and Mator's service fee, worked out again on every change to the cart. While a
+ * change is on its way they are one step behind, and greyed like the row being changed.
+ * A guest's cart is local only, so it has no fee yet: that is stated at checkout.
  */
 export default function CartScreen() {
   const { t } = useTranslation();
@@ -34,6 +39,7 @@ export default function CartScreen() {
     items,
     itemCount,
     totals,
+    charges,
     incrementItem,
     decrementItem,
     removeItem,
@@ -43,6 +49,9 @@ export default function CartScreen() {
     error,
     refresh,
   } = useCartContext();
+
+  // The server's figures trail a change on its way by one answer.
+  const updating = pendingIds.size > 0;
 
   // Guests can browse the cart freely; auth is only required to check out. The
   // phone-auth bottom sheet is presented on the "Proceed to checkout" tap below.
@@ -130,13 +139,6 @@ export default function CartScreen() {
           >
             {t('cart.emptySubtitle')}
           </AppText>
-          <AppButton
-            title={t('cart.startShopping')}
-            kind="brand"
-            size="lg"
-            onPress={() => router.navigate('/explore')}
-            containerStyle={{ marginTop: 4 }}
-          />
         </AppView>
       </AppView>
     );
@@ -276,33 +278,42 @@ export default function CartScreen() {
         {/* The cost breakdown follows the items; only the total and checkout stay
          *  fixed, and the scroll view ends above them so nothing is covered. */}
         <AppView
+          testID="cart-summary"
           rounded={16}
           colorName="card"
           borderWidth={1}
           borderName="border"
           gap="sm"
-          style={{ padding: 16, marginTop: 8 }}
+          style={{ padding: 16, marginTop: 8, opacity: charges && updating ? 0.55 : 1 }}
         >
           <SummaryRow
             label={t('cart.subtotal')}
-            value={formatCurrency(totals.subtotal)}
+            value={formatCurrency(charges ? charges.subtotal : totals.subtotal)}
             tokens={tokens}
           />
-          {totals.discount > 0 ? (
+          {(charges ? charges.discount : totals.discount) > 0 ? (
             <SummaryRow
               label={t('cart.discount')}
-              value={`−${formatCurrency(totals.discount)}`}
+              value={`−${formatCurrency(charges ? charges.discount : totals.discount)}`}
+              tokens={tokens}
+            />
+          ) : null}
+          {!charges ? (
+            <SummaryRow
+              label={t('cart.serviceFee')}
+              value={t('cart.deliveryAtCheckout')}
+              tokens={tokens}
+            />
+          ) : charges.serviceFee > 0 ? (
+            <SummaryRow
+              label={t('cart.serviceFee')}
+              value={formatCurrency(charges.serviceFee)}
               tokens={tokens}
             />
           ) : null}
           <SummaryRow
             label={t('cart.shipping')}
-            value={totals.shipping > 0 ? formatCurrency(totals.shipping) : t('cart.free')}
-            tokens={tokens}
-          />
-          <SummaryRow
-            label={t('cart.serviceFee')}
-            value={formatCurrency(totals.serviceFee)}
+            value={t('cart.deliveryAtCheckout')}
             tokens={tokens}
           />
         </AppView>
@@ -324,7 +335,13 @@ export default function CartScreen() {
           <AppText textVariant="bodySm" weight="medium" colorName="textMuted">
             {t('cart.total')}
           </AppText>
-          <AppPrice value={formatCurrency(totals.total)} size={20} color={tokens.text} />
+          <AppView style={{ opacity: charges && updating ? 0.55 : 1 }}>
+            <AppPrice
+              value={formatCurrency(charges ? charges.total : totals.total)}
+              size={20}
+              color={tokens.text}
+            />
+          </AppView>
         </AppView>
         <AppButton
           testID="cart-checkout-btn"

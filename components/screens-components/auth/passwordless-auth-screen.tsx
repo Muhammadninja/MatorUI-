@@ -138,8 +138,8 @@ export default function PasswordlessAuthScreen() {
   }, [translateY]);
 
   const [phase, setPhase] = useState<'phone' | 'otp'>('phone');
-  // Real remote backends start empty (users type their number); the demo/E2E
-  // mock prefills the demo phone so the offline suite stays buttons-only.
+  // Every new sheet starts empty, including the deterministic E2E flow.
+  // Never restore the previous account's phone from device storage.
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [otpLength, setOtpLength] = useState(DEFAULT_OTP_LENGTH);

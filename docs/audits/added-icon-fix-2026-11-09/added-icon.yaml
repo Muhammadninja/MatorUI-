@@ -1,0 +1,61 @@
+appId: com.mator.e2e
+name: added-icon-visual-${THEME}
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "English, English"
+    timeout: 30000
+- tapOn: "English, English"
+- tapOn: "Continue"
+- extendedWaitUntil:
+    visible:
+      id: explore-search-entry
+    timeout: 30000
+- extendedWaitUntil:
+    notVisible: Skip
+    timeout: 30000
+- runFlow:
+    file: /Users/muhammadfotihabdullaev/Desktop/matorui/.local/worktrees/rc-startup-integration/.maestro/subflows/favorites-sign-in.yaml
+    env:
+      PHONE: '+998900000001'
+- openLink: mator-e2e://catalog/parts?categoryId=filters
+- extendedWaitUntil:
+    visible:
+      id: parts-directory-screen
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Add MANN Cabin Filter to cart"
+    direction: DOWN
+    centerElement: true
+- waitForAnimationToEnd
+- takeScreenshot: ${THEME}-1-add
+- tapOn:
+    text: "Add MANN Cabin Filter to cart"
+    retryTapIfNoChange: false
+    waitToSettleTimeoutMs: 200
+- takeScreenshot: ${THEME}-2-added
+- assertVisible: "Added to cart"
+- openLink: mator-e2e://cart
+- extendedWaitUntil:
+    visible:
+      id: cart-item-mann-cabin-filter
+    timeout: 15000
+- tapOn:
+    id: cart-remove-mann-cabin-filter
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    notVisible:
+      id: cart-item-mann-cabin-filter
+    timeout: 15000
+- openLink: mator-e2e://catalog/parts?categoryId=filters
+- extendedWaitUntil:
+    visible:
+      id: parts-directory-screen
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Add MANN Cabin Filter to cart"
+    direction: DOWN
+    centerElement: true
+- waitForAnimationToEnd
+- takeScreenshot: ${THEME}-3-after-remove

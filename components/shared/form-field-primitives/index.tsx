@@ -114,6 +114,8 @@ export function TextEntryField({
     | 'textContentType'
     | 'autoComplete'
     | 'importantForAutofill'
+    | 'onSubmitEditing'
+    | 'returnKeyType'
   > & {
     value?: string;
     onChangeText?: (value: string) => void;

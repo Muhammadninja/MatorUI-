@@ -25,8 +25,9 @@ function isValidPhone(raw: string): boolean {
 
 /**
  * Change the login phone number via the backend OTP flow:
- *   1. enter the new number → `requestPhoneChange` sends an OTP to it
- *   2. enter the code → `confirmPhoneChange` rebinds the account + swaps session
+ *   1. enter the new number → `requestPhoneChange` sends an OTP to it and, when the
+ *      account has a number, another to that one
+ *   2. enter the codes → `confirmPhoneChange` rebinds the account + swaps session
  */
 export function PhoneChangeSheet({
   visible,
@@ -44,6 +45,9 @@ export function PhoneChangeSheet({
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [phone, setPhone] = useState(currentPhone ?? '+998');
   const [code, setCode] = useState('');
+  const [currentCode, setCurrentCode] = useState('');
+  const [currentRequired, setCurrentRequired] = useState(false);
+  const [currentMasked, setCurrentMasked] = useState('');
   const [otpLength, setOtpLength] = useState(DEFAULT_OTP_LENGTH);
   const [busy, setBusy] = useState(false);
 
@@ -53,6 +57,9 @@ export function PhoneChangeSheet({
       setStep('phone');
       setPhone(currentPhone ?? '+998');
       setCode('');
+      setCurrentCode('');
+      setCurrentRequired(false);
+      setCurrentMasked('');
       setOtpLength(DEFAULT_OTP_LENGTH);
       setBusy(false);
     }
@@ -65,9 +72,12 @@ export function PhoneChangeSheet({
     }
     setBusy(true);
     try {
-      const { devCode, otpLength: length } = await requestPhoneChange(phone);
-      setOtpLength(resolveOtpLength(length));
-      if (devCode) setCode(devCode); // dev/demo convenience
+      const request = await requestPhoneChange(phone);
+      setOtpLength(resolveOtpLength(request.otpLength));
+      setCode(request.devCode ?? ''); // dev/demo convenience
+      setCurrentCode(request.devCurrentCode ?? '');
+      setCurrentRequired(request.currentPhoneOtpRequired);
+      setCurrentMasked(request.currentPhoneMasked ?? '');
       setStep('otp');
       toast.info(t('account.codeSent', { phone }));
     } catch (err) {
@@ -82,7 +92,7 @@ export function PhoneChangeSheet({
   const verify = async () => {
     setBusy(true);
     try {
-      await confirmPhoneChange(phone, code.trim());
+      await confirmPhoneChange(phone, code.trim(), currentRequired ? currentCode.trim() : undefined);
       toast.success(t('account.phoneUpdated'));
       onClose();
     } catch (err) {
@@ -95,7 +105,7 @@ export function PhoneChangeSheet({
   };
 
   return (
-    <AppBottomSheet visible={visible} onClose={onClose} expandable={false} heightFraction={0.44}>
+    <AppBottomSheet visible={visible} onClose={onClose} expandable={false} heightFraction={step === 'otp' && currentRequired ? 0.62 : 0.44}>
       <AppView flex={1} px={20} pb={6} gap={14}>
         <AppText family="heading" weight="bold" style={{ fontSize: 20, lineHeight: 26 }} colorName="text">
           {t('account.changePhoneTitle')}
@@ -126,10 +136,12 @@ export function PhoneChangeSheet({
         ) : (
           <>
             <AppText family="default" colorName="textMuted" style={{ fontSize: 13, marginTop: -4 }}>
-              {t('account.otpHint', { phone })}
+              {currentRequired
+                ? t('account.otpHintBoth', { phone, current: currentMasked })
+                : t('account.otpHint', { phone })}
             </AppText>
             <AppTextField
-              label={t('account.verificationCode')}
+              label={t(currentRequired ? 'account.newPhoneCode' : 'account.verificationCode')}
               placeholder={otpPlaceholder(otpLength)}
               value={code}
               onChangeText={(v) => setCode((previous) => normalizeOtpInput(v, otpLength, previous))}
@@ -137,12 +149,22 @@ export function PhoneChangeSheet({
               autoCorrect={false}
               {...otpAutofillProps()}
             />
+            {currentRequired ? (
+              <AppTextField
+                label={t('account.currentPhoneCode', { current: currentMasked })}
+                placeholder={otpPlaceholder(otpLength)}
+                value={currentCode}
+                onChangeText={(v) => setCurrentCode(v.replace(/\D/g, '').slice(0, otpLength))}
+                keyboardType="number-pad"
+                autoCorrect={false}
+              />
+            ) : null}
             <AppButton
               title={busy ? t('account.verifying') : t('account.verifyUpdate')}
               kind="brand"
               size="lg"
               fullWidth
-              disabled={busy || code.length < otpLength}
+              disabled={busy || code.length < otpLength || (currentRequired && currentCode.length < otpLength)}
               onPress={verify}
             />
             <Pressable onPress={() => setStep('phone')} disabled={busy} accessibilityRole="button">

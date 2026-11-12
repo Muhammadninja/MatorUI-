@@ -13,6 +13,8 @@ import type { OrderPricing } from '@/services/order-pricing';
  * read what they need; nothing is reshaped at the edge of the network.
  */
 
+import type { DeliveryPolygons } from '@/services/delivery-coverage';
+
 /** Step the order is currently at. Server is the source of truth — the
  *  client renders a fixed STEPS array and lights up steps `<= status`. */
 export type OrderStatus =
@@ -124,6 +126,12 @@ export type Address = {
   /** True for the user's default shipping address. Optional for the same
    *  back-compat reason — the server enforces a single default. */
   isDefault?: boolean;
+  /** A readable hint for the courier. A map pin may have no other words at all. */
+  landmark?: string | null;
+  /** Where the address is on the ground, which courier delivery is priced from and the
+   *  courier goes to. Set only when the buyer chooses one. Null or absent means not chosen. */
+  lat?: number | null;
+  lng?: number | null;
 };
 
 export type Courier = {
@@ -161,6 +169,21 @@ export type OrderListPage = {
   pageSize: number;
 };
 
+/**
+ * What an order charges, each part apart, exactly as the backend stored it when the order was
+ * placed. Fixed from then on: nothing here is worked out by the app.
+ */
+export type OrderCharges = {
+  /** The cost of the parts. */
+  subtotal: number;
+  discount: number;
+  /** Mator's service fee. 0 when the order carries none. */
+  serviceFee: number;
+  delivery: number;
+  /** What the buyer pays: the parts after discount, the fee and delivery. */
+  total: number;
+};
+
 export type OrderDetail = {
   id: string;
   status: OrderStatus;
@@ -180,6 +203,15 @@ export type OrderDetail = {
   totalLabel: string;
   /** Source amounts and validation; missing values remain unknown. */
   pricing?: OrderPricing;
+  /** Each part of the total, as stored on the order. Absent when the source states none. */
+  charges?: OrderCharges | null;
+  /** The backend's own word for the status (`pending_payment`, `paid`, …), before it is
+   *  mapped onto the timeline, which calls an unpaid order 'placed'. Anything deciding
+   *  about payment reads this. */
+  serverStatus?: string;
+  /** How the order is being paid, when the backend says. Cash and terminal orders wait in
+   *  `pending_payment` too, for an operator, so the status alone cannot tell. */
+  paymentType?: PaymentType | null;
 };
 
 export type PaymentMethod = {
@@ -198,14 +230,48 @@ export type PaymentMethod = {
  *  brings; Cash is cash-on-delivery. */
 export type PaymentType = 'payme' | 'terminal' | 'cash';
 
-export type ShippingOption = {
+/** One way to get the order, as the backend's quote states it: priced, or not available. */
+export type ShippingOption = AvailableShippingOption | UnavailableShippingOption;
+
+export type AvailableShippingOption = {
   /** Stable server key (`pickup`, `courier`). */
   key: string;
   label: string;
-  /** Server-formatted ETA string ("1–3 days"). */
-  eta: string;
+  /** Absent on a backend that only ever listed options it could price. */
+  available?: true;
   /** Numeric fee in UZS. 0 = free (pickup). */
   price: number;
+  /** Names what a courier price is for: the saved destination, the pickup points and the
+   *  rates. Handed back when placing the order, which the server refuses if any changed. */
+  quoteId?: string | null;
+};
+
+/** The backend offers this way but cannot deliver it now: it says why, and gives no price. */
+export type UnavailableShippingOption = {
+  key: string;
+  label: string;
+  available: false;
+  /** Never a number: an option that cannot be had is not a free one. */
+  price: null;
+  quoteId?: null;
+  /** The backend's code for why (`DELIVERY_OUTSIDE_COVERAGE`, …), worded by the checkout.
+   *  Null when it gave none. */
+  unavailableCode: string | null;
+};
+
+/** Where the buyer collects one dealer's goods, as the backend states it for the cart: the
+ *  dealer each part is bought from, never a list of every dealer. */
+export type PickupPoint = {
+  /** The storefront the goods are bought from. Null for goods whose dealer is not known. */
+  dealerId: string | null;
+  dealerName: string | null;
+  /** Null while the dealer has given no address. */
+  address: string | null;
+  landmark: string | null;
+  /** Null while the dealer has no location on record. Never a made-up point. */
+  location: DeliveryPoint | null;
+  /** This dealer's lines in the cart, and only those. */
+  items: { cartItemId: string; partId: string | null; title: string; quantity: number }[];
 };
 
 /** Input from the client when creating an order. The server owns all
@@ -214,14 +280,22 @@ export type CreateOrderInput = {
   /** Line items as known to the cart at submit time. The server
    *  re-validates pricing and rejects on mismatch. */
   items: { productId: string; quantity: number }[];
-  /** Selected delivery address, or `null` when the buyer skips it — the
-   *  courier calls to confirm the drop-off location. */
+  /** Selected delivery address, or `null` when the buyer skips it and collects
+   *  the order themselves. */
   addressId: string | null;
   /** Chosen payment method (Payme / Terminal / Cash). */
   paymentType: PaymentType;
   shippingOptionKey: string;
   /** Optional promo code already applied to the cart. */
   promoCode: string | null;
+  /** The courier price the buyer was shown. The server computes its own and refuses
+   *  the order if the two differ, so this only says what the buyer agreed to. */
+  confirmedDeliveryUzs?: number | null;
+  /** The quote that price came from. See `ShippingOption.quoteId`. */
+  deliveryQuoteId?: string | null;
+  /** The total the buyer was shown, fee and delivery included. The server works out its own
+   *  and refuses the order (`ORDER_TOTAL_CHANGED`) if the two differ: it never charges this. */
+  confirmedTotalUzs?: number | null;
   /** Optional courier note. */
   note?: string;
   /** Garage vehicle this order is for (backend `vehicle_id`). Optional — the
@@ -235,6 +309,10 @@ export type CreateOrderInput = {
    *  authoritatively and MAY ignore this; the mock echoes it so the
    *  just-placed order's confirmation/track total isn't blank. */
   totalLabel?: string;
+  /** Sent as `Idempotency-Key`. The same key is reused when the buyer retries
+   *  the same order after a failure, so a request whose response was lost
+   *  can't create a second order on a backend that honors the header. */
+  idempotencyKey?: string;
 };
 
 /**
@@ -257,6 +335,67 @@ export type CreateOrderResult = {
   eta: string;
   /** Pre-formatted grand total for the receipt. */
   totalLabel: string;
+  /** Original checkout payload when this response resolves a stored attempt. */
+  recoveredAttempt?: Omit<CreateOrderInput, 'totalLabel' | 'idempotencyKey'>;
+};
+
+// ── Address search ─────────────────────────────────────────────────────
+
+/** What the buyer has typed so far, and only that. The backend does the searching. */
+export type AddressSearchQuery = {
+  street: string;
+  house?: string;
+  city?: string;
+  lang: string;
+  /** 'search' once the buyer submits what they typed, 'autocomplete' until then. */
+  mode?: 'autocomplete' | 'search';
+  /** Where the map is looking, to rank what is near it first. */
+  nearLat?: number;
+  nearLng?: number;
+};
+
+/** A place the backend offers for what was typed, which the buyer can pick and save. */
+export type AddressSuggestion = {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  city: string | null;
+  district: string | null;
+  street: string | null;
+  /** Null when the match is a street or a place rather than a numbered building. */
+  houseNumber: string | null;
+  lat: number;
+  lng: number;
+};
+
+export type AddressSuggestions = {
+  items: AddressSuggestion[];
+  /** Credit the data's licence requires wherever these are shown. */
+  attribution: string | null;
+};
+
+/** A point on the map. Exactly what the buyer chose: never rounded on its way anywhere. */
+export type DeliveryPoint = { lat: number; lng: number };
+
+/** What the backend can say about a point the buyer has confirmed. Best effort throughout. */
+export type PointDescription = {
+  address: {
+    city: string | null;
+    district: string | null;
+    street: string | null;
+    houseNumber: string | null;
+  } | null;
+  /** Null when no delivery area is configured, so it cannot be said. */
+  withinCoverage: boolean | null;
+  attribution: string | null;
+};
+
+/** Whether couriers operate and where: the box to open the map on, and the very geometry the
+ *  backend enforces, so a point outside it can be told on the map. Null when not known. */
+export type DeliveryCoverageInfo = {
+  configured: boolean;
+  bounds: { minLat: number; minLng: number; maxLat: number; maxLng: number } | null;
+  polygons: DeliveryPolygons | null;
 };
 
 // ── Account CRUD inputs ────────────────────────────────────────────────
@@ -268,6 +407,13 @@ export type AddressInput = {
   name: string;
   line1: string;
   city: string;
+  /** A readable hint for the courier. */
+  landmark?: string;
+  /** The point the buyer chose, on the map, from a suggestion or, if they ask, where they
+   *  are now. Left out, the server keeps what it has unless the text moved the address, in
+   *  which case it drops the old point. */
+  lat?: number;
+  lng?: number;
 };
 
 /** Client-supplied fields when creating/updating a payment method. Never

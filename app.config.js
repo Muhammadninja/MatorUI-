@@ -14,17 +14,27 @@ module.exports = ({ config }) => {
   if (e2e && (appEnvironment.name !== 'local' || appEnvironment.apiBaseUrl !== 'http://127.0.0.1:8080' || appEnvironment.allowDevOtp || appEnvironment.httpDomains)) {
     throw new Error('E2E requires the isolated loopback mock, all HTTP domains and no development OTP.');
   }
+  // The Android map needs this at build time, and crashes without it. Baked into the build,
+  // so it is public: restrict it to this app's package and signing certificate in Google
+  // Cloud. iOS uses Apple Maps and needs none. With none set, the app offers address search
+  // in place of the Android map (services/delivery-map.ts).
+  const googleMapsKey = (process.env.GOOGLE_MAPS_ANDROID_API_KEY || '').trim();
   return {
     ...config,
+    plugins: [
+      ...(config.plugins || []),
+      ['react-native-maps', googleMapsKey ? { androidGoogleMapsApiKey: googleMapsKey } : {}],
+      ...(e2e ? ['./plugins/with-e2e-loopback'] : []),
+    ],
     ...(e2e ? {
       name: 'Mator E2E', scheme: 'mator-e2e',
       android: { ...config.android, package: 'com.mator.e2e' },
-      plugins: [...(config.plugins || []), './plugins/with-e2e-loopback'],
       ios: { ...config.ios, bundleIdentifier: 'com.mator.e2e' },
       updates: { enabled: false },
     } : {}),
     extra: {
       ...config.extra,
+      googleMapsConfigured: Boolean(googleMapsKey),
       // Public, resolved once by the launcher/config process. Expo 56's virtual
       // env module can otherwise override shell variables with stale .env files.
       appEnvironment,

@@ -11,7 +11,12 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => k
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) }));
 vi.mock('@/contexts/theme.context', () => ({ useThemeContext: () => ({ tokens: {} }) }));
 vi.mock('@/services/api-client', () => ({ apiClient: { post: state.post } }));
-vi.mock('@/hooks/use-orders', () => ({ useOrder: () => ({ state: state.orderState, order: null, refresh: vi.fn() }) }));
+vi.mock('@/hooks/use-orders', () => ({
+  useOrder: () => ({ state: state.orderState, order: null, refresh: vi.fn() }),
+  useCancelOrder: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+// Payment recovery is covered separately; these cases have no order to pay.
+vi.mock('@/hooks/use-order-payment', () => ({ useRecoverPayment: () => ({ paying: false, failure: null, pay: vi.fn() }) }));
 vi.mock('@/components/shared/app-settings-header', () => ({ AppSettingsHeader: () => null }));
 vi.mock('@/components/shared/app-view', () => ({ AppView: ({ children, ...props }: any) => <section {...props}>{children}</section>, AppPressableView: ({ children, ...props }: any) => <button {...props}>{children}</button> }));
 vi.mock('@/components/shared/app-text', () => ({ AppText: ({ children }: any) => <span>{children}</span> }));

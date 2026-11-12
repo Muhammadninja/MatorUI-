@@ -87,8 +87,12 @@ function CategoryTile({ name, label, iconKey, count, onPress, width }: CategoryT
       align="center"
       style={{ width: width ?? '31.5%', paddingHorizontal: 8, paddingVertical: 12, gap: 8 }}
     >
-      <AppView center style={{ width: 68, height: 68 }}>
-        <AutoPartIcon name={name} iconKey={iconKey} size={60} />
+      <AppView
+        testID="category-tile-art"
+        center
+        style={{ width: 68, height: 68 }}
+      >
+        <AutoPartIcon name={name} iconKey={iconKey} size={64} />
       </AppView>
       <AppView align="center" style={{ alignSelf: 'stretch' }}>
         <AppView justify="center" style={{ minHeight: LABEL_BLOCK_HEIGHT, alignSelf: 'stretch' }}>

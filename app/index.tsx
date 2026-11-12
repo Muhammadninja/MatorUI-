@@ -1,7 +1,9 @@
 import 'expo-dev-client';
 import { Redirect } from 'expo-router';
+import { useEffect } from 'react';
 
 import { useLanguageContext } from '@/contexts/language.context';
+import { traceStartup } from '@/services/e2e-startup-trace';
 
 /**
  * Entry-point gate. The branded splash is now a full-screen overlay owned by
@@ -15,6 +17,9 @@ import { useLanguageContext } from '@/contexts/language.context';
  */
 export default function RootIndex() {
   const { isHydrated, hasChosen } = useLanguageContext();
+  useEffect(() => {
+    traceStartup('index-gate', { hydrated: isHydrated, chosen: hasChosen });
+  }, [isHydrated, hasChosen]);
 
   if (!isHydrated) return null;
 

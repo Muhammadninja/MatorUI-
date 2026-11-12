@@ -43,7 +43,7 @@ import {
   getCurrentSession,
   type AuthSession,
 } from '@/services/auth-storage';
-import { userTransport } from '@/services/user-api';
+import { type PhoneChangeRequest, userTransport } from '@/services/user-api';
 import { debugLog } from '@/services/debug-log';
 import { garageService } from '@/services/garage-service';
 import { cartTransport } from '@/services/cart-api';
@@ -67,11 +67,9 @@ type UserContextValue = {
   updateProfile: (patch: Partial<Omit<UserProfile, 'id' | 'memberSince'>>) => Promise<void>;
   /** Change the login phone: send an OTP to the new number. Returns a dev code on
    *  dev builds so the verify step can prefill it. */
-  requestPhoneChange: (
-    phone: string,
-  ) => Promise<{ expiresIn: number; otpLength?: number; devCode?: string }>;
+  requestPhoneChange: (phone: string) => Promise<PhoneChangeRequest>;
   /** Verify the OTP; rebinds the account to the new number and swaps the session. */
-  confirmPhoneChange: (phone: string, otp: string) => Promise<void>;
+  confirmPhoneChange: (phone: string, otp: string, currentPhoneOtp?: string) => Promise<void>;
   /** Passwordless: send a one-time code to the phone/email. Returns a handle for `verifyOtp`. */
   requestOtp: (input: RequestOtpInput) => Promise<RequestOtpResult>;
   /** Passwordless: verify the code, establish the session, and load the profile. */
@@ -179,7 +177,7 @@ export function UserProvider({ children }: PropsWithChildren) {
     await persistSession(null);
     // Best-effort revocation — don't block the sign-out UX on it.
     if (existing) {
-      authTransport.signOut(existing.refreshToken).catch(() => undefined);
+      authTransport.signOut(existing.refreshToken, undefined, existing.accessToken).catch(() => undefined);
     }
   }, [persistSession]);
 
@@ -284,11 +282,11 @@ export function UserProvider({ children }: PropsWithChildren) {
   );
 
   const confirmPhoneChange = useCallback(
-    async (phone: string, otp: string) => {
+    async (phone: string, otp: string, currentPhoneOtp?: string) => {
       // Confirming rebinds the account to the new number and issues a NEW session
       // (the login identity changed) — persist it and swap the profile.
       const generation = lifecycleRef.current;
-      const { user, session } = await userTransport.confirmPhoneChange(phone, otp);
+      const { user, session } = await userTransport.confirmPhoneChange(phone, otp, currentPhoneOtp);
       if (!(await persistSession(session, generation))) return;
       applyProfile(user);
       debugLog('profile', 'phone changed — session swapped', { phone: user.phone });

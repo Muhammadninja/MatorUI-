@@ -19,6 +19,15 @@ appId: com.fotih12.mator
     timeout: 8000
 - assertVisible:
     id: "checkout-place-order-btn"
+# The button is disabled until the delivery price is in.
+- extendedWaitUntil:
+    visible:
+      id: "checkout-delivery-price"
+    timeout: 8000
+# Cash: Payme opens a real browser page and confirms by webhook, which a mock cannot do,
+# and anything short of that (rightly) stays on the checkout as unpaid.
+- tapOn:
+    text: ".*(Наличные|Naqd pul|Cash).*"
 - tapOn:
     id: "checkout-place-order-btn"
 - extendedWaitUntil:

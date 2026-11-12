@@ -27,7 +27,15 @@ vi.mock('@/services/api-client', () => ({
   },
 }));
 
-import { HttpOrdersTransport, mapOrderToListRow, mapOrderToDetail, type RawBackendOrder } from './orders-api';
+import { formatCurrency } from './cart-math';
+import i18n from './i18n';
+import {
+  HttpOrdersTransport,
+  mapOrderCharges,
+  mapOrderToListRow,
+  mapOrderToDetail,
+  type RawBackendOrder,
+} from './orders-api';
 import { formatOrderNo } from './orders-service';
 
 describe('formatOrderNo', () => {
@@ -43,7 +51,10 @@ describe('formatOrderNo', () => {
   });
 });
 
-// The exact object api.mator.uz returned for a freshly-created order.
+// The exact object api.mator.uz returned for a freshly-created order. It was placed on
+// 2026-07-21 under the old flat fee of 5 000; today's tariff (tariff A) would charge 10 000 on
+// 250 000 of parts. That is the point: an order keeps what it was charged, and the app shows
+// the backend's stored figures, never a fee it works out itself.
 const RAW: RawBackendOrder = {
   order_id: 'ord_01KY2DNPSRYPT8C7SDT2N7JJCH',
   status: 'pending_payment',
@@ -74,7 +85,7 @@ describe('mapOrderToListRow', () => {
     expect(row.id).toBe('ord_01KY2DNPSRYPT8C7SDT2N7JJCH');
     expect(row.status).toBe('Processing'); // pending_payment → Processing
     expect(row.items).toBe(2); // sum of qty
-    expect(row.total).toBe("280\u00A0000 UZS"); // UZS grouped
+    expect(row.total).toBe(formatCurrency(280000)); // UZS grouped, in the app's language
     expect(row.date).toBe('Jul 21, 2026');
     expect(row.summary).toBe('Motor oil');
   });
@@ -107,6 +118,41 @@ describe('mapOrderToDetail', () => {
     expect(d.pricing?.lines[0]).toEqual({ quantity: 2, unitPrice: 250000, lineTotal: 500000 });
     expect(d.pricing?.checks.items).toBe(false);
     expect(d.pricing?.status).toBe('inconsistent');
+  });
+
+  test('keeps each part of what the order charges, as the backend stored it', () => {
+    expect(mapOrderToDetail(RAW).charges).toEqual({
+      subtotal: 250000,
+      discount: 0,
+      serviceFee: 5000,
+      delivery: 25000,
+      total: 280000,
+    });
+  });
+});
+
+describe('mapOrderCharges', () => {
+  test('an order with no fee carries a fee of 0, not an unknown one', () => {
+    expect(mapOrderCharges({ ...RAW, service_fee_uzs: 0, total_uzs: 275000 })).toMatchObject({
+      serviceFee: 0,
+      total: 275000,
+    });
+  });
+
+  test('nothing is made up when the backend states no total or no parts', () => {
+    expect(mapOrderCharges({ ...RAW, total_uzs: undefined })).toBeNull();
+    expect(mapOrderCharges({ ...RAW, subtotal_uzs: undefined })).toBeNull();
+  });
+});
+
+describe('amounts in the app’s language', () => {
+  test.each([
+    ['ru', '280\u00A0000 сум'],
+    ['uz', '280\u00A0000 soʻm'],
+    ['en', '280\u00A0000 UZS'],
+  ])('%s', async (lang, expected) => {
+    await i18n.changeLanguage(lang);
+    expect(mapOrderToDetail(RAW).totalLabel).toBe(expected);
   });
 });
 
@@ -159,7 +205,7 @@ describe('HttpOrdersTransport', () => {
       payment_type: 'cash', // chosen method forwarded so the backend can route the webhook
     });
     expect(res.orderId).toBe(RAW.order_id);
-    expect(res.totalLabel).toBe("280\u00A0000 UZS");
+    expect(res.totalLabel).toBe(formatCurrency(280000));
   });
 
   test('createOrder omits vehicle/phone when absent (both optional server-side)', async () => {
@@ -180,19 +226,117 @@ describe('HttpOrdersTransport', () => {
     expect(body).not.toHaveProperty('contact_phone_e164');
   });
 
+  test('createOrder states the courier price the buyer was shown', async () => {
+    post.mockResolvedValueOnce(RAW);
+    await t.createOrder({
+      items: [],
+      addressId: 'addr_1',
+      paymentType: 'cash',
+      shippingOptionKey: 'courier',
+      confirmedDeliveryUzs: 32500,
+      deliveryQuoteId: 'quote_1',
+      promoCode: null,
+    });
+    const [, body] = post.mock.calls[0]!;
+    expect(body).toMatchObject({
+      cart_snapshot: { delivery_method: 'courier', delivery_address_id: 'addr_1' },
+      confirmed_delivery_uzs: 32500,
+      delivery_quote_id: 'quote_1',
+    });
+  });
+
+  test('createOrder states the total the buyer was shown, fee included, and nothing else of money', async () => {
+    post.mockResolvedValueOnce(RAW);
+    await t.createOrder({
+      items: [],
+      addressId: null,
+      paymentType: 'payme',
+      shippingOptionKey: 'pickup',
+      confirmedTotalUzs: 620000,
+      promoCode: null,
+    });
+    const [, body] = post.mock.calls[0]!;
+    expect(body).toMatchObject({ confirmed_total_uzs: 620000 });
+    expect(body).not.toHaveProperty('service_fee_uzs');
+    expect(body).not.toHaveProperty('total_uzs');
+  });
+
+  test('createOrder states no total when none was shown', async () => {
+    post.mockResolvedValueOnce(RAW);
+    await t.createOrder({
+      items: [],
+      addressId: null,
+      paymentType: 'cash',
+      shippingOptionKey: 'pickup',
+      confirmedTotalUzs: null,
+      promoCode: null,
+    });
+    expect(post.mock.calls[0]![1]).not.toHaveProperty('confirmed_total_uzs');
+  });
+
+  test('createOrder states no price for pickup', async () => {
+    post.mockResolvedValueOnce(RAW);
+    await t.createOrder({
+      items: [],
+      addressId: null,
+      paymentType: 'cash',
+      shippingOptionKey: 'pickup',
+      confirmedDeliveryUzs: null,
+      promoCode: null,
+    });
+    const [, body] = post.mock.calls[0]!;
+    expect(body).not.toHaveProperty('confirmed_delivery_uzs');
+    expect(body).not.toHaveProperty('delivery_quote_id');
+    expect((body as any).cart_snapshot.delivery_method).toBe('pickup');
+  });
+
+  test.each([
+    ['payme', 'payme'],
+    ['cash', 'cash'],
+    ['terminal', 'terminal'],
+    [null, null],
+    [undefined, null],
+    ['barter', null],
+  ])('an order paid by %s reads as %s, keeping the status word as sent', (sent, read) => {
+    const detail = mapOrderToDetail({ ...RAW, payment_type: sent } as never);
+    expect(detail.paymentType).toBe(read);
+    expect(detail.serverStatus).toBe('pending_payment');
+  });
+
   test('getOrder returns null on 404', async () => {
     const { ApiError } = await import('@/services/api-client');
     get.mockRejectedValueOnce(new (ApiError as any)(404));
     const d = await t.getOrder('ord_missing');
     expect(d).toBeNull();
   });
+
+
 });
 
 test('contradictory foreign currency cannot be relabeled UZS in history/detail/create results', async () => {
   const foreign = { ...RAW, currency: 'USD' };
   expect(mapOrderToListRow(foreign).total).toBe('');
   expect(mapOrderToDetail(foreign).totalLabel).toBe('');
+  expect(mapOrderCharges(foreign)).toBeNull();
   post.mockResolvedValueOnce(foreign);
   const result = await new HttpOrdersTransport().createOrder({ items: [], addressId: null, paymentType: 'cash', shippingOptionKey: 'pickup', promoCode: null });
   expect(result.totalLabel).toBe('');
+});
+
+describe('cancelling an offline order', () => {
+  const t = new HttpOrdersTransport();
+  beforeEach(() => post.mockReset());
+
+  test('posts to the cancel endpoint and maps the answer', async () => {
+    post.mockResolvedValue({ order_id: 'o 1', status: 'cancelled', payment_type: 'cash' });
+    const order = await t.cancelOrder('o 1');
+    expect(post).toHaveBeenCalledWith('/v1/orders/o%201/cancel', {});
+    expect(order.status).toBe('cancelled');
+    expect(order.serverStatus).toBe('cancelled');
+  });
+
+  test('a refusal reaches the caller', async () => {
+    post.mockRejectedValueOnce(new Error('409'));
+    await expect(t.cancelOrder('o1')).rejects.toThrow('409');
+  });
 });

@@ -1,0 +1,10 @@
+2026-11-10T00:23:27.279Z
+Success
+
+Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.mator.e2e/.MainActivity }
+Status: ok
+LaunchState: COLD
+Activity: com.mator.e2e/.MainActivity
+TotalTime: 998
+WaitTime: 1051
+Complete

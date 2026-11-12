@@ -1,0 +1,20 @@
+# Final iPhone / localization check
+
+Scope is fixed by the [25-journey matrix](journey-coverage.md). Complete before the targeted November 20 App Review submission. Every item below is **not-verified** for the final iPhone candidate until its evidence is attached; a passing Android mock run does not close a native iPhone or real-backend check.
+
+Current consolidated application source is Claude's [frozen `5da6971`](candidate-freeze.md). Its 1,778 passing tests/typecheck/token lint are reported by Claude in that handoff, not rerun by this checklist. Claude also identifies terminated-app push-tap handling and real push delivery as unverified, and reports a local iOS build blocker; preserve those limits when planning the final native check.
+
+- [ ] **Identify the candidate (J25):** record frontend SHA, native build/version, iPhone/iOS, backend SHA/config and real-vs-test data. Confirm production identity/API and no mock/OTP bypass. Confirm exact-candidate CI results; bundle exports alone are not a native-build check.
+- [ ] **Launch, auth and isolation (J01–04/J09/J11/J22):** fresh and restored/offline launch, sign-in/legal Back, cold deep link, A→guest→B→A and sign-out during pending responses. Own favorites/cart/chat restore; foreign private data never flashes. Use approved test accounts; preserve their data.
+- [ ] **Discover and fitment (J05–08/J18–19):** category/search/filter/page→detail, correct active vehicle and unknown fitment, Garage/VIN Back. Recheck changed coming-soon toast and Garage icon, plus missing-item/loading/error/empty recovery. VIN Finder placement stays open until product-approved.
+- [ ] **Cart and delivery (J10–14/J20):** add/rapid quantity/remove and failed-write rollback, exact fractional totals/fee and delivery only at checkout, empty-cart navigation, address/map keyboard and location-denial handling, pickup/courier/unavailable/stale quote with reconfirmation.
+- [ ] **Order/payment recovery (J14–17):** backend-owned sandbox/test checkout only; cash confirmation, same-order payment retry, Payme/Click return/cancel/expiry, pending-order recovery after app termination and changed-cart protection. History/tracking/not-found keep truthful stored amounts. Backend idempotency remains separately unverified until employee evidence arrives.
+- [ ] **Other private journeys (J20–23):** profile/security/address/payment-method failures, notification destinations and read/clear feedback, chat draft→OTP return, sourcing capability-off behavior. Enabled sourcing/staff delivery/offer checks require the backend-owned test setup; keep unavailable scenarios open.
+- [ ] **Localization and appearance (J24, all journeys):** RU and UZ in OS light/dark, long labels/narrow layout, large text and VoiceOver, filled forms/open keyboard, loading/error/empty states; separate EN wording/key/plural pass. Capture current screen/state evidence with language/theme/platform/SHA/data-source metadata and scrub PII before saving.
+- [ ] **Close the record (J25):** link outcomes to matrix rows as verified/error/blocked/not-verified; list unresolved blockers and actual versions. PR #16 merging and publication remain pending; this checklist does not authorize submission.
+
+## Evidence to reuse
+
+Reuse the matrix's unit/contract tests, preserved startup diagnosis and completed exact-candidate Android checks where their source and scope still apply; avoid repeating them as iPhone evidence. The earlier `41ab8a3` passing pairs and `23905a9` EN/light-dark Add/Added images retain their historical source labels. They help target regressions but do not close final-candidate native/localization gaps. No new screenshots are required for the EN pass by the project audit instructions.
+
+Backend handoff: [prepared order-idempotency acceptance steps](combined-rc-acceptance.md#backend-employee-acceptance-steps-production-order-idempotency). Requirements: owner instructions for this release, AGENTS.md and the sources attached to each matrix journey. No release readiness percentage is used.

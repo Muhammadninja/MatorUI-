@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -6,6 +7,37 @@ import { brandColor } from '@/components/screens-components/catalog/brand-meta';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
+
+const BUNDLED_BRAND_LOGOS = {
+  chevrolet: {
+    light: require('../../../assets/brands/optimized/chevrolet.webp'),
+    dark: require('../../../assets/brands/optimized/chevrolet.webp'),
+  },
+  byd: {
+    light: require('../../../assets/brands/optimized/byd.webp'),
+    dark: require('../../../assets/brands/optimized/byd.webp'),
+  },
+  leapmotor: {
+    light: require('../../../assets/brands/optimized/leapmotor.webp'),
+    dark: require('../../../assets/brands/optimized/leapmotor-light.webp'),
+  },
+  volkswagen: {
+    light: require('../../../assets/brands/optimized/volkswagen.webp'),
+    dark: require('../../../assets/brands/optimized/volkswagen-light.webp'),
+  },
+  vw: {
+    light: require('../../../assets/brands/optimized/volkswagen.webp'),
+    dark: require('../../../assets/brands/optimized/volkswagen-light.webp'),
+  },
+} as const;
+
+const BRAND_LOGO_FRAMES: Record<string, { width: number; height: number }> = {
+  chevrolet: { width: 58, height: 30 },
+  byd: { width: 58, height: 26 },
+  leapmotor: { width: 55, height: 34 },
+  volkswagen: { width: 44, height: 44 },
+  vw: { width: 44, height: 44 },
+};
 
 export type VehicleMakeTileProps = {
   /** Brand id used for navigation. */
@@ -33,7 +65,11 @@ const VehicleMakeTile = ({
   onPress,
 }: VehicleMakeTileProps) => {
   const { t } = useTranslation();
-  const { tokens } = useThemeContext();
+  const { tokens, scheme } = useThemeContext();
+  const brandKey = brandId.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const bundledLogo = BUNDLED_BRAND_LOGOS[brandKey as keyof typeof BUNDLED_BRAND_LOGOS];
+  const logoSource = bundledLogo?.[scheme === 'dark' ? 'dark' : 'light'];
+  const logoFrame = BRAND_LOGO_FRAMES[brandKey] ?? { width: 50, height: 50 };
   return (
     <AppPressableView
       onPress={() => onPress(brandId)}
@@ -47,14 +83,30 @@ const VehicleMakeTile = ({
       gap={8}
       style={{ width: 84 }}
     >
-      {/* The chip stays the same white in every state. Dimming the CHIP for
-       *  a coming-soon brand was invisible in light mode (45% white on white)
-       *  and turned it into a muddy grey square in dark, so the row read as
-       *  mismatched tiles rather than as two brands not being live yet. The
-       *  MARK is what fades now — same treatment in both themes. */}
-      <AppView center rounded={20} style={{ width: 65, height: 65, backgroundColor: tokens.white }}>
+      {/* Preserve the white chips in light mode; dark mode uses a raised card
+       *  surface with a quiet outline. Availability dims the mark only. */}
+      <AppView
+        center
+        rounded={20}
+        style={{
+          width: 65,
+          height: 65,
+          backgroundColor: scheme === 'dark' ? tokens.card : tokens.white,
+          borderWidth: scheme === 'dark' ? 1 : 0,
+          borderColor: tokens.divider,
+        }}
+      >
         <AppView style={{ opacity: comingSoon ? 0.55 : 1 }}>
-          <BrandLogo logoUrl={logoUrl} name={label} size={50} color={brandColor(brandId)} />
+          {logoSource ? (
+            <Image
+              source={logoSource}
+              style={logoFrame}
+              contentFit="contain"
+              accessibilityLabel={t('make.brandLogo', { name: label })}
+            />
+          ) : (
+            <BrandLogo logoUrl={logoUrl} name={label} size={50} color={brandColor(brandId)} />
+          )}
         </AppView>
       </AppView>
       <AppView align="center" gap={2} style={{ alignSelf: 'stretch' }}>

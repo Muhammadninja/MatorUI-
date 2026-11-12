@@ -20,7 +20,15 @@ export function OrderLinePrice({ line }: { line?: OrderLinePricing }) {
 }
 
 /** Show supplied fields, including explicit zero; unknown fees stay absent. */
-export function OrderPriceBreakdown({ pricing }: { pricing?: OrderPricing }) {
+export function OrderPriceBreakdown({
+  pricing,
+  hideZeroServiceFee = false,
+  deliveryLabel,
+}: {
+  pricing?: OrderPricing;
+  hideZeroServiceFee?: boolean;
+  deliveryLabel?: string;
+}) {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const rows = [
@@ -31,9 +39,11 @@ export function OrderPriceBreakdown({ pricing }: { pricing?: OrderPricing }) {
   ] as const;
   return (
     <AppView gap={8} testID="order-price-breakdown">
-      {rows.map(([key, label, amount]) => amount == null ? null : (
+      {rows.map(([key, label, amount]) => amount == null || (key === 'serviceFee' && hideZeroServiceFee && amount === 0) ? null : (
         <AppView key={key} row justify="space-between" align="center" gap={12} testID={`order-amount-${key}`}>
-          <AppText textVariant="bodySm" colorName="textMuted" style={{ flex: 1 }}>{t(label)}</AppText>
+          <AppText textVariant="bodySm" colorName="textMuted" style={{ flex: 1 }}>
+            {key === 'delivery' && deliveryLabel ? deliveryLabel : t(label)}
+          </AppText>
           <AppView row align="center" gap={2}>
             {key === 'discount' && amount > 0 ? <AppText colorName="text">−</AppText> : null}
             <AppPrice value={formatOrderMoney(amount)} size={14} color={tokens.text} />

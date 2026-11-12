@@ -1,10 +1,15 @@
 // Test-only implementations. Never imported by application code.
-import { STANDARD_DELIVERY_UZS } from '@/services/cart-math';
 import type {
   Address,
   AddressInput,
+  AddressSearchQuery,
+  AddressSuggestion,
+  AddressSuggestions,
   CreateOrderInput,
+  DeliveryCoverageInfo,
+  DeliveryPoint,
   CreateOrderResult,
+  OrderCharges,
   OrderDetail,
   OrderListPage,
   OrderListRow,
@@ -12,11 +17,11 @@ import type {
   OrderStatus,
   PaymentMethod,
   PaymentMethodInput,
+  PaymentType,
+  PickupPoint,
+  PointDescription,
   ShippingOption,
 } from '@/services/orders-service';
-import { shouldUseHttpTransport } from '@/config/api';
-import { apiClient, ApiError } from '@/services/api-client';
-import { debugLog } from '@/services/debug-log';
 
 import type { OrderListRequest, ShippingQuoteRequest, OrdersTransport } from "@/services/orders-api";
 
@@ -47,6 +52,8 @@ const SEED_ADDRESSES: Address[] = [
     line1: '128 Marrakesh Rd, Suite 4',
     city: 'Brooklyn, NY 11211',
     isDefault: true,
+    lat: 41.3111,
+    lng: 69.2797,
   },
   {
     id: 'addr_shop',
@@ -55,6 +62,8 @@ const SEED_ADDRESSES: Address[] = [
     line1: '2210 W Industrial Blvd',
     city: 'Long Island City, NY 11101',
     isDefault: false,
+    lat: 41.3385,
+    lng: 69.3345,
   },
 ];
 
@@ -63,11 +72,33 @@ const SEED_PAYMENT_METHODS: PaymentMethod[] = [
   { id: 'pm_visa_1881', brand: 'Visa', last4: '1881', exp: '03/26', isDefault: false },
 ];
 
-// Mirrors the real backend quote (`shipping.service.ts`): pickup is free,
-// courier is the flat `DELIVERY_COURIER_UZS` fee (default 25,000).
-const BASE_SHIPPING_OPTIONS: ShippingOption[] = [
-  { key: 'pickup', label: 'Pickup', eta: 'Today', price: 0 },
-  { key: 'courier', label: 'Courier', eta: '1-3 days', price: STANDARD_DELIVERY_UZS },
+// Mock only: the real price comes from the backend's quote, per address and seller.
+const MOCK_COURIER_PRICE_UZS = 15_000;
+
+// Mock only: the real matches come from the backend's address search.
+const MOCK_ADDRESS_SUGGESTIONS: AddressSuggestion[] = [
+  {
+    id: 'mock_1',
+    title: 'Amir Temur 12',
+    subtitle: 'Yunusobod, Toshkent',
+    city: 'Toshkent',
+    district: 'Yunusobod',
+    street: 'Amir Temur',
+    houseNumber: '12',
+    lat: 41.3111,
+    lng: 69.2797,
+  },
+  {
+    id: 'mock_2',
+    title: 'Navoiy 5',
+    subtitle: 'Shayxontohur, Toshkent',
+    city: 'Toshkent',
+    district: 'Shayxontohur',
+    street: 'Navoiy',
+    houseNumber: '5',
+    lat: 41.3225,
+    lng: 69.2391,
+  },
 ];
 
 function detailFor(row: { id: string; total: string }, statusKey: 'in_transit' | 'delivered' | 'cancelled'): OrderDetail {
@@ -165,6 +196,20 @@ export class MockOrdersTransport implements OrdersTransport {
     return this.details[orderId] ?? null;
   }
 
+  async cancelOrder(orderId: string): Promise<OrderDetail> {
+    await delay(MOCK_LATENCY_MS);
+    const current = this.details[orderId];
+    if (!current) throw new Error('Order not found');
+    const cancelled: OrderDetail = {
+      ...current,
+      status: 'cancelled',
+      statusLabel: 'Cancelled',
+      serverStatus: 'cancelled',
+    };
+    this.details[orderId] = cancelled;
+    return cancelled;
+  }
+
   async createOrder(
     input: CreateOrderInput,
     _signal?: AbortSignal,
@@ -174,8 +219,7 @@ export class MockOrdersTransport implements OrdersTransport {
       throw new Error('Cart is empty');
     }
     const orderId = `M-${Math.floor(40000 + Math.random() * 60000)}`;
-    const shipping = BASE_SHIPPING_OPTIONS.find((o) => o.key === input.shippingOptionKey);
-    const eta = shipping?.eta ?? '1-3 days';
+    const eta = input.shippingOptionKey === 'pickup' ? 'Today' : '1-3 days';
     // Real server calculates this authoritatively; the mock echoes the
     // client's optimistic grand-total hint so the just-placed order's
     // confirmation + track screens show a real total instead of a blank.
@@ -193,6 +237,32 @@ export class MockOrdersTransport implements OrdersTransport {
   async listAddresses(signal?: AbortSignal): Promise<Address[]> {
     await delay(MOCK_LATENCY_MS, signal);
     return this.addresses.map((a) => ({ ...a }));
+  }
+
+  async searchAddresses(
+    query: AddressSearchQuery,
+    signal?: AbortSignal,
+  ): Promise<AddressSuggestions> {
+    await delay(MOCK_LATENCY_MS, signal);
+    const typed = query.street.trim().toLowerCase();
+    return {
+      items: MOCK_ADDRESS_SUGGESTIONS.filter((s) => s.title.toLowerCase().includes(typed)),
+      attribution: null,
+    };
+  }
+
+  async describePoint(
+    _point: DeliveryPoint,
+    _lang: string,
+    signal?: AbortSignal,
+  ): Promise<PointDescription> {
+    await delay(MOCK_LATENCY_MS, signal);
+    return { address: null, withinCoverage: true, attribution: null };
+  }
+
+  async getDeliveryCoverage(signal?: AbortSignal): Promise<DeliveryCoverageInfo> {
+    await delay(MOCK_LATENCY_MS, signal);
+    return { configured: true, bounds: null, polygons: null };
   }
 
   async createAddress(input: AddressInput): Promise<Address> {
@@ -277,12 +347,41 @@ export class MockOrdersTransport implements OrdersTransport {
   }
 
   async getShippingQuote(
-    _request: ShippingQuoteRequest,
+    request: ShippingQuoteRequest,
     signal?: AbortSignal,
   ): Promise<ShippingOption[]> {
     await delay(MOCK_LATENCY_MS, signal);
-    // Mirrors the real backend's flat quote (shipping.service.ts): pickup is
-    // free, courier is a flat fee — no subtotal-based threshold exists there.
-    return BASE_SHIPPING_OPTIONS;
+    // Answers like the real backend does: pickup always, and a courier that an address with
+    // no location cannot have, so the screen's refusal state can be exercised.
+    const pickup: ShippingOption = { key: 'pickup', label: 'Pickup', price: 0, quoteId: null };
+    const address = this.addresses.find((a) => a.id === request.addressId);
+    if (address?.lat == null || address.lng == null) {
+      return [
+        pickup,
+        {
+          key: 'courier',
+          label: 'Courier',
+          available: false,
+          price: null,
+          quoteId: null,
+          unavailableCode: 'DELIVERY_ADDRESS_COORDINATES_MISSING',
+        },
+      ];
+    }
+    return [
+      pickup,
+      {
+        key: 'courier',
+        label: 'Courier',
+        price: MOCK_COURIER_PRICE_UZS,
+        quoteId: `mock_quote_${request.addressId}`,
+      },
+    ];
+  }
+
+  async getPickupPoints(signal?: AbortSignal): Promise<PickupPoint[]> {
+    await delay(MOCK_LATENCY_MS, signal);
+    // The mock knows no cart and no dealer, so it names no place to collect from.
+    return [];
   }
 }

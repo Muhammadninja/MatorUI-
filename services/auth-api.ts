@@ -13,12 +13,15 @@
  *   POST /v1/auth/phone/request-otp  { phone_e164, country_iso2, channel:'sms', lang }
  *                                      → { request_id, phone_e164, expires_at,
  *                                          resend_after_seconds, otp_length,
- *                                          is_existing_user, next_screen }
+ *                                          next_screen }
+ *                                        (never whether the number has an
+ *                                        account: that is not public)
  *   POST /v1/auth/phone/verify-otp   { request_id, phone_e164, otp_code }
  *                                      → { user, tokens }
  *   POST /v1/auth/token/refresh      { refresh_token } → { user?, tokens }
- *   (Sign-out has no token-revoke endpoint; the session is cleared locally and
- *    the device is unbound via /v1/devices/unregister — see device-api.)
+ *   POST /v1/auth/logout             { refresh_token, install_id } (Bearer)
+ *                                      → revokes the session and this install's
+ *                                        push registration; best effort
  *
  * `devCode` is a DEV/DEMO convenience: the mock transport (and the offline mock
  * server, via a `dev_otp_code` field) return the just-generated code so demo/E2E
@@ -27,6 +30,7 @@
 
 import { apiClient, ApiError } from '@/services/api-client';
 import { debugLog } from '@/services/debug-log';
+import { getDeviceId } from '@/services/device-id';
 import { allowLocalDevOtp } from '@/config/environment';
 import type { AuthSession } from '@/services/auth-storage';
 import type { LanguageCode } from '@/services/language-storage';
@@ -111,7 +115,10 @@ export interface AuthTransport {
    *     unparseable 2xx body) — the token may still be valid, so the caller
    *     should keep the session and retry on the next request. */
   refresh(refreshToken: string, signal?: AbortSignal): Promise<AuthResult | null>;
-  signOut(refreshToken: string, signal?: AbortSignal): Promise<void>;
+  /** Ends the session on the server: revokes the refresh token, the access
+   *  token that is passed, and this install's push registration. Best effort;
+   *  the caller has already cleared the local session. */
+  signOut(refreshToken: string, signal?: AbortSignal, accessToken?: string): Promise<void>;
 }
 
 // ── HTTP transport (backend.json wire shape) ────────────────────────────
@@ -145,7 +152,6 @@ type RawRequestOtpResponse = {
   resend_after_seconds?: number;
   otp_length?: number;
   delivery_channel?: string;
-  is_existing_user?: boolean;
   next_screen?: string;
   /** MOCK/DEV ONLY — the code, so offline/E2E builds can auto-fill it. */
   dev_otp_code?: string;
@@ -342,10 +348,23 @@ class HttpAuthTransport implements AuthTransport {
     };
   }
 
-  async signOut(_refreshToken: string, _signal?: AbortSignal): Promise<void> {
-    // The backend exposes no token-revoke endpoint; sign-out clears the local
-    // session (auth context) and unbinds the device via /v1/devices/unregister
-    // (device-api). Nothing to call here.
+  async signOut(refreshToken: string, signal?: AbortSignal, accessToken?: string): Promise<void> {
+    // Without the access token the endpoint cannot authenticate the call; the
+    // local session is already gone, so there is nothing more to do.
+    if (!accessToken) return;
+    // The local session was cleared before this runs, so the token is passed
+    // explicitly (`skipAuth` stops the client injecting a now-absent one).
+    // `install_id` lets the backend stop push notifications to this install.
+    await apiClient.post(
+      '/v1/auth/logout',
+      { refresh_token: refreshToken, install_id: await getDeviceId() },
+      {
+        signal,
+        skipAuth: true,
+        maxRetries: 0,
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
+    );
   }
 }
 

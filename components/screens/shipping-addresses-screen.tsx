@@ -4,13 +4,13 @@ import { ScrollView } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { WheelLoader } from '@/components/shared/wheel-loader';
-import { AlertCircle, MapPin } from 'lucide-react-native';
+import { AlertCircle, MapPin, Plus } from 'lucide-react-native';
 
 import AddressFormSheet, {
   type AddressFormValues,
 } from '@/components/screens-components/account/address-form-sheet';
 import { AppButton } from '@/components/shared/app-button';
-import { AppSettingsHeader } from '@/components/shared/app-settings-header';
+import { AppSettingsHeader, HEADER_ACTION_SIZE } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
@@ -66,7 +66,8 @@ export default function ShippingAddressesScreen() {
         }
       } catch (err) {
         debugLog('address', '✗ save FAILED', { message: (err as Error)?.message });
-        toast.danger(t('addresses.saveFailed'));
+        // The form stays open and says why.
+        throw err;
       }
     },
     [editing, updateAddress, createAddress, toast, t],
@@ -96,26 +97,26 @@ export default function ShippingAddressesScreen() {
     [setDefaultAddress, toast, t],
   );
 
+  // The same round 36pt target as the back button, so the title sits on the
+  // screen's center line with room to stay at full size. A text pill here
+  // squeezed the title into the gap between two unequal buttons.
   const addButton = (
     <AppPressableView
+      testID="addresses-add"
+      center
+      rounded={999}
       androidRipple={false}
       onPress={openAdd}
       accessibilityRole="button"
       accessibilityLabel={t('addresses.addNew')}
+      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
       style={{
+        width: HEADER_ACTION_SIZE,
+        height: HEADER_ACTION_SIZE,
         backgroundColor: tokens.brandBg,
-        borderRadius: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 9,
       }}
     >
-      <AppText
-        family="accent"
-        weight="bold"
-        style={{ fontSize: 12, color: tokens.onBrand }}
-      >
-        {t('addresses.addShort')}
-      </AppText>
+      <Plus size={18} strokeWidth={2.4} color={tokens.onBrand} />
     </AppPressableView>
   );
 
@@ -147,14 +148,37 @@ export default function ShippingAddressesScreen() {
           <AppButton title={t('common.retry')} kind="secondary" size="sm" onPress={refresh} />
         </AppView>
       ) : addresses.length === 0 ? (
-        <AppView flex={1} center px={20} gap={10}>
-          <MapPin size={30} strokeWidth={2} color={tokens.textMuted} />
-          <AppText
-            family="default"
-            style={{ fontSize: 13, color: tokens.textMuted, textAlign: 'center' }}
+        // Same composition as the empty cart, sitting slightly above centre.
+        <AppView flex={1} center gap={12} px="xl" style={{ paddingBottom: 72 }}>
+          <AppView
+            center
+            rounded={999}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={{ width: 72, height: 72, backgroundColor: tokens.brandSoft }}
           >
-            {t('addresses.emptyText')}
+            <MapPin size={32} strokeWidth={2} color={tokens.brand} />
+          </AppView>
+          <AppText textVariant="h4" weight="bold" colorName="text" align="center">
+            {t('addresses.emptyTitle')}
           </AppText>
+          <AppText
+            textVariant="bodySm"
+            colorName="textMuted"
+            style={{ textAlign: 'center', maxWidth: 280 }}
+          >
+            {t('addresses.emptySubtitle')}
+          </AppText>
+          {/* The header's plus has no words, so the empty list names the action. */}
+          <AppButton
+            testID="addresses-empty-add"
+            title={t('addresses.addNew')}
+            kind="brand"
+            size="md"
+            fullWidth
+            onPress={openAdd}
+            containerStyle={{ marginTop: 12, width: '100%', maxWidth: 320, alignSelf: 'center' }}
+          />
         </AppView>
       ) : (
         <ScrollView
@@ -246,17 +270,27 @@ const AddressCard = React.memo(function AddressCard({
           {address.name}
         </AppText>
       ) : null}
-      {/* Street */}
-      <AppText
-        family="default"
-        style={{ fontSize: 13, color: tokens.textMuted, marginTop: 2 }}
-      >
-        {address.line1}
-      </AppText>
+      {/* Street. A point saved with no words has none, and no city either. */}
+      {address.line1 ? (
+        <AppText
+          family="default"
+          style={{ fontSize: 13, color: tokens.textMuted, marginTop: 2 }}
+        >
+          {address.line1}
+        </AppText>
+      ) : null}
       {/* City / state / zip */}
-      <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>
-        {address.city}
-      </AppText>
+      {address.city ? (
+        <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>
+          {address.city}
+        </AppText>
+      ) : null}
+      {/* A hint for the courier */}
+      {address.landmark ? (
+        <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>
+          {address.landmark}
+        </AppText>
+      ) : null}
 
       {/* Actions */}
       <AppView row style={{ gap: 16, marginTop: 12 }}>

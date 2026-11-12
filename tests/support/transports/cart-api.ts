@@ -1,6 +1,6 @@
-/** Test double for the cart transport. Tests only: never import this from app code. */
-import type { CartItem, PromoResult } from '@/services/cart-math';
-import type { AddItemInput, CartSnapshot, CartTransport } from '@/services/cart-api';
+/** Test double for the cart transport. Never imported by application code. */
+import type { CartCharges, CartItem, PromoResult } from "@/services/cart-math";
+import type { CartSnapshot, AddItemInput, CartTransport } from "@/services/cart-api";
 
 // ── Mock transport ───────────────────────────────────────────────────
 
@@ -42,7 +42,17 @@ export class MockCartTransport implements CartTransport {
     return {
       items: [...this.items],
       appliedPromoCode: this.appliedPromoCode,
+      charges: this.charges(),
     };
+  }
+
+  /** Mock only: no fee. The real one is the backend's, and the app holds no tariff. */
+  charges(): CartCharges {
+    const subtotal = this.items.reduce(
+      (sum, item) => sum + (Number(item.price.replace(/[^0-9.]/g, '')) || 0) * item.quantity,
+      0,
+    );
+    return { subtotal, discount: 0, serviceFee: 0, total: subtotal };
   }
 
   async addItem(input: AddItemInput): Promise<CartItem> {
@@ -50,7 +60,7 @@ export class MockCartTransport implements CartTransport {
     maybeFail('addItem');
     const existing = this.items.find((i) => i.id === input.productId);
     if (existing) {
-      existing.quantity += 1;
+      existing.quantity += input.quantity ?? 1;
       return { ...existing };
     }
     const created: CartItem = {
@@ -62,7 +72,7 @@ export class MockCartTransport implements CartTransport {
       badge: input.badge,
       status: input.status,
       imageUrl: input.imageUrl,
-      quantity: 1,
+      quantity: input.quantity ?? 1,
     };
     this.items.push(created);
     return { ...created };
@@ -111,4 +121,3 @@ export class MockCartTransport implements CartTransport {
     this.appliedPromoCode = null;
   }
 }
-

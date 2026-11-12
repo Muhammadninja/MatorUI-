@@ -6,7 +6,7 @@ import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import type { AiChatPartGroup } from '@/types/ai-chat';
-import { openItemDetail } from '@/utils/nav';
+import { openChatItemDetail } from '@/utils/nav';
 
 /** Catalog matches as product links, grouped by the part they answer so a
  *  customer can see what each result is for and notice one that's missing. */
@@ -34,7 +34,7 @@ export function AiChatPartLinks({ groups }: { groups: AiChatPartGroup[] }) {
               <AppPressableView
                 key={link.id}
                 testID={`chat-part-link-${link.id}`}
-                onPress={() => openItemDetail(link.id)}
+                onPress={() => openChatItemDetail(link.id)}
                 accessibilityRole="link"
                 accessibilityLabel={t('aiChat.openPartA11y', {
                   title: link.title,

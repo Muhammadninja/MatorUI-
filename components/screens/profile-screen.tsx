@@ -2,17 +2,16 @@ import React from 'react';
 import { Image } from 'react-native';
 
 import { useTranslation } from 'react-i18next';
-import { router, useFocusEffect } from 'expo-router';
-import { Heart, MapPin, ReceiptText, Shield, User } from 'lucide-react-native';
+import { router, useFocusEffect, useNavigationContainerRef } from 'expo-router';
+import { Heart, LogOut, MapPin, ReceiptText, Shield, User } from 'lucide-react-native';
 
 import ProfileGuestEmpty from '@/components/screens-components/profile/profile-guest-empty';
 import ScreenShell from '@/components/screens-components/screen-shell';
 import { AppIconBox } from '@/components/shared/app-icon-box';
 import { AppListItem } from '@/components/shared/app-list-item';
 import AppScrollView from '@/components/shared/app-scroll-view/app-scroll-view';
-import { AppButton } from '@/components/shared/app-button';
 import { AppText } from '@/components/shared/app-text';
-import { AppView } from '@/components/shared/app-view';
+import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useLikesContext } from '@/contexts/likes.context';
 import { debugLog } from '@/services/debug-log';
@@ -22,6 +21,7 @@ import { useOrders } from '@/hooks/use-orders';
 import { useUserContext, type UserProfile } from '@/contexts/user.context';
 
 const SECTION_RADIUS = 16;
+const AVATAR = 60;
 /** Teal outline icon on a pale teal square. */
 const ROW_ICON = {
   size: 40,
@@ -33,6 +33,8 @@ const ROW_ICON = {
 } as const;
 /** Row padding + icon + gap, so dividers start at the text column. */
 const ROW_DIVIDER_INSET = 16 + ROW_ICON.size + 12;
+/** Row padding above and below the 40pt icon: rows are 60pt, down from 72. */
+const ROW_PADDING_Y = 10;
 
 // ── Account list row definitions ─────────────────────────────────────────────
 // Defined at module scope so the array is stable across renders.
@@ -97,8 +99,10 @@ function buildAccountItems(t: (key: string) => string): AccountItem[] {
 
 export default function ProfileScreen() {
   const { t } = useTranslation();
+  const { tokens } = useThemeContext();
   const toast = useToast();
   const { profile, isAuthenticated, isHydrating, signOut, refreshProfile } = useUserContext();
+  const rootNavigation = useNavigationContainerRef();
   const accountItems = React.useMemo(() => buildAccountItems(t), [t]);
 
   // Re-fetch GET /v1/me every time the tab gains focus so freshly-saved fields
@@ -125,7 +129,15 @@ export default function ProfileScreen() {
   const handleSignOut = async () => {
     await signOut();
     toast.info(t('profile.signedOutToast'));
-    router.replace('/explore');
+    // Start navigation over: `router.replace('/explore')` only switched tabs,
+    // so the next person landed on the previous account's last Explore page,
+    // and stale nested params outlived any pop. `__root` is Expo Router's slot
+    // above app/_layout; its `(tabs)` opens on Explore.
+    if (rootNavigation.getRootState()?.routeNames?.includes('__root')) {
+      rootNavigation.reset({ index: 0, routes: [{ name: '__root', state: { index: 0, routes: [{ name: '(tabs)' }] } }] });
+    } else {
+      router.replace('/explore');
+    }
   };
 
   // Brief cold-boot hydrate — avoid flashing the guest state before we know
@@ -168,7 +180,7 @@ export default function ProfileScreen() {
               colorName="card"
               borderWidth={1}
               borderName="border"
-              style={{ overflow: 'hidden', paddingVertical: 12 }}
+              style={{ overflow: 'hidden', paddingVertical: 14 }}
             >
               <StatCell label={t('profile.statOrders')} value={String(orderCount)} />
               <StatDivider />
@@ -193,7 +205,7 @@ export default function ProfileScreen() {
                   {...item}
                   titleWeight="medium"
                   size="md"
-                  style={{ minHeight: 62 }}
+                  py={ROW_PADDING_Y}
                   dividerInset={ROW_DIVIDER_INSET}
                   _isFirst={index === 0}
                   _isLast={index === accountItems.length - 1}
@@ -205,17 +217,30 @@ export default function ProfileScreen() {
             </AppView>
           </AppView>
 
-          {/* Separate from the menu and quiet: a ghost button in the error colour. */}
+          {/* Separate from the menu and quiet: an outlined row with a red icon,
+           *  not red text floating on the page. */}
           <AppView px="lg">
-            <AppButton
+            <AppPressableView
               testID="profile-sign-out"
-              title={t('profile.signOut')}
-              variant="ghost"
-              kind="error"
-              size="lg"
-              fullWidth
               onPress={handleSignOut}
-            />
+              accessibilityRole="button"
+              accessibilityLabel={t('profile.signOut')}
+              androidRipple={false}
+              pressedOpacity={0.7}
+              rounded={SECTION_RADIUS}
+              colorName="card"
+              borderWidth={1}
+              borderName="border"
+              row
+              center
+              gap={8}
+              style={{ minHeight: 52, paddingHorizontal: 16 }}
+            >
+              <LogOut size={20} strokeWidth={2} color={tokens.error} />
+              <AppText weight="semibold" style={{ fontSize: 15, lineHeight: 20, color: tokens.text }}>
+                {t('profile.signOut')}
+              </AppText>
+            </AppPressableView>
           </AppView>
         </AppView>
       </AppScrollView>
@@ -239,27 +264,29 @@ function ProfileHeader({ profile }: { profile: UserProfile }) {
   const [imgFailed, setImgFailed] = React.useState(false);
   React.useEffect(() => setImgFailed(false), [avatarUri]);
   const showAvatar = !!avatarUri && !imgFailed;
+  const contact = profile.email || profile.phone || '';
 
   return (
-    <AppView row align="center" gap="md" px="lg" style={{ paddingTop: 8 }}>
-      {/* 64px avatar, or a monogram when it's missing or fails to load. */}
+    <AppView row align="center" gap={14} px="lg" style={{ paddingTop: 4, paddingBottom: 2 }}>
+      {/* 60pt avatar with a soft brand ring, or a monogram when it's missing or
+       *  fails to load. */}
       <AppView
         center
         rounded={999}
         style={{
-          width: 64,
-          height: 64,
+          width: AVATAR,
+          height: AVATAR,
           flexShrink: 0,
           overflow: 'hidden',
           backgroundColor: tokens.brandSoft,
-          borderWidth: 1,
-          borderColor: tokens.border,
+          borderWidth: 2,
+          borderColor: tokens.brandSoft,
         }}
       >
         {showAvatar ? (
           <Image
             source={{ uri: avatarUri }}
-            style={{ width: 64, height: 64 }}
+            style={{ width: AVATAR, height: AVATAR }}
             onError={(e) => {
               debugLog('profile', '✗ avatar image failed to load', {
                 url: avatarUri,
@@ -272,21 +299,26 @@ function ProfileHeader({ profile }: { profile: UserProfile }) {
           <AppText
             family="heading"
             weight="bold"
-            style={{ fontSize: 22, lineHeight: 26, color: tokens.brand }}
+            style={{ fontSize: 22, lineHeight: 26, color: tokens.brandText }}
           >
             {monogram}
           </AppText>
         )}
       </AppView>
 
-      {/* Name + contact line; the column wraps long names. */}
-      <AppView style={{ flex: 1, minWidth: 0 }}>
-        <AppText textVariant="h4" weight="bold" style={{ color: tokens.text }}>
+      {/* Name + contact line, centred on the avatar; the column wraps long names. */}
+      <AppView justify="center" gap={4} style={{ flex: 1, minWidth: 0 }}>
+        <AppText family="heading" weight="bold" style={{ fontSize: 22, lineHeight: 26, color: tokens.text }}>
           {fullName || t('profile.namePlaceholder')}
         </AppText>
-        <AppText textVariant="bodySm" style={{ color: tokens.textMuted, marginTop: 2 }}>
-          {profile.email || profile.phone || ''}
-        </AppText>
+        {contact ? (
+          <AppText
+            textVariant="bodySm"
+            style={{ color: tokens.textMuted, fontVariant: ['tabular-nums'] }}
+          >
+            {contact}
+          </AppText>
+        ) : null}
       </AppView>
     </AppView>
   );
@@ -299,9 +331,9 @@ function StatCell({ label, value }: { label: string; value: string }) {
   return (
     <AppView flex={1} align="center" gap={2} style={{ paddingHorizontal: 8 }}>
       <AppText
-        textVariant="h4"
+        family="heading"
         weight="bold"
-        style={{ color: tokens.text, fontVariant: ['tabular-nums'] }}
+        style={{ fontSize: 24, lineHeight: 28, color: tokens.text, fontVariant: ['tabular-nums'] }}
       >
         {value}
       </AppText>
@@ -313,7 +345,7 @@ function StatCell({ label, value }: { label: string; value: string }) {
         numberOfLines={1}
         adjustsFontSizeToFit
         minimumFontScale={0.6}
-        style={{ color: tokens.textMuted }}
+        style={{ fontSize: 11, lineHeight: 14, color: tokens.textMuted }}
       >
         {label}
       </AppText>

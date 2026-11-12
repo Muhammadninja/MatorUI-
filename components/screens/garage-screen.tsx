@@ -1,5 +1,5 @@
-import { router } from 'expo-router';
-import { useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AlertCircle } from 'lucide-react-native';
 import { RefreshControl } from 'react-native';
@@ -114,6 +114,16 @@ export default function GarageScreen() {
     }
     setPickingVehicle(true);
   };
+
+  // Explore's empty-garage hero links here with `add=1`: run the same add flow
+  // once, then drop the flag so Back or a re-render doesn't reopen the sheet.
+  const { add } = useLocalSearchParams<{ add?: string }>();
+  useEffect(() => {
+    if (add !== '1') return;
+    router.setParams({ add: undefined });
+    startAdd();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per link
+  }, [add]);
 
   // Route 2, submit: make + model + year in hand -> create.
   //

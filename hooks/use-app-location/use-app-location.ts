@@ -21,11 +21,18 @@ export type AppCoords = {
 
 export type PermissionStatus = 'unknown' | 'granted' | 'denied';
 
+/** Why the last request returned no position: the user refused access, or the
+ *  device could not produce a fix (GPS off, no signal, timeout). */
+export type LocationFailure = 'denied' | 'unavailable';
+
 export type UseAppLocationValue = {
   coords: AppCoords | null;
   isLoading: boolean;
   error: string | null;
   permission: PermissionStatus;
+  /** Why the last request returned no position (null after a success). Read it
+   *  once `requestAndGetPosition` has settled. */
+  lastFailure: () => LocationFailure | null;
   /** Asks for permission if needed, then resolves with the current position. */
   requestAndGetPosition: () => Promise<AppCoords | null>;
   /** Returns the last cached position without prompting. */
@@ -47,6 +54,7 @@ export function useAppLocation(): UseAppLocationValue {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [permission, setPermission] = useState<PermissionStatus>('unknown');
+  const failureRef = useRef<LocationFailure | null>(null);
   const cancelledRef = useRef(false);
 
   useEffect(() => {
@@ -58,12 +66,14 @@ export function useAppLocation(): UseAppLocationValue {
   const requestAndGetPosition = useCallback(async (): Promise<AppCoords | null> => {
     setIsLoading(true);
     setError(null);
+    failureRef.current = null;
     try {
       const perm = await Location.requestForegroundPermissionsAsync();
       if (cancelledRef.current) return null;
       if (perm.status !== 'granted') {
         setPermission('denied');
         setError('Location permission denied');
+        failureRef.current = 'denied';
         return null;
       }
       setPermission('granted');
@@ -78,6 +88,7 @@ export function useAppLocation(): UseAppLocationValue {
       if (cancelledRef.current) return null;
       const message = err instanceof Error ? err.message : 'Location request failed';
       setError(message);
+      failureRef.current = 'unavailable';
       return null;
     } finally {
       if (!cancelledRef.current) setIsLoading(false);
@@ -85,10 +96,12 @@ export function useAppLocation(): UseAppLocationValue {
   }, []);
 
   const getLast = useCallback(() => coords, [coords]);
+  const lastFailure = useCallback(() => failureRef.current, []);
 
   const reset = useCallback(() => {
     setCoords(null);
     setError(null);
+    failureRef.current = null;
     setIsLoading(false);
   }, []);
 
@@ -97,6 +110,7 @@ export function useAppLocation(): UseAppLocationValue {
     isLoading,
     error,
     permission,
+    lastFailure,
     requestAndGetPosition,
     getLast,
     reset,

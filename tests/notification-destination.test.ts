@@ -7,7 +7,10 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 
-import { notificationDestination } from '@/components/screens-components/notifications/notification-destination';
+import {
+  notificationDestination,
+  pushNotificationDestination,
+} from '@/components/screens-components/notifications/notification-destination';
 import type { NotificationItem } from '@/services/notifications-service';
 
 const row = (over: Partial<NotificationItem>) => ({ id: 'n1', ...over }) as NotificationItem;
@@ -52,6 +55,45 @@ describe('notificationDestination', () => {
 
   test('no link means no destination', () => {
     expect(notificationDestination(row({ type: 'other' }), false)).toBeNull();
+  });
+});
+
+// Push `data` as the backend's Expo provider sends it: the inbox row's `data`,
+// plus `notification_id`, lower-case `type` and the link under `deeplink`.
+describe('pushNotificationDestination', () => {
+  test.each([
+    ['order_status_changed', { order_id: 'ord/1', status: 'shipped' }],
+    ['order_paid', { order_id: 'ord/1', payment_id: 'pay1' }],
+  ])('%s push opens that order on track-order', (type, data) => {
+    const push = { ...data, notification_id: 'ntf1', type, deeplink: TAB_ORDER_LINK };
+    expect(pushNotificationDestination(push)).toBe('/track-order?orderId=ord%2F1');
+  });
+
+  test('a car push opens the root vehicle screen', () => {
+    const push = {
+      vehicle_id: 'veh 1',
+      notification_id: 'ntf1',
+      type: 'vehicle_status_updated',
+      deeplink: '/(tabs)/(garage)/vehicle/veh 1',
+    };
+    expect(pushNotificationDestination(push)).toBe('/notification-vehicle?id=veh%201');
+  });
+
+  test.each([
+    ['deeplink', { deeplink: '/sourcing/offer/o1' }],
+    ['legacy deeplinkPath', { deeplinkPath: '/sourcing/offer/o1' }],
+  ])('a root link under %s is followed', (_, link) => {
+    expect(pushNotificationDestination({ type: 'sourcing_offer', ...link })).toBe(
+      '/sourcing/offer/o1',
+    );
+  });
+
+  test('an order push without an id, carrying only a tab link, goes nowhere', () => {
+    expect(pushNotificationDestination({ type: 'order_paid', deeplink: TAB_ORDER_LINK })).toBeNull();
+  });
+
+  test.each([undefined, null, 'x', {}])('unusable data goes nowhere: %s', (data) => {
+    expect(pushNotificationDestination(data)).toBeNull();
   });
 });
 

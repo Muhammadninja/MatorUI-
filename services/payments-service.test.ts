@@ -2,11 +2,9 @@
  * payments-service — HTTP transport contract tests.
  *
  * Pins the LIVE invoice wire contract (POST /v1/payments/:provider/invoices →
- * { deep_link, https_fallback, payment_id }) and the FAIL-OPEN behavior: an
- * endpoint that can't charge online (404/501 not live, or 400 order not
- * chargeable) must degrade to `unsupported` so a placed order still completes,
- * while a real transport error (network/5xx) must surface so the caller can
- * tell the buyer payment couldn't start.
+ * { deep_link, https_fallback, payment_id }) and that nothing here fails open: a
+ * refusal of any kind surfaces with its code, so an order the backend would not
+ * charge can never be taken for one that needs no payment.
  */
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -81,24 +79,22 @@ describe('HttpPaymentsTransport — startPayment', () => {
     });
   });
 
-  test('2xx with no url → unsupported (never opens a dead tab)', async () => {
+  test('2xx with no url is a failure: there is nothing to pay with', async () => {
     post.mockResolvedValueOnce({});
-    expect(await paymentsTransport.startPayment(input)).toEqual({ status: 'unsupported' });
+    await expect(paymentsTransport.startPayment(input)).rejects.toMatchObject({
+      code: 'PAYMENT_LINK_MISSING',
+    });
   });
 
-  test('404 (endpoint not live) → unsupported (fail open)', async () => {
-    post.mockRejectedValueOnce(new ApiError(404, 'NOT_FOUND', 'no route'));
-    expect(await paymentsTransport.startPayment(input)).toEqual({ status: 'unsupported' });
-  });
-
-  test('501 (not implemented) → unsupported (fail open)', async () => {
-    post.mockRejectedValueOnce(new ApiError(501, 'NOT_IMPLEMENTED', 'todo'));
-    expect(await paymentsTransport.startPayment(input)).toEqual({ status: 'unsupported' });
-  });
-
-  test('400 (order not chargeable online, e.g. fiscal data) → unsupported (fail open)', async () => {
-    post.mockRejectedValueOnce(new ApiError(400, 'BAD_REQUEST', 'not fiscalizable'));
-    expect(await paymentsTransport.startPayment(input)).toEqual({ status: 'unsupported' });
+  test.each([
+    [400, 'FISCAL_DATA_INCOMPLETE'],
+    [409, 'PART_UNAVAILABLE'],
+    [400, 'BAD_REQUEST'],
+    [404, 'NOT_FOUND'],
+    [501, 'NOT_IMPLEMENTED'],
+  ])('a %i %s surfaces with its code, never as "nothing to pay"', async (status, code) => {
+    post.mockRejectedValueOnce(new ApiError(status, code, 'refused'));
+    await expect(paymentsTransport.startPayment(input)).rejects.toMatchObject({ code });
   });
 
   test('network/5xx error → throws (caller tells the buyer)', async () => {

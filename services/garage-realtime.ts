@@ -37,6 +37,9 @@ export type GarageRealtimeConfig = {
   userId: string;
 };
 
+/** Marker subprotocol; the token follows it. Must match the backend gateway. */
+export const WS_BEARER_PROTOCOL = 'mator.bearer';
+
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const HEARTBEAT_TIMEOUT_MS = 45_000;
 const MAX_BACKOFF_MS = 30_000;
@@ -136,10 +139,15 @@ export class GarageRealtimeClient {
       return;
     }
     if (this.explicitClose) return;
-    const url = this.buildUrl(token);
+    const url = this.buildUrl();
     let socket: WebSocket;
     try {
-      socket = new WebSocket(url);
+      // The access token rides in the `Sec-WebSocket-Protocol` handshake
+      // header, not the URL: URLs end up in proxy access logs. The gateway
+      // selects the marker protocol and never echoes the token.
+      socket = token
+        ? new WebSocket(url, [WS_BEARER_PROTOCOL, token])
+        : new WebSocket(url);
     } catch {
       this.scheduleReconnect();
       return;
@@ -303,18 +311,9 @@ export class GarageRealtimeClient {
     return `${GARAGE_SOCKET_CHANNEL}:${this.config.userId}`;
   }
 
-  private buildUrl(token: string | null): string {
+  private buildUrl(): string {
     if (!this.config) return '';
     const url = new URL(this.config.url);
-    // Browser/RN `WebSocket` can't set an Authorization header on the
-    // handshake, so the token rides as a query param. The gateway reads
-    // `Authorization: Bearer` first and falls back to `?token=` (the
-    // documented fallback), so send `token`. `access_token` is kept as a
-    // legacy alias in case an older gateway build still reads it.
-    if (token) {
-      url.searchParams.set('token', token);
-      url.searchParams.set('access_token', token);
-    }
     url.searchParams.set('channel', this.buildChannelName());
     return url.toString();
   }

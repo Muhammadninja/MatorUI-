@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 
+import { pushNotificationDestination } from '@/components/screens-components/notifications/notification-destination';
 import { useUserContext } from '@/contexts/user.context';
 import { useAppNotifications } from '@/hooks/use-app-notifications';
 import { getDeviceId } from '@/services/device-id';
@@ -14,7 +15,7 @@ import { registerDevice } from '@/services/notifications-service';
  * Expo push token → `POST /v1/devices/register` — so server/admin delivery-status
  * pushes actually reach the device (the in-app inbox already works via
  * `GET /v1/notifications`; this adds the OS-level banner). Also routes a tapped
- * notification to its backend-supplied `deeplinkPath`.
+ * notification the same way the in-app feed routes that notification.
  *
  * Best-effort: mount once near the app root. It never throws into render, and if
  * token acquisition fails (e.g. a simulator without an EAS projectId) it simply
@@ -24,10 +25,7 @@ export function useDeviceRegistration(): void {
   const { isAuthenticated } = useUserContext();
 
   const onResponse = useCallback((response: NotificationResponse) => {
-    const data = response.notification.request.content.data as
-      | { deeplinkPath?: unknown }
-      | undefined;
-    const path = typeof data?.deeplinkPath === 'string' ? data.deeplinkPath : null;
+    const path = pushNotificationDestination(response.notification.request.content.data);
     if (!path) return;
     try {
       router.push(path as never);
