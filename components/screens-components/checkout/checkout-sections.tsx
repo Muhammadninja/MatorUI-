@@ -280,8 +280,11 @@ export function PaymentRow({
       <AppView row align="center" gap={12}>
         <PaymentOptionMark option={option} width={48} iconSize={20} color={tokens.text} />
         <AppView flex={1}>
-          <AppText family="default" weight="semibold" style={{ fontSize: 15, color: tokens.text }}>{t(option.labelKey)}</AppText>
-          <AppText family="default" style={{ fontSize: 12, color: tokens.textMuted, marginTop: 1 }}>{t(option.descriptionKey)}</AppText>
+          {/* A provider logo already names the method; the label stays for screen readers. */}
+          {option.logo ? null : (
+            <AppText family="default" weight="semibold" style={{ fontSize: 15, color: tokens.text }}>{t(option.labelKey)}</AppText>
+          )}
+          <AppText family="default" style={{ fontSize: 12, color: tokens.textMuted, marginTop: option.logo ? 0 : 1 }}>{t(option.descriptionKey)}</AppText>
         </AppView>
         <RadioMark tokens={tokens} selected={selected} />
       </AppView>

@@ -50,10 +50,17 @@ export default function PaymentMethodsScreen() {
                 </AppView>
               )}
               <AppView flex={1}>
-                <AppText family="heading" weight="bold" style={{ fontSize: 16, color: tokens.text }}>
-                  {t(opt.labelKey)}
-                </AppText>
-                <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted, marginTop: 2 }}>
+                {/* A provider logo already names the method. */}
+                {opt.logo ? null : (
+                  <AppText family="heading" weight="bold" style={{ fontSize: 16, color: tokens.text }}>
+                    {t(opt.labelKey)}
+                  </AppText>
+                )}
+                <AppText
+                  family="default"
+                  accessibilityLabel={opt.logo ? `${t(opt.labelKey)}. ${t(opt.descriptionKey)}` : undefined}
+                  style={{ fontSize: 13, color: tokens.textMuted, marginTop: opt.logo ? 0 : 2 }}
+                >
                   {t(opt.descriptionKey)}
                 </AppText>
               </AppView>
