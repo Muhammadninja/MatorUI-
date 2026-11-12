@@ -5,6 +5,9 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { useUserContext } from '@/contexts/user.context';
+import { submitOrderAttempt } from '@/services/order-attempt';
+
 import {
   ordersTransport,
   type OrderListRequest,
@@ -153,9 +156,15 @@ export type UseCreateOrderValue = {
 
 export function useCreateOrder(): UseCreateOrderValue {
   const [result, setResult] = useState<CreateOrderResult | null>(null);
+  const ownerId = useUserContext().profile?.id ?? null;
 
   const mutation = useMutation({
-    mutationFn: (input: CreateOrderInput) => ordersTransport.createOrder(input),
+    // Every attempt at this checkout sends one Idempotency-Key, kept across failures and
+    // restarts until the server confirms the order: a lost answer cannot place two orders.
+    mutationFn: (input: CreateOrderInput) =>
+      submitOrderAttempt(ownerId, input, (keyed) => ordersTransport.createOrder(keyed)),
+    // Only the buyer retries an order, and then under the same key.
+    retry: false,
     onSuccess: (r) => setResult(r),
   });
 
