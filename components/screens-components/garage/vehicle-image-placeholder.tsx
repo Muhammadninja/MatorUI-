@@ -49,7 +49,7 @@ export default function VehicleImagePlaceholder({
       <Image
         source={universalPlaceholderArt}
         contentFit="contain"
-        style={{ width, height, opacity: scheme === 'dark' ? 0.6 : 1 }}
+        style={{ width, height, opacity: scheme === 'dark' ? 0.7 : 1 }}
         accessibilityIgnoresInvertColors
         accessible={false}
       />
@@ -70,16 +70,16 @@ export default function VehicleImagePlaceholder({
           gap={4}
           style={{
             maxWidth: width,
-            paddingHorizontal: 7,
-            paddingVertical: 2,
+            paddingHorizontal: 8,
+            paddingVertical: 3,
             borderRadius: 999,
             borderWidth: 1,
             borderColor: tokens.border,
             backgroundColor: tokens.card,
           }}
         >
-          <ImagePlus size={10} strokeWidth={2} color={tokens.textMuted} />
-          <AppText family="default" weight="medium" style={{ fontSize: 10, lineHeight: 13, color: tokens.textMuted, flexShrink: 1 }}>
+          <ImagePlus size={11} strokeWidth={2} color={tokens.textMuted} />
+          <AppText family="default" weight="medium" style={{ fontSize: 11.5, lineHeight: 15, color: tokens.textMuted, flexShrink: 1 }}>
             {message}
           </AppText>
         </AppView>
