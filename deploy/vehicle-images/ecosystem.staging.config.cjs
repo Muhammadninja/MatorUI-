@@ -4,6 +4,8 @@ module.exports = {
     script: 'scripts/vehicle-image-server.mjs',
     interpreter: 'node',
     cwd: '/opt/mator/vehicle-image-pipeline-staging',
+    uid: 'mator-vehicle-images-staging',
+    gid: 'mator-vehicle-images-staging',
     instances: 1,
     exec_mode: 'fork',
     autorestart: true,
