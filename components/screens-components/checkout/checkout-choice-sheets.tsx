@@ -239,6 +239,7 @@ export function CheckoutChoiceSheets({
             testID="checkout-items-subtotal"
             label={t('checkout.subtotal')}
             value={formatCurrency(productsSubtotal)}
+            valueColor={tokens.brandText}
             tokens={tokens}
           />
         }

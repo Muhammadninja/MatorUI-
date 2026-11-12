@@ -45,16 +45,19 @@ export function SummaryRow({
   value,
   tokens,
   testID,
+  valueColor,
 }: {
   label: string;
   value: string;
   tokens: Tokens;
   testID?: string;
+  /** Defaults to the text colour. */
+  valueColor?: string;
 }) {
   return (
     <AppView row justify="space-between" testID={testID}>
       <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted }}>{label}</AppText>
-      <AppText family="accent" weight="semibold" style={{ fontSize: 14, color: tokens.text }}>{value}</AppText>
+      <AppText family="accent" weight="semibold" style={{ fontSize: 14, color: valueColor ?? tokens.text }}>{value}</AppText>
     </AppView>
   );
 }
