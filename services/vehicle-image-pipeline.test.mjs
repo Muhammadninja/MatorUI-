@@ -9,7 +9,10 @@ import { createVehicleImagePipeline, vehicleIdentityKey } from './vehicle-image-
 import { processGeneratedImage } from './vehicle-image-processing.mjs';
 import { buildVehicleImagePrompt, OpenAIImageProvider } from './vehicle-image-provider.mjs';
 import { createCloudinaryAssetStore } from './vehicle-image-cloudinary-store.mjs';
-import { isVehicleImageGenerationEnabled } from './vehicle-image-env.mjs';
+import {
+  isVehicleImageCloudinaryPublicationEnabled,
+  isVehicleImageGenerationEnabled,
+} from './vehicle-image-env.mjs';
 
 const dirs = [];
 const token = 'local-admin-token-for-tests';
@@ -42,17 +45,21 @@ async function setup(options = {}) {
     retryDelayMs: 0,
     autoRun: false,
     generationEnabled: options.generationEnabled ?? Boolean(options.provider),
+    cloudinaryPublicationEnabled: options.cloudinaryPublicationEnabled ?? Boolean(options.assetStore),
     ...options,
   });
   await pipeline.initialize();
   return { pipeline, dataDir };
 }
-function invokeServer(server, { method, url, token }) {
+function invokeServer(server, { method, url, token, body }) {
   return new Promise((resolve) => {
-    const request = Readable.from([]);
+    const request = Readable.from(body ? [Buffer.from(JSON.stringify(body))] : []);
     request.method = method;
     request.url = url;
-    request.headers = token ? { authorization: `Bearer ${token}` } : {};
+    request.headers = {
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...(body ? { 'content-type': 'application/json' } : {}),
+    };
     const response = {
       writeHead(status) { this.status = status; },
       end(raw) { resolve({ status: this.status, body: raw ? JSON.parse(raw) : null }); },
@@ -70,6 +77,28 @@ describe('vehicle image pipeline', () => {
     expect(isVehicleImageGenerationEnabled('false')).toBe(false);
     expect(isVehicleImageGenerationEnabled('TRUE')).toBe(false);
     expect(isVehicleImageGenerationEnabled('true')).toBe(true);
+    expect(isVehicleImageCloudinaryPublicationEnabled(undefined)).toBe(false);
+    expect(isVehicleImageCloudinaryPublicationEnabled('false')).toBe(false);
+    expect(isVehicleImageCloudinaryPublicationEnabled('TRUE')).toBe(false);
+    expect(isVehicleImageCloudinaryPublicationEnabled('true')).toBe(true);
+  });
+
+  it('keeps candidate approval local while Cloudinary publication is disabled', async () => {
+    const publish = vi.fn();
+    const { pipeline } = await setup({
+      assetStore: { publish },
+      cloudinaryPublicationEnabled: false,
+    });
+    const result = await pipeline.submitRequest({ make: 'BYD', model: 'Han', year: 2024 });
+    const candidate = await pipeline.uploadCandidate(
+      result.request.id,
+      { contentType: 'image/png', bytes: await fixtureImage() },
+      true,
+    );
+    const approved = await pipeline.decideCandidate(candidate.id, 'approve', true);
+    expect(approved.status).toBe('approved');
+    expect(publish).not.toHaveBeenCalled();
+    expect(pipeline.resolve(result.request.identityKey).url).toMatch(/^\/published\//);
   });
 
   it('records canonical requests without provider calls, including admin processing and restart', async () => {
@@ -89,18 +118,41 @@ describe('vehicle image pipeline', () => {
       generationId: 'nexia-2', faceliftId: null, bodyType: null, trimId: null,
     };
     const vehicle = { manufacturer: 'Daewoo', model: 'Nexia', generation: 'Nexia 2' };
-    const first = await pipeline.submitCanonicalRequest({ identity, vehicle });
-    const duplicate = await pipeline.submitCanonicalRequest({ identity, vehicle });
-    expect(first.job.status).toBe('queued');
-    expect(duplicate.duplicate).toBe(true);
-    expect(duplicate.job).toBeNull();
+    const requestBody = { identity, vehicle };
+    const first = await invokeServer(pipeline.server(), {
+      method: 'POST', url: '/internal/v1/vehicle-images/requests',
+      token: requestToken, body: requestBody,
+    });
+    expect(first.status, JSON.stringify(first.body)).toBe(202);
+    expect(first.body.status).toBe('queued');
+    const duplicate = await invokeServer(pipeline.server(), {
+      method: 'POST', url: '/internal/v1/vehicle-images/requests',
+      token: requestToken, body: requestBody,
+    });
+    expect(duplicate.status).toBe(202);
+    expect(duplicate.body.deduplicated).toBe(true);
 
-    await pipeline.runQueuedJobs();
+    const unauthorizedRequest = await invokeServer(pipeline.server(), {
+      method: 'POST', url: '/internal/v1/vehicle-images/requests',
+      body: requestBody,
+    });
+    expect(unauthorizedRequest.status).toBe(403);
+    const unauthorizedAdmin = await invokeServer(pipeline.server(), {
+      method: 'POST', url: '/admin/jobs/process',
+    });
+    expect(unauthorizedAdmin.status).toBe(403);
+
     const response = await invokeServer(pipeline.server(), {
       method: 'POST', url: '/admin/jobs/process', token: token,
     });
     expect(response.status).toBe(200);
     expect(generate).not.toHaveBeenCalled();
+
+    const registryPath = path.join(dataDir, 'metadata.json');
+    const registry = JSON.parse(await readFile(registryPath, 'utf8'));
+    registry.jobs[0].status = 'failed';
+    registry.jobs[0].completedAt = new Date().toISOString();
+    await writeFile(registryPath, JSON.stringify(registry));
 
     const restartedProvider = { generate: vi.fn() };
     const restarted = createVehicleImagePipeline({
@@ -110,6 +162,16 @@ describe('vehicle image pipeline', () => {
       provider: restartedProvider,
     });
     await restarted.initialize();
+    const regeneration = await invokeServer(restarted.server(), {
+      method: 'POST',
+      url: `/admin/requests/${encodeURIComponent(first.body.requestId)}/regenerate`,
+      token,
+    });
+    expect(regeneration.status).toBe(202);
+    const restartedProcess = await invokeServer(restarted.server(), {
+      method: 'POST', url: '/admin/jobs/process', token,
+    });
+    expect(restartedProcess.status).toBe(200);
     await restarted.runQueuedJobs();
     expect(restarted.listPending(true)[0].job.status).toBe('queued');
     expect(restartedProvider.generate).not.toHaveBeenCalled();

@@ -193,6 +193,7 @@ export function createVehicleImagePipeline({
   requestToken = null,
   provider = null,
   generationEnabled = false,
+  cloudinaryPublicationEnabled = false,
   autoRun = false,
   imageValidator = defaultImageValidator,
   assetStore = null,
@@ -674,7 +675,7 @@ export function createVehicleImagePipeline({
     if (decision === 'approve') publishInProgress.add(request.identityKey);
     try {
       let publishedAsset = null;
-      if (decision === 'approve' && assetStore) {
+      if (decision === 'approve' && cloudinaryPublicationEnabled && assetStore) {
         const prior = db.published.filter((item) => item.identityKey === request.identityKey);
         const version = Math.max(0, ...prior.map((item) => item.version)) + 1;
         const bytes = await readFile(path.join(privateDir, candidate.id));
