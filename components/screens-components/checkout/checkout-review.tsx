@@ -175,7 +175,8 @@ export function OrderItemRows({ tokens, lines }: { tokens: Tokens; lines: OrderI
           <AppText
             family="accent"
             weight="semibold"
-            style={{ fontSize: 14, lineHeight: 20, color: tokens.text, textAlign: 'right', fontVariant: ['tabular-nums'], flexShrink: 0, maxWidth: '45%' }}
+            // Line prices in the brand's text teal, apart from the names beside them.
+            style={{ fontSize: 14, lineHeight: 20, color: tokens.brandText, textAlign: 'right', fontVariant: ['tabular-nums'], flexShrink: 0, maxWidth: '45%' }}
           >
             {line.total}
           </AppText>
