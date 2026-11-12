@@ -1,32 +1,35 @@
 import { useEffect, useState } from 'react';
 
-import { useCancelOrder } from '@/hooks/use-orders';
-import { orderCancelDeadline, type CancelWindowSource } from '@/services/order-cancel-window';
-
-/** Orders this session has already asked the server to cancel on expiry, so a
- *  list row and the detail screen showing the same order ask only once. */
-const expiryCancelRequested = new Set<string>();
+import { useCancelOrder, useRefreshOrders } from '@/hooks/use-orders';
+import {
+  canCancelOrder,
+  orderPaymentDeadline,
+  type CancelWindowSource,
+} from '@/services/order-cancel-window';
 
 export type OrderCancelWindow = {
-  /** Time left in ms, or null when the order has no window. */
+  /** Time left before the backend's `expires_at`, in ms, or null when there is no deadline. */
   remainingMs: number | null;
-  /** The window ran out: the order is being, or has been, cancelled. */
+  /** The deadline has passed. Display only: the order is unchanged until the backend says. */
   expired: boolean;
-  /** Manual cancel, for the detail screen's button. */
+  /** Whether the manual cancel button applies (cash or terminal order, still waiting). */
+  canCancel: boolean;
+  /** Manual cancel, for the detail screen's button. Never called on a timer. */
   cancel: ReturnType<typeof useCancelOrder>;
 };
 
 /**
- * Counts an unconfirmed order down to its cancel deadline, once a second, and
- * asks the server to cancel it when the time is up. The server has the final
- * say: a refusal (it was paid at the last moment) just re-reads the order.
+ * Counts an unpaid online order down to the backend's `expires_at`, once a second.
+ * At zero it only re-reads the order queries, so the status shown is the backend's.
+ * It never cancels and never changes the order itself.
  */
 export function useOrderCancelWindow(
   orderId: string | null | undefined,
   order: CancelWindowSource | null | undefined,
 ): OrderCancelWindow {
-  const deadline = order ? orderCancelDeadline(order) : null;
+  const deadline = order ? orderPaymentDeadline(order) : null;
   const cancel = useCancelOrder(orderId);
+  const refreshOrders = useRefreshOrders();
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -43,14 +46,11 @@ export function useOrderCancelWindow(
   const remainingMs = deadline === null ? null : Math.max(0, deadline - now);
   const expired = remainingMs === 0;
 
-  const { mutate } = cancel;
   useEffect(() => {
-    if (!expired || !orderId || expiryCancelRequested.has(orderId)) return;
-    expiryCancelRequested.add(orderId);
-    // A 409 means the server already moved the order on; either way the
-    // mutation re-reads every order query once it settles.
-    mutate(undefined);
-  }, [expired, orderId, mutate]);
+    if (!expired) return;
+    // The backend's sweep expires the order; read what it decided.
+    refreshOrders();
+  }, [expired, refreshOrders]);
 
-  return { remainingMs, expired, cancel };
+  return { remainingMs, expired, canCancel: order ? canCancelOrder(order) : false, cancel };
 }

@@ -157,12 +157,16 @@ export type OrderListRow = {
   total: string;
   /** Short headline of the order ("Garrett GTX3582R + 2 items"). */
   summary: string;
-  /** Backend's own status word, for the cancel window. Absent from older sources. */
+  /** Backend's own status word, for the payment deadline. Absent from older sources. */
   serverStatus?: string;
+  /** How the order is paid, when the backend says: cash/terminal orders have no deadline. */
+  paymentType?: PaymentType | null;
   /** ISO creation time, as the server sent it. */
   createdAt?: string;
-  /** ISO time the server will expire an unpaid order, when it says. */
+  /** ISO time the server will expire an unpaid online order, when it says. */
   expiresAt?: string;
+  /** The server has suspended expiry (an open Payme transaction): no countdown. */
+  expirySuspended?: boolean;
 };
 
 export type OrderListPage = {
@@ -218,10 +222,12 @@ export type OrderDetail = {
   /** How the order is being paid, when the backend says. Cash and terminal orders wait in
    *  `pending_payment` too, for an operator, so the status alone cannot tell. */
   paymentType?: PaymentType | null;
-  /** ISO creation time, as the server sent it. Starts the 20-minute cancel window. */
+  /** ISO creation time, as the server sent it. */
   createdAt?: string;
-  /** ISO time the server will expire an unpaid order, when it says. */
+  /** ISO time the server will expire an unpaid online order: the countdown's only source. */
   expiresAt?: string;
+  /** The server has suspended expiry (an open Payme transaction): no countdown. */
+  expirySuspended?: boolean;
 };
 
 export type PaymentMethod = {

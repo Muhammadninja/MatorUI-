@@ -22,6 +22,9 @@ import {
 import type { Vehicle } from '@/services/garage-service';
 import { nearestSwatch } from '@/utils/vehicle-color';
 import { resolveVehicleImage } from '@/services/vehicle-images/resolver';
+import { chooseVehicleVisual } from '@/services/vehicle-images/vehicle-visual';
+import type { VehicleImageState } from '@/services/vehicle-images/image-status';
+import { useVehicleImage } from '@/hooks/use-vehicle-image';
 import { triggerHaptic } from '@/utils/haptics';
 
 /** Reserved while the persisted vehicle hydrates, so nothing below the card
@@ -75,16 +78,17 @@ function summarize(
 }
 
 /**
- * The selected vehicle's picture: an approved image of exactly this model and
- * generation, else the universal placeholder until one is approved. Never the
- * empty state's decorative car, and never a stand-in model. Reads the garage row
- * when loaded, else the persisted fitment ids. When the Asset Registry is
- * connected, its status for this vehicle goes on the placeholder; an approved
- * image then arrives through the resolver and replaces it.
+ * The selected vehicle's picture: the backend's approved, published image when it
+ * has one; else an approved bundled image of exactly this model and generation;
+ * else the universal placeholder, saying "preparing" or "no image yet" from the
+ * backend's `vehicle_image` status. Never the empty state's decorative car, and
+ * never a stand-in model. Reads the garage row when loaded, else the persisted
+ * fitment ids.
  */
 function heroVisual(
   active: ReturnType<typeof useActiveVehicle>['currentActiveVehicle'],
   vehicle: Vehicle | undefined,
+  image: VehicleImageState | undefined,
 ): GarageHeroVisual {
   const resolved = resolveVehicleImage({
     brandId: vehicle?.brandId || active?.fitment.brandId,
@@ -93,8 +97,7 @@ function heroVisual(
     year: vehicle?.year,
     colorHex: vehicle?.colorHex,
   });
-  if (resolved.kind === 'image') return { kind: 'image', source: resolved.source };
-  return { kind: 'placeholder' };
+  return chooseVehicleVisual(resolved, image);
 }
 
 /**
@@ -117,6 +120,8 @@ function HomeGarageCard() {
   const vehicle =
     currentActiveVehicle?.vehicle ?? vehicles.find((v) => v.id === currentActiveVehicle?.vehicleId);
   const summary = isHydrating ? null : summarize(currentActiveVehicle, vehicle);
+  // Refreshes only while pending, on a backing-off schedule; never blocks the card.
+  const image = useVehicleImage(vehicle?.id, vehicle?.image);
   // The saved colour, named as the Garage screen names it. It's the car's real
   // colour even when the picture is the white fallback.
   const colorName = vehicle?.colorHex ? t(nearestSwatch(vehicle.colorHex).labelKey) : '';
@@ -165,7 +170,7 @@ function HomeGarageCard() {
     return <GarageAddHero onPress={addVehicle} />;
   }
 
-  const visual = heroVisual(currentActiveVehicle, vehicle);
+  const visual = heroVisual(currentActiveVehicle, vehicle, image);
 
   return (
     <GarageHeroCard

@@ -1,43 +1,53 @@
 /**
- * The 20-minute window an unconfirmed order lives in. An order still in
- * `pending_payment` is cancelled once it runs out, and until then the buyer can
- * cancel it themselves. Pure: screens, hooks and tests share it.
+ * Payment deadline and cancellation of an unpaid order. The backend owns both rules;
+ * this module only reads what the order response states. Pure: screens, hooks and
+ * tests share it.
  *
- * The backend owns the real rule and must cancel on its own (an app that is
- * closed cancels nothing). The app counts down from what the server stated and
- * asks the server to cancel at zero; the server may refuse with 409.
+ *   • Deadline: an ONLINE (Payme) order waiting in `pending_payment` expires at the
+ *     backend's `expires_at` (ORDER_TTL_MIN, 30 minutes by default). While a Payme
+ *     transaction is open the backend suspends that expiry (`expiry_suspended`), so no
+ *     deadline is shown. Cash and terminal orders have no deadline: they wait for an
+ *     operator (OFFLINE_ORDER_TIMEOUT_HOURS=0).
+ *   • The countdown only displays time. Reaching zero changes nothing: the app never
+ *     cancels on a timer, it re-reads the order and shows whatever the backend says.
+ *   • Cancelling by hand: `POST /v1/orders/:id/cancel` accepts only a waiting cash or
+ *     terminal order with nothing collected. The server decides; 409 if it cannot.
  */
 
-/** How long an order may wait for payment or confirmation before it is cancelled. */
-export const ORDER_CANCEL_WINDOW_MS = 20 * 60_000;
+/** Payment types that wait for an operator rather than an online payment. */
+const OFFLINE_PAYMENT_TYPES: ReadonlySet<string> = new Set(['cash', 'terminal']);
 
 export type CancelWindowSource = {
   /** Backend's own status word (`pending_payment`, `paid`, …). */
   serverStatus?: string | null;
-  /** ISO time the order was created. */
-  createdAt?: string | null;
-  /** ISO time the backend will expire the order, when it says. */
+  /** `payme` | `terminal` | `cash`, when the backend says. */
+  paymentType?: string | null;
+  /** ISO time the backend will expire the unpaid order. */
   expiresAt?: string | null;
+  /** The backend has suspended expiry: a Payme transaction is open. */
+  expirySuspended?: boolean | null;
 };
 
 /**
- * When the order is cancelled, in epoch ms, or null when no window applies:
- * the order is past waiting, or the server gave no creation time. An earlier
- * server expiry wins, so the app never shows more time than the backend allows.
+ * When the backend expires this order, in epoch ms, or null when there is no deadline
+ * to show: not waiting for payment, a cash/terminal order, expiry suspended, or no
+ * usable `expires_at`. Never a client-side constant.
  */
-export function orderCancelDeadline(order: CancelWindowSource): number | null {
+export function orderPaymentDeadline(order: CancelWindowSource): number | null {
   if (order.serverStatus !== 'pending_payment') return null;
-  const created = order.createdAt ? Date.parse(order.createdAt) : NaN;
-  if (!Number.isFinite(created)) return null;
-  const deadline = created + ORDER_CANCEL_WINDOW_MS;
+  if (order.paymentType && OFFLINE_PAYMENT_TYPES.has(order.paymentType)) return null;
+  if (order.expirySuspended) return null;
   const expires = order.expiresAt ? Date.parse(order.expiresAt) : NaN;
-  return Number.isFinite(expires) ? Math.min(deadline, expires) : deadline;
+  return Number.isFinite(expires) ? expires : null;
 }
 
-/** Whether the buyer can still cancel this order from the app. */
-export function canCancelOrder(order: CancelWindowSource, now: number = Date.now()): boolean {
-  const deadline = orderCancelDeadline(order);
-  return deadline !== null && now < deadline;
+/** Whether to offer the cancel button: a cash or terminal order still waiting. No timer. */
+export function canCancelOrder(order: CancelWindowSource): boolean {
+  return (
+    order.serverStatus === 'pending_payment' &&
+    !!order.paymentType &&
+    OFFLINE_PAYMENT_TYPES.has(order.paymentType)
+  );
 }
 
 /** Remaining time as "m:ss" ("19:05", "0:42"); never negative. */

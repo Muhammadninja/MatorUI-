@@ -1,3 +1,4 @@
+import type { VehicleImageState } from '@/services/vehicle-images/image-status';
 import {
   HttpGarageTransport,
   type GarageTransport,
@@ -113,13 +114,16 @@ export type Vehicle = {
    *  walkaround. Optional — only populated for vehicles the backend
    *  has a CAD asset for. */
   model3d?: VehicleModel3d;
+  /** The backend's `vehicle_image` (pending | approved + url | unavailable). Read-only:
+   *  absent from an older backend, from the mock, and never sent back. */
+  image?: VehicleImageState;
 };
 
-export type VehicleInput = Omit<Vehicle, 'id' | 'isPrimary' | 'addedAt'> & {
+export type VehicleInput = Omit<Vehicle, 'id' | 'isPrimary' | 'addedAt' | 'image'> & {
   setAsPrimary?: boolean;
 };
 
-export type VehiclePatch = Partial<Omit<Vehicle, 'id' | 'addedAt'>>;
+export type VehiclePatch = Partial<Omit<Vehicle, 'id' | 'addedAt' | 'image'>>;
 
 // ── Realtime contract ────────────────────────────────────────────────
 //

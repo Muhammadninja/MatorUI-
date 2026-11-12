@@ -178,8 +178,8 @@ const OrderCard = React.memo(function OrderCard({ order }: { order: OrderListRow
 
 // ── Countdown chip ────────────────────────────────────────────────────────────
 
-/** Time left before an unconfirmed order is cancelled. Renders nothing for an
- *  order with no window, and cancels the order when it reaches zero. */
+/** Time left before the backend expires an unpaid online order. Renders nothing
+ *  for an order with no deadline. Display only: at zero the order is re-read. */
 function OrderCountdownChip({ order }: { order: OrderListRow }) {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();

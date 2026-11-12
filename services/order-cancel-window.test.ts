@@ -1,66 +1,68 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, test } from 'vitest';
 
-import {
-  canCancelOrder,
-  formatCountdown,
-  ORDER_CANCEL_WINDOW_MS,
-  orderCancelDeadline,
-} from './order-cancel-window';
+import { canCancelOrder, formatCountdown, orderPaymentDeadline } from './order-cancel-window';
 
-const CREATED = '2026-11-12T10:00:00.000Z';
-const CREATED_MS = Date.parse(CREATED);
+const EXPIRES = '2026-11-12T10:30:00.000Z';
+const waitingOnline = { serverStatus: 'pending_payment', paymentType: 'payme', expiresAt: EXPIRES };
 
-describe('orderCancelDeadline', () => {
-  test('is 20 minutes after creation for an order waiting for payment', () => {
-    expect(orderCancelDeadline({ serverStatus: 'pending_payment', createdAt: CREATED })).toBe(
-      CREATED_MS + 20 * 60_000,
-    );
-    expect(ORDER_CANCEL_WINDOW_MS).toBe(20 * 60_000);
+describe('orderPaymentDeadline', () => {
+  test("is exactly the backend's expires_at for an unpaid online order", () => {
+    expect(orderPaymentDeadline(waitingOnline)).toBe(Date.parse(EXPIRES));
   });
 
-  test('an earlier server expiry wins, a later one does not', () => {
-    const earlier = '2026-11-12T10:10:00.000Z';
-    const later = '2026-11-12T10:30:00.000Z';
-    expect(
-      orderCancelDeadline({ serverStatus: 'pending_payment', createdAt: CREATED, expiresAt: earlier }),
-    ).toBe(Date.parse(earlier));
-    expect(
-      orderCancelDeadline({ serverStatus: 'pending_payment', createdAt: CREATED, expiresAt: later }),
-    ).toBe(CREATED_MS + ORDER_CANCEL_WINDOW_MS);
+  test('applies when the payment type is not stated (older responses)', () => {
+    expect(orderPaymentDeadline({ ...waitingOnline, paymentType: null })).toBe(Date.parse(EXPIRES));
+  });
+
+  test.each(['cash', 'terminal'])('a %s order has no deadline: it waits for an operator', (paymentType) => {
+    expect(orderPaymentDeadline({ ...waitingOnline, paymentType })).toBeNull();
+  });
+
+  test('an open Payme transaction (expiry_suspended) removes the deadline', () => {
+    expect(orderPaymentDeadline({ ...waitingOnline, expirySuspended: true })).toBeNull();
+    expect(orderPaymentDeadline({ ...waitingOnline, expirySuspended: false })).toBe(Date.parse(EXPIRES));
   });
 
   test.each(['paid', 'processing', 'shipped', 'delivered', 'cancelled', 'expired', undefined])(
-    'has no window once an order is %s',
+    'no deadline once an order is %s',
     (serverStatus) => {
-      expect(orderCancelDeadline({ serverStatus, createdAt: CREATED })).toBeNull();
+      expect(orderPaymentDeadline({ ...waitingOnline, serverStatus })).toBeNull();
     },
   );
 
-  test.each([undefined, null, '', 'not a date'])('has no window without a creation time (%s)', (createdAt) => {
-    expect(orderCancelDeadline({ serverStatus: 'pending_payment', createdAt })).toBeNull();
+  test.each([undefined, null, '', 'not a date'])('no deadline without a usable expires_at (%s)', (expiresAt) => {
+    expect(orderPaymentDeadline({ ...waitingOnline, expiresAt })).toBeNull();
   });
 });
 
 describe('canCancelOrder', () => {
-  const order = { serverStatus: 'pending_payment', createdAt: CREATED };
-
-  test('is offered for any payment type while the window runs', () => {
-    expect(canCancelOrder(order, CREATED_MS + 60_000)).toBe(true);
-    expect(canCancelOrder(order, CREATED_MS + ORDER_CANCEL_WINDOW_MS - 1)).toBe(true);
+  test.each(['cash', 'terminal'])('offers the button on a waiting %s order, with no timer', (paymentType) => {
+    expect(canCancelOrder({ serverStatus: 'pending_payment', paymentType })).toBe(true);
   });
 
-  test('is gone when the time is up', () => {
-    expect(canCancelOrder(order, CREATED_MS + ORDER_CANCEL_WINDOW_MS)).toBe(false);
+  test.each(['payme', null, undefined])('never for payment type %s (the backend refuses it)', (paymentType) => {
+    expect(canCancelOrder({ serverStatus: 'pending_payment', paymentType })).toBe(false);
   });
 
-  test('is never offered for a paid order', () => {
-    expect(canCancelOrder({ ...order, serverStatus: 'paid' }, CREATED_MS)).toBe(false);
+  test('never once the order has moved on', () => {
+    expect(canCancelOrder({ serverStatus: 'paid', paymentType: 'cash' })).toBe(false);
+  });
+});
+
+describe('the countdown never cancels by itself', () => {
+  test('the hook has no timer-driven cancel call', () => {
+    const hook = readFileSync(join(__dirname, '../hooks/use-order-cancel-window.ts'), 'utf8');
+    expect(hook).not.toMatch(/\.mutate\(/);
+    expect(hook).not.toMatch(/mutateAsync/);
   });
 });
 
 describe('formatCountdown', () => {
   test.each([
-    [20 * 60_000, '20:00'],
+    [30 * 60_000, '30:00'],
     [19 * 60_000 + 5_000, '19:05'],
     [42_000, '0:42'],
     [41_001, '0:42'],

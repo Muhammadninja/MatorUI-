@@ -508,7 +508,7 @@
     "dateItems_one": "{{date}} · {{count}} item",
     "dateItems_other": "{{date}} · {{count}} items",
     "autoCancelIn": "Cancels in {{time}}",
-    "autoCancelling": "Cancelling…",
+    "autoCancelling": "Time is up",
     "autoCancelA11y": "Cancels automatically in {{time}}"
   },
   "trackOrder": {
@@ -533,7 +533,7 @@
     "cancelFailed": "The order could not be cancelled. Please try again.",
     "autoCancelTitle": "Waiting for confirmation",
     "autoCancelBody": "If the order isn't paid or confirmed in time, it is cancelled automatically.",
-    "autoCancelExpired": "Time is up. The order is being cancelled.",
+    "autoCancelExpired": "Payment time is up. The order status will update shortly.",
     "autoCancelA11y": "{{time}} left before the order is cancelled"
   },
   "explore": {
