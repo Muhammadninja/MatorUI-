@@ -1,4 +1,5 @@
 import { AlertCircle, MapPin } from 'lucide-react-native';
+import { Linking, Platform } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { LinkAction } from '@/components/screens-components/checkout/checkout-sections';
@@ -10,7 +11,12 @@ import { useThemeContext } from '@/contexts/theme.context';
 import type { PickupPointsState } from '@/hooks/use-pickup-points';
 import { isMapAvailable, regionAround } from '@/services/delivery-map';
 import type { PickupPoint } from '@/services/orders-service';
-import { formatCoordinates, pickupPointGap } from '@/services/pickup-points';
+import {
+  formatCoordinates,
+  isUsableLocation,
+  pickupMapUrl,
+  pickupPointGap,
+} from '@/services/pickup-points';
 
 type Tokens = ReturnType<typeof useThemeContext>['tokens'];
 
@@ -30,11 +36,17 @@ export function PickupPoints({
   state,
   points,
   onRetry,
+  showItems = true,
+  bare = false,
 }: {
   tokens: Tokens;
   state: PickupPointsState;
   points: PickupPoint[];
   onRetry: () => void;
+  /** List each place's goods under it. Off in the pickup sheet: the order's sheet lists them. */
+  showItems?: boolean;
+  /** Inside a sheet that already names it: no title. */
+  bare?: boolean;
 }) {
   const { t } = useTranslation();
   if (state === 'idle') return null;
@@ -66,15 +78,18 @@ export function PickupPoints({
   const mapAvailable = isMapAvailable();
   return (
     <AppView testID="checkout-pickup-points" gap={10}>
-      <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.textMuted }}>
-        {t('checkout.pickupPointsTitle')}
-      </AppText>
+      {bare ? null : (
+        <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.textMuted }}>
+          {t('checkout.pickupPointsTitle')}
+        </AppText>
+      )}
       {points.map((point, index) => (
         <PickupPointCard
           key={point.dealerId ?? `unknown_${index}`}
           tokens={tokens}
           point={point}
           mapAvailable={mapAvailable}
+          showItems={showItems}
         />
       ))}
     </AppView>
@@ -85,13 +100,16 @@ function PickupPointCard({
   tokens,
   point,
   mapAvailable,
+  showItems,
 }: {
   tokens: Tokens;
   point: PickupPoint;
   mapAvailable: boolean;
+  showItems: boolean;
 }) {
   const { t } = useTranslation();
   const gap = pickupPointGap(point);
+  const pin = isUsableLocation(point.location) ? point.location : null;
   return (
     <AppView
       testID="checkout-pickup-point"
@@ -132,7 +150,7 @@ function PickupPointCard({
         </AppText>
       ) : null}
 
-      {point.location ? (
+      {pin ? (
         mapAvailable ? (
           <AppView
             testID="checkout-pickup-map"
@@ -141,11 +159,11 @@ function PickupPointCard({
             style={{ height: MAP_HEIGHT, overflow: 'hidden' }}
           >
             <AppMap
-              initialRegion={regionAround(point.location)}
+              initialRegion={regionAround(pin)}
               markers={[
                 {
                   id: point.dealerId ?? 'pickup',
-                  coordinate: { latitude: point.location.lat, longitude: point.location.lng },
+                  coordinate: { latitude: pin.lat, longitude: pin.lng },
                   title: point.dealerName ?? undefined,
                 },
               ]}
@@ -163,9 +181,18 @@ function PickupPointCard({
             family="default"
             style={{ fontSize: 12.5, color: tokens.textMuted }}
           >
-            {t('checkout.pickupCoordinates', { coordinates: formatCoordinates(point.location) })}
+            {t('checkout.pickupCoordinates', { coordinates: formatCoordinates(pin) })}
           </AppText>
         )
+      ) : null}
+      {pin ? (
+        <AppView testID="checkout-pickup-open-map" style={{ alignSelf: 'flex-start' }}>
+          <LinkAction
+            label={t('checkout.pickupOpenMap')}
+            onPress={() => void Linking.openURL(pickupMapUrl(pin, point.dealerName, Platform.OS))}
+            color={tokens.brandText}
+          />
+        </AppView>
       ) : null}
 
       {gap ? (
@@ -181,6 +208,7 @@ function PickupPointCard({
         </AppView>
       ) : null}
 
+      {showItems ? (
       <AppView gap={2}>
         {point.items.map((item) => (
           <AppText
@@ -193,6 +221,7 @@ function PickupPointCard({
           </AppText>
         ))}
       </AppView>
+      ) : null}
     </AppView>
   );
 }

@@ -406,7 +406,7 @@
     "pickupPointsTitle": "Buyurtmani qayerdan olish mumkin",
     "pickupPointsLoading": "Olib ketish manzili yuklanmoqda…",
     "pickupPointsError": "Olib ketish manzilini yuklab boʻlmadi.",
-    "pickupPointNotSpecified": "Olib ketish nuqtasi hali koʻrsatilmagan",
+    "pickupPointNotSpecified": "Olib ketish manzili aniqlanmoqda",
     "pickupAddressNotSpecified": "Manzil hali koʻrsatilmagan",
     "pickupLocationNotSpecified": "Xaritadagi nuqta hali koʻrsatilmagan",
     "pickupLandmark": "Moʻljal: {{landmark}}",
@@ -481,7 +481,8 @@
     "reviewItemsCount_other": "{{count}} ta pozitsiya",
     "reviewChooseAddress": "Manzilni tanlang",
     "reviewPickupMore": "yana {{count}} ta",
-    "retryPaymentShort": "Buyurtmani toʻlash"
+    "retryPaymentShort": "Buyurtmani toʻlash",
+    "pickupOpenMap": "Xaritada ochish"
   },
   "orderConfirmation": {
     "loadErrorTitle": "Buyurtmani yuklab boʻlmadi",

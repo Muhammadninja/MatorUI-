@@ -406,7 +406,7 @@
     "pickupPointsTitle": "Where to collect your order",
     "pickupPointsLoading": "Loading the pickup address…",
     "pickupPointsError": "Could not load the pickup address.",
-    "pickupPointNotSpecified": "The pickup point has not been specified yet",
+    "pickupPointNotSpecified": "The pickup address is being confirmed",
     "pickupAddressNotSpecified": "The address has not been specified yet",
     "pickupLocationNotSpecified": "The map location has not been specified yet",
     "pickupLandmark": "Landmark: {{landmark}}",
@@ -481,7 +481,8 @@
     "reviewItemsCount_other": "{{count}} items",
     "reviewChooseAddress": "Choose an address",
     "reviewPickupMore": "{{count}} more",
-    "retryPaymentShort": "Pay for order"
+    "retryPaymentShort": "Pay for order",
+    "pickupOpenMap": "Open in Maps"
   },
   "orderConfirmation": {
     "loadErrorTitle": "Couldn't load your order",

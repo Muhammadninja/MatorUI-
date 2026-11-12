@@ -1,4 +1,5 @@
 import type { TFunction } from 'i18next';
+import { MapPin } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -12,6 +13,8 @@ import {
   SummaryRow,
 } from '@/components/screens-components/checkout/checkout-sections';
 import { PickupPoints } from '@/components/screens-components/checkout/pickup-points';
+import { AppText } from '@/components/shared/app-text';
+import { AppView } from '@/components/shared/app-view';
 import { PAYMENT_OPTIONS } from '@/constants/payment-options';
 import { useThemeContext } from '@/contexts/theme.context';
 import type { CartItem } from '@/contexts/cart.context';
@@ -25,11 +28,12 @@ import {
   type DeliveryMethod,
 } from '@/services/checkout-presentation';
 import type { Address, PaymentType } from '@/services/orders-service';
+import { groupLinesByPickup } from '@/services/pickup-points';
 
 type Tokens = ReturnType<typeof useThemeContext>['tokens'];
 type Pickup = ReturnType<typeof usePickupPoints>;
 
-export type CheckoutSheetName = 'delivery' | 'address' | 'payment' | 'items';
+export type CheckoutSheetName = 'delivery' | 'pickup' | 'address' | 'payment' | 'items';
 
 type ReviewText = {
   value: string;
@@ -83,7 +87,7 @@ export function reviewSummaries({
     return {
       deliveryReview,
       addressReview: {
-        label: t('checkout.reviewAddress'),
+        label: t('checkout.deliveryAddress'),
         value: addr ? addr.label : t('checkout.reviewChooseAddress'),
         detail: addr ? formatAddressLine(addr) || null : null,
         missing: !addr,
@@ -106,8 +110,8 @@ export function reviewSummaries({
           : t('checkout.pickupPointsLoading'),
       detail: ready ? [first.dealerName ? first.address : null, more].filter(Boolean).join(' · ') || null : null,
       error: pickup.state === 'error',
-      // Where to collect is shown with the pickup choice itself.
-      onPress: () => onOpen('delivery'),
+      // Where to collect has a sheet of its own; the delivery picker stays a picker.
+      onPress: () => onOpen('pickup'),
     },
   };
 }
@@ -161,6 +165,14 @@ export function CheckoutChoiceSheets({
   formatCurrency: (amount: number) => string;
 }) {
   const { t } = useTranslation();
+  const lines = items.map((item) => ({
+    id: item.id,
+    title: item.title,
+    quantity: item.quantity,
+    total: formatCurrency(parsePrice(item.price) * item.quantity),
+  }));
+  // Collected from several places: the lines grouped by where each is picked up.
+  const groups = delivery.method === 'pickup' && pickup.state === 'success' ? groupLinesByPickup(lines, pickup.points) : null;
   return (
     <>
       <CheckoutSheet testID="checkout-sheet-delivery" visible={open === 'delivery'} onClose={onClose} title={t('checkout.shipping')}>
@@ -174,11 +186,20 @@ export function CheckoutChoiceSheets({
             onRetry={onRetryQuote}
             onEditAddress={onEditAddress}
             formatCurrency={formatCurrency}
-            pickupDetails={
-              <PickupPoints tokens={tokens} state={pickup.state} points={pickup.points} onRetry={pickup.refresh} />
-            }
           />
         ) : null}
+      </CheckoutSheet>
+
+      {/* The place, its address and map: never the goods, which the order's sheet lists. */}
+      <CheckoutSheet testID="checkout-sheet-pickup" visible={open === 'pickup'} onClose={onClose} title={t('checkout.reviewPickupPoint')}>
+        <PickupPoints
+          bare
+          showItems={false}
+          tokens={tokens}
+          state={pickup.state}
+          points={pickup.points}
+          onRetry={pickup.refresh}
+        />
       </CheckoutSheet>
 
       <CheckoutSheet testID="checkout-sheet-address" visible={open === 'address'} onClose={onClose} title={t('checkout.deliveryAddress')}>
@@ -222,15 +243,23 @@ export function CheckoutChoiceSheets({
           />
         }
       >
-        <OrderItemRows
-          tokens={tokens}
-          lines={items.map((item) => ({
-            id: item.id,
-            title: item.title,
-            quantity: item.quantity,
-            total: formatCurrency(parsePrice(item.price) * item.quantity),
-          }))}
-        />
+        {groups ? (
+          groups.map((group) => (
+            <AppView key={group.key} testID="checkout-items-group" gap={10} style={{ paddingBottom: 6 }}>
+              <AppView row align="center" gap={6}>
+                <MapPin size={14} strokeWidth={2} color={tokens.textMuted} />
+                <AppText family="accent" weight="bold" style={{ flex: 1, fontSize: 13, color: tokens.textMuted }}>
+                  {group.point
+                    ? [group.point.dealerName ?? t('checkout.pickupDealerUnknown'), group.point.address].filter(Boolean).join(' · ')
+                    : t('checkout.pickupDealerUnknown')}
+                </AppText>
+              </AppView>
+              <OrderItemRows tokens={tokens} lines={group.lines} />
+            </AppView>
+          ))
+        ) : (
+          <OrderItemRows tokens={tokens} lines={lines} />
+        )}
       </CheckoutSheet>
     </>
   );

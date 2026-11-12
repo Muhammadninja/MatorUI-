@@ -410,7 +410,7 @@
     "pickupPointsTitle": "Где забрать заказ",
     "pickupPointsLoading": "Загружаем адрес самовывоза…",
     "pickupPointsError": "Не удалось загрузить адрес самовывоза.",
-    "pickupPointNotSpecified": "Точка самовывоза пока не указана",
+    "pickupPointNotSpecified": "Адрес пункта выдачи уточняется",
     "pickupAddressNotSpecified": "Адрес пока не указан",
     "pickupLocationNotSpecified": "Точка на карте пока не указана",
     "pickupLandmark": "Ориентир: {{landmark}}",
@@ -491,7 +491,8 @@
     "reviewItemsCount_other": "{{count}} позиции",
     "reviewChooseAddress": "Выберите адрес",
     "reviewPickupMore": "ещё {{count}}",
-    "retryPaymentShort": "Оплатить заказ"
+    "retryPaymentShort": "Оплатить заказ",
+    "pickupOpenMap": "Открыть на карте"
   },
   "orderConfirmation": {
     "loadErrorTitle": "Не удалось загрузить заказ",
