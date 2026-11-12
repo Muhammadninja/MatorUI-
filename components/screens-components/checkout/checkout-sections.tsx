@@ -1,6 +1,7 @@
 import { AlertCircle, Check, MapPin } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Image } from 'react-native';
 
 import { AppButton } from '@/components/shared/app-button';
 import { AppText } from '@/components/shared/app-text';
@@ -201,6 +202,37 @@ export function DeliverySection({
 
 // ── Payment row (selectable) ───────────────────────────────────────────
 
+/** A payment method's mark: its provider logo when it has one, else its icon,
+ *  centred in a fixed-width column so the labels beside it line up. */
+export function PaymentOptionMark({
+  option,
+  width,
+  iconSize,
+  color,
+}: {
+  option: PaymentOption;
+  width: number;
+  iconSize: number;
+  color: string;
+}) {
+  const Icon = option.icon;
+  return (
+    <AppView center style={{ width, flexShrink: 0 }}>
+      {option.logo ? (
+        <Image
+          testID={`payment-logo-${option.id}`}
+          source={option.logo.source}
+          accessibilityIgnoresInvertColors
+          resizeMode="contain"
+          style={{ width, height: width / option.logo.aspectRatio }}
+        />
+      ) : (
+        <Icon size={iconSize} strokeWidth={2} color={color} />
+      )}
+    </AppView>
+  );
+}
+
 /** The round mark a selectable row shows: filled with a tick when chosen. */
 function RadioMark({ tokens, selected }: { tokens: Tokens; selected: boolean }) {
   return (
@@ -231,7 +263,6 @@ export function PaymentRow({
   onPress: () => void;
   tokens: Tokens;
 }) {
-  const Icon = option.icon;
   const { t } = useTranslation();
   return (
     <AppPressableView
@@ -247,7 +278,7 @@ export function PaymentRow({
       style={selected ? { borderWidth: 1.5, borderColor: tokens.brand } : undefined}
     >
       <AppView row align="center" gap={12}>
-        <Icon size={20} strokeWidth={2} color={tokens.text} />
+        <PaymentOptionMark option={option} width={48} iconSize={20} color={tokens.text} />
         <AppView flex={1}>
           <AppText family="default" weight="semibold" style={{ fontSize: 15, color: tokens.text }}>{t(option.labelKey)}</AppText>
           <AppText family="default" style={{ fontSize: 12, color: tokens.textMuted, marginTop: 1 }}>{t(option.descriptionKey)}</AppText>

@@ -41,7 +41,7 @@ const { host, transport, cart, startPayment, openAuthSessionAsync, replace, push
   };
 });
 
-vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, ScrollView: host('scroll') }));
+vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, ScrollView: host('scroll'), Image: host('image') }));
 vi.mock('expo-linking', () => ({ createURL: () => 'mator://payment-return' }));
 vi.mock('expo-router', () => ({ router: { back: vi.fn(), push, replace } }));
 vi.mock('expo-web-browser', () => ({ openAuthSessionAsync }));
