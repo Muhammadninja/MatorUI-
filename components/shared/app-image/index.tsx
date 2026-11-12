@@ -192,6 +192,8 @@ const AppImageImpl = forwardRef<View, AppImageProps>(function AppImage(
   // Only remote photos get the pulse: a bundled `require()` asset is decoded
   // from disk in the same frame, so a loader would flash for nothing.
   const showShimmer = showLoader && !showFallback && !isLoaded && sourceUri != null;
+  // A white placeholder is a product photo's surface (white in both themes).
+  const onPhoto = resolvedPlaceholder === tokens.white;
   // Below ~72px the glyph is bigger than the tile it sits in — pulse only.
   const shimmerGlyph =
     (typeof width !== 'number' || width >= 72) && (typeof height !== 'number' || height >= 72);
@@ -204,7 +206,7 @@ const AppImageImpl = forwardRef<View, AppImageProps>(function AppImage(
       accessibilityLabel={alt}
       accessible={!!alt}
     >
-      {showShimmer ? <ImageShimmer showGlyph={shimmerGlyph} /> : null}
+      {showShimmer ? <ImageShimmer showGlyph={shimmerGlyph} onPhoto={onPhoto} /> : null}
       {showFallback ? (
         <View style={StyleSheet.absoluteFill}>{fallback}</View>
       ) : normalized != null ? (

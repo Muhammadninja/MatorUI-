@@ -1,0 +1,23 @@
+[
+  {
+    "run": 1,
+    "pid": "4468",
+    "languageScreen": true,
+    "englishRow": true,
+    "anrDialog": false
+  },
+  {
+    "run": 2,
+    "pid": "4674",
+    "languageScreen": true,
+    "englishRow": true,
+    "anrDialog": false
+  },
+  {
+    "run": 3,
+    "pid": "4828",
+    "languageScreen": true,
+    "englishRow": true,
+    "anrDialog": false
+  }
+]

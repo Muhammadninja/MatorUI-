@@ -1,8 +1,7 @@
-import { router } from 'expo-router';
+import { router, useNavigation } from 'expo-router';
 import { ArrowLeft, X } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, Pressable, ScrollView } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Animated, BackHandler, Dimensions, Pressable, ScrollView } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,7 +16,6 @@ import { useThemeContext } from '@/contexts/theme.context';
 import { useUserContext } from '@/contexts/user.context';
 import { useToast } from '@/hooks/use-toast';
 import { useAcceptLegal, useLegalDocuments } from '@/hooks/use-legal';
-import { getApiBaseUrl } from '@/config/api';
 import { ApiError } from '@/services/api-client';
 import {
   LEGAL_ACCEPTANCE_REQUIRED,
@@ -26,6 +24,13 @@ import {
   type LegalRegistrationVersions,
 } from '@/types/legal';
 import { triggerHaptic } from '@/utils/haptics';
+import {
+  DEFAULT_OTP_LENGTH,
+  normalizeOtpInput,
+  otpAutofillProps,
+  otpPlaceholder,
+  resolveOtpLength,
+} from '@/utils/otp-input';
 
 /** Turn a request/verify failure into a user-facing description. A 429
  *  (global rate limit) gets an explicit "too many attempts" message that
@@ -43,24 +48,6 @@ function describeAuthError(
   return err instanceof Error ? err.message : undefined;
 }
 
-/** DEMO/E2E prefill so the offline Maestro suite stays buttons-only (no typing).
- *  Only used against a demo backend — a real remote backend starts on an empty
- *  field so users type their own number (no seeded demo phone in production). */
-const DEMO_PHONE = '+998 90 123 45 67';
-
-/** Remembers the last phone typed so a simulator reload doesn't wipe it. */
-const LAST_PHONE_KEY = 'mator.last_phone';
-
-/** True only for a DEMO backend: the pure offline mock (no base URL) or the
- *  local E2E mock server (localhost). A real remote backend — dev, staging, or
- *  prod (api.mator.uz) — is NOT demo, so the phone field starts empty. Evaluated
- *  once at module load (env-driven, never changes at runtime). */
-const IS_DEMO_AUTH: boolean = (() => {
-  const base = getApiBaseUrl();
-  if (base === null) return true; // pure offline mock
-  return /\/\/(localhost|127\.0\.0\.1|10\.0\.2\.2)(:|\/|$)/i.test(base); // E2E mock server
-})();
-
 /** Minimal sanity check: E.164-ish — an optional leading '+' then 9–15 digits
  *  (an Uzbek MSISDN is +998 + 9 digits = 12). We keep this loose on purpose; the
  *  backend is the source of truth for validity, this only stops obviously-empty
@@ -70,8 +57,23 @@ function isValidPhone(raw: string): boolean {
   return /^\+?\d[\d\s()-]*$/.test(raw.trim()) && digits.length >= 9 && digits.length <= 15;
 }
 
+/** How long the backdrop ignores taps once the sheet opens, about as long as it
+ *  takes to slide in. The Log in button sits where this backdrop lands, so without
+ *  it a repeated tap closes the sheet it just opened and the button reads as dead. */
+const BACKDROP_ARM_MS = 700;
+
+/** Covers the sheet's 180 ms fade-out. The screen unmounts before the fade ends,
+ *  so a Back in this window would otherwise pop the screen underneath. */
+const LEAVE_BACK_GUARD_MS = 300;
+
+/** Ignore Back until the sheet has faded. This outlives the unmounting screen. */
+function swallowBackDuringFade() {
+  const subscription = BackHandler.addEventListener('hardwareBackPress', () => true);
+  setTimeout(() => subscription.remove(), LEAVE_BACK_GUARD_MS);
+}
+
 /** Leave the auth sheet, returning to whatever screen pushed it. */
-function dismiss() {
+function leaveSheet() {
   if (router.canGoBack()) router.back();
   else router.replace('/explore');
 }
@@ -102,6 +104,30 @@ export default function PasswordlessAuthScreen() {
   // Slide the panel up over the (fading) scrim on mount so the screen underneath
   // stays put, matching the app's other bottom sheets.
   const translateY = useRef(new Animated.Value(Dimensions.get('window').height)).current;
+  const openedAt = useRef(Date.now());
+
+  // The sheet stays on screen while it fades out, so Back, the backdrop and the
+  // close button can all still fire. Only the first may pop: a second one would
+  // take the customer off the screen underneath.
+  const navigation = useNavigation();
+  const leaving = useRef(false);
+  const dismiss = () => {
+    if (leaving.current || !navigation.isFocused()) return;
+    leaving.current = true;
+    swallowBackDuringFade();
+    leaveSheet();
+  };
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      // Not focused means Back belongs to a legal document above this sheet.
+      if (!leaving.current && navigation.isFocused()) {
+        leaving.current = true;
+        swallowBackDuringFade();
+      }
+      return false;
+    });
+    return () => subscription.remove();
+  }, [navigation]);
   useEffect(() => {
     Animated.spring(translateY, {
       toValue: 0,
@@ -112,10 +138,11 @@ export default function PasswordlessAuthScreen() {
   }, [translateY]);
 
   const [phase, setPhase] = useState<'phone' | 'otp'>('phone');
-  // Real remote backends start empty (users type their number); the demo/E2E
-  // mock prefills the demo phone so the offline suite stays buttons-only.
-  const [phone, setPhone] = useState(IS_DEMO_AUTH ? DEMO_PHONE : '');
+  // Every new sheet starts empty, including the deterministic E2E flow.
+  // Never restore the previous account's phone from device storage.
+  const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
+  const [otpLength, setOtpLength] = useState(DEFAULT_OTP_LENGTH);
   const [otpToken, setOtpToken] = useState<string | null>(null);
 
   // ── Legal consent ────────────────────────────────────────────────────
@@ -165,17 +192,6 @@ export default function PasswordlessAuthScreen() {
     router.push({ pathname: '/legal/[type]', params: { type: legalDocumentSlug(type) } });
   };
 
-  // Prefill the last-used number on reload (real backends only — demo already
-  // seeds its own). So the simulator "remembers" the account across reloads.
-  useEffect(() => {
-    if (IS_DEMO_AUTH) return;
-    AsyncStorage.getItem(LAST_PHONE_KEY)
-      .then((saved) => {
-        if (saved) setPhone(saved);
-      })
-      .catch(() => undefined);
-  }, []);
-
   const phoneValid = isValidPhone(phone);
 
   const field = {
@@ -193,7 +209,7 @@ export default function PasswordlessAuthScreen() {
       return;
     }
     try {
-      const { otpToken: token, devCode } = await requestOtp({
+      const { otpToken: token, otpLength: length, devCode } = await requestOtp({
         channel: 'phone',
         identifier,
         // Unified flow: the backend upserts by phone. See file header.
@@ -202,8 +218,7 @@ export default function PasswordlessAuthScreen() {
       });
       triggerHaptic('success');
       setOtpToken(token);
-      // Remember this number so a reload prefills it next time.
-      AsyncStorage.setItem(LAST_PHONE_KEY, identifier).catch(() => undefined);
+      setOtpLength(resolveOtpLength(length));
       // DEMO/E2E: auto-fill the code the mock handed back. Real backends omit it.
       setCode(devCode ?? '');
       setPhase('otp');
@@ -264,13 +279,14 @@ export default function PasswordlessAuthScreen() {
   const resend = async () => {
     if (isLoading) return;
     try {
-      const { otpToken: token, devCode } = await requestOtp({
+      const { otpToken: token, otpLength: length, devCode } = await requestOtp({
         channel: 'phone',
         identifier: phone.trim(),
         purpose: 'sign-in',
         lang: language,
       });
       setOtpToken(token);
+      setOtpLength(resolveOtpLength(length));
       setCode(devCode ?? '');
       toast.info(t('auth.newCodeSent'));
     } catch (err) {
@@ -284,6 +300,10 @@ export default function PasswordlessAuthScreen() {
     else dismiss();
   };
 
+  const onBackdropPress = () => {
+    if (Date.now() - openedAt.current >= BACKDROP_ARM_MS) dismiss();
+  };
+
   return (
     <AppView
       flex={1}
@@ -295,7 +315,7 @@ export default function PasswordlessAuthScreen() {
       {/* Backdrop — tap to dismiss. */}
       <Pressable
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-        onPress={dismiss}
+        onPress={onBackdropPress}
         accessibilityLabel={t('auth.dismiss')}
       />
 
@@ -444,18 +464,19 @@ export default function PasswordlessAuthScreen() {
               <AppTextField
                 testID="auth-otp-field"
                 label={t('auth.verificationCodeLabel')}
-                placeholder="123456"
+                placeholder={otpPlaceholder(otpLength)}
                 value={code}
-                onChangeText={(v: string) => setCode(v.replace(/\D/g, '').slice(0, 6))}
+                onChangeText={(v: string) =>
+                  setCode((previous) => normalizeOtpInput(v, otpLength, previous))
+                }
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="number-pad"
-                // Surfaces the SMS code as a one-tap suggestion above the
-                // keyboard: `oneTimeCode` = iOS QuickType "From Messages",
-                // `sms-otp` = Android SMS Retriever / autofill.
-                textContentType="oneTimeCode"
-                autoComplete="sms-otp"
-                importantForAutofill="yes"
+                // Autofill only fills this field. It never submits: the button
+                // below is also the legal consent, so that tap stays the user's.
+                // Focused on arrival because the OS offers the code on focus.
+                autoFocus
+                {...otpAutofillProps()}
                 {...field}
               />
 
@@ -485,7 +506,7 @@ export default function PasswordlessAuthScreen() {
                 kind="brand"
                 size="lg"
                 fullWidth
-                disabled={isLoading || code.length < 6}
+                disabled={isLoading || code.length < otpLength}
                 onPress={verify}
               />
 

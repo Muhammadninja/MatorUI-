@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/shared/app-text';
@@ -11,6 +12,10 @@ import { triggerHaptic } from '@/utils/haptics';
 /** Visible (post-safe-area) height of the header. Kept exported for any
  *  consumer that still needs the number for layout calculations. */
 export const SETTINGS_HEADER_HEIGHT = 56;
+export const HEADER_TITLE_SIZE = 17;
+/** Size of the round back button; a right-slot action should match it so the
+ *  title sits on the screen's center line. */
+export const HEADER_ACTION_SIZE = 36;
 
 export type AppSettingsHeaderProps = {
   title: string;
@@ -43,8 +48,9 @@ export function AppSettingsHeader({
   fallbackHref,
   onBack,
   right,
-  backAccessibilityLabel = 'Go back',
+  backAccessibilityLabel,
 }: AppSettingsHeaderProps) {
+  const { t } = useTranslation();
   const { tokens, scheme } = useThemeContext();
   const insets = useSafeAreaInsets();
 
@@ -89,10 +95,10 @@ export function AppSettingsHeader({
           onPress={handleBack}
           androidRipple
           accessibilityRole="button"
-          accessibilityLabel={backAccessibilityLabel}
+          accessibilityLabel={backAccessibilityLabel ?? t('common.back')}
           style={{
-            width: 36,
-            height: 36,
+            width: HEADER_ACTION_SIZE,
+            height: HEADER_ACTION_SIZE,
             flexShrink: 0,
             borderWidth: 1,
             borderColor: tokens.border,
@@ -103,12 +109,18 @@ export function AppSettingsHeader({
         </AppPressableView>
 
         <AppView style={{ flex: 1, alignItems: 'center', paddingHorizontal: 8 }}>
-          <AppText textVariant="bodySm" weight="semibold" align="center">
+          {/* A screen title, not a caption: 17pt like the platform's own nav
+              titles. It wraps to a second line rather than shrinking. */}
+          <AppText
+            weight="semibold"
+            align="center"
+            style={{ fontSize: HEADER_TITLE_SIZE, lineHeight: 22, color: tokens.text }}
+          >
             {title}
           </AppText>
         </AppView>
 
-        <AppView style={{ minWidth: 36, alignItems: 'flex-end', flexShrink: 0 }}>
+        <AppView style={{ minWidth: HEADER_ACTION_SIZE, alignItems: 'flex-end', flexShrink: 0 }}>
           {right ?? null}
         </AppView>
       </AppView>

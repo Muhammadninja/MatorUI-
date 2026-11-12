@@ -63,13 +63,16 @@ describe('payOrder', () => {
     expect(getOrder).toHaveBeenCalledTimes(PAYMENT_POLL.readsAfterReturn);
   });
 
-  test.each(['cancel', 'dismiss'])('closing the page (%s) without paying is not paid', async (type) => {
-    openAuthSessionAsync.mockResolvedValue({ type });
-    getOrder.mockResolvedValue(withStatus('pending_payment'));
+  test.each(['cancel', 'dismiss'])(
+    'closing the page (%s) without paying is not paid',
+    async (type) => {
+      openAuthSessionAsync.mockResolvedValue({ type });
+      getOrder.mockResolvedValue(withStatus('pending_payment'));
 
-    await expect(payOrder('ord_1')).resolves.toEqual({ kind: 'failed', reason: 'cancelled' });
-    expect(getOrder).toHaveBeenCalledTimes(PAYMENT_POLL.readsAfterDismiss);
-  });
+      await expect(payOrder('ord_1')).resolves.toEqual({ kind: 'failed', reason: 'cancelled' });
+      expect(getOrder).toHaveBeenCalledTimes(PAYMENT_POLL.readsAfterDismiss);
+    },
+  );
 
   test('closing the page after paying in the Payme app is paid', async () => {
     openAuthSessionAsync.mockResolvedValue({ type: 'dismiss' });
@@ -138,6 +141,38 @@ describe('payOrder', () => {
 
     await expect(payOrder('ord_1')).resolves.toEqual({ kind: 'no_online_step' });
     expect(openAuthSessionAsync).not.toHaveBeenCalled();
+  });
+
+  test('a stale invoice refusal does not start a status request in the next session', async () => {
+    let current = true;
+    let reject!: (error: Error) => void;
+    startPayment.mockReturnValueOnce(
+      new Promise((_resolve, fail) => {
+        reject = fail;
+      }),
+    );
+    const paying = payOrder('ord_a', () => current);
+    current = false;
+    reject(new Error('old invoice failed'));
+    await expect(paying).resolves.toEqual({ kind: 'failed', reason: 'cancelled' });
+    expect(getOrder).not.toHaveBeenCalled();
+    expect(openAuthSessionAsync).not.toHaveBeenCalled();
+  });
+
+  test('a session invalidated during a status read stops all later polls', async () => {
+    let current = true;
+    let answer!: (order: { serverStatus: string }) => void;
+    getOrder.mockReturnValueOnce(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
+    const paying = payOrder('ord_a', () => current);
+    await vi.waitFor(() => expect(getOrder).toHaveBeenCalledOnce());
+    current = false;
+    answer(withStatus('pending_payment'));
+    await expect(paying).resolves.toEqual({ kind: 'failed', reason: 'cancelled' });
+    expect(getOrder).toHaveBeenCalledOnce();
   });
 });
 

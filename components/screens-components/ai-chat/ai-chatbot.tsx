@@ -24,22 +24,32 @@ import { useTranslation } from 'react-i18next';
 
 import AiChatComposer from '@/components/screens-components/ai-chat/ai-chat-composer';
 import AiChatMessageBubble from '@/components/screens-components/ai-chat/ai-chat-message-bubble';
+import { AiChatPartLinks } from '@/components/screens-components/ai-chat/ai-chat-part-links';
 import AiChatTypingDots from '@/components/screens-components/ai-chat/ai-chat-typing-dots';
 import ComposerBlurWrapper from '@/components/screens-components/ai-chat/composer-blur-wrapper';
 import ScreenShell from '@/components/screens-components/screen-shell';
+import { AppButton } from '@/components/shared/app-button';
 import { AppIconButton } from '@/components/shared/app-icon-button';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useActiveVehicle } from '@/contexts/active-vehicle.context';
 import { useThemeContext } from '@/contexts/theme.context';
+import { useUserContext } from '@/contexts/user.context';
 import { useGlobalModal } from '@/hooks/use-global-modal';
+import { useSourcingSignInGate } from '@/hooks/use-sourcing-sign-in-gate';
 import { chatTransport } from '@/services/chat-api';
-import { clearStoredChat, loadChat, saveChat } from '@/services/chat-storage';
+import { composeSourcingBody } from '@/services/sourcing-chat-reply';
+import { clearStoredChat, loadChat, saveChat, type ChatOwner } from '@/services/chat-storage';
+import type { Vehicle } from '@/services/garage-service';
 import { toastService } from '@/services/toast-service';
 import type {
-    AiChatConversationSummary,
-    AiChatMessage,
-    AiChatToolCall,
+  AiChatConversationSummary,
+  AiChatMessage,
+  AiChatPartGroup,
+  AiChatPartsClarification,
+  AiChatSourcingState,
+  AiChatToolCall,
+  AiChatVehicleContext,
 } from '@/types/ai-chat';
 import { triggerHaptic } from '@/utils/haptics';
 import { router } from 'expo-router';
@@ -94,12 +104,33 @@ function dateBucket(iso: string): string {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
+/** A guest's message waiting for sign-in. The only thing that survives it. */
+type HeldRequest = { assistantMessageId: string; userMessageId: string; body: string };
+
+/** What the endpoint is told about the car selected in the garage. */
+function selectedVehicleContext(
+  vehicle: Vehicle | null | undefined,
+): AiChatVehicleContext | null {
+  if (!vehicle) return null;
+  return {
+    makeId: vehicle.brandId ?? '',
+    modelId: vehicle.modelId ?? '',
+    trimId: '',
+    selectedCarName: [vehicle.make, vehicle.model, vehicle.year].filter(Boolean).join(' '),
+    vehicleId: vehicle.id,
+    vin: vehicle.vin || undefined,
+  };
+}
+
 export default function AiChatbot() {
   const { tokens } = useThemeContext();
   const { t } = useTranslation();
   const suggestionChips = useMemo(() => buildSuggestionChips(t), [t]);
   const { openConfirm, openActionSheet } = useGlobalModal();
-  const { currentActiveVehicle } = useActiveVehicle();
+  const { currentActiveVehicle, isHydrating: vehicleHydrating } = useActiveVehicle();
+  const { isAuthenticated, profile, isHydrating: authHydrating } = useUserContext();
+  // Undefined until auth has settled, so nothing loads for the wrong person.
+  const chatOwner: ChatOwner | undefined = authHydrating ? undefined : (profile?.id ?? null);
   const [historyItems, setHistoryItems] = useState<AiChatConversationSummary[]>([]);
 
   // Load conversations from the transport. Real backend pushes the full
@@ -134,6 +165,27 @@ export default function AiChatbot() {
   const [systemNotes, setSystemNotes] = useState<SystemNote[]>([]);
   const [showScrollToLatest, setShowScrollToLatest] = useState(false);
 
+  // Bumped when the person changes, so a reply still on its way can tell that it
+  // belongs to a session that's over.
+  const sessionRef = useRef(0);
+  const [sessionOwner, setSessionOwner] = useState(chatOwner);
+  const [hydratedOwner, setHydratedOwner] = useState<ChatOwner | undefined>(undefined);
+  // During render, not in an effect: an effect would commit one frame showing the
+  // previous account's messages to the next person.
+  if (sessionOwner !== chatOwner) {
+    sessionRef.current += 1;
+    setSessionOwner(chatOwner);
+    setHydratedOwner(undefined);
+    setDraft('');
+    setMessages([]);
+    setConversationId(null);
+    setStreamingReply(null);
+    setLastSuggestions([]);
+    setFailedUserMessageIds(new Set());
+    setSystemNotes([]);
+    setShowScrollToLatest(false);
+  }
+
   const abortRef = useRef<AbortController | null>(null);
   // Synchronous in-flight gate. `isSending` is derived from render state
   // (streamingReply !== null) and is captured stale in the sendMessage
@@ -153,30 +205,42 @@ export default function AiChatbot() {
 
   // ── Persist the conversation across refresh/relaunch ────────────────
   // The sourcing endpoint is stateless, so without this the thread is lost on
-  // reload. Hydrate the cached turns once on mount, then debounce-save on change.
-  const chatHydratedRef = useRef(false);
+  // reload. Hydrate each person's own turns when they arrive, then debounce-save.
+  const previousOwnerRef = useRef<ChatOwner | undefined>(undefined);
   useEffect(() => {
+    // Whatever was in flight belonged to the previous person.
+    abortRef.current?.abort();
+    abortRef.current = null;
+    sendingRef.current = false;
+
+    const previousOwner = previousOwnerRef.current;
+    previousOwnerRef.current = chatOwner;
+    if (chatOwner === undefined) return;
+    // A guest's chat ends at sign-in: the next guest on this phone mustn't see it.
+    if (previousOwner === null && chatOwner !== null) void clearStoredChat(null);
+
     let cancelled = false;
     void (async () => {
-      const stored = await loadChat();
-      if (!cancelled && stored && stored.messages.length > 0) {
-        setMessages(stored.messages);
+      const stored = await loadChat(chatOwner);
+      if (cancelled) return;
+      if (stored && stored.messages.length > 0) {
+        setMessages((current) => [...stored.messages, ...current]);
         if (stored.conversationId) setConversationId(stored.conversationId);
       }
-      if (!cancelled) chatHydratedRef.current = true;
+      setHydratedOwner(chatOwner);
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [chatOwner]);
 
   useEffect(() => {
-    if (!chatHydratedRef.current) return;
-    const t = setTimeout(() => {
-      void saveChat({ messages, conversationId });
+    if (chatOwner === undefined || hydratedOwner !== chatOwner) return;
+    const timer = setTimeout(() => {
+      void saveChat(chatOwner, { messages, conversationId });
     }, 400);
-    return () => clearTimeout(t);
-  }, [messages, conversationId]);
+    return () => clearTimeout(timer);
+  }, [chatOwner, hydratedOwner, messages, conversationId]);
   const isSending = streamingReply !== null;
 
   // ── Scroll plumbing ─────────────────────────────────────────────────
@@ -202,18 +266,29 @@ export default function AiChatbot() {
   const sendMessage = useCallback(
     async (
       text: string,
-      options: { retryUserId?: string; replaceLastAssistant?: boolean } = {},
+      options: {
+        retryUserId?: string;
+        replaceLastAssistant?: boolean;
+        removeAssistantId?: string;
+        /** Keeps a held message's id, and so its request id, in a new session. */
+        messageId?: string;
+      } = {},
     ) => {
       const trimmed = text.trim();
       // Authoritative synchronous guard — see sendingRef declaration.
-      if (!trimmed || sendingRef.current) return;
+      if (!trimmed || sendingRef.current || chatOwner === undefined) return;
       sendingRef.current = true;
+      const session = sessionRef.current;
 
-      const { retryUserId, replaceLastAssistant } = options;
+      const { retryUserId, replaceLastAssistant, removeAssistantId, messageId } = options;
       triggerHaptic('selection');
       setDraft('');
 
-      const finalUserId = retryUserId ?? `user-${Date.now()}`;
+      // Doubles as the request id, so it has to stay unique and survive retries.
+      const finalUserId =
+        retryUserId ??
+        messageId ??
+        `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       if (!retryUserId) {
         setMessages((current) => [
           ...current,
@@ -235,6 +310,9 @@ export default function AiChatbot() {
         });
       }
 
+      if (removeAssistantId) {
+        setMessages((current) => current.filter((m) => m.id !== removeAssistantId));
+      }
       if (replaceLastAssistant) {
         // Regenerate: drop the previous assistant reply so the new one
         // visually replaces it in place.
@@ -272,12 +350,21 @@ export default function AiChatbot() {
         let createdAt = new Date().toISOString();
         let suggestions: string[] = [];
         let convoId = conversationId;
+        let partGroups: AiChatPartGroup[] | undefined;
+        let sourcing: AiChatSourcingState | undefined;
+        let partsClarification: AiChatPartsClarification | undefined;
+        let chatUnavailable = false;
         const toolCallMap = new Map<string, AiChatToolCall>();
 
         const stream = chatTransport.streamMessage(
           {
             conversationId,
             message: trimmed,
+            // A different car is a different request, even for the same message.
+            requestId: `${finalUserId}:${currentActiveVehicle?.vehicleId ?? 'none'}`,
+            userMessageId: finalUserId,
+            isAuthenticated,
+            vehicleContext: selectedVehicleContext(currentActiveVehicle?.vehicle),
             // Snapshot the prior turns (pre-append: this fires before the ref
             // effect runs) so the endpoint remembers earlier context.
             history: messagesRef.current
@@ -288,6 +375,7 @@ export default function AiChatbot() {
         );
 
         for await (const event of stream) {
+          if (sessionRef.current !== session) return;
           if (event.type === 'token') {
             body += event.value;
             setStreamingReply({
@@ -326,18 +414,27 @@ export default function AiChatbot() {
             replyId = event.replyId;
             title = event.title;
             createdAt = event.createdAt;
+            partGroups = event.partGroups;
+            sourcing = event.sourcing;
+            partsClarification = event.partsClarification;
+            chatUnavailable = event.chatUnavailable ?? false;
           }
         }
 
+        if (sessionRef.current !== session) return;
         const finalToolCalls = Array.from(toolCallMap.values());
         const completed: AiChatMessage = {
           id: replyId,
           role: 'assistant',
           title,
-          body,
+          body: chatUnavailable
+            ? t('aiChat.temporarilyUnavailable')
+            : composeSourcingBody({ text: body, sourcing, partsClarification }, t),
           caption: t('aiChat.captionNow'),
           createdAt,
           toolCalls: finalToolCalls.length > 0 ? finalToolCalls : undefined,
+          partGroups,
+          sourcing,
         };
         setStreamingReply(null);
         setMessages((current) => [...current, completed]);
@@ -345,6 +442,7 @@ export default function AiChatbot() {
         setLastSuggestions(suggestions);
         scrollToEnd();
       } catch (err) {
+        if (sessionRef.current !== session) return;
         const aborted =
           (err instanceof DOMException && err.name === 'AbortError') ||
           (err instanceof Error && err.name === 'AbortError');
@@ -366,11 +464,47 @@ export default function AiChatbot() {
           abortRef.current = null;
         }
         // Release the synchronous gate so the next send is allowed once
-        // this stream completes or aborts.
-        sendingRef.current = false;
+        // this stream completes or aborts. A newer session owns it by then.
+        if (sessionRef.current === session) sendingRef.current = false;
       }
     },
-    [conversationId, isSending, scrollToEnd, t],
+    [chatOwner, conversationId, currentActiveVehicle, isAuthenticated, isSending, scrollToEnd, t],
+  );
+
+  const submitHeldRequest = useCallback(
+    (held: HeldRequest) => {
+      // Still in the thread if this person was signed in all along. After sign-in
+      // the guest's thread is gone, so this message starts the account's.
+      const inThread = messagesRef.current.some((m) => m.id === held.userMessageId);
+      void sendMessage(
+        held.body,
+        inThread
+          ? { retryUserId: held.userMessageId, removeAssistantId: held.assistantMessageId }
+          : { messageId: held.userMessageId },
+      );
+    },
+    [sendMessage],
+  );
+  const requestHeldSubmit = useSourcingSignInGate<HeldRequest>({
+    isAuthenticated,
+    ready: chatOwner !== undefined && hydratedOwner === chatOwner && !vehicleHydrating,
+    submit: submitHeldRequest,
+  });
+  const holdRequest = useCallback(
+    (assistant: AiChatMessage) => {
+      const userMessageId =
+        assistant.sourcing?.status === 'sign_in_required'
+          ? assistant.sourcing.userMessageId
+          : undefined;
+      const original = messagesRef.current.find((m) => m.id === userMessageId);
+      if (!original) return;
+      requestHeldSubmit({
+        assistantMessageId: assistant.id,
+        userMessageId: original.id,
+        body: original.body,
+      });
+    },
+    [requestHeldSubmit],
   );
 
   const stopGenerating = useCallback(() => {
@@ -486,8 +620,8 @@ export default function AiChatbot() {
     setFailedUserMessageIds(new Set());
     setSystemNotes([]);
     setDraft('');
-    void clearStoredChat();
-  }, []);
+    if (chatOwner !== undefined) void clearStoredChat(chatOwner);
+  }, [chatOwner]);
 
   const requestClear = useCallback(() => {
     if (messages.length === 0 && !streamingReply) return;
@@ -593,15 +727,26 @@ export default function AiChatbot() {
     return () => sub.remove();
   }, [scrollToEnd]);
 
+  const [composerHeight, setComposerHeight] = useState(0);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  useEffect(() => {
+    const show = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hide = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const subs = [
+      Keyboard.addListener(show, (e) => setKeyboardHeight(e.endCoordinates.height)),
+      Keyboard.addListener(hide, () => setKeyboardHeight(0)),
+    ];
+    return () => subs.forEach((sub) => sub.remove());
+  }, []);
+
   // ── Render ──────────────────────────────────────────────────────────
   const hasMessages = messages.length > 0 || streamingReply !== null;
 
-  // Build the "fits your X" suffix from the real active vehicle.
-  // Only show the model name (not full year+make+model) to keep the
-  // header compact, matching handoff copy "● Online · fits your Camry".
+  // Names the selected car without claiming anything fits it: fitment is only
+  // known per part. Model only, to keep the header compact.
   const activeVehicleModel = currentActiveVehicle?.vehicle?.model ?? null;
   const onlineLabel = activeVehicleModel
-    ? t('aiChat.fitsYourVehicle', { model: activeVehicleModel })
+    ? t('aiChat.selectedVehicle', { model: activeVehicleModel })
     : null;
 
   return (
@@ -618,7 +763,7 @@ export default function AiChatbot() {
           borderTopWidth={1}
           borderColor={tokens.border}
         >
-          <AppView row align="center" gap={10}>
+          <AppView flex={1} row align="center" gap={10}>
             {/* Mator AI brand monogram avatar */}
             <AppView
               center
@@ -640,7 +785,7 @@ export default function AiChatbot() {
             </AppView>
 
             {/* Title + status row */}
-            <AppView gap={1}>
+            <AppView flex={1} gap={1}>
               <AppText
                 textVariant="bodySemibold"
                 family="heading"
@@ -660,7 +805,7 @@ export default function AiChatbot() {
                   textVariant="caption"
                   family="accent"
                   weight="semibold"
-                  style={{ color: tokens.success, lineHeight: 14 }}
+                  style={{ color: tokens.success, lineHeight: 14, flexShrink: 1 }}
                 >
                   {t('aiChat.online')}{onlineLabel ? ` · ${onlineLabel}` : ''}
                 </AppText>
@@ -685,17 +830,19 @@ export default function AiChatbot() {
             // message hugs the right side.
             paddingHorizontal: 8,
             paddingTop: 24,
-            // Composer is absolutely overlaid via KeyboardStickyView,
-            // so reserve ~120dp here for: composer (50) + disclosure
-            // (18) + safe-area cushion (50). Messages can still scroll
-            // behind the composer so the BlurView has content to blur.
-            paddingBottom: 120,
+            // The composer takes its own space below this list, so only the
+            // keyboard has to be cleared: the sticky view lifts the composer
+            // over the list by exactly the keyboard's height.
+            paddingBottom: keyboardHeight + 16,
           }}
           keyboardShouldPersistTaps="handled"
           onScroll={handleScroll}
           scrollEventThrottle={16}
-          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
           onContentSizeChange={() => {
+            if (isAtBottomRef.current) scrollToEnd(false);
+          }}
+          // The list shrinks as the composer grows, which changes no content size.
+          onLayout={() => {
             if (isAtBottomRef.current) scrollToEnd(false);
           }}
         >
@@ -815,6 +962,22 @@ export default function AiChatbot() {
                             : handleUserAvatarPress
                         }
                       />
+                      {message.partGroups?.length ? (
+                        <AiChatPartLinks groups={message.partGroups} />
+                      ) : null}
+                      {message.sourcing?.status === 'sign_in_required' ? (
+                        <AppView style={{ paddingLeft: 40 }}>
+                          <AppButton
+                            testID="chat-sourcing-submit"
+                            title={t(isAuthenticated ? 'aiChat.submitRequest' : 'aiChat.signInToSubmit')}
+                            kind="brand"
+                            size="lg"
+                            fullWidth
+                            disabled={isSending}
+                            onPress={() => holdRequest(message)}
+                          />
+                        </AppView>
+                      ) : null}
                       {failed ? (
                         <AppView row justify="flex-end">
                           <Pressable
@@ -847,6 +1010,7 @@ export default function AiChatbot() {
                       ) : null}
                       {isLatestAssistant && !streamingReply ? (
                         <AppView row gap={6} style={{ paddingLeft: 40 }}>
+                          {message.sourcing ? null : (
                           <Pressable
                             onPress={regenerateLastReply}
                             accessibilityRole="button"
@@ -874,6 +1038,7 @@ export default function AiChatbot() {
                               {t('aiChat.regenerate')}
                             </AppText>
                           </Pressable>
+                          )}
                           <FeedbackButton
                             active={message.feedback === 'up'}
                             kind="up"
@@ -953,7 +1118,7 @@ export default function AiChatbot() {
             style={{
               position: 'absolute',
               right: 16,
-              bottom: 96,
+              bottom: keyboardHeight + composerHeight + 12,
             }}
             pointerEvents="box-none"
           >
@@ -977,14 +1142,10 @@ export default function AiChatbot() {
           </AppView>
         ) : null}
 
-        {/* Composer is absolutely overlaid on the ScrollView's bottom
-         *  via KeyboardStickyView. The ScrollView extends BEHIND it
-         *  (with paddingBottom reserved below), so the BlurView in
-         *  ComposerBlurWrapper actually has something to blur. When the
-         *  keyboard opens, KeyboardStickyView slides the composer up;
-         *  the ScrollView's automaticallyAdjustKeyboardInsets keeps the
-         *  latest message visible above the keyboard. */}
-        <KeyboardStickyView>
+        {/* Sits below the list and grows with its text, which shrinks the list.
+         *  When the keyboard opens, KeyboardStickyView slides it up, and the
+         *  list's bottom padding keeps the latest message above it. */}
+        <KeyboardStickyView onLayout={(e) => setComposerHeight(e.nativeEvent.layout.height)}>
           <ComposerBlurWrapper>
             <AiChatComposer
               value={draft}
@@ -1001,9 +1162,8 @@ export default function AiChatbot() {
             <AppView px="md" pt={2} pb={4}>
               <AppText
                 textVariant="caption"
-                colorName="gray400"
+                colorName="textMuted"
                 align="center"
-                style={{ fontSize: 10, lineHeight: 14 }}
               >
                 {t('aiChat.disclaimerShort')}
               </AppText>
@@ -1039,7 +1199,7 @@ function FeedbackButton({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={kind === 'up' ? t('aiChat.goodResponse') : t('aiChat.badResponse')}
-      hitSlop={{ top: 9, bottom: 9, left: 9, right: 9 }}
+      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
       style={{
         width: 26,
         height: 26,

@@ -12,18 +12,23 @@ import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vi
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const { host, requestPosition, searchAddresses, describePoint, picker } = vi.hoisted(() => ({
-  host:
-    (type: string) =>
-    ({ children, ...p }: Record<string, unknown> & { children?: React.ReactNode }) =>
-      React.createElement(type, p, children),
-  requestPosition: vi.fn(),
-  searchAddresses: vi.fn(),
-  describePoint: vi.fn(),
-  picker: { props: null as null | Record<string, any> },
-}));
+const { host, requestPosition, searchAddresses, describePoint, picker, locationFailure } =
+  vi.hoisted(() => ({
+    host:
+      (type: string) =>
+      ({ children, ...p }: Record<string, unknown> & { children?: React.ReactNode }) =>
+        React.createElement(type, p, children),
+    requestPosition: vi.fn(),
+    searchAddresses: vi.fn(),
+    describePoint: vi.fn(),
+    picker: { props: null as null | Record<string, any> },
+    locationFailure: { current: null as null | 'denied' | 'unavailable' },
+  }));
 
-vi.mock('react-native', () => ({ ScrollView: host('scroll') }));
+vi.mock('react-native', () => ({
+  ScrollView: host('scroll'),
+  Keyboard: { addListener: () => ({ remove: () => {} }), isVisible: () => false },
+}));
 vi.mock('lucide-react-native', () => ({ Check: () => null, MapPin: () => null }));
 vi.mock('@/components/shared/app-bottom-sheet', () => ({ AppBottomSheet: host('sheet') }));
 vi.mock('@/components/shared/app-button', () => ({ AppButton: host('button') }));
@@ -36,7 +41,11 @@ vi.mock('@/components/shared/app-view', () => ({
 vi.mock('@/components/shared/wheel-loader', () => ({ WheelLoader: host('loader') }));
 vi.mock('@/contexts/theme.context', () => ({ useThemeContext: () => ({ tokens: {} }) }));
 vi.mock('@/hooks/use-app-location/use-app-location', () => ({
-  useAppLocation: () => ({ requestAndGetPosition: requestPosition, isLoading: false }),
+  useAppLocation: () => ({
+    requestAndGetPosition: requestPosition,
+    isLoading: false,
+    lastFailure: () => locationFailure.current,
+  }),
 }));
 vi.mock('@/services/debug-log', () => ({ debugLog: vi.fn() }));
 vi.mock('@/services/orders-api', () => ({ ordersTransport: { searchAddresses, describePoint } }));
@@ -82,6 +91,12 @@ describe('AddressFormSheet', () => {
 
   const allText = () =>
     renderer.root
+      .findAll((node) => node.type === 'text')
+      .flatMap((node) => node.children.filter((c): c is string => typeof c === 'string'))
+      .join(' | ');
+  /** Every string drawn inside one testID'd host view. */
+  const hostText = (id: string) =>
+    hostNode(id)
       .findAll((node) => node.type === 'text')
       .flatMap((node) => node.children.filter((c): c is string => typeof c === 'string'))
       .join(' | ');
@@ -149,6 +164,7 @@ describe('AddressFormSheet', () => {
   });
   beforeEach(() => {
     vi.clearAllMocks();
+    locationFailure.current = null;
     client = new QueryClient({ defaultOptions: { queries: { gcTime: 0 } } });
     searchAddresses.mockResolvedValue({ items: [MATCH], attribution: null });
     describePoint.mockResolvedValue({ address: null, withinCoverage: true, attribution: null });
@@ -254,7 +270,7 @@ describe('AddressFormSheet', () => {
       expect(fieldValue('street')).toBe('Амира Темура');
       expect(fieldValue('house')).toBe('12');
       expect(fieldValue('city')).toBe('Ташкент');
-      expect(allText()).toContain('Местоположение указано');
+      expect(allText()).toContain('Точка доставки выбрана');
 
       await save();
 
@@ -298,7 +314,7 @@ describe('AddressFormSheet', () => {
       pick(0);
 
       type('house', '13');
-      expect(allText()).not.toContain('Местоположение указано');
+      expect(allText()).not.toContain('Точка доставки выбрана');
       await searched();
 
       expect(searchAddresses).toHaveBeenCalledTimes(2);
@@ -334,7 +350,7 @@ describe('AddressFormSheet', () => {
       await confirmOnMap(PIN.lat, PIN.lng);
 
       expect(picker.props!.visible).toBe(false);
-      expect(allText()).toContain('Местоположение указано');
+      expect(allText()).toContain('Точка доставки выбрана');
       expect(saveButton().props.disabled).toBe(false);
       await save();
       expect(onSubmit.mock.calls[0]![0]).toEqual({
@@ -393,9 +409,9 @@ describe('AddressFormSheet', () => {
       });
     });
 
-    test('never overwrites what the buyer typed', async () => {
+    test('the confirmed point address replaces what was typed before', async () => {
       describePoint.mockResolvedValue({
-        address: { city: 'Ташкент', district: null, street: 'Сеул', houseNumber: null },
+        address: { city: 'Ташкент', district: null, street: 'Сеул', houseNumber: '7' },
         withinCoverage: true,
         attribution: 'credit',
       });
@@ -404,8 +420,37 @@ describe('AddressFormSheet', () => {
 
       await confirmOnMap(PIN.lat, PIN.lng);
 
-      expect(fieldValue('street')).toBe('Мой дом');
-      expect(allText()).not.toContain('credit');
+      expect(fieldValue('street')).toBe('Сеул');
+      expect(fieldValue('house')).toBe('7');
+      expect(fieldValue('city')).toBe('Ташкент');
+      expect(allText()).toContain('credit');
+      expect(hostText('address-chosen-place')).toContain('Сеул 7');
+    });
+
+    test('a place found on the map shows by name, fills the address and names the saved address', async () => {
+      await mount();
+      type('street', 'Мой дом');
+      openMap();
+      await act(async () => {
+        picker.props!.onConfirm(
+          { lat: PIN.lat, lng: PIN.lng },
+          { id: 'p1', title: 'Tashkent City Mall', subtitle: 'Олмазор, Ташкент', city: 'Ташкент', district: 'Олмазор', street: 'Олмазор', houseNumber: '1', lat: PIN.lat, lng: PIN.lng },
+        );
+      });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      expect(fieldValue('street')).toBe('Олмазор');
+      expect(fieldValue('house')).toBe('1');
+      expect(fieldValue('city')).toBe('Ташкент');
+      expect(hostText('address-chosen-place')).toContain('Tashkent City Mall');
+      expect(hostText('address-chosen-place')).toContain('Ташкент');
+
+      await act(async () => {
+        saveButton().props.onPress();
+      });
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ label: 'Tashkent City Mall', city: 'Ташкент' }));
     });
 
     test('a point with no known address is still the destination', async () => {
@@ -506,7 +551,7 @@ describe('AddressFormSheet', () => {
       type('street', 'Навои');
       type('city', 'Самарканд');
 
-      expect(allText()).toContain('Местоположение указано');
+      expect(allText()).toContain('Точка доставки выбрана');
       await searched();
       expect(searchAddresses).not.toHaveBeenCalled();
       await save();
@@ -563,7 +608,7 @@ describe('AddressFormSheet', () => {
         hostNode('address-field-landmark').props.onChangeText('Новый ориентир');
       });
 
-      expect(allText()).toContain('Местоположение указано');
+      expect(allText()).toContain('Сохранённая точка доставки');
       await save();
       const payload = onSubmit.mock.calls[0]![0];
       expect(payload.landmark).toBe('Новый ориентир');
@@ -628,7 +673,7 @@ describe('AddressFormSheet', () => {
 
       await useLocation();
 
-      expect(allText()).toContain('Местоположение указано');
+      expect(allText()).toContain('Указано ваше текущее местоположение');
       await save();
       expect(onSubmit.mock.calls[0]![0]).toMatchObject({ lat: 41.3, lng: 69.2 });
     });
@@ -675,6 +720,54 @@ describe('AddressFormSheet', () => {
       expect(allText()).toContain('Не удалось определить местоположение');
       await save();
       expect(onSubmit.mock.calls[0]![0]).not.toHaveProperty('lat');
+    });
+
+    test('refused access is told apart from a device that cannot find itself', async () => {
+      await mount();
+      requestPosition.mockResolvedValue(null);
+      locationFailure.current = 'denied';
+
+      await useLocation();
+
+      expect(hostNode('address-location-note').props.children).toBe(
+        'Нет доступа к геолокации. Разрешите его в настройках телефона или укажите точку на карте.',
+      );
+    });
+
+    describe('a saved point whose refresh fails (the contradiction seen on device)', () => {
+      test.each([
+        ['denied', 'Нет доступа к геолокации, поэтому точка не обновлена.'],
+        ['unavailable', 'Не удалось определить местоположение, поэтому точка не обновлена.'],
+      ] as const)(
+        '%s: still says the saved point is set, and that it was kept',
+        async (failure, note) => {
+          await mount(SAVED);
+          requestPosition.mockResolvedValue(null);
+          locationFailure.current = failure;
+
+          await useLocation();
+
+          expect(hostNode('address-location-status').props.children).toBe(
+            'Сохранённая точка доставки',
+          );
+          expect(hostNode('address-location-note').props.children).toBe(note);
+          // One note at most: never "set" beside a bare "could not determine".
+          expect(
+            renderer.root.findAll(
+              (n) => n.props.testID === 'address-location-note' && typeof n.type === 'string',
+            ),
+          ).toHaveLength(1);
+          expect(allText()).not.toContain('Проверьте, что геолокация включена');
+          await save();
+          expect(onSubmit.mock.calls[0]![0]).not.toHaveProperty('lat');
+        },
+      );
+    });
+
+    test('a pin with no words is shown as the saved point, not as a fresh GPS reading', async () => {
+      await mount({ ...SAVED, line1: '', city: '' });
+      expect(hostNode('address-location-status').props.children).toBe('Сохранённая точка доставки');
+      expect(exists('address-location-note')).toBe(false);
     });
 
     test('never shows the coordinates', async () => {
@@ -740,7 +833,7 @@ describe('AddressFormSheet', () => {
 
     test('with a point: shows it as set, searches nothing, and an unchanged save leaves it to the server', async () => {
       await mount(SAVED);
-      expect(allText()).toContain('Местоположение указано');
+      expect(allText()).toContain('Сохранённая точка доставки');
       await searched();
       expect(searchAddresses).not.toHaveBeenCalled();
 
@@ -764,7 +857,7 @@ describe('AddressFormSheet', () => {
 
       type('street', 'Бабура');
 
-      expect(allText()).not.toContain('Местоположение указано');
+      expect(allText()).not.toContain('Сохранённая точка доставки');
       expect(allText()).toContain('Использовать моё текущее местоположение');
       await save();
       expect(onSubmit.mock.calls[0]![0]).not.toHaveProperty('lat');
@@ -776,7 +869,7 @@ describe('AddressFormSheet', () => {
       requestPosition.mockResolvedValue({ latitude: 41.29, longitude: 69.25 });
 
       await useLocation();
-      expect(allText()).toContain('Местоположение указано');
+      expect(allText()).toContain('Указано ваше текущее местоположение');
       await save();
 
       expect(onSubmit.mock.calls[0]![0]).toMatchObject({ line1: 'Бабура 1', lat: 41.29, lng: 69.25 });
@@ -822,7 +915,7 @@ describe('AddressFormSheet', () => {
         renderer.update(ui(null, true));
       });
 
-      expect(allText()).not.toContain('Местоположение указано');
+      expect(allText()).not.toContain('Указано ваше текущее местоположение');
     });
   });
 });

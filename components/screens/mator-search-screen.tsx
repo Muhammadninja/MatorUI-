@@ -81,14 +81,15 @@ export default function MatorSearchScreen() {
           <AppPressableView
             onPress={() => router.back()}
             center
-            rounded={12}
+            rounded={999}
             borderWidth={1}
             borderName="border"
+            colorName="surface"
             accessibilityRole="button"
             accessibilityLabel={t('search.back')}
-            style={{ width: 48, height: 48 }}
+            style={{ width: 36, height: 36 }}
           >
-            <ArrowLeft size={22} strokeWidth={2.2} color={tokens.text} />
+            <ArrowLeft size={18} strokeWidth={2.2} color={tokens.text} />
           </AppPressableView>
 
           <AppView

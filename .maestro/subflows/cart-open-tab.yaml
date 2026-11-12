@@ -1,0 +1,11 @@
+# Opens the Cart tab from any primary tab screen.
+appId: com.mator.e2e
+---
+- tapOn:
+    text: Cart
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible:
+      id: cart-screen
+    timeout: 15000
+- waitForAnimationToEnd

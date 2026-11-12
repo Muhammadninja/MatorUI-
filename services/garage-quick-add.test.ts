@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { MockGarageTransport, toServerVehicleCreatePayload } from './garage-api';
+import { toServerVehicleCreatePayload } from "@/services/garage-api";
+import { MockGarageTransport } from "@/tests/support/transports/garage-api";
 import type { VehicleInput } from './garage-service';
 import { colorHexToEnum, DEFAULT_VEHICLE_COLOR_HEX } from '../utils/vehicle-color';
 

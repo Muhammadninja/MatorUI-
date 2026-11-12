@@ -26,6 +26,21 @@ export function noBreakDigits(text: string): string {
   return text.replace(/(\d)[ \u202F\u2009](?=\d)/g, `$1${NBSP}`);
 }
 
+/**
+ * The one way a som amount reads, in every price surface: digit groups joined
+ * with NBSP, and hundredths only when the amount really has them.
+ *
+ * Fractions are real money, not noise. Some catalog prices carry them
+ * (65730.24), and Payme charges the exact amount in tiyin, so rounding here
+ * would show a total the customer is not charged. The point is the decimal mark
+ * every price parser in the app understands. This never changes a stored value.
+ */
+export function formatSomAmount(amount: number): string {
+  const [whole, fraction] = (Math.round(amount * 100) / 100).toFixed(2).split('.');
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, NBSP);
+  return fraction === '00' ? grouped : `${grouped}.${fraction}`;
+}
+
 type ParsedPrice = {
   amount: number;
   /** Leading currency text, e.g. "UZS" or "$" (empty when none). */

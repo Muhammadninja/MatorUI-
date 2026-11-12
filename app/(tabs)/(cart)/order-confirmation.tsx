@@ -1,5 +1,7 @@
 import { Stack } from 'expo-router';
 
+import { AuthenticatedRoute } from '@/components/screens-components/auth/authenticated-route';
+
 import OrderConfirmationScreen from '@/components/screens/order-confirmation-screen';
 
 export default function OrderConfirmationRoute() {
@@ -13,7 +15,9 @@ export default function OrderConfirmationRoute() {
           gestureDirection: 'vertical',
         }}
       />
-      <OrderConfirmationScreen />
+      <AuthenticatedRoute titleKey="orderConfirmation.orderPlaced" fallbackHref="/cart">
+        <OrderConfirmationScreen />
+      </AuthenticatedRoute>
     </>
   );
 }

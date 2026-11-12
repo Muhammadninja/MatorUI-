@@ -102,6 +102,8 @@ export type AppListItemProps = {
   rightTextColorName?: ColorName;
   style?: StyleProp<ViewStyle>;
   contentStyle?: StyleProp<ViewStyle>;
+  /** Vertical padding override for a denser list; the inset divider follows it. */
+  py?: number;
 };
 
 const SIZE_MAP: Record<
@@ -184,9 +186,11 @@ const AppListItemComponent: React.FC<AppListItemProps> = ({
   rightTextColorName,
   style,
   contentStyle,
+  py,
 }) => {
   const { tokens: C, scheme } = useThemeContext();
   const sz = SIZE_MAP[size];
+  const padY = py ?? sz.py;
   const selectedTokenName = (selectionColorName ??
     (scheme === 'light' ? 'gray50' : 'gray200')) as ColorName;
   const selectedBg = useColorToken(selectedTokenName);
@@ -463,7 +467,7 @@ const AppListItemComponent: React.FC<AppListItemProps> = ({
 
   const wrapperProps = {
     px: sz.px,
-    py: sz.py,
+    py: padY,
     borderBottomWidth: divider && !dividerInset ? 1 : 0,
     borderName: divider && !dividerInset ? ('divider' as any) : undefined,
   } as const;
@@ -509,8 +513,8 @@ const AppListItemComponent: React.FC<AppListItemProps> = ({
               height: 1,
               backgroundColor: C.divider,
               marginLeft: dividerInset,
-              marginTop: sz.py,
-              marginBottom: -sz.py,
+              marginTop: padY,
+              marginBottom: -padY,
             }}
           />
         ) : null}
@@ -533,8 +537,8 @@ const AppListItemComponent: React.FC<AppListItemProps> = ({
             height: 1,
             backgroundColor: C.divider,
             marginLeft: dividerInset,
-            marginTop: sz.py,
-            marginBottom: -sz.py,
+            marginTop: padY,
+            marginBottom: -padY,
           }}
         />
       ) : null}

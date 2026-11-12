@@ -63,6 +63,8 @@ export function ResultsToolbar({ count, sortBy, onSortChange }: ResultsToolbarPr
               rounded={8}
               px={14}
               py={8}
+              // The padding belongs to the wrapper, so the slop has to cover it.
+              hitSlop={{ top: 13, bottom: 13, left: 14, right: 14 }}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
               style={{
@@ -74,7 +76,7 @@ export function ResultsToolbar({ count, sortBy, onSortChange }: ResultsToolbarPr
               <AppText
                 family="accent"
                 weight="bold"
-                style={{ fontSize: 12.5, color: active ? tokens.onBrand : tokens.text }}
+                style={{ fontSize: 12, color: active ? tokens.onBrand : tokens.text }}
               >
                 {t(s.labelKey)}
               </AppText>

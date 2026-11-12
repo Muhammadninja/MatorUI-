@@ -16,3 +16,13 @@ export function openItemDetail(id: string): void {
   prefetchCatalogDetail(id);
   router.push({ pathname: '/item-detail/[id]', params: { id } });
 }
+
+/**
+ * Open a product from an Assistant chat result. It stays in the Assistant
+ * tab's stack, so back returns to the conversation; `openItemDetail` would
+ * switch to Explore and strand the user on its home screen.
+ */
+export function openChatItemDetail(id: string): void {
+  prefetchCatalogDetail(id);
+  router.push({ pathname: '/chat-item/[id]', params: { id } });
+}

@@ -26,16 +26,14 @@ test('the key travels as a header and never in the whitelisted body', async () =
   expect(body).not.toHaveProperty('idempotency_key');
 });
 
-test('a resend of the request after a dropped connection carries the same key', async () => {
-  const fetch = vi.fn()
-    .mockRejectedValueOnce(new TypeError('Network request failed'))
-    .mockResolvedValueOnce(created());
+test('a dropped connection is not resent by the client: the buyer retries under the same key', async () => {
+  const fetch = vi.fn().mockRejectedValueOnce(new TypeError('Network request failed'));
   vi.stubGlobal('fetch', fetch);
-  const result = await new HttpOrdersTransport().createOrder({ ...input, idempotencyKey: 'ord_unit_key_2' });
-
-  expect(result.orderId).toBe('ord_1');
-  expect(fetch).toHaveBeenCalledTimes(2);
-  expect(fetch.mock.calls.map(([, init]) => headerOf(init))).toEqual(['ord_unit_key_2', 'ord_unit_key_2']);
+  await expect(new HttpOrdersTransport().createOrder({ ...input, idempotencyKey: 'ord_unit_key_2' }))
+    .rejects.toMatchObject({ code: 'NETWORK_ERROR' });
+  // A write is never replayed by the transport; useCreateOrder keeps the key for the retry.
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(headerOf(fetch.mock.calls[0]![1])).toBe('ord_unit_key_2');
 });
 
 test('an older caller without a key sends no header', async () => {

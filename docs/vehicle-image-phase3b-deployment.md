@@ -1,0 +1,85 @@
+# Vehicle Image Pipeline — Phase 3B deployment preparation
+
+Status: prepared locally; not deployed. This service is separate from the commerce backend and writes only to its own data directory and Cloudinary namespace.
+
+## Hosting recommendation
+
+Run `mator-vehicle-images` as one Node.js PM2 fork on the Ubuntu VPS already used by Mator. Bind it to `127.0.0.1:8047` and expose its API through the existing HTTPS reverse proxy after a separate deployment review. Use one process only: the pipeline's persistent JSON registry, write queue and generation deduplication are single-process. Do not use PM2 cluster mode or run multiple replicas.
+
+Use the existing Cloudinary account for approved image delivery. It is already used by the Mator backend, supports signed server-side uploads, and provides HTTPS CDN URLs. Candidate files and request/job/version metadata stay private on a dedicated persistent volume. Upload only after admin approval. Store the Cloudinary URL and storage key against each immutable version; rollback changes the active version pointer and leaves previous URLs intact.
+
+This avoids a new VM, database, queue, and object-storage service for the first low-volume deployment. The JSON registry is intentionally a one-writer store; it is not a multi-replica database. If the service later needs multiple instances, replace the registry with a dedicated pipeline database and a transactional uniqueness/locking mechanism before scaling.
+
+## Storage and lifecycle
+
+- Registry and private candidate/reference files: `/var/lib/mator-vehicle-images`, mode `0700`; metadata and asset files are created owner-only. Back up the complete directory with encryption and test restore before launch.
+- Public approved objects: Cloudinary `mator/vehicle-images/<identity-hash>/v<version>-<candidate-id>`. The candidate ID scopes an upload retry to the same approved candidate; a retry can replace only that candidate's deterministic key. Different candidates and versions have different keys. The stored CDN URL is the resolver output. Upload signatures follow [Cloudinary's authentication signature specification](https://cloudinary.com/documentation/authentication_signatures).
+- Requests, job attempts, approval decisions, candidate metadata and version history remain in `metadata.json`. The active version pointer provides rollback. Do not delete prior Cloudinary objects during rollback.
+- On restart, a job found in `running` is marked `failed` with `interrupted-provider-outcome-unknown`; it is not automatically retried because the provider may have completed a billable request before the process stopped. An administrator can inspect and explicitly regenerate.
+- Health checks: `GET /health/live` and `GET /health/ready`. Readiness becomes true after the registry has loaded and persisted. PM2 restarts the process; monitor HTTP readiness and free disk space externally.
+- The app process and its secret file must be readable only by a dedicated service account. The process binds loopback; terminate TLS at the existing reverse proxy. Admin endpoints require the admin bearer token. `POST /requests` also requires a separate server-to-server bearer token in the cloud runtime; enforce proxy-level rate limits before exposing it. The mobile app must never receive either token. Do not put `VEHICLE_IMAGE_ADMIN_TOKEN`, `VEHICLE_IMAGE_REQUEST_TOKEN`, OpenAI credentials, or Cloudinary API secret in Expo variables, app config, logs, or client uploads.
+
+## BYD Han Published v1 migration
+
+The local Phase 3A registry contains the approved BYD Han 2024 v1 asset. `scripts/vehicle-image-export-approved.mjs` locates it by its legacy text identity and copies only that approved WebP plus a metadata/checksum manifest into a private export directory. It refuses a missing/unapproved candidate, wrong dimensions/format, or an image without an alpha channel. It does not upload anything or alter the source registry.
+
+Example, run on the machine that has the Phase 3A data directory:
+
+```sh
+umask 077
+node scripts/vehicle-image-export-approved.mjs \
+  --source-dir=/private/tmp/mator-vehicle-image-validation \
+  --output-dir=/secure/path/byd-han-v1-export
+```
+
+Review the manifest SHA-256 and image. During the eventual deployment, import the image as a private candidate in a clean pipeline registry, then use the authenticated admin approval path. The cloud storage adapter publishes it as cloud v1 only when approved; verify the stored checksum and public URL before routing clients. Retain the local source and encrypted export until cloud v1 is verified. Never copy the whole local `metadata.json` into a cloud runtime: it includes private candidate/job state and may contain provider diagnostics.
+
+The exporter checks WebP format, 1200×600 dimensions and alpha-channel presence. Alpha-channel presence alone does not prove transparent pixels; the recorded Phase 3A validation also inspected the alpha range. Recheck actual alpha values and visually review the exported file before migration.
+
+## Mobile image delivery boundary
+
+Cloudinary URLs are stable public HTTPS URLs and can be fetched by current iOS and Android networking stacks without an app release once the app receives those URLs from an existing API response. The current repository has no connected Garage stock-vehicle resolver, and the current commerce vehicle response was not changed. Therefore there is no claim that the currently installed app will discover this asset automatically. Before launch, an already-shipped client/API contract must be confirmed to pass vehicle `images[]` through; otherwise a separate, explicitly authorized API integration is required. This preparation does not modify Garage or the commerce backend.
+
+## Deployment contents and operations
+
+- `services/vehicle-image-server.mjs`: standalone HTTP entry point, async worker, storage adapter and OpenAI adapter.
+- `services/vehicle-image-cloudinary-store.mjs`: signed Cloudinary upload adapter; only called on admin approval.
+- `services/vehicle-image-env.mjs`: owner-only environment-file loader, allowlisted server keys.
+- `deploy/vehicle-images/ecosystem.config.cjs`: PM2 single-fork process definition.
+- `deploy/vehicle-images/nginx-location.conf.example`: reverse-proxy location snippet for the existing HTTPS virtual host; it does not create a listener or server block.
+- `deploy/vehicle-images/vehicle-images.env.example`: names only; install a populated file outside the repository as `/etc/mator/vehicle-images.env`, owned by the service account, mode `0600`. Generate distinct random admin and request tokens.
+- `services/package.json` and lockfile: isolated runtime dependency manifest (`sharp` only). Install production runtime dependencies with `npm ci --prefix services --omit=dev`.
+
+Example operational checks (after deployment only):
+
+```sh
+curl --fail http://127.0.0.1:8047/health/live
+curl --fail http://127.0.0.1:8047/health/ready
+pm2 status mator-vehicle-images
+```
+
+Do not expose port 8047 directly. Configure the existing reverse proxy and firewall, add a process/disk/health monitor, and verify encrypted backup restore. Admin authorization is bearer-token based; distribute a long random token through a secret manager or owner-only environment file and rotate it on suspected exposure.
+
+## Estimated monthly costs
+
+| Component | Estimate | Basis |
+| --- | ---: | --- |
+| Additional VPS | $0 | Reuse current VPS, assuming CPU, RAM, disk, and outbound bandwidth headroom. The current host/provider and its bill were not identified in the repo, so this is incremental cost, not the total VPS bill. |
+| Cloudinary | $0 incremental while included quota remains; Free is $0 with 25 credits/month. | Storage, transformations, and image bandwidth all consume credits. Current account plan/usage must be checked before activation. |
+| Cloudinary Plus, if quota/features require it | $99/month monthly, or $89/month billed annually | Published plan lists 225 credits/month. Do not upgrade without owner approval. |
+| OpenAI generation | Variable; excluded | Per-image cost depends on actual selected model, quality, references, and provider pricing. No API calls or paid generation were made for this preparation. |
+| Backups | Unknown / possibly $0 incremental | Store an encrypted copy in the existing backup destination if available. No new backup service is recommended until the VPS backup policy is confirmed. |
+
+Cloudinary currently defines one credit as 1,000 transformations, 1 GB managed storage, or 1 GB image bandwidth; actual monthly use combines these resources. Estimate storage using the actual normalized file sizes and retained versions before activation. [Cloudinary pricing](https://cloudinary.com/pricing), [Cloudinary credit and billing definitions](https://cloudinary.com/documentation/billing_and_plans).
+
+## Prerequisites and activation gates
+
+1. Confirm VPS capacity, Node.js 20+, PM2 availability, persistent disk ownership, reverse proxy hostname/routing, firewall, backup destination, and a tested restore. The existing Mator deployment docs identify Ubuntu/PM2/Postgres but do not name the VPS vendor or its plan.
+2. Confirm Cloudinary account owner, plan/quota, usage, upload API entitlement, delivery policy, and an isolated namespace. Provision a dedicated credential/account for the pipeline if the account supports suitable scopes; otherwise use a separate Cloudinary product environment/account. Do not copy the commerce backend's API secret.
+3. Supply OpenAI key and a currently enabled model ID through the server-only secret file. Confirm spend limits and authorize paid work separately. No key is included in this repository.
+4. Generate distinct random 32+ character admin and server-to-server request tokens; install all secrets outside Git with mode `0600`. Verify `.env` remains ignored and scan the deployment artifact for credentials.
+5. Export and visually/checksum validate the existing BYD Han v1 asset. Provision a fresh service data directory, import it as a private candidate, then approve it through admin authorization. No local database or production data migration is required.
+6. Decide the mobile delivery contract. The current app/API does not expose a verified path for vehicle image URLs, so automatic display without an app update remains unproven and needs an existing compatible API field or separately authorized integration.
+7. Before public DNS/routing, review admin rate limits, request body limits, audit log retention, CORS policy, backup encryption, monitoring/alert ownership, rollback rehearsal, and a restore drill.
+
+No deployment, Cloudinary upload, API generation, production modification, database migration, or branch merge was performed.

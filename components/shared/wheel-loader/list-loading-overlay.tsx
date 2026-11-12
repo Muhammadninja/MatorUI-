@@ -40,7 +40,7 @@ export default function ListLoadingOverlay({ visible, label }: ListLoadingOverla
       />
       <AppView center gap={16}>
         <WheelLoader size={46} color={tokens.text} />
-        <AppText family="accent" weight="semibold" style={{ fontSize: 13.5, color: tokens.textMuted }}>
+        <AppText family="accent" weight="semibold" style={{ fontSize: 14, color: tokens.textMuted }}>
           {label}
         </AppText>
       </AppView>

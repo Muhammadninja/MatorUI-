@@ -19,6 +19,10 @@ export default function AiChatStackLayout() {
       }}
     >
       <Stack.Screen name="ai-chat" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="chat-item/[id]"
+        options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }}
+      />
     </Stack>
   );
 }

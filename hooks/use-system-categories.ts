@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 
 import { fetchRootCategories, type CategoryTileData } from '@/services/categories-service';
-import { MATOR_CAT_TILES } from '@/mocks/mator-catalog';
 import { localizedCategoryLabel } from '@/utils/category-label';
 
 /**
@@ -27,17 +26,6 @@ export type UseSystemCategoriesValue = {
   refresh: () => Promise<unknown>;
 };
 
-/** Bundled buckets as the offline / error fallback so the list never renders blank. */
-const FALLBACK_TILES: CategoryTileData[] = MATOR_CAT_TILES.map((t) => ({
-  id: t.name,
-  name: t.name,
-  // Bundled tiles carry a single name, so it doubles as the display label.
-  label: t.name,
-  count: t.count,
-  color: t.color,
-  iconKey: t.name,
-}));
-
 export const SYSTEM_CATEGORIES_QUERY_KEY = ['categories', 'systems'] as const;
 
 export function useSystemCategories(): UseSystemCategoriesValue {
@@ -55,12 +43,7 @@ export function useSystemCategories(): UseSystemCategoriesValue {
     else if (query.isError) state = 'error';
     else state = 'success';
 
-    // On mock/offline builds the reference fetcher returns [] (state 'success',
-    // empty). Keep the landing populated by falling back to the bundled buckets
-    // there and on outright error.
-    const live = query.data ?? [];
-    const rows =
-      query.isError || (state === 'success' && live.length === 0) ? FALLBACK_TILES : live;
+    const rows = query.data ?? [];
     const categories = rows.map((c) => ({ ...c, label: localizedCategoryLabel(c, lang) }));
 
     return {

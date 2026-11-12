@@ -266,11 +266,7 @@ export default function CatalogPartsScreen() {
             <TextInput
               value={search}
               onChangeText={setSearch}
-              placeholder={
-                categoryLabel
-                  ? t('catalog.searchIn', { label: categoryLabel })
-                  : t('catalog.searchParts')
-              }
+              placeholder={t('search.inputPlaceholder')}
               placeholderTextColor={tokens.textMuted}
               autoCorrect={false}
               autoCapitalize="none"
@@ -442,6 +438,7 @@ function QuickPill({
   const { tokens } = useThemeContext();
   return (
     <AppPressableView
+      hitSlop={{ top: 13, bottom: 13, left: 14, right: 14 }}
       testID={testID}
       onPress={onPress}
       androidRipple={false}

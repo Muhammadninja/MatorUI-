@@ -39,7 +39,7 @@ const { host, transport, cart, availability } = vi.hoisted(() => {
   };
 });
 
-vi.mock('react-native', () => ({ ScrollView: host('scroll') }));
+vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, ScrollView: host('scroll') }));
 vi.mock('expo-linking', () => ({ createURL: () => 'mator://payment-return' }));
 vi.mock('expo-router', () => ({ router: { back: vi.fn(), push: vi.fn(), replace: vi.fn() } }));
 vi.mock('expo-web-browser', () => ({ openAuthSessionAsync: vi.fn() }));
@@ -71,7 +71,9 @@ vi.mock('@/components/screens-components/account/address-form-sheet', () => ({
   default: () => null,
 }));
 vi.mock('@/contexts/theme.context', () => ({ useThemeContext: () => ({ tokens: {} }) }));
-vi.mock('@/contexts/user.context', () => ({ useUserContext: () => ({ profile: null }) }));
+vi.mock('@/contexts/user.context', () => ({ useUserContext: () => ({
+  profile: { id: 'user_a' }, isAuthenticated: true, isHydrating: false,
+}) }));
 vi.mock('@/services/pending-payment-storage', () => ({
   loadPendingPayment: vi.fn(async () => null),
   savePendingPayment: vi.fn(async () => undefined),
@@ -83,6 +85,11 @@ vi.mock('@/services/payments-service', () => ({
 }));
 vi.mock('@/utils/haptics', () => ({ triggerHaptic: vi.fn() }));
 vi.mock('@/services/orders-api', () => ({ ordersTransport: transport }));
+vi.mock('@/services/order-attempt-storage', () => ({
+  loadPendingOrderAttempt: vi.fn(async () => null),
+  savePendingOrderAttempt: vi.fn(async () => undefined),
+  clearPendingOrderAttempt: vi.fn(async () => undefined),
+}));
 vi.mock('@/services/delivery-map', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/services/delivery-map')>();
   return { ...actual, isMapAvailable: () => availability.map };

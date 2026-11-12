@@ -43,6 +43,9 @@ function SearchResultRow({ result, query, onPress }: SearchResultRowProps) {
   const liked = isLiked(result.id);
   const image = result.images?.[0];
   const outOfStock = /out of stock/i.test(result.status ?? '');
+  const partNumbers = [result.gm && `GM ${result.gm}`, result.oem && `OEM ${result.oem}`]
+    .filter(Boolean)
+    .join(' · ');
   const [viewerVisible, setViewerVisible] = useState(false);
   // Debounce guard: ignore a second tap within 800ms so rapid taps can't
   // push duplicate line items into the cart.
@@ -95,6 +98,12 @@ function SearchResultRow({ result, query, onPress }: SearchResultRowProps) {
             </AppView>
             <LikeButton liked={liked} onToggle={() => toggleLike(result.id)} />
           </AppView>
+
+          {partNumbers ? (
+            <AppText textVariant="bodyXs" colorName="textMuted">
+              {partNumbers}
+            </AppText>
+          ) : null}
 
           {/* Pinned to the row's foot, so the button sits at the bottom right. */}
           <AppView row align="center" justify="space-between" gap={8} style={{ marginTop: 'auto' }}>

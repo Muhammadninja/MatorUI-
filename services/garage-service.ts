@@ -1,7 +1,5 @@
-import { shouldUseHttpTransport } from '@/config/api';
 import {
   HttpGarageTransport,
-  MockGarageTransport,
   type GarageTransport,
 } from '@/services/garage-api';
 
@@ -386,14 +384,9 @@ class GarageService {
 
 // ── Singleton wired to the env-selected transport ────────────────────
 //
-// Picks HTTP when `EXPO_PUBLIC_API_BASE_URL` is set (production / staging),
-// falls back to the in-process mock when not (dev / tests with no
-// backend). The selector is module-scope so the choice is fixed at load
-// time — `setTransport()` on the service still lets us swap at runtime
-// (e.g. for a "switch to mock" debug toggle).
-
+// Application initialization always selects the real HTTP transport.
 function createGarageTransport(): GarageTransport {
-  return shouldUseHttpTransport('garage') ? new HttpGarageTransport() : new MockGarageTransport();
+  return new HttpGarageTransport();
 }
 
 export const garageService = new GarageService(createGarageTransport());

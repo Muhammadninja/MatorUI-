@@ -18,7 +18,9 @@ vi.mock('@/config/api', () => ({
 }));
 
 import { vi } from 'vitest';
-import { authTransport } from './auth-api';
+import { MockAuthTransport } from '@/tests/support/transports/auth-api';
+import type { AuthTransport } from './auth-api';
+const authTransport: AuthTransport = new MockAuthTransport();
 
 describe('auth-api mock (OTP)', () => {
   test('requestOtp returns a token + devCode for demo builds', async () => {

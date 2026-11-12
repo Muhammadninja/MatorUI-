@@ -41,7 +41,7 @@ const { host, transport, cart, startPayment, openAuthSessionAsync, replace, push
   };
 });
 
-vi.mock('react-native', () => ({ ScrollView: host('scroll') }));
+vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, ScrollView: host('scroll') }));
 vi.mock('expo-linking', () => ({ createURL: () => 'mator://payment-return' }));
 vi.mock('expo-router', () => ({ router: { back: vi.fn(), push, replace } }));
 vi.mock('expo-web-browser', () => ({ openAuthSessionAsync }));
@@ -70,11 +70,18 @@ vi.mock('@/components/shared/wheel-loader', () => ({ WheelLoader: host('loader')
 vi.mock('@/components/shared/app-map', () => ({ default: host('map') }));
 vi.mock('@/components/screens-components/account/address-form-sheet', () => ({ default: () => null }));
 vi.mock('@/contexts/theme.context', () => ({ useThemeContext: () => ({ tokens: {} }) }));
-vi.mock('@/contexts/user.context', () => ({ useUserContext: () => ({ profile: { id: 'user_a' } }) }));
+vi.mock('@/contexts/user.context', () => ({ useUserContext: () => ({
+  profile: { id: 'user_a' }, isAuthenticated: true, isHydrating: false,
+}) }));
 vi.mock('@/services/garage-service', () => ({ default: { getPrimary: () => null } }));
 vi.mock('@/services/payments-service', () => ({ paymentsTransport: { startPayment } }));
 vi.mock('@/utils/haptics', () => ({ triggerHaptic: vi.fn() }));
 vi.mock('@/services/orders-api', () => ({ ordersTransport: transport }));
+vi.mock('@/services/order-attempt-storage', () => ({
+  loadPendingOrderAttempt: vi.fn(async () => null),
+  savePendingOrderAttempt: vi.fn(async () => undefined),
+  clearPendingOrderAttempt: vi.fn(async () => undefined),
+}));
 vi.mock('@/services/pending-payment-storage', () => ({
   loadPendingPayment: vi.fn(async () => stored.record),
   savePendingPayment: vi.fn(async (_: unknown, record: Record<string, string>) => {

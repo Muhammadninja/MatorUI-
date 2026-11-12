@@ -141,6 +141,29 @@ describe('active vehicle pin', () => {
     expect(setPrimaryOnServer).toHaveBeenCalledWith('v-nexia');
   });
 
+  test('failed server activation preserves the old pin and persisted choice', async () => {
+    const tree = await mount();
+    await act(async () => { await api.setPrimaryVehicle('v-cobalt', { skipBackend: true }); });
+    const before = snapshot;
+    setPrimaryOnServer.mockRejectedValueOnce(new Error('Rejected'));
+    await act(async () => { await expect(api.setPrimaryVehicle('v-nexia')).rejects.toThrow('Rejected'); });
+    expect(api.currentActiveVehicle?.vehicleId).toBe('v-cobalt');
+    expect(snapshot).toEqual(before);
+    await act(async () => tree.unmount());
+  });
+
+  test('activation changes local scope only after server confirmation', async () => {
+    const tree = await mount();
+    let finish!: () => void;
+    setPrimaryOnServer.mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; }));
+    let pending!: Promise<boolean>;
+    await act(async () => { pending = api.setPrimaryVehicle('v-nexia'); });
+    expect(api.currentActiveVehicle?.vehicleId).toBe('v-cobalt');
+    await act(async () => { finish(); expect(await pending).toBe(true); });
+    expect(api.currentActiveVehicle?.vehicleId).toBe('v-nexia');
+    await act(async () => tree.unmount());
+  });
+
   test('skipBackend moves the pin without a second server call', async () => {
     // The garage screen calls the backend itself first so it can surface a
     // failure, then moves the pin with skipBackend. Without this, the flip
@@ -168,6 +191,17 @@ describe('active vehicle pin', () => {
     });
 
     expect(api.currentActiveVehicle?.vehicleId).toBe('v-cobalt');
+  });
+
+  test('replacement vehicle never inherits the removed vehicle engine or trim', async () => {
+    const tree = await mount();
+    await act(async () => { api.setFitment({ generationId: 'cobalt-gen', trimId: 'cobalt-trim', engineId: 'cobalt-engine' }); });
+    await act(async () => { vehicles = [NEXIA]; emit(); });
+    expect(api.currentActiveVehicle?.vehicleId).toBe('v-nexia');
+    expect(api.currentActiveVehicle?.fitment.generationId).toBeUndefined();
+    expect(api.currentActiveVehicle?.fitment.trimId).toBeUndefined();
+    expect(api.currentActiveVehicle?.fitment.engineId).toBeUndefined();
+    await act(async () => tree.unmount());
   });
 
   test('logout clears the pin and disk; old cache emissions cannot restore it', async () => {

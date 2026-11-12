@@ -118,6 +118,17 @@ describe('HttpAuthTransport — request-otp', () => {
     expect(post.mock.calls[0]![1]).toMatchObject({ phone_e164: expected });
   });
 
+  test('passes on the otp_length the backend reports', async () => {
+    post.mockResolvedValueOnce({ request_id: 'req_len', otp_length: 4 });
+    const result = await authTransport.requestOtp({
+      channel: 'phone',
+      identifier: '+998901234567',
+      purpose: 'sign-in',
+      lang: 'ru',
+    });
+    expect(result.otpLength).toBe(4);
+  });
+
   test('falls back to resend_after_seconds when expires_at is absent', async () => {
     post.mockResolvedValueOnce({ request_id: 'otp_X', resend_after_seconds: 45 });
     const res = await authTransport.requestOtp({

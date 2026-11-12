@@ -3,13 +3,13 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type PropsWithChildren,
   type SetStateAction,
 } from 'react';
-
 import { cartTransport, type AddItemInput } from '@/services/cart-api';
 import {
   computeSubtotal,
@@ -27,43 +27,14 @@ import { clearStoredCart, loadCart, saveCart } from '@/services/cart-storage';
 import { toastService } from '@/services/toast-service';
 import { useUserContext } from '@/contexts/user.context';
 import { CartMutationQueue } from '@/services/cart-mutation-queue';
+import { useCartRestore } from '@/hooks/use-cart-restore';
+import { useE2EStartupMount } from '@/hooks/use-e2e-startup-mount';
 
-// Re-export types and constants so existing imports keep working without churn.
 export type { CartCharges, CartItem, CartTotals, PromoCode, PromoResult };
-
 type AddCartItemInput = Omit<CartItem, 'quantity'>;
 
-type CartContextValue = {
-  items: CartItem[];
-  itemCount: number;
-  /** Worked out here from the lines, for showing before the server has answered. Goods only. */
-  totals: CartTotals;
-  /** What the server last said the cart costs, service fee included, or null when it has not
-   *  said: a guest, a cart never fetched, a failed read. While `pendingIds` is not empty a
-   *  change is on its way, so these can be one step behind the lines. */
-  charges: CartCharges | null;
-  appliedPromo: PromoCode | null;
-  /** True once the persisted cart has been read from storage. */
-  isHydrated: boolean;
-  /** Set of item IDs currently mid-flight to the transport. UI can grey
-   *  out rows or show a spinner per row using this. */
-  pendingIds: Set<string>;
-  /** Last transport error, if any. Cleared on the next successful op. */
-  error: string | null;
-  /** Force a fresh fetch from the transport, reconciling local state. */
-  refresh: () => Promise<void>;
-  addItem: (item: AddCartItemInput) => void;
-  removeItem: (itemId: string) => void;
-  clearCart: () => void;
-  /** Puts these lines back on the server after an order took them and went unpaid, and
-   *  resolves with the cart as it then stands. Safe to repeat: adds only what is missing. */
-  restoreCart: () => Promise<CartItem[]>;
-  incrementItem: (itemId: string) => void;
-  decrementItem: (itemId: string) => void;
-  applyPromoCode: (code: string) => PromoResult;
-  removePromoCode: () => void;
-  formatCurrency: (amount: number) => string;
-};
+import { EMPTY_CART_CONTEXT, type CartContextValue } from '@/contexts/cart-context-value';
+import { useSessionContextValue } from '@/contexts/session-context-value';
 
 const CartContext = createContext<CartContextValue | undefined>(undefined);
 
@@ -72,10 +43,18 @@ const PROMO_PENDING_ID = '__promo__';
 export function CartProvider({ children }: PropsWithChildren) {
   const { profile, isHydrating } = useUserContext();
   const ownerId = profile?.id ?? null;
-  return <CartSessionProvider key={ownerId ?? 'guest'} ownerId={ownerId} hydrating={!!isHydrating}>{children}</CartSessionProvider>;
+  const key = ownerId ?? 'guest';
+  const [value, publish] = useSessionContextValue(key, EMPTY_CART_CONTEXT);
+  return (
+    <CartContext.Provider value={value}>
+      <CartSessionProvider key={key} ownerId={ownerId} hydrating={!!isHydrating} publish={publish} />
+      {children}
+    </CartContext.Provider>
+  );
 }
 
-function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren<{ ownerId: string | null; hydrating: boolean }>) {
+function CartSessionProvider({ ownerId, hydrating, publish }: { ownerId: string | null; hydrating: boolean; publish: (value: CartContextValue) => void }) {
+  useE2EStartupMount('cart-controller');
   const [items, setItemsState] = useState<CartItem[]>([]);
   const [appliedPromo, setAppliedPromoState] = useState<PromoCode | null>(null);
   const [charges, setCharges] = useState<CartCharges | null>(null);
@@ -88,10 +67,7 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
     return () => { mutations.invalidate(true); };
   }, [mutations, ownerId]);
 
-  // The server-side cart endpoints require auth. Guests use a purely LOCAL cart
-  // (persisted to storage); we only talk to the remote cart once signed in —
-  // otherwise every mutation 401s and rolls the change back. A ref keeps the
-  // async transport gate reading the CURRENT auth state, not a stale closure.
+  // Guests use local storage; async transport calls read current authentication.
   const { isAuthenticated } = useUserContext();
   const authedRef = useRef(isAuthenticated);
   useEffect(() => {
@@ -103,15 +79,12 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
     authedRef.current = isAuthenticated;
   }, [isAuthenticated, mutations]);
 
-  // Every server answer carries the whole cart's figures, so after any call that reached the
-  // server this is what it now says. A guest's cart never reaches it, and has none.
+  // Transport answers carry authoritative charges; guests have none.
   const syncCharges = useCallback(() => {
     setCharges(authedRef.current ? (cartTransport.charges?.() ?? null) : null);
   }, []);
 
-  // Always-current snapshot for rollback during optimistic mutations.
-  // We can't rely on closure values inside async callbacks because they
-  // capture stale state from the moment the mutation was queued.
+  // Optimistic rollback reads the current snapshot instead of queued closures.
   const snapshotRef = useRef<{ items: CartItem[]; appliedPromo: PromoCode | null }>({
     items: [],
     appliedPromo: null,
@@ -165,12 +138,7 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
     };
   }, [hydrating, ownerId]);
 
-  // ── Reconcile with the server whenever we're signed in. This runs on every
-  // transition into an authenticated state — not just at mount — because auth
-  // is restored asynchronously on relaunch and may not be ready when hydrate
-  // fires. Beyond syncing state, the fetch WARMS the transport's part_id →
-  // line_id map for the persisted cart, so a subsequent quantity update PATCHes
-  // the right line instead of 404ing on a cold map.
+  // Reconcile after async auth hydration and warm the transport's part→line ID map.
   useEffect(() => {
     if (!isAuthenticated || !isHydrated) return;
     let cancelled = false;
@@ -179,16 +147,13 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
       try {
         const remote = await mutations.read(() => cartTransport.fetch());
         if (!remote || cancelled || version !== mutations.readVersion()) return;
-        // A successful authenticated response is authoritative, including an
-        // empty cart. Cached lines must not survive only in the UI and inflate
-        // checkout totals. Failed fetches still retain the offline cache.
+        // Successful responses, including empty carts, replace the offline cache.
         setItems(remote.items);
         syncCharges();
         const promo = remote.appliedPromoCode ? PROMO_CODES[remote.appliedPromoCode] : null;
         setAppliedPromo(promo ?? null);
       } catch {
-        // Offline / fetch failed — silently keep local state. The transport
-        // self-heals the id map lazily on the next mutation if needed.
+        // Offline: retain local state; the next mutation can rebuild the ID map.
       }
     })();
     return () => {
@@ -399,62 +364,8 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
     );
   }, [withOptimistic]);
 
-  // The backend empties its cart in the same transaction that creates an order, and a fresh
-  // fetch treats the server as the truth. So leaving the local lines alone after a failed
-  // payment would only last until the next launch, and a quantity change before then would
-  // hit a line that no longer exists. This puts them back for real. A line that cannot go
-  // back (a sourced offer, a service, a part no longer sold) stays out and drops from the
-  // cart on the final read: it is still on the unpaid order, which can still be paid.
-  const restoreCart = useCallback(async (): Promise<CartItem[]> => {
-    const { items: wanted, appliedPromo: promo } = snapshotRef.current;
-    if (!authedRef.current) return wanted;
-    const ticket = mutations.begin('cart');
-    const version = mutations.readVersion();
-    setPendingIds(new Set());
-    markPending('cart');
-    try {
-      const remote = await mutations.enqueue(ticket, async () => {
-        const current = await cartTransport.fetch();
-        for (const line of wanted) {
-          const have = current.items.find((item) => item.id === line.id)?.quantity ?? 0;
-          if (line.sourced || have >= line.quantity) continue;
-          try {
-            await cartTransport.addItem({
-              productId: line.id,
-              title: line.title,
-              description: line.description,
-              price: line.price,
-              priceLabel: line.priceLabel,
-              badge: line.badge,
-              status: line.status,
-              imageUrl: line.imageUrl,
-              quantity: line.quantity - have,
-            });
-          } catch {
-            // No longer sold. The final read below is what the cart then holds.
-          }
-        }
-        if (promo && current.appliedPromoCode !== promo.code) {
-          try {
-            await cartTransport.applyPromo(promo.code, computeSubtotal(wanted));
-          } catch {
-            // The promo was on the order. Without it the buyer sees the price they'd pay.
-          }
-        }
-        return cartTransport.fetch();
-      });
-      if (remote && version === mutations.readVersion()) {
-        setItems(remote.items);
-        setAppliedPromo(remote.appliedPromoCode ? PROMO_CODES[remote.appliedPromoCode] ?? null : null);
-        syncCharges();
-      }
-    } catch {
-      // Offline: the local lines stay for now, and the unpaid order is safe either way.
-    } finally {
-      if (mutations.finish(ticket)) clearPending('cart');
-    }
-    return snapshotRef.current.items;
-  }, [mutations, markPending, clearPending, setItems, setAppliedPromo, syncCharges]);
+  const restoreCart = useCartRestore({ snapshotRef, authedRef, mutations, setPendingIds,
+    markPending, clearPending, setItems, setAppliedPromo, syncCharges });
 
   const removePromoCode = useCallback(() => {
     void withOptimistic(
@@ -559,7 +470,8 @@ function CartSessionProvider({ children, ownerId, hydrating }: PropsWithChildren
     ],
   );
 
-  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
+  useLayoutEffect(() => publish(value), [publish, value]);
+  return null;
 }
 
 export function useCartContext() {

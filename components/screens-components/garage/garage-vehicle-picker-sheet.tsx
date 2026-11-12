@@ -232,6 +232,7 @@ export function GarageVehiclePickerSheet({
             testID="picker-close"
             onPress={onClose}
             disabled={busy}
+            hitSlop={{ top: 9, bottom: 9, left: 9, right: 9 }}
             androidRipple={false}
             accessibilityRole="button"
             accessibilityLabel={t('common.close')}

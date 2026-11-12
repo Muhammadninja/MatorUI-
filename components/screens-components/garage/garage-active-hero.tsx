@@ -47,7 +47,7 @@ export function GarageActiveHero({ vehicle, onShopParts, onOpenDetail }: GarageA
       {/* The name's column flexes and wraps; the settings button keeps its own
        *  fixed space, so long makes ("Mercedes-Benz") never run under it. */}
       <AppView row align="center" gap="md">
-        <GarageBrandBadge make={vehicle.make} />
+        <GarageBrandBadge makeId={vehicle.brandId} make={vehicle.make} />
 
         <AppView flex={1} style={{ minWidth: 0 }}>
           {/* "Selected", never green: this says which car is chosen, not that

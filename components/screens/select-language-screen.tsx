@@ -43,6 +43,7 @@ export default function SelectLanguageScreen() {
     uz: { title: 'Tilni tanlang', subtitle: 'Buni har doim sozlamalarda oʻzgartirishingiz mumkin.' },
   } as const;
   const ctaLabels = { en: { onboarding: 'Continue', edit: 'Save' }, ru: { onboarding: 'Продолжить', edit: 'Сохранить' }, uz: { onboarding: 'Davom etish', edit: 'Saqlash' } } as const;
+  const closeLabels = { en: 'Close', ru: 'Закрыть', uz: 'Yopish' } as const;
   const headline = headlines[pick];
   const ctaLabel = ctaLabels[pick][isOnboarding ? 'onboarding' : 'edit'];
 
@@ -81,7 +82,7 @@ export default function SelectLanguageScreen() {
           <Pressable
             onPress={handleClose}
             accessibilityRole="button"
-            accessibilityLabel="Close"
+            accessibilityLabel={closeLabels[pick]}
             hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
             style={({ pressed }) => ({
               width: 36,

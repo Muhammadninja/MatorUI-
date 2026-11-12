@@ -52,7 +52,7 @@ export default function SettingsSecurityScreen() {
       onConfirm: async () => {
         try {
           await deleteAccount();
-          toast.info(t('settings.accountDeletedToast'));
+          toast.success(t('settings.accountDeletedToast'));
           router.replace('/explore');
         } catch {
           // Deletion failed server-side — the user stays signed in.
@@ -98,13 +98,13 @@ export default function SettingsSecurityScreen() {
                 fillContainer
               >
                 <AppView style={{ flex: 1 }}>
-                  <AppText family="accent" weight="semibold" style={{ fontSize: 14.5, color: tokens.text }}>
+                  <AppText family="accent" weight="semibold" style={{ fontSize: 14, color: tokens.text }}>
                     {t('settings.language')}
                   </AppText>
                 </AppView>
                 <AppText
                   family="default"
-                  style={{ fontSize: 13.5, color: tokens.textMuted, marginRight: 4 }}
+                  style={{ fontSize: 14, color: tokens.textMuted, marginRight: 4 }}
                 >
                   {languageLabel}
                 </AppText>
@@ -143,7 +143,7 @@ export default function SettingsSecurityScreen() {
                   style={i > 0 ? { borderTopWidth: 1, borderTopColor: tokens.divider } : undefined}
                 >
                   <AppView style={{ flex: 1 }}>
-                    <AppText family="accent" weight="semibold" style={{ fontSize: 14.5, color: tokens.text }}>
+                    <AppText family="accent" weight="semibold" style={{ fontSize: 14, color: tokens.text }}>
                       {t(row.labelKey)}
                     </AppText>
                   </AppView>

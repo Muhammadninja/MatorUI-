@@ -2,89 +2,148 @@ import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, expect, test, vi } from 'vitest';
-import type { CreateOrderInput } from '@/services/orders-service';
+import type { CreateOrderInput, CreateOrderResult } from '@/services/orders-service';
+import type { PendingOrderAttempt } from '@/services/order-attempt-storage';
 
-const state = vi.hoisted(() => ({ createOrder: vi.fn(), storage: new Map<string, string>() }));
+const state = vi.hoisted(() => ({ createOrder: vi.fn(), pendingAttempt: null as PendingOrderAttempt | null }));
 vi.mock('@/services/orders-api', () => ({ ordersTransport: { createOrder: state.createOrder } }));
-vi.mock('@react-native-async-storage/async-storage', () => ({ default: {
-  getItem: async (key: string) => state.storage.get(key) ?? null,
-  setItem: async (key: string, value: string) => { state.storage.set(key, value); },
-  removeItem: async (key: string) => { state.storage.delete(key); },
-} }));
-vi.mock('@/contexts/user.context', () => ({ useUserContext: () => ({ profile: { id: 'user_a' } }) }));
+vi.mock('@/services/order-attempt-storage', () => ({
+  loadPendingOrderAttempt: async () => state.pendingAttempt,
+  savePendingOrderAttempt: async (_owner: string, attempt: PendingOrderAttempt) => { state.pendingAttempt = attempt; },
+  clearPendingOrderAttempt: async () => { state.pendingAttempt = null; },
+}));
+// The hook scopes orders to the signed-in account; only its owner matters here.
+vi.mock('@/contexts/user.context', () => ({ useUserContext: () => ({ isAuthenticated: true, isHydrating: false, profile: { id: 'unit-owner' } }) }));
 vi.mock('react-native', () => ({ Platform: { OS: 'ios', select: (o: { ios?: unknown }) => o.ios } }));
 import { useCreateOrder } from '@/hooks/use-orders';
-import { resetOrderAttemptMemoryForTests } from '@/services/order-attempt';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 let tree: TestRenderer.ReactTestRenderer | undefined;
+let client: QueryClient | undefined;
 afterEach(async () => {
   await act(async () => tree?.unmount());
-  tree = undefined;
+  client?.clear();
   state.createOrder.mockReset();
-  state.storage.clear();
-  resetOrderAttemptMemoryForTests();
+  state.pendingAttempt = null;
 });
-
-const input: CreateOrderInput = { items: [{ productId: 'part_1', quantity: 1 }], addressId: null,
-  paymentType: 'cash', shippingOptionKey: 'pickup', promoCode: null };
-const placed = { orderId: 'ord_1', eta: 'Awaiting payment', totalLabel: '1 000 UZS' };
-
-async function mount() {
+const input: CreateOrderInput = { items: [{ productId: 'unit-part', quantity: 1 }],
+  addressId: null, paymentType: 'cash', shippingOptionKey: 'pickup', promoCode: null };
+async function renderOrder() {
   let value!: ReturnType<typeof useCreateOrder>;
   function Probe() { value = useCreateOrder(); return null; }
-  // A hostile global policy: the hook must not let React Query resubmit an order by itself.
-  const client = new QueryClient({ defaultOptions: { mutations: { retry: 3, retryDelay: 0 } } });
+  // Deliberately hostile global policy: the hook must disable mutation retries.
+  client = new QueryClient({ defaultOptions: { mutations: { retry: 3, retryDelay: 0 } } });
   await act(async () => {
-    tree = TestRenderer.create(createElement(QueryClientProvider, { client }, createElement(Probe)));
+    tree = TestRenderer.create(createElement(QueryClientProvider, { client: client! }, createElement(Probe)));
   });
   return () => value;
 }
-/** React Query hands mutation state to observers on its scheduler's next tick. */
-const settle = () => act(async () => { await new Promise((done) => setTimeout(done, 0)); });
-const keyOf = (call: number) => (state.createOrder.mock.calls[call]![0] as CreateOrderInput).idempotencyKey;
 
-test('a lost answer, then the app is closed and reopened: the retry sends the original key', async () => {
-  state.createOrder.mockRejectedValueOnce(Object.assign(new Error('Request timed out.'), { code: 'TIMEOUT' }));
-  let get = await mount();
+test('rapid submissions and taps after success produce only one order until explicit reset', async () => {
+  let resolve!: (value: CreateOrderResult) => void;
+  state.createOrder.mockReturnValueOnce(new Promise<CreateOrderResult>((done) => { resolve = done; }));
+  const get = await renderOrder();
+  let first!: Promise<CreateOrderResult | null>;
+  let duplicate!: Promise<CreateOrderResult | null>;
+  await act(async () => { first = get().placeOrder(input); duplicate = get().placeOrder(input); });
+  expect(await duplicate).toBeNull();
+  expect(state.createOrder).toHaveBeenCalledTimes(1);
+  await act(async () => { resolve({ orderId: 'unit-order', eta: 'unit', totalLabel: '1 UZS' }); await first; });
   await act(async () => { expect(await get().placeOrder(input)).toBeNull(); });
-  await settle();
-  expect(get()).toMatchObject({ phase: 'error', errorCode: 'TIMEOUT' });
-  expect(state.createOrder).toHaveBeenCalledTimes(1); // no silent resubmission
-  const sent = keyOf(0);
-  expect(sent).toMatch(/^ord_[A-Za-z0-9_]+$/);
-
-  // Process killed: the screen is gone and so is everything in memory, storage remains.
-  await act(async () => tree?.unmount());
-  resetOrderAttemptMemoryForTests();
-  state.createOrder.mockResolvedValueOnce(placed);
-  get = await mount();
-  await act(async () => { expect(await get().placeOrder(input)).toEqual(placed); });
-  await settle();
-
-  expect(keyOf(1)).toBe(sent);
-  expect(get()).toMatchObject({ phase: 'success', result: placed });
-  expect(state.storage.size).toBe(0); // confirmed, so given up
+  expect(state.createOrder).toHaveBeenCalledTimes(1);
+  await act(async () => get().reset());
+  state.createOrder.mockResolvedValueOnce({ orderId: 'next-unit-order', eta: 'unit', totalLabel: '1 UZS' });
+  await act(async () => { await get().placeOrder(input); });
+  expect(state.createOrder).toHaveBeenCalledTimes(2);
 });
 
-test('a confirmed order ends the operation: the next checkout uses a new key', async () => {
-  state.createOrder.mockResolvedValue(placed);
-  const get = await mount();
-  await act(async () => { await get().placeOrder(input); });
-  await act(async () => get().reset());
-  await act(async () => { await get().placeOrder(input); });
-  expect(keyOf(1)).not.toBe(keyOf(0));
+test('failed order creation is not automatically retried by React Query', async () => {
+  state.createOrder.mockRejectedValue(new TypeError('response lost'));
+  const get = await renderOrder();
+  await act(async () => { expect(await get().placeOrder(input)).toBeNull(); });
+  expect(state.createOrder).toHaveBeenCalledTimes(1);
 });
 
-test('a refusal keeps its code for the screen and does not rotate the key', async () => {
-  state.createOrder
-    .mockRejectedValueOnce(Object.assign(new Error('Total changed'), { code: 'ORDER_TOTAL_CHANGED' }))
-    .mockResolvedValueOnce(placed);
-  const get = await mount();
-  await act(async () => { await get().placeOrder(input); });
-  await settle();
-  expect(get()).toMatchObject({ phase: 'error', errorCode: 'ORDER_TOTAL_CHANGED' });
+test('a refused total preserves the machine-readable code without weakening submission guards', async () => {
+  const refusal = Object.assign(new Error('Total changed'), { status: 409, code: 'ORDER_TOTAL_CHANGED' });
+  state.createOrder.mockRejectedValueOnce(refusal);
+  const get = await renderOrder();
+  await act(async () => { expect(await get().placeOrder(input)).toBeNull(); });
+  expect(get()).toMatchObject({ phase: 'error', error: 'Total changed', errorCode: 'ORDER_TOTAL_CHANGED' });
+  expect(state.createOrder).toHaveBeenCalledTimes(1);
   await act(async () => get().reset());
-  await act(async () => { await get().placeOrder({ ...input, confirmedTotalUzs: 1100 }); });
+  expect(get()).toMatchObject({ phase: 'idle', error: null, errorCode: null });
+});
+
+test('a definitive refusal clears its attempt so corrected checkout uses a new key', async () => {
+  state.createOrder.mockRejectedValueOnce(
+    Object.assign(new Error('Stock changed'), { status: 409, code: 'PART_UNAVAILABLE' }),
+  ).mockResolvedValueOnce({ orderId: 'corrected-order', eta: 'unit', totalLabel: '2 UZS' });
+  const get = await renderOrder();
+  await act(async () => { await get().placeOrder(input); });
+  const refusedKey = (state.createOrder.mock.calls[0]![0] as CreateOrderInput).idempotencyKey;
+  expect(state.pendingAttempt).toBeNull();
+
+  await act(async () => {
+    await get().placeOrder({ ...input, items: [{ productId: 'unit-part', quantity: 2 }] });
+  });
+  const corrected = state.createOrder.mock.calls[1]![0] as CreateOrderInput;
+  expect(corrected.items).toEqual([{ productId: 'unit-part', quantity: 2 }]);
+  expect(corrected.idempotencyKey).not.toBe(refusedKey);
+});
+
+test.each(['IDEMPOTENCY_KEY_REUSED', 'IDEMPOTENCY_KEY_EXPIRED'])('a 409 %s settles the key so the next checkout gets a new one', async (code) => {
+  state.createOrder.mockRejectedValueOnce(Object.assign(new Error('Already placed'), { status: 409, code }))
+    .mockResolvedValueOnce({ orderId: 'next-order', eta: 'unit', totalLabel: '1 UZS' });
+  const get = await renderOrder();
+  await act(async () => { await get().placeOrder(input); });
+  expect(get()).toMatchObject({ phase: 'error', errorCode: code });
+  expect(state.pendingAttempt).toBeNull();
+  await act(async () => get().reset());
+  await act(async () => { await get().placeOrder(input); });
+  expect((state.createOrder.mock.calls[1]![0] as CreateOrderInput).idempotencyKey)
+    .not.toBe((state.createOrder.mock.calls[0]![0] as CreateOrderInput).idempotencyKey);
+});
+
+test('empty cart never reaches the order transport', async () => {
+  const get = await renderOrder();
+  await act(async () => { expect(await get().placeOrder({ ...input, items: [] })).toBeNull(); });
+  expect(state.createOrder).not.toHaveBeenCalled();
+});
+
+test('a retry after a lost response reuses the idempotency key even if inputs change; only confirmed success clears it', async () => {
+  state.createOrder.mockRejectedValueOnce(new TypeError('response lost'))
+    .mockRejectedValueOnce(new TypeError('response lost'))
+    .mockRejectedValueOnce(new TypeError('response lost'))
+    .mockResolvedValue({ orderId: 'unit-order', eta: 'unit', totalLabel: '1 UZS' });
+  const get = await renderOrder();
+  const keyOf = (call: number) => (state.createOrder.mock.calls[call][0] as CreateOrderInput).idempotencyKey;
+  await act(async () => { await get().placeOrder({ ...input, totalLabel: '1 UZS' }); });
+  // A re-rendered display total is the same order.
+  await act(async () => { await get().placeOrder({ ...input, totalLabel: '1 сум' }); });
+  expect(keyOf(0)).toMatch(/^[A-Za-z0-9_]{8,128}$/);
   expect(keyOf(1)).toBe(keyOf(0));
+  await act(async () => { await get().placeOrder({ ...input, items: [{ productId: 'unit-part', quantity: 2 }] }); });
+  expect(keyOf(2)).toBe(keyOf(0));
+  await act(async () => get().reset());
+  state.createOrder.mockResolvedValueOnce({ orderId: 'resolved-order', eta: 'unit', totalLabel: '1 UZS' });
+  await act(async () => { await get().placeOrder(input); });
+  expect(keyOf(3)).toBe(keyOf(2));
+  expect(state.pendingAttempt).toBeNull();
+});
+
+test('a remounted hook replays the original key and canonical parameters after edits, even with an empty cart', async () => {
+  state.createOrder.mockRejectedValueOnce(new TypeError('response lost'));
+  let get = await renderOrder();
+  await act(async () => { await get().placeOrder(input); });
+  const sentKey = state.createOrder.mock.calls[0]![0].idempotencyKey;
+  expect(state.pendingAttempt).toMatchObject({ key: sentKey, input });
+  await act(async () => tree?.unmount());
+  tree = undefined;
+  state.createOrder.mockResolvedValueOnce({ orderId: 'recovered-order', eta: 'unit', totalLabel: '1 UZS' });
+  get = await renderOrder();
+  await act(async () => { await get().placeOrder({ ...input, items: [], addressId: 'edited-address', paymentType: 'payme', promoCode: 'CHANGED' }); });
+  expect(state.createOrder.mock.calls[1]![0].idempotencyKey).toBe(sentKey);
+  expect(state.createOrder.mock.calls[1]![0]).toMatchObject(input);
+  expect(state.createOrder.mock.calls[1]![0].items).toEqual(input.items);
 });

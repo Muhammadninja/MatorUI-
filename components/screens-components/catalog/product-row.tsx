@@ -6,7 +6,7 @@ import { useWindowDimensions, View, type ViewStyle } from 'react-native';
 import ImageBox from '@/components/screens-components/home/image-box';
 import { AppIconButton } from '@/components/shared/app-icon-button';
 import { splitPrice } from '@/components/shared/app-price';
-import { noBreakDigits } from '@/utils/format-price';
+import { formatSomAmount } from '@/utils/format-price';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import WheelLoader from '@/components/shared/wheel-loader/wheel-loader';
@@ -66,12 +66,20 @@ export function productCellStyle(index: number, columns: number): ViewStyle {
  * amount is only ever digits and non-breaking separators, so the size that
  * fits the copy column follows from the character count.
  */
-function priceFontSize(amount: string): number {
+export function priceFontSize(amount: string): number {
   const n = amount.length;
   if (n <= 7) return 18;
   if (n <= 10) return 16;
   return 14;
 }
+
+/** Amount and currency on one baseline, never wrapped apart. */
+const PRICE_LINE: ViewStyle = {
+  flexDirection: 'row',
+  flexWrap: 'nowrap',
+  alignItems: 'baseline',
+  columnGap: 4,
+};
 
 /**
  * `ProductRow` — the listing card behind every result screen (category,
@@ -132,7 +140,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
       // The check couldn't run (offline, mock transport, server error). Say so
       // and reset — never fall back to a fabricated "fits".
       setFitState('idle');
-      toast.info(t('catalog.fitCheckUnavailable'));
+      toast.warning(t('catalog.fitCheckUnavailable'));
       return;
     }
     setFit(result);
@@ -144,7 +152,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
   const { savePct, wasUzs: wasNum } = resolveItemPricing(item, sales);
   const priceAmount = splitPrice(item.price).amount || item.price;
   const priceSize = priceFontSize(priceAmount);
-  const wasLabel = wasNum > 0 ? noBreakDigits(wasNum.toLocaleString('ru-RU')) : null;
+  const wasLabel = wasNum > 0 ? formatSomAmount(wasNum) : null;
 
   const brandEyebrow = (item.brand ?? item.description?.split('·')[0])?.trim();
   const outOfStock = /out of stock/i.test(item.status ?? '');
@@ -176,7 +184,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
   const handleToggleLike = () => {
     triggerHaptic(liked ? 'selection' : 'success');
     const nowLiked = toggleLike(item.id);
-    toast.info(t(nowLiked ? 'itemDetail.savedToFavorites' : 'itemDetail.removedFromFavorites'));
+    toast.success(t(nowLiked ? 'itemDetail.savedToFavorites' : 'itemDetail.removedFromFavorites'));
   };
 
   // ── Add — the cart update is optimistic, so "added" is the feedback and the
@@ -273,8 +281,10 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
           <Heart
             size={20}
             strokeWidth={2.2}
-            color={liked ? tokens.brand : tokens.textMuted}
-            fill={liked ? tokens.brand : 'transparent'}
+            // The photo is white in both themes, so the heart takes the
+            // on-photo inks rather than the page's.
+            color={liked ? tokens.onPhotoAccent : tokens.onPhotoMuted}
+            fill={liked ? tokens.onPhotoAccent : 'transparent'}
           />
         </AppPressableView>
       </AppView>
@@ -375,7 +385,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
             style={{
               fontSize: 12,
               lineHeight: 16,
-              color: fitState === 'checking' ? tokens.textMuted : tokens.brand,
+              color: fitState === 'checking' ? tokens.textMuted : tokens.brandText,
             }}
           >
             {fitState === 'checking'
@@ -413,24 +423,41 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
               ) : null}
             </View>
           ) : null}
-          {/* Amount + currency are ONE unit that wraps as a block; the amount
-           *  itself stays on one line. `priceFontSize` already fits it, so the
-           *  auto-shrink is a backstop and carries NO explicit `lineHeight`,
-           *  the pair that collapses the text on iOS. */}
-          <View
-            style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 4 }}
-          >
+          {/* Amount + currency are ONE line that never wraps, so "сум" can't
+           *  drop away from its number. The currency keeps its size; only the
+           *  amount gives way, and `priceFontSize` already fits it, so the
+           *  auto-shrink is a backstop. `lineHeight: undefined` clears the 24
+           *  AppText inherits from `body`: that hard line height paired with
+           *  `adjustsFontSizeToFit` is what shrank prices to a few pixels on
+           *  iOS (see `AppPrice`). */}
+          <View testID={`part-price-${item.id}`} style={PRICE_LINE}>
             <AppText
               family="heading"
               weight="bold"
               numberOfLines={1}
               adjustsFontSizeToFit
-              minimumFontScale={0.8}
-              style={{ fontSize: priceSize, fontVariant: ['tabular-nums'], color: tokens.text }}
+              minimumFontScale={0.75}
+              style={{
+                flexShrink: 1,
+                minWidth: 0,
+                fontSize: priceSize,
+                lineHeight: undefined,
+                fontVariant: ['tabular-nums'],
+                color: tokens.text,
+              }}
             >
               {priceAmount}
             </AppText>
-            <AppText textVariant="bodyXs" weight="medium" colorName="textMuted">
+            <AppText
+              family="accent"
+              weight="semibold"
+              style={{
+                flexShrink: 0,
+                fontSize: 13,
+                lineHeight: undefined,
+                color: tokens.text,
+              }}
+            >
               {t('common.currency')}
             </AppText>
           </View>

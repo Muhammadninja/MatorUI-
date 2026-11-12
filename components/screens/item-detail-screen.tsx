@@ -44,7 +44,7 @@ import { useToast } from '@/hooks/use-toast';
 import { parsePrice } from '@/services/cart-math';
 import type { CatalogItem, CatalogItemSpec } from '@/services/catalog-service';
 import { resolveItemPricing } from '@/services/sales-service';
-import { noBreakDigits } from '@/utils/format-price';
+import { formatSomAmount } from '@/utils/format-price';
 import { triggerHaptic } from '@/utils/haptics';
 import { shareItem } from '@/utils/share';
 
@@ -165,7 +165,7 @@ export default function ItemDetailScreen() {
   const unitPriceUzs = item.priceUzs ?? unitPrice;
   const savingsLabel =
     wasUzs > unitPriceUzs
-      ? `${noBreakDigits((wasUzs - unitPriceUzs).toLocaleString('ru-RU'))} ${t('common.currency')}`
+      ? `${formatSomAmount(wasUzs - unitPriceUzs)} ${t('common.currency')}`
       : null;
   const vehicleLabel = activeVehicle
     ? `${activeVehicle.year} ${activeVehicle.make} ${activeVehicle.model ?? ''}`.trim()
@@ -177,7 +177,7 @@ export default function ItemDetailScreen() {
 
   const toggleFavorite = () => {
     const nowFav = toggleLike(item.id);
-    toast.info(nowFav ? t('itemDetail.savedToFavorites') : t('itemDetail.removedFromFavorites'));
+    toast.success(nowFav ? t('itemDetail.savedToFavorites') : t('itemDetail.removedFromFavorites'));
   };
 
   const shareCurrentItem = async () => {

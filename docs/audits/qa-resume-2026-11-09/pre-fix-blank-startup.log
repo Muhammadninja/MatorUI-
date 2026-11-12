@@ -1,0 +1,28 @@
+Mator mock server → http://localhost:8080
+Point EXPO_PUBLIC_API_BASE_URL at this host, then run: maestro test .maestro/  (cart/orders: commerce.mjs)
+[mock] GET /
+[mock] POST /__e2e/reset
+[mock] GET /v1/app/config
+[mock] GET /v1/reference/categories
+[mock] GET /v1/reference/makes
+[mock] GET /v1/legal/documents
+[mock] GET /v1/reference/categories
+[mock] GET /v1/reference/makes
+[mock] GET /v1/app/config
+
+[redacted test-device UI]
+<?xml version='1.0' encoding='UTF-8' standalone='yes' ?><hierarchy rotation="0">
+<node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="com.mator.e2e" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][1080,2424]">
+<node index="0" text="" resource-id="" class="android.widget.LinearLayout" package="com.mator.e2e" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][1080,2424]">
+<node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="com.mator.e2e" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][1080,2424]">
+<node index="0" text="" resource-id="com.mator.e2e:id/action_bar_root" class="android.widget.LinearLayout" package="com.mator.e2e" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][1080,2424]">
+<node index="0" text="" resource-id="android:id/content" class="android.widget.FrameLayout" package="com.mator.e2e" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][1080,2424]">
+<node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="com.mator.e2e" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][1080,2424]" /></node></node></node></node></node></hierarchy>UI hierchary dumped to: /proc/self/fd/1
+
+
+[redacted crash and focus log]
+I/ActivityManager(  563): Force stopping com.mator.e2e appid=10210 user=0: clear data
+I/ActivityManager(  563): Killing 9638:com.mator.e2e/u0a210 (adj 0): stop com.mator.e2e due to clear data
+I/ActivityManager(  563): Force stopping com.mator.e2e appid=10210 user=-1: clearApplicationUserData
+I/ActivityManager(  563): Force stopping com.mator.e2e appid=10210 user=0: from pid 11771
+I/ActivityManager(  563): Start proc 11779:com.mator.e2e/u0a210 for next-top-activity {com.mator.e2e/com.mator.e2e.MainActivity}

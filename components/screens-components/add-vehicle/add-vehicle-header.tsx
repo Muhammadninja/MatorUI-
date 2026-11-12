@@ -17,7 +17,7 @@ export function AddVehicleHeader({ title, canSubmit, onBack, onSubmit }: AddVehi
   const { tokens } = useThemeContext();
 
   return (
-    <AppView px={20}>
+    <AppView px={16}>
       <AppView row align="center">
         <AppView style={{ flex: 1, alignItems: 'flex-start' }}>
           <AppPressableView

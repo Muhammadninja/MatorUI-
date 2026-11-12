@@ -6,7 +6,7 @@
  *   - the `{ items }` envelope unwrap + snake→camel mapping for each level
  *   - the cascade query params (makeId / modelId / trimId)
  *   - the local-catalog fallback when the `garage` domain isn't HTTP-enabled
- *   - graceful degradation to local makes when the HTTP call throws
+ *   - an HTTP failure stays a failure, never the bundled catalog
  */
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -53,11 +53,9 @@ describe('fetchMakes', () => {
     ]);
   });
 
-  test('falls back to the local catalog when the request throws', async () => {
+  test('a failed request stays a failure, so the picker can offer a retry', async () => {
     get.mockRejectedValueOnce(new Error('network'));
-    const makes = await fetchMakes();
-    expect(makes.length).toBe(UZ_BRANDS.length);
-    expect(makes[0]).toHaveProperty('id');
+    await expect(fetchMakes()).rejects.toThrow('network');
   });
 
   test('uses the local catalog (no HTTP) when garage domain is off', async () => {

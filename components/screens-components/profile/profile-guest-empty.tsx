@@ -101,7 +101,7 @@ export default function ProfileGuestEmpty() {
 
         <AppButton
           kind="brand"
-          size="md"
+          size="lg"
           fullWidth
           debounceMs={LOGIN_DEBOUNCE_MS}
           onPress={handleLogin}

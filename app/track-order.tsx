@@ -1,5 +1,7 @@
 import { Stack } from 'expo-router';
 
+import { AuthenticatedRoute } from '@/components/screens-components/auth/authenticated-route';
+
 import TrackOrderScreen from '@/components/screens/track-order-screen';
 
 /**
@@ -20,7 +22,9 @@ export default function TrackOrderRoute() {
           gestureEnabled: true,
         }}
       />
-      <TrackOrderScreen />
+      <AuthenticatedRoute titleKey="trackOrder.title" fallbackHref="/profile">
+        <TrackOrderScreen />
+      </AuthenticatedRoute>
     </>
   );
 }

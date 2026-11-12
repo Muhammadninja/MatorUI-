@@ -136,7 +136,7 @@ export default function AiChatToolCallCard({ toolCall }: AiChatToolCallCardProps
             <AppText
               textVariant="caption"
               weight="semibold"
-              style={{ color: tokens.brand, lineHeight: 14, includeFontPadding: false }}
+              style={{ color: tokens.brandText, lineHeight: 14, includeFontPadding: false }}
             >
               {toolCall.result.deepLink.label}
             </AppText>

@@ -10,6 +10,13 @@ import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import { useToast } from '@/hooks/use-toast';
 import { useUserContext } from '@/contexts/user.context';
+import {
+  DEFAULT_OTP_LENGTH,
+  normalizeOtpInput,
+  otpAutofillProps,
+  otpPlaceholder,
+  resolveOtpLength,
+} from '@/utils/otp-input';
 
 /** Loose E.164 check — "+" then 9–15 digits after normalizing. */
 function isValidPhone(raw: string): boolean {
@@ -41,6 +48,7 @@ export function PhoneChangeSheet({
   const [currentCode, setCurrentCode] = useState('');
   const [currentRequired, setCurrentRequired] = useState(false);
   const [currentMasked, setCurrentMasked] = useState('');
+  const [otpLength, setOtpLength] = useState(DEFAULT_OTP_LENGTH);
   const [busy, setBusy] = useState(false);
 
   // Reset each time the sheet (re)opens.
@@ -52,6 +60,7 @@ export function PhoneChangeSheet({
       setCurrentCode('');
       setCurrentRequired(false);
       setCurrentMasked('');
+      setOtpLength(DEFAULT_OTP_LENGTH);
       setBusy(false);
     }
   }, [visible, currentPhone]);
@@ -64,6 +73,7 @@ export function PhoneChangeSheet({
     setBusy(true);
     try {
       const request = await requestPhoneChange(phone);
+      setOtpLength(resolveOtpLength(request.otpLength));
       setCode(request.devCode ?? ''); // dev/demo convenience
       setCurrentCode(request.devCurrentCode ?? '');
       setCurrentRequired(request.currentPhoneOtpRequired);
@@ -132,23 +142,19 @@ export function PhoneChangeSheet({
             </AppText>
             <AppTextField
               label={t(currentRequired ? 'account.newPhoneCode' : 'account.verificationCode')}
-              placeholder="123456"
+              placeholder={otpPlaceholder(otpLength)}
               value={code}
-              onChangeText={(v) => setCode(v.replace(/\D/g, '').slice(0, 6))}
+              onChangeText={(v) => setCode((previous) => normalizeOtpInput(v, otpLength, previous))}
               keyboardType="number-pad"
               autoCorrect={false}
-              // One-tap SMS-code suggestion above the keyboard (iOS QuickType
-              // "From Messages" + Android SMS autofill).
-              textContentType="oneTimeCode"
-              autoComplete="sms-otp"
-              importantForAutofill="yes"
+              {...otpAutofillProps()}
             />
             {currentRequired ? (
               <AppTextField
                 label={t('account.currentPhoneCode', { current: currentMasked })}
-                placeholder="123456"
+                placeholder={otpPlaceholder(otpLength)}
                 value={currentCode}
-                onChangeText={(v) => setCurrentCode(v.replace(/\D/g, '').slice(0, 6))}
+                onChangeText={(v) => setCurrentCode(v.replace(/\D/g, '').slice(0, otpLength))}
                 keyboardType="number-pad"
                 autoCorrect={false}
               />
@@ -158,7 +164,7 @@ export function PhoneChangeSheet({
               kind="brand"
               size="lg"
               fullWidth
-              disabled={busy || code.length < 6 || (currentRequired && currentCode.length < 6)}
+              disabled={busy || code.length < otpLength || (currentRequired && currentCode.length < otpLength)}
               onPress={verify}
             />
             <Pressable onPress={() => setStep('phone')} disabled={busy} accessibilityRole="button">

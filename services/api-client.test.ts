@@ -141,13 +141,27 @@ describe('apiClient — retry behavior', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  test('POST retries on TypeError (network error — request likely never reached server)', async () => {
-    fetchMock
-      .mockRejectedValueOnce(new TypeError('Network request failed'))
-      .mockResolvedValueOnce(ok({ ok: true }));
-    const res = await apiClient.post('/x', { a: 1 }, { maxRetries: 1 });
-    expect(res).toEqual({ ok: true });
+  test.each(['post', 'patch', 'put', 'delete'] as const)('%s does not replay ambiguous network failures', async (method) => {
+    fetchMock.mockRejectedValue(new TypeError('Network request failed'));
+    await expect(apiClient[method]('/x')).rejects.toMatchObject({ code: 'NETWORK_ERROR' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  test('GET still retries network errors', async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError('Network request failed')).mockResolvedValueOnce(ok({ ok: true }));
+    await expect(apiClient.get('/x', { maxRetries: 1 })).resolves.toEqual({ ok: true });
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  test('completed requests release caller abort listeners', async () => {
+    const controller = new AbortController();
+    const add = vi.spyOn(controller.signal, 'addEventListener');
+    const remove = vi.spyOn(controller.signal, 'removeEventListener');
+    fetchMock.mockImplementation(async () => ok({}));
+    for (let i = 0; i < 20; i++) await apiClient.get('/x', { signal: controller.signal });
+    expect(add).toHaveBeenCalledTimes(20);
+    expect(remove).toHaveBeenCalledTimes(20);
+    for (let i = 0; i < 20; i++) expect(remove.mock.calls[i]?.[1]).toBe(add.mock.calls[i]?.[1]);
   });
 
   test('gives up after maxRetries on persistent 5xx', async () => {

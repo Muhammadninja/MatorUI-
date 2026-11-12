@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { AlertCircle, ArrowLeft } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView } from 'react-native';
+import { Platform, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AddressFormSheet, {
@@ -20,6 +20,7 @@ import {
 } from '@/components/screens-components/checkout/checkout-sections';
 import { PickupPoints } from '@/components/screens-components/checkout/pickup-points';
 import { StockShortagePanel } from '@/components/screens-components/checkout/stock-shortage-panel';
+import { OrderLinePrice } from '@/components/screens-components/orders/order-price-breakdown';
 import { AppButton } from '@/components/shared/app-button';
 import { AppPrice } from '@/components/shared/app-price';
 import { AppText } from '@/components/shared/app-text';
@@ -56,6 +57,7 @@ import garageService from '@/services/garage-service';
 import type { Address, PaymentType } from '@/services/orders-service';
 import { pickupCartKey } from '@/services/pickup-points';
 import { triggerHaptic } from '@/utils/haptics';
+import { checkoutFooterBottom } from '@/utils/sticky-footer';
 
 /**
  * Checkout — the Uzbek-market flow. The buyer chooses pickup or Mator's courier, seeing
@@ -254,7 +256,7 @@ export default function CheckoutScreen() {
   };
 
   const placeOrder = async () => {
-    if (items.length === 0 || !delivery.ready || grandTotal === null || payment.phase !== 'idle') {
+    if ((!create.hasPendingAttempt && (items.length === 0 || !delivery.ready || grandTotal === null)) || payment.phase !== 'idle') {
       return;
     }
     triggerHaptic('success');
@@ -265,9 +267,9 @@ export default function CheckoutScreen() {
       shippingOptionKey: delivery.method,
       confirmedDeliveryUzs: delivery.method === 'courier' ? delivery.fee : null,
       deliveryQuoteId: delivery.method === 'courier' ? delivery.quoteId : null,
-      confirmedTotalUzs: grandTotal,
+      confirmedTotalUzs: grandTotal ?? 0,
       promoCode: appliedPromo?.code ?? null,
-      totalLabel: formatCurrency(grandTotal),
+      totalLabel: formatCurrency(grandTotal ?? 0),
       // Backend order is built from the server cart; these tag it with the
       // buyer's vehicle + contact number (both optional server-side).
       vehicleId: garageService.getPrimary()?.id,
@@ -277,15 +279,17 @@ export default function CheckoutScreen() {
 
     // Payme is paid online, against the order that now exists. Terminal and cash are paid on
     // delivery, so the order is all there is to do.
-    if (paymentType === 'payme') {
+    const submittedAttempt = result.recoveredAttempt;
+    const submittedPaymentType = submittedAttempt?.paymentType ?? paymentType;
+    if (submittedPaymentType === 'payme') {
       await payment.collect({
         orderId: result.orderId,
         totalLabel: result.totalLabel,
-        cartKey: cartKeyOf(items),
+        cartKey: cartKeyOf(submittedAttempt?.items.map((item) => ({ id: item.productId, quantity: item.quantity })) ?? items),
       });
       return;
     }
-    clearCart();
+    if (!submittedAttempt) clearCart();
     goToConfirmation(result.orderId);
   };
 
@@ -310,8 +314,8 @@ export default function CheckoutScreen() {
       >
         {/* Header */}
         <AppView row align="center" gap={12} px="lg" style={{ paddingBottom: 14 }}>
-          <AppPressableView onPress={() => router.back()} center rounded={12} borderWidth={1} borderName="border" accessibilityRole="button" accessibilityLabel={t('checkout.back')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ width: 40, height: 40 }}>
-            <ArrowLeft size={22} strokeWidth={2.2} color={tokens.text} />
+          <AppPressableView onPress={() => router.back()} center rounded={999} borderWidth={1} borderName="border" colorName="surface" accessibilityRole="button" accessibilityLabel={t('checkout.back')} style={{ width: 36, height: 36 }}>
+            <ArrowLeft size={18} strokeWidth={2.2} color={tokens.text} />
           </AppPressableView>
           <AppText family="heading" weight="bold" style={{ fontSize: 20, color: tokens.text }}>{t('checkout.title')}</AppText>
         </AppView>
@@ -320,7 +324,7 @@ export default function CheckoutScreen() {
           {payment.orderClosed ? (
             <AppView testID="checkout-order-closed" row align="center" gap={8}>
               <AlertCircle size={16} strokeWidth={2} color={tokens.error} />
-              <AppText family="default" style={{ fontSize: 12.5, color: tokens.error, flex: 1 }}>
+              <AppText family="default" style={{ fontSize: 12, color: tokens.error, flex: 1 }}>
                 {t('checkout.paymentOrderClosed')}
               </AppText>
             </AppView>
@@ -397,14 +401,18 @@ export default function CheckoutScreen() {
           <AppText family="heading" weight="bold" style={{ fontSize: 16, color: tokens.text, marginTop: 4 }}>{t('checkout.orderSummary')}</AppText>
           {payment.pending ? (
             <AppView gap={10}>
-              {(payment.order?.items ?? []).map((line) => (
+              {(payment.order?.items ?? []).map((line, index) => (
                 <AppView key={line.id} row justify="space-between">
-                  <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted, flex: 1 }}>
-                    {line.title} × {line.quantity}
+                  <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted, flex: 1 }}>
+                    {line.title}{line.quantity > 0 ? ` × ${line.quantity}` : ''}
                   </AppText>
-                  <AppText family="accent" weight="semibold" style={{ fontSize: 13.5, color: tokens.text }}>
-                    {line.price}
-                  </AppText>
+                  {payment.order?.pricing ? (
+                    <OrderLinePrice line={payment.order.pricing.lines[index]} />
+                  ) : (
+                    <AppText family="accent" weight="semibold" style={{ fontSize: 14, color: tokens.text }}>
+                      {line.price}
+                    </AppText>
+                  )}
                 </AppView>
               ))}
               {/* What the order was placed at: fixed, whatever the cart says now. */}
@@ -423,10 +431,10 @@ export default function CheckoutScreen() {
             <AppView gap={10}>
               {items.map((item) => (
                 <AppView key={item.id} row justify="space-between">
-                  <AppText family="default" style={{ fontSize: 13.5, color: tokens.textMuted, flex: 1 }}>
+                  <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted, flex: 1 }}>
                     {item.title} × {item.quantity}
                   </AppText>
-                  <AppText family="accent" weight="semibold" style={{ fontSize: 13.5, color: tokens.text }}>
+                  <AppText family="accent" weight="semibold" style={{ fontSize: 14, color: tokens.text }}>
                     {formatCurrency(parsePrice(item.price) * item.quantity)}
                   </AppText>
                 </AppView>
@@ -445,10 +453,10 @@ export default function CheckoutScreen() {
               {!charges && cartSettled && cartError ? (
                 <AppView testID="checkout-charges-unavailable" row align="center" gap={8}>
                   <AlertCircle size={16} strokeWidth={2} color={tokens.error} />
-                  <AppText family="default" style={{ fontSize: 12.5, color: tokens.error, flex: 1 }}>
+                  <AppText family="default" style={{ fontSize: 12, color: tokens.error, flex: 1 }}>
                     {t('checkout.totalsUnavailable')}
                   </AppText>
-                  <LinkAction label={t('common.retry')} onPress={() => void refreshCart()} color={tokens.text} />
+                  <LinkAction label={t('common.retry')} onPress={() => void refreshCart()} color={tokens.brandText} />
                 </AppView>
               ) : null}
               <AppView row justify="space-between">
@@ -475,7 +483,7 @@ export default function CheckoutScreen() {
           {create.error ? (
             <AppView row align="center" gap={8}>
               <AlertCircle size={16} strokeWidth={2} color={tokens.error} />
-              <AppText family="default" style={{ fontSize: 12.5, color: tokens.error, flex: 1 }}>
+              <AppText family="default" style={{ fontSize: 12, color: tokens.error, flex: 1 }}>
                 {refusalKey ? t(refusalKey) : create.error}
               </AppText>
             </AppView>
@@ -484,7 +492,7 @@ export default function CheckoutScreen() {
       </ScrollView>
 
       {/* Sticky place order */}
-      <AppView colorName="background" px="lg" style={{ paddingTop: 14, paddingBottom: Math.max(insets.bottom, 20), borderTopWidth: 1, borderTopColor: tokens.divider }}>
+      <AppView testID="checkout-footer" colorName="background" px="lg" style={{ paddingTop: 14, paddingBottom: checkoutFooterBottom(insets.bottom, Platform.OS), borderTopWidth: 1, borderTopColor: tokens.divider }}>
         <AppButton
           testID="checkout-place-order-btn"
           title={

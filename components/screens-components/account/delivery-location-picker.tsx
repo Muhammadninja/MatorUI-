@@ -14,7 +14,7 @@ import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useAddressSuggestions } from '@/hooks/use-address-suggestions';
-import { useAppLocation } from '@/hooks/use-app-location/use-app-location';
+import { useAppLocation, type LocationFailure } from '@/hooks/use-app-location/use-app-location';
 import { useDeliveryCoverage } from '@/hooks/use-delivery-coverage';
 import { isWithinCoverage } from '@/services/delivery-coverage';
 import {
@@ -38,7 +38,8 @@ export type DeliveryLocationPickerProps = {
   /** The point to start from, when the address has one. */
   initialPoint: DeliveryPoint | null;
   onCancel: () => void;
-  onConfirm: (point: DeliveryPoint) => void;
+  /** `place` is the search result the point was taken from, while the map still sits on it. */
+  onConfirm: (point: DeliveryPoint, place: AddressSuggestion | null) => void;
 };
 
 const SEARCH_LANGUAGES = ['uz', 'ru', 'en'];
@@ -96,8 +97,10 @@ function PickerContent({
   const [closeEnough, setCloseEnough] = useState(
     !mapAvailable || isCloseEnoughToChoose(startRegion),
   );
-  const [locateFailed, setLocateFailed] = useState(false);
+  const [locateFailure, setLocateFailure] = useState<LocationFailure | null>(null);
   const [typed, setTyped] = useState('');
+  /** The search result under the marker, so its name can go with the point. */
+  const [place, setPlace] = useState<AddressSuggestion | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
   /** The buyer has chosen something, so the point under the marker now counts. */
@@ -133,12 +136,13 @@ function PickerContent({
   /** Brings a place under the marker, and selects exactly that place. */
   const moveTo = (point: DeliveryPoint, delta: number) => {
     chosen.current = true;
+    setPlace(null);
     heading.current = point;
     center.current = point;
     lastRegion.current = null;
     setSelected(point);
     setCloseEnough(!mapAvailable || delta <= MAX_CONFIRM_DELTA);
-    setLocateFailed(false);
+    setLocateFailure(null);
     mapRef.current?.animateToRegion(regionAround(point, delta), MOVE_MS);
     // If the buyer cuts the move short it never arrives, and there may be no further report.
     // What the map last said is then where the marker is, so that has to count.
@@ -168,19 +172,22 @@ function PickerContent({
     chosen.current = true;
     // Keep an exact choice exact when the map merely settles on it.
     setSelected((current) => (current && isCenteredOn(current, region) ? current : point));
+    // Moving off a found place leaves its name behind.
+    setPlace((current) => (current && isCenteredOn(current, region) ? current : null));
   };
 
   const useMyLocation = async () => {
-    setLocateFailed(false);
+    setLocateFailure(null);
     const coords = await location.requestAndGetPosition();
     if (coords) moveTo({ lat: coords.latitude, lng: coords.longitude }, STREET_DELTA);
-    else setLocateFailed(true);
+    else setLocateFailure(location.lastFailure?.() ?? 'unavailable');
   };
 
   const pickSuggestion = (suggestion: AddressSuggestion) => {
     setTyped('');
     setSubmitted(false);
     moveTo({ lat: suggestion.lat, lng: suggestion.lng }, STREET_DELTA);
+    setPlace(suggestion);
   };
 
   const outsideCoverage = !!selected && !!polygons && !isWithinCoverage(selected, polygons);
@@ -310,9 +317,24 @@ function PickerContent({
       </AppView>
 
       <AppView px={20} gap={10} style={{ paddingTop: 12, paddingBottom: Math.max(insets.bottom, 16) }}>
-        {locateFailed ? (
-          <AppText family="default" style={{ fontSize: 12.5, color: tokens.error }}>
-            {t('account.locationFailed')}
+        {place ? (
+          <AppView testID="delivery-map-place" row align="center" gap={10}>
+            <MapPin size={20} strokeWidth={2.2} color={tokens.brandBg} />
+            <AppView flex={1}>
+              <AppText family="accent" weight="bold" style={{ fontSize: 15, color: tokens.text }}>
+                {place.title}
+              </AppText>
+              {place.subtitle ? (
+                <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>
+                  {place.subtitle}
+                </AppText>
+              ) : null}
+            </AppView>
+          </AppView>
+        ) : null}
+        {locateFailure ? (
+          <AppText testID="delivery-map-locate-failed" family="default" style={{ fontSize: 12.5, color: tokens.error }}>
+            {t(locateFailure === 'denied' ? 'account.locationDenied' : 'account.locationUnavailable')}
           </AppText>
         ) : outsideCoverage ? (
           <AppText testID="delivery-map-outside" family="default" style={{ fontSize: 13, color: tokens.error }}>
@@ -331,7 +353,7 @@ function PickerContent({
           fullWidth
           disabled={!selected || !closeEnough || outsideCoverage}
           onPress={() => {
-            if (selected && closeEnough && !outsideCoverage) onConfirm(selected);
+            if (selected && closeEnough && !outsideCoverage) onConfirm(selected, place);
           }}
         />
       </AppView>

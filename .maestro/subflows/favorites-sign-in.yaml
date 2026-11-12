@@ -1,0 +1,49 @@
+appId: com.mator.e2e
+---
+- openLink: mator-e2e://profile
+- tapOn:
+    text: Log in to your account
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible:
+      id: auth-phone-field
+    timeout: 15000
+- waitForAnimationToEnd
+# Read before typing: never erase a retained number to make this check pass.
+- copyTextFrom:
+    id: auth-phone-field
+- assertTrue: ${maestro.copiedText === '' || maestro.copiedText === '+998 90 123 45 67'}
+# A real retained placeholder-looking number would enable Next and fail here.
+- assertVisible:
+    id: auth-send-code-btn
+    enabled: false
+- tapOn:
+    id: auth-phone-field
+    retryTapIfNoChange: false
+- waitForAnimationToEnd
+- inputText: ${PHONE}
+# Native editor completion blurs the input without Android Back dismissing the
+# entire sheet, and without a full-screen scroll hitting its backdrop.
+- pressKey: Enter
+- waitForAnimationToEnd
+- tapOn:
+    id: auth-send-code-btn
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible:
+      id: auth-otp-field
+    timeout: 15000
+- tapOn:
+    id: auth-otp-field
+    retryTapIfNoChange: false
+- waitForAnimationToEnd
+- inputText: '123456'
+- pressKey: Enter
+- waitForAnimationToEnd
+- tapOn:
+    id: auth-verify-btn
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    notVisible:
+      id: sign-in-screen
+    timeout: 15000

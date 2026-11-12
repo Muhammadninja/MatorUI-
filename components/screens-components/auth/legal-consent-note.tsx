@@ -19,7 +19,7 @@ export type LegalConsentNoteProps = {
   linkTestIDPrefix: string;
 };
 
-const TEXT_STYLE = { fontSize: 12.5, lineHeight: 18 } as const;
+const TEXT_STYLE = { fontSize: 12, lineHeight: 18 } as const;
 
 /**
  * The line under the sign-in sheet's CTA that names every legal document

@@ -1,0 +1,11 @@
+UTC: 2026-11-10T00:23:25.579Z
+APK SHA256: f6237f5103f77b81d2ed9f2b8c41e8806481c071d63841cbada94281e9d9a5b0
+Git HEAD (build predates checkpoint): 5a8fcd26f6500a430281056c2ba430e6e8509271
+Package: com.mator.e2e
+Installed APK SHA256: f6237f5103f77b81d2ed9f2b8c41e8806481c071d63841cbada94281e9d9a5b0
+Device: google/sdk_gphone64_arm64/emu64a:15/AE3A.240806.036/12592187:user/release-keys
+RAM: Pixel_9_API_35
+Animator scale: 0
+Reproduction: mock ready; clear app log; pm clear dedicated app; am start -W MAIN/LAUNCHER;
+wait 8s with no input or UI automation; capture frame/resources; then dump UI hierarchy.
+Repeat 3 times; no sign-in, production calls, orders or payments.

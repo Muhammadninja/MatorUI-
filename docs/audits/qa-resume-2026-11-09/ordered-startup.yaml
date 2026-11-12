@@ -1,0 +1,32 @@
+appId: com.mator.e2e
+name: controlled-guest-startup
+---
+- repeat:
+    times: 1
+    commands:
+      - launchApp:
+          clearState: true
+      - extendedWaitUntil:
+          visible:
+            id: language-screen
+          timeout: 30000
+      - extendedWaitUntil:
+          notVisible: Skip
+          timeout: 30000
+      - assertVisible:
+          id: language-screen
+      - assertVisible:
+          id: language-option-en
+      - assertVisible: "English, English"
+      - tapOn:
+          id: language-option-en
+      - tapOn:
+          id: language-continue-btn
+      - extendedWaitUntil:
+          visible:
+            id: explore-search-entry
+          timeout: 30000
+      - extendedWaitUntil:
+          notVisible: Skip
+          timeout: 30000
+      - stopApp

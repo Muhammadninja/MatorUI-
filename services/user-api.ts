@@ -18,7 +18,6 @@
  * `mapBackendUser` (same mapper auth-api uses on verify/refresh).
  */
 
-import { shouldUseHttpTransport } from '@/config/api';
 import { apiClient } from '@/services/api-client';
 import { mapBackendUser, type RawBackendUser, type UserSummary } from '@/services/auth-api';
 import type { AuthSession } from '@/services/auth-storage';
@@ -31,6 +30,8 @@ export type UserPatch = Partial<Omit<UserSummary, 'id' | 'memberSince'>>;
 export type PhoneChangeRequest = {
   /** Seconds until the code expires. */
   expiresIn: number;
+  /** Digits in the code, when the backend reports it. */
+  otpLength?: number;
   /** DEV/DEMO only — the code, so dev builds can prefill it. Prod omits it. */
   devCode?: string;
   /** The change also needs the code sent to the number on the account. */
@@ -75,76 +76,6 @@ function epochFromIso(iso?: string): number | undefined {
   if (!iso) return undefined;
   const ms = Date.parse(iso);
   return Number.isNaN(ms) ? undefined : Math.floor(ms / 1000);
-}
-
-// ── Mock transport ─────────────────────────────────────────────────────
-//
-// Starts EMPTY — never fabricates a fake identity. Real profile data comes
-// from the auth session (verify/refresh) or the live `/v1/me` (HTTP transport).
-// So on mock the screen shows the honest empty state, never a placeholder user.
-
-const EMPTY_PROFILE: UserSummary = {
-  id: '',
-  firstName: '',
-  lastName: '',
-  email: '',
-  username: '',
-  phone: null,
-  avatarUrl: null,
-  memberSince: '',
-};
-
-class MockUserTransport implements UserTransport {
-  private state: UserSummary = { ...EMPTY_PROFILE };
-
-  async getMe(): Promise<UserSummary> {
-    await delay(200);
-    return { ...this.state };
-  }
-
-  async updateMe(patch: UserPatch): Promise<UserSummary> {
-    await delay(250);
-    this.state = { ...this.state, ...patch };
-    // NOTE: mock state is in-memory only — it resets on every reload/restart.
-    // If your name edits "don't stick" locally, this is why: the `user` domain
-    // is on the mock transport. Add `user` to EXPO_PUBLIC_HTTP_DOMAINS to persist
-    // against the real backend.
-    debugLog('profile', 'updateMe (MOCK — in-memory, resets on reload)', this.state);
-    return { ...this.state };
-  }
-
-  async requestPhoneChange(): Promise<PhoneChangeRequest> {
-    await delay(300);
-    // Mock accepts any 6-digit code; prefill "123456" like the auth mock.
-    return {
-      expiresIn: 300,
-      devCode: '123456',
-      currentPhoneOtpRequired: !!this.state.phone,
-      currentPhoneMasked: this.state.phone ?? undefined,
-      devCurrentCode: '654321',
-    };
-  }
-
-  async confirmPhoneChange(phone: string, otp: string): Promise<PhoneChangeResult> {
-    await delay(300);
-    if (!/^\d{6}$/.test(otp)) throw new Error('Enter the 6-digit code we sent you.');
-    const normalized = phone.replace(/[^\d+]/g, '');
-    this.state = { ...this.state, phone: normalized, username: normalized };
-    return {
-      user: { ...this.state },
-      session: { accessToken: 'mock_access', refreshToken: 'mock_refresh' },
-    };
-  }
-
-  async deleteMe(): Promise<void> {
-    await delay(250);
-    this.state = { ...EMPTY_PROFILE };
-    debugLog('profile', 'deleteMe (MOCK — in-memory reset)');
-  }
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // ── HTTP transport ─────────────────────────────────────────────────────
@@ -197,6 +128,7 @@ class HttpUserTransport implements UserTransport {
     const r = await apiClient.post<{
       expires_at?: string;
       resend_after_seconds?: number;
+      otp_length?: number;
       dev_otp_code?: string;
       current_phone_otp_required?: boolean;
       current_phone_masked?: string;
@@ -209,6 +141,7 @@ class HttpUserTransport implements UserTransport {
     debugLog('profile', 'requestPhoneChange → OTP sent', { expiresIn });
     return {
       expiresIn,
+      otpLength: r.otp_length,
       devCode: r.dev_otp_code,
       currentPhoneOtpRequired: r.current_phone_otp_required ?? false,
       currentPhoneMasked: r.current_phone_masked,
@@ -264,6 +197,4 @@ class HttpUserTransport implements UserTransport {
 
 // ── Singleton ──────────────────────────────────────────────────────────
 
-export const userTransport: UserTransport = shouldUseHttpTransport('user')
-  ? new HttpUserTransport()
-  : new MockUserTransport();
+export const userTransport: UserTransport = new HttpUserTransport();

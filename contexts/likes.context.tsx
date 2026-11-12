@@ -3,120 +3,131 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type PropsWithChildren,
 } from 'react';
-
-import { loadLikes, saveLikes } from '@/services/likes-storage';
-
-/**
- * Likes / saved-items state.
- *
- *  - In-memory `Set<string>` of liked product ids.
- *  - Persisted to AsyncStorage so likes survive an app restart.
- *  - Tracks whether the user has *ever* liked something before so the
- *    Lists tab can offer first-like onboarding ("Save this to a list!")
- *    only once per device.
- */
+import { useUserContext } from '@/contexts/user.context';
+import { createFavoritesTransport } from '@/services/favorites-api';
+import { FavoritesSync, type FavoritesView } from '@/services/favorites-sync';
+import { favoritesStorage } from '@/services/likes-storage';
+import { useSessionContextValue } from '@/contexts/session-context-value';
+import { getAuthRequestEpoch } from '@/services/api-client';
+import { useE2EStartupMount } from '@/hooks/use-e2e-startup-mount';
 
 type LikesContextValue = {
   likedIds: Set<string>;
   isLiked: (id: string) => boolean;
-  /** Toggle the like state. Returns the NEW state (true = now liked). */
   toggleLike: (id: string) => boolean;
-  /** True only for the moment between the first-ever like and when the
-   *  user acknowledges the list-creation prompt. */
   shouldSuggestList: boolean;
-  /** Mark the list-creation prompt as seen so it doesn't reappear. */
   acknowledgeListSuggestion: () => void;
   isHydrated: boolean;
+  isSyncing: boolean;
+  pendingIds: Set<string>;
+  syncError: string | null;
+  retrySync: () => Promise<void>;
+};
+
+const EMPTY_LIKES_CONTEXT: LikesContextValue = {
+  likedIds: new Set(),
+  isLiked: () => false,
+  toggleLike: () => false,
+  shouldSuggestList: false,
+  acknowledgeListSuggestion: () => undefined,
+  isHydrated: false,
+  isSyncing: false,
+  pendingIds: new Set(),
+  syncError: null,
+  retrySync: async () => undefined,
 };
 
 const LikesContext = createContext<LikesContextValue | undefined>(undefined);
 
 export function LikesProvider({ children }: PropsWithChildren) {
-  const [likedIds, setLikedIds] = useState<Set<string>>(() => new Set());
-  const [hasEverLiked, setHasEverLiked] = useState(false);
-  const [shouldSuggestList, setShouldSuggestList] = useState(false);
-  const [isHydrated, setIsHydrated] = useState(false);
-
-  // Hydrate from disk once.
-  useEffect(() => {
-    let cancelled = false;
-    loadLikes().then((stored) => {
-      if (cancelled) return;
-      if (stored) {
-        setLikedIds(new Set(stored.ids));
-        setHasEverLiked(stored.hasEverLiked);
-      }
-      setIsHydrated(true);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Debounced write.
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (!isHydrated) return;
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => {
-      void saveLikes({ ids: Array.from(likedIds), hasEverLiked });
-    }, 250);
-    return () => {
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    };
-  }, [likedIds, hasEverLiked, isHydrated]);
-
-  const isLiked = useCallback(
-    (id: string) => likedIds.has(id),
-    [likedIds],
+  const { profile, isHydrating, isAuthenticated } = useUserContext();
+  const ownerId = isAuthenticated ? (profile?.id ?? null) : null;
+  const epoch = getAuthRequestEpoch();
+  const key = `${isHydrating ? 'auth-pending' : ownerId === null ? 'guest' : `user:${ownerId}`}:${epoch}`;
+  const [value, publish] = useSessionContextValue(key, EMPTY_LIKES_CONTEXT);
+  return (
+    <LikesContext.Provider value={value}>
+      <LikesSessionProvider
+        key={key}
+        ownerId={ownerId}
+        authHydrating={!!isHydrating}
+        epoch={epoch}
+        publish={publish}
+      />
+      {children}
+    </LikesContext.Provider>
   );
+}
 
-  const toggleLike = useCallback(
-    (id: string): boolean => {
-      let nextLiked = false;
-      setLikedIds((current) => {
-        const next = new Set(current);
-        if (next.has(id)) {
-          next.delete(id);
-          nextLiked = false;
-        } else {
-          next.add(id);
-          nextLiked = true;
-        }
-        return next;
-      });
-      // Record the first-ever like for persistence, but no longer pop the
-      // list-creation suggestion sheet on like (removed per product decision).
-      if (nextLiked && !hasEverLiked) {
-        setHasEverLiked(true);
-      }
-      return nextLiked;
-    },
-    [hasEverLiked],
-  );
+function LikesSessionProvider({
+  publish,
+  ownerId,
+  authHydrating,
+  epoch,
+}: {
+  ownerId: string | null;
+  authHydrating: boolean;
+  epoch: number;
+  publish: (value: LikesContextValue) => void;
+}) {
+  useE2EStartupMount('likes-controller');
+  const engine = useRef<FavoritesSync | null>(null);
+  const [view, setView] = useState<FavoritesView>(() => ({
+    likedIds: new Set(),
+    hasEverLiked: false,
+    isHydrated: false,
+    isSyncing: false,
+    pendingIds: new Set(),
+    error: null,
+  }));
 
-  const acknowledgeListSuggestion = useCallback(() => {
-    setShouldSuggestList(false);
-  }, []);
+  useEffect(() => {
+    if (authHydrating) return;
+    const session = new FavoritesSync(
+      ownerId,
+      favoritesStorage,
+      ownerId === null ? undefined : createFavoritesTransport(),
+      undefined,
+      undefined,
+      () => epoch === getAuthRequestEpoch(),
+    );
+    engine.current = session;
+    const unsubscribe = session.subscribe(setView);
+    void session.start();
+    return () => {
+      unsubscribe();
+      session.stop();
+      if (engine.current === session) engine.current = null;
+    };
+  }, [ownerId, authHydrating, epoch]);
 
+  const isLiked = useCallback((id: string) => view.likedIds.has(id), [view.likedIds]);
+  const toggleLike = useCallback((id: string) => engine.current?.toggle(id) ?? false, []);
+  const acknowledgeListSuggestion = useCallback(() => undefined, []);
+  const retrySync = useCallback(() => engine.current?.retry() ?? Promise.resolve(), []);
   const value = useMemo<LikesContextValue>(
     () => ({
-      likedIds,
+      likedIds: view.likedIds,
       isLiked,
       toggleLike,
-      shouldSuggestList,
+      shouldSuggestList: false,
       acknowledgeListSuggestion,
-      isHydrated,
+      isHydrated: !authHydrating && view.isHydrated,
+      isSyncing: view.isSyncing,
+      pendingIds: view.pendingIds,
+      syncError: view.error,
+      retrySync,
     }),
-    [likedIds, isLiked, toggleLike, shouldSuggestList, acknowledgeListSuggestion, isHydrated],
+    [view, authHydrating, isLiked, toggleLike, acknowledgeListSuggestion, retrySync],
   );
-
-  return <LikesContext.Provider value={value}>{children}</LikesContext.Provider>;
+  useLayoutEffect(() => publish(value), [publish, value]);
+  return null;
 }
 
 export function useLikesContext() {

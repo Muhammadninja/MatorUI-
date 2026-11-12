@@ -8,6 +8,9 @@ export type ImageShimmerProps = {
   /** Draw the rotor glyph in the middle. Off for boxes under ~72px, where the
    *  glyph is larger than the pulse it sits on. */
   showGlyph?: boolean;
+  /** The box is a product photo's white surface, which stays white in dark
+   *  mode, so the pulse must too — or controls drawn for white vanish on it. */
+  onPhoto?: boolean;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -27,7 +30,7 @@ const GLYPH = 44;
  * "this photo is coming" and "this part has no photo" should read as the same
  * family, with movement as the only difference between them.
  */
-function ImageShimmer({ showGlyph = true, style }: ImageShimmerProps) {
+function ImageShimmer({ showGlyph = true, onPhoto = false, style }: ImageShimmerProps) {
   const { tokens, scheme } = useThemeContext();
   const isDark = scheme === 'dark';
   const pulse = useRef(new Animated.Value(0)).current;
@@ -62,7 +65,7 @@ function ImageShimmer({ showGlyph = true, style }: ImageShimmerProps) {
         StyleSheet.absoluteFill,
         {
           opacity,
-          backgroundColor: isDark ? tokens.gray200 : tokens.gray100,
+          backgroundColor: onPhoto ? tokens.photoShimmer : isDark ? tokens.gray200 : tokens.gray100,
           alignItems: 'center',
           justifyContent: 'center',
         },
@@ -71,7 +74,12 @@ function ImageShimmer({ showGlyph = true, style }: ImageShimmerProps) {
     >
       {showGlyph ? (
         <Svg width={GLYPH} height={GLYPH} viewBox="0 0 48 48">
-          <G stroke={tokens.textMuted} strokeWidth={2} fill="none" opacity={0.32}>
+          <G
+            stroke={onPhoto ? tokens.onPhotoMuted : tokens.textMuted}
+            strokeWidth={2}
+            fill="none"
+            opacity={0.32}
+          >
             <Circle cx={24} cy={24} r={19} />
             <Circle cx={24} cy={24} r={7.5} />
           </G>

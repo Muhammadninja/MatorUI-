@@ -146,7 +146,7 @@ function useHttp(): boolean {
   return shouldUseHttpTransport('garage');
 }
 
-// ── Local fallback (offline / mock / E2E) ────────────────────────────
+// ── Local catalog (development without an API URL only) ─────────────
 
 function localMakes(): RefMake[] {
   return UZ_BRANDS.map((b) => ({
@@ -169,18 +169,15 @@ function localModels(makeId: string): RefModel[] {
 
 export async function fetchMakes(signal?: AbortSignal): Promise<RefMake[]> {
   if (!useHttp()) return localMakes();
-  try {
-    const res = await apiClient.get<Envelope>(`${BASE}/makes`, { signal });
-    return asItems(res).map((m) => ({
-      id: str(m.id),
-      name: str(m.name),
-      logoUrl: (m.logo_url as string | null) ?? null,
-      comingSoon: m.coming_soon === true,
-    }));
-  } catch {
-    // A reachable-but-failing backend shouldn't leave the picker empty.
-    return localMakes();
-  }
+  // A failure stays a failure so the picker can offer a retry. The bundled list
+  // has different ids from the backend, so it must never stand in for this call.
+  const res = await apiClient.get<Envelope>(`${BASE}/makes`, { signal });
+  return asItems(res).map((m) => ({
+    id: str(m.id),
+    name: str(m.name),
+    logoUrl: (m.logo_url as string | null) ?? null,
+    comingSoon: m.coming_soon === true,
+  }));
 }
 
 export async function fetchModels(
@@ -189,19 +186,15 @@ export async function fetchModels(
 ): Promise<RefModel[]> {
   if (!makeId) return [];
   if (!useHttp()) return localModels(makeId);
-  try {
-    const res = await apiClient.get<Envelope>(
-      `${BASE}/models?makeId=${encodeURIComponent(makeId)}`,
-      { signal },
-    );
-    return asItems(res).map((m) => ({
-      id: str(m.id),
-      makeId: str(m.make_id) || makeId,
-      name: str(m.name),
-    }));
-  } catch {
-    return localModels(makeId);
-  }
+  const res = await apiClient.get<Envelope>(
+    `${BASE}/models?makeId=${encodeURIComponent(makeId)}`,
+    { signal },
+  );
+  return asItems(res).map((m) => ({
+    id: str(m.id),
+    makeId: str(m.make_id) || makeId,
+    name: str(m.name),
+  }));
 }
 
 /**
@@ -243,9 +236,7 @@ export async function resolveCatalogIds(
     return lmd ? { makeId: lm.id, modelId: lmd.id } : {};
   }
 
-  // Live: read the ids straight off the reference endpoints (not via the
-  // fetchers above — those fall back to local ids on failure, which would
-  // reintroduce the exact mismatch we're fixing). Any failure → {}.
+  // Live: read the ids straight off the reference endpoints. Any failure → {}.
   try {
     const makes = asItems(await apiClient.get<Envelope>(`${BASE}/makes`, { signal }));
     const m = makes.find((x) => str(x.name).trim().toLowerCase() === wantMake);

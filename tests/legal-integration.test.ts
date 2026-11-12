@@ -10,7 +10,7 @@ import { join } from 'node:path';
 
 import { describe, expect, test } from 'vitest';
 
-import { MockLegalTransport } from '@/services/legal-api';
+import { MockLegalTransport } from "@/tests/support/transports/legal-api";
 import {
   LEGAL_DOCUMENT_TYPES,
   legalDocumentSlug,
