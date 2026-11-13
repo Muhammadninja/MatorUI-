@@ -15,6 +15,8 @@ This avoids a new VM, database, queue, and object-storage service for the first 
 - Registry and private candidate/reference files: `/var/lib/mator-vehicle-images`, mode `0700`; metadata and asset files are created owner-only. Back up the complete directory with encryption and test restore before launch.
 - Public approved objects: Cloudinary `mator/vehicle-images/<identity-hash>/v<version>-<candidate-id>`. The candidate ID scopes an upload retry to the same approved candidate; a retry can replace only that candidate's deterministic key. Different candidates and versions have different keys. The stored CDN URL is the resolver output. Upload signatures follow [Cloudinary's authentication signature specification](https://cloudinary.com/documentation/authentication_signatures).
 - Requests, job attempts, approval decisions, candidate metadata and version history remain in `metadata.json`. The active version pointer provides rollback. Do not delete prior Cloudinary objects during rollback.
+- Paid provider generation is OFF unless `VEHICLE_IMAGE_GENERATION_ENABLED=true` is explicitly set. The default is OFF; when OFF, the provider is not constructed, queued requests remain recorded, and startup or admin queue processing cannot invoke generation. Restarting the service with OFF does not drain pending jobs. Keep this setting false in production until a separate cost approval and operational review.
+- Publication is separately OFF unless `VEHICLE_IMAGE_PUBLICATION_ENABLED=true` is explicitly set. With it OFF, the Cloudinary adapter is not constructed, candidate approval is rejected, candidates remain private, and no `/published` asset is created; no Cloudinary credentials are required. Existing stored approved URLs continue to resolve. Enable publication only with separately scoped credentials and owner-approved quota.
 - On restart, a job found in `running` is marked `failed` with `interrupted-provider-outcome-unknown`; it is not automatically retried because the provider may have completed a billable request before the process stopped. An administrator can inspect and explicitly regenerate.
 - Health checks: `GET /health/live` and `GET /health/ready`. Readiness becomes true after the registry has loaded and persisted. PM2 restarts the process; monitor HTTP readiness and free disk space externally.
 - The app process and its secret file must be readable only by a dedicated service account. The process binds loopback; terminate TLS at the existing reverse proxy. Admin endpoints require the admin bearer token. `POST /requests` also requires a separate server-to-server bearer token in the cloud runtime; enforce proxy-level rate limits before exposing it. The mobile app must never receive either token. Do not put `VEHICLE_IMAGE_ADMIN_TOKEN`, `VEHICLE_IMAGE_REQUEST_TOKEN`, OpenAI credentials, or Cloudinary API secret in Expo variables, app config, logs, or client uploads.
@@ -83,3 +85,38 @@ Cloudinary currently defines one credit as 1,000 transformations, 1 GB managed s
 7. Before public DNS/routing, review admin rate limits, request body limits, audit log retention, CORS policy, backup encryption, monitoring/alert ownership, rollback rehearsal, and a restore drill.
 
 No deployment, Cloudinary upload, API generation, production modification, database migration, or branch merge was performed.
+
+## Encrypted registry backup and restore
+
+Before first activation, provision an approved off-host backup destination and an encryption key held outside the VPS. Do not store the encryption key beside the archive or in the pipeline environment file. Stop here if either prerequisite is unavailable. The archive must include the full `/var/lib/mator-vehicle-images` tree, including `metadata.json` and private candidate files; preserve owner/mode on restore and do not edit registry JSON by hand.
+
+Create an encrypted archive without writing a plaintext staging archive (GPG prompts for the passphrase):
+
+```sh
+tar -C /var/lib -czf - mator-vehicle-images \
+  | gpg --symmetric --cipher-algo AES256 --output /approved/off-host/path/vehicle-images-YYYYMMDD.tar.gz.gpg
+```
+
+Verify the ciphertext can be decrypted and the archive is readable before activation:
+
+```sh
+gpg --decrypt /approved/off-host/path/vehicle-images-YYYYMMDD.tar.gz.gpg \
+  | tar -tzf - >/dev/null
+```
+
+Rehearse a restore in a new isolated directory with restrictive permissions. GPG prompts for the key; do not put it on the command line:
+
+```sh
+install -d -m 0700 /var/tmp/mator-vehicle-images-restore-check
+gpg --decrypt /approved/off-host/path/vehicle-images-YYYYMMDD.tar.gz.gpg \
+  | tar -xzpf - -C /var/tmp/mator-vehicle-images-restore-check
+test -s /var/tmp/mator-vehicle-images-restore-check/mator-vehicle-images/metadata.json
+```
+
+Compare the restored registry and candidate-file inventory with the source using a checksum manifest generated before backup and stored alongside the encrypted archive. Remove the isolated restore only after the comparison passes. For recovery, stop the one PM2 process, preserve the current data directory by renaming it, restore the archive to `/var/lib`, restore the dedicated service account ownership and `0700` directory permissions, verify the inventory, then start exactly one PM2 fork and check readiness. Keep the preserved directory until health and admin review are confirmed. Never run restore over the live directory or remove prior approved Cloudinary objects during registry rollback.
+
+## Isolated VPS staging
+
+Use `deploy/vehicle-images/ecosystem.staging.config.cjs` and `vehicle-images-staging.env.example` for the non-customer-facing staging process. It uses the distinct process name `mator-vehicle-images-staging`, one PM2 fork running as the dedicated `mator-vehicle-images-staging` OS account, loopback port `8048`, its own owner-only environment file, and an initially empty `/var/lib/mator-vehicle-images-staging` registry. Do not configure the production backend to call this port, create a reverse-proxy route, import existing images, or add production Cloudinary/OpenAI credentials. Both generation and publication must remain false. Candidate approval is refused while publication is disabled; no Cloudinary adapter is constructed.
+
+Staging may contain only synthetic identities and test fixtures and is disposable. Before its first start, rehearse encrypted backup and isolated restore using a temporary synthetic directory. Keep the staging-only key at `/root/.config/mator/vehicle-images-staging-backup.key` (mode `0600`), separate from `/var/backups/mator-vehicle-images-staging` and from the service environment. Create the key once; preserve it for future restores and never regenerate it while archives exist. Encrypt the rehearsal archive with GPG AES-256, verify decryption and archive listing, restore into a new `0700` temp directory, and compare the restored file tree/checksums with the synthetic source before starting PM2. A same-host staging backup only protects against accidental staging-data loss; it is not a VPS disaster-recovery backup. Do not put customer records, customer images, or production assets into staging. If staging starts to hold anything non-disposable, stop and provision an approved off-host backup destination and external key custody before continuing.

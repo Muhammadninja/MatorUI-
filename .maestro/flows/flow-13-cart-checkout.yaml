@@ -214,8 +214,19 @@ tags:
 - extendedWaitUntil:
     visible: "Home"
     timeout: 15000
-- tapOn: "Cash"
-- assertVisible: '.*Place order.*227.190\.72.*'
+- tapOn:
+    id: checkout-review-payment
+- extendedWaitUntil:
+    visible:
+      id: checkout-sheet-payment
+    timeout: 8000
+- tapOn:
+    text: ".*(Наличные|Naqd pul|Cash).*"
+- tapOn:
+    id: checkout-sheet-payment-close
+- assertVisible:
+    id: checkout-place-order-btn
+- assertVisible: '.*227.190\.72.*'
 - scrollUntilVisible:
     element: "Service fee"
     direction: DOWN

@@ -38,7 +38,9 @@ async function setup(options = {}) {
   const dataDir = await mkdtemp(path.join(os.tmpdir(), 'vehicle-image-canonical-test-'));
   dirs.push(dataDir);
   const pipeline = createVehicleImagePipeline({
-    dataDir, adminToken, requestToken, autoRun: false, retryDelayMs: 0, ...options,
+    dataDir, adminToken, requestToken, autoRun: false, retryDelayMs: 0,
+    generationEnabled: options.generationEnabled ?? Boolean(options.provider), ...options,
+    publicationEnabled: options.publicationEnabled ?? true,
   });
   await pipeline.initialize();
   return { pipeline, dataDir };
