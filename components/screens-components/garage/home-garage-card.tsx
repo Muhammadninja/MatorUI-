@@ -184,28 +184,30 @@ function HomeGarageCard() {
       <AppText textVariant="h4" weight="bold" style={{ color: tokens.onVehicleBanner }}>
         {summary.name}
       </AppText>
-      {spec ? (
-        // The banner's own ink at 70%: secondary to the name, but readable on the mint.
-        <AppText textVariant="bodySm" style={{ color: `${tokens.onVehicleBanner}B3` }}>
-          {spec}
-        </AppText>
-      ) : null}
-      <AppPressableView
-        onPress={openGarage}
-        androidRipple={false}
-        pressedOpacity={0.7}
-        accessibilityRole="button"
-        accessibilityLabel={t('explore.changeVehicleAccessibility', { name: summary.name })}
-        style={{ alignSelf: 'flex-start', minHeight: 48, minWidth: 48, justifyContent: 'center' }}
-      >
-        {/* An app action, not a web link: a small swap glyph instead of an underline. */}
-        <AppView row align="center" gap={6}>
-          <ArrowLeftRight size={14} strokeWidth={2.4} color={tokens.brandText} />
-          <AppText textVariant="bodySm" weight="semibold" style={{ color: tokens.brandText }}>
-            {t('explore.changeVehicle')}
+      <AppView row align="center" gap="sm">
+        {spec ? (
+          // The banner's own ink at 70%: secondary to the name, but readable on the mint.
+          <AppText textVariant="bodySm" style={{ color: `${tokens.onVehicleBanner}B3`, flex: 1, minWidth: 0 }}>
+            {spec}
           </AppText>
-        </AppView>
-      </AppPressableView>
+        ) : <AppView style={{ flex: 1 }} />}
+        <AppPressableView
+          onPress={openGarage}
+          androidRipple={false}
+          pressedOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={t('explore.changeVehicleAccessibility', { name: summary.name })}
+          style={{ flexShrink: 0, minHeight: 48, minWidth: 48, justifyContent: 'center' }}
+        >
+          {/* An app action, not a web link: a small swap glyph instead of an underline. */}
+          <AppView row align="center" gap={6}>
+            <ArrowLeftRight size={14} strokeWidth={2.4} color={tokens.brandText} />
+            <AppText textVariant="bodySm" weight="semibold" style={{ color: tokens.brandText }}>
+              {t('explore.changeVehicle')}
+            </AppText>
+          </AppView>
+        </AppPressableView>
+      </AppView>
     </GarageHeroCard>
   );
 

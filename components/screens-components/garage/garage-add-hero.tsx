@@ -77,9 +77,9 @@ export function GarageHeroCard({
   const width = measured?.width ?? windowWidth - PAGE_GUTTER * 2;
   const height = measured?.height ?? 0;
   // At large text the copy needs the full width; the car moves above it.
-  const stacked = fontScale >= 1.3;
+  const stacked = fontScale >= 1.3 || windowWidth <= 360;
 
-  const carWidth = Math.round(width * (stacked ? 0.66 : emptyGarage ? 0.66 : 0.54));
+  const carWidth = Math.round(width * (stacked ? 0.66 : emptyGarage ? 0.66 : 0.42));
   const carHeight = Math.round(carWidth / CAR_ASPECT);
   // Nudge the empty-state Corvette right and up without scaling the artwork. A
   // selected car keeps ~8pt between its bumper and the card's edge.
@@ -89,7 +89,7 @@ export function GarageHeroCard({
   const carTop = stacked ? PADDING / 2 : PADDING + (emptyGarage ? 3 : 4);
   const copyWidth = stacked
     ? width - PADDING * 2
-    : Math.round(width * (emptyGarage ? 0.55 : 0.5)) - PADDING;
+    : Math.round(width * (emptyGarage ? 0.55 : 0.64)) - PADDING;
   const isPlaceholder = visual.kind === 'placeholder';
   // Preserve the approved empty-card height as the car artwork grows.
   const copyMinHeight = emptyGarage && !stacked
