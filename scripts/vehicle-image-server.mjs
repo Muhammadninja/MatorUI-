@@ -6,6 +6,7 @@ import {
   isVehicleImageGenerationEnabled,
   isVehicleImagePublicationEnabled,
   loadVehicleImageEnv,
+  vehicleImageMaxProviderCallsPerDay,
 } from '../services/vehicle-image-env.mjs';
 
 await loadVehicleImageEnv();
@@ -31,6 +32,9 @@ const pipeline = createVehicleImagePipeline({
   publicationEnabled,
   autoRun: generationEnabled,
   maxAttempts: 3,
+  maxProviderCallsPerDay: vehicleImageMaxProviderCallsPerDay(
+    process.env.VEHICLE_IMAGE_MAX_PROVIDER_CALLS_PER_DAY,
+  ),
   jobTimeoutMs: 180_000,
 });
 await pipeline.initialize();

@@ -22,6 +22,7 @@ export async function loadVehicleImageEnv() {
     if (!match || !['OPENAI_API_KEY', 'VEHICLE_IMAGE_MODEL', 'VEHICLE_IMAGE_PROVIDER',
       'VEHICLE_IMAGE_GENERATION_ENABLED',
       'VEHICLE_IMAGE_PUBLICATION_ENABLED',
+      'VEHICLE_IMAGE_MAX_PROVIDER_CALLS_PER_DAY',
       'VEHICLE_IMAGE_ADMIN_TOKEN', 'VEHICLE_IMAGE_REQUEST_TOKEN', 'VEHICLE_IMAGE_DATA_DIR', 'PORT', 'CLOUDINARY_CLOUD_NAME',
       'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'].includes(match[1])) continue;
     const [, key, raw] = match;
@@ -32,4 +33,12 @@ export async function loadVehicleImageEnv() {
     else value = value.replace(/\s+#.*$/, '').trim();
     if (value) process.env[key] = value;
   }
+}
+
+export function vehicleImageMaxProviderCallsPerDay(value) {
+  if (value === undefined || value === '') return 25;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 10_000)
+    throw new Error('VEHICLE_IMAGE_MAX_PROVIDER_CALLS_PER_DAY must be an integer from 1 to 10000');
+  return parsed;
 }

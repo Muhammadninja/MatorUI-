@@ -215,7 +215,8 @@ describe('canonical vehicle identity integration', () => {
     expect(canonicalVehicleIdentityKey(nexia2)).not.toBe(canonicalVehicleIdentityKey(nexia3));
     const n2 = await pipeline.submitCanonicalRequest({ identity: nexia2, vehicle: { manufacturer: 'Chevrolet', model: 'Nexia 2', marketRegion: 'UZ' } });
     const n3 = await pipeline.submitCanonicalRequest({ identity: nexia3, vehicle: { manufacturer: 'Chevrolet', model: 'Nexia 3', marketRegion: 'UZ' } });
-    expect(n2.job?.status).toBe('queued');
+    expect(n2.job).toBeNull();
+    expect(pipeline.resolveCanonicalStatus(nexia2).status).toBe('needs_review');
     expect(n3).toMatchObject({ reused: true, job: null, asset: { catalogAssetKey: 'nexia-r3' } });
     await pipeline.runQueuedJobs();
     expect(generate).not.toHaveBeenCalled();
@@ -260,14 +261,14 @@ describe('canonical vehicle identity integration', () => {
       method: 'POST', url: '/internal/v1/vehicle-images/requests', token: requestToken, body,
     });
     expect(accepted.status, JSON.stringify(accepted.body)).toBe(202);
-    expect(accepted.body).toMatchObject({ identityKey: canonicalVehicleIdentityKey(byrHanIdentity), status: 'queued' });
+    expect(accepted.body).toMatchObject({ identityKey: canonicalVehicleIdentityKey(byrHanIdentity), status: 'needs_review' });
 
     const resolved = await invokeServer(server, {
       method: 'POST', url: '/internal/v1/vehicle-images/resolve', token: requestToken,
       body: { identity: byrHanIdentity },
     });
     expect(resolved.status).toBe(200);
-    expect(resolved.body).toMatchObject({ status: 'queued', requestId: accepted.body.requestId });
+    expect(resolved.body).toMatchObject({ status: 'needs_review', requestId: accepted.body.requestId });
   });
 
   it('does not restart a failed canonical job unless an administrator regenerates it', async () => {

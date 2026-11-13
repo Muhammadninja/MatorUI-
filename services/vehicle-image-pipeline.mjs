@@ -219,6 +219,7 @@ export function createVehicleImagePipeline({
   maxAttempts = 3,
   jobTimeoutMs = 120_000,
   retryDelayMs = 250,
+  maxProviderCallsPerDay = 25,
   catalog = VEHICLE_IMAGE_CATALOG,
 } = {}) {
   if (!dataDir) throw new Error('dataDir is required');
@@ -226,13 +227,16 @@ export function createVehicleImagePipeline({
     throw new Error('adminToken must be at least 16 characters');
   if (!Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 10)
     throw new Error('maxAttempts must be between 1 and 10');
+  if (!Number.isInteger(maxProviderCallsPerDay) || maxProviderCallsPerDay < 1 || maxProviderCallsPerDay > 10_000)
+    throw new Error('maxProviderCallsPerDay must be between 1 and 10000');
   if (!catalog || !Array.isArray(catalog.assets)) throw new Error('vehicle image catalog is invalid');
   const dbPath = path.join(dataDir, 'metadata.json');
   const privateDir = path.join(dataDir, 'private');
-  let db = { requests: [], candidates: [], published: [], jobs: [], identityLinks: [], catalogDecisions: {} };
+  let db = { requests: [], candidates: [], published: [], jobs: [], identityLinks: [], catalogDecisions: {}, providerCallLedger: {} };
   let writeQueue = Promise.resolve();
   let workerPromise = null;
   let initialized = false;
+  const generationAvailable = Boolean(provider && generationEnabled);
   const publishInProgress = new Set();
   const identityLinkInProgress = new Set();
 
@@ -243,6 +247,7 @@ export function createVehicleImagePipeline({
       db.jobs ??= [];
       db.identityLinks ??= [];
       db.catalogDecisions ??= {};
+      db.providerCallLedger ??= {};
       const remap = new Map();
       for (const request of db.requests) {
         request.vehicle = validateVehicle(request.vehicle);
@@ -277,6 +282,11 @@ export function createVehicleImagePipeline({
           job.status = 'cancelled';
           job.completedAt = new Date().toISOString();
           request.identityReviewRequired = true;
+        }
+        if (job.status === 'queued' && request?.canonicalIdentity && !generationAvailable) {
+          job.status = 'cancelled';
+          job.completedAt = new Date().toISOString();
+          request.generationDisabled = true;
         }
       }
       await persist();
@@ -516,14 +526,18 @@ export function createVehicleImagePipeline({
         }
       }
     }
+    if (generationVerified && !rejectedCatalogAsset) {
+      if (generationAvailable) delete request.generationDisabled;
+      else request.generationDisabled = true;
+    }
     let job = null;
     if (
-      generationVerified &&
+      generationVerified && generationAvailable &&
       !reusableAsset && !activeJob(identityKey) &&
       !ADMIN_ONLY_TERMINAL_JOB_STATES.has(previousJob?.status)
     ) job = createJob(request);
     await persist();
-    if (job && provider && generationEnabled && autoRun) queueMicrotask(() => void runQueuedJobs());
+    if (job && generationAvailable && autoRun) queueMicrotask(() => void runQueuedJobs());
     return {
       request,
       duplicate,
@@ -661,6 +675,16 @@ export function createVehicleImagePipeline({
     await persist();
     let lastFailure = 'provider failure';
     while (job.attempts < maxAttempts) {
+      const day = new Date().toISOString().slice(0, 10);
+      const usedToday = db.providerCallLedger[day] ?? 0;
+      if (usedToday >= maxProviderCallsPerDay) {
+        job.status = 'failed';
+        job.completedAt = new Date().toISOString();
+        job.lastError = 'daily-provider-call-limit';
+        await persist();
+        return;
+      }
+      db.providerCallLedger[day] = usedToday + 1;
       job.attempts += 1;
       delete job.transportDiagnostics;
       delete job.providerHttpStatus;
@@ -780,6 +804,10 @@ export function createVehicleImagePipeline({
     requireAdmin(authorized);
     const request = db.requests.find((item) => item.id === requestId);
     if (!request) throw Object.assign(new Error('request not found'), { status: 404 });
+    if (!generationAvailable)
+      throw Object.assign(new Error('image generation is disabled'), { status: 503 });
+    if (request.activeVersion || resolve(request.identityKey))
+      throw Object.assign(new Error('an approved image already exists for this identity'), { status: 409 });
     if (request.canonicalIdentity && !generationIdentityIsVerified(request.canonicalIdentity))
       throw Object.assign(new Error('canonical identity requires review before generation'), { status: 409 });
     if (activeJob(request.identityKey))
@@ -904,7 +932,7 @@ export function createVehicleImagePipeline({
     const job = latestJob(identityKey);
     const status = asset
       ? 'approved'
-      : request.identityReviewRequired
+      : request.identityReviewRequired || request.generationDisabled
         ? 'needs_review'
         : ACTIVE_JOB_STATES.has(job?.status)
         ? job.status
@@ -1083,8 +1111,7 @@ export function createVehicleImagePipeline({
           });
         }
         if (req.method === 'POST' && url.pathname === '/requests') {
-          if (requestToken ? !isAuthorized(req.headers.authorization, requestToken) : !isAdmin)
-            requireAdmin(false);
+          requireAdmin(isAdmin);
           const body = await readJson(req);
           return send(201, await submitRequest(body.vehicle, body.referenceImages ?? []));
         }

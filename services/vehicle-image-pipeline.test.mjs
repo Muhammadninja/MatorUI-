@@ -12,6 +12,7 @@ import { createCloudinaryAssetStore } from './vehicle-image-cloudinary-store.mjs
 import {
   isVehicleImageGenerationEnabled,
   isVehicleImagePublicationEnabled,
+  vehicleImageMaxProviderCallsPerDay,
 } from './vehicle-image-env.mjs';
 
 const dirs = [];
@@ -81,6 +82,9 @@ describe('vehicle image pipeline', () => {
     expect(isVehicleImagePublicationEnabled('false')).toBe(false);
     expect(isVehicleImagePublicationEnabled('TRUE')).toBe(false);
     expect(isVehicleImagePublicationEnabled('true')).toBe(true);
+    expect(vehicleImageMaxProviderCallsPerDay(undefined)).toBe(25);
+    expect(vehicleImageMaxProviderCallsPerDay('10')).toBe(10);
+    expect(() => vehicleImageMaxProviderCallsPerDay('0')).toThrow(/integer/);
   });
 
   it('refuses candidate approval and publication while publication is disabled', async () => {
@@ -129,7 +133,7 @@ describe('vehicle image pipeline', () => {
       token: requestToken, body: requestBody,
     });
     expect(first.status, JSON.stringify(first.body)).toBe(202);
-    expect(first.body.status).toBe('queued');
+    expect(first.body.status).toBe('needs_review');
     const duplicate = await invokeServer(pipeline.server(), {
       method: 'POST', url: '/internal/v1/vehicle-images/requests',
       token: requestToken, body: requestBody,
@@ -177,12 +181,6 @@ describe('vehicle image pipeline', () => {
     expect(response.status).toBe(200);
     expect(generate).not.toHaveBeenCalled();
 
-    const registryPath = path.join(dataDir, 'metadata.json');
-    const registry = JSON.parse(await readFile(registryPath, 'utf8'));
-    registry.jobs[0].status = 'failed';
-    registry.jobs[0].completedAt = new Date().toISOString();
-    await writeFile(registryPath, JSON.stringify(registry));
-
     const restartedProvider = { generate: vi.fn() };
     const restarted = createVehicleImagePipeline({
       dataDir,
@@ -191,19 +189,54 @@ describe('vehicle image pipeline', () => {
       provider: restartedProvider,
     });
     await restarted.initialize();
-    const regeneration = await invokeServer(restarted.server(), {
-      method: 'POST',
-      url: `/admin/requests/${encodeURIComponent(first.body.requestId)}/regenerate`,
-      token,
-    });
-    expect(regeneration.status).toBe(202);
     const restartedProcess = await invokeServer(restarted.server(), {
       method: 'POST', url: '/admin/jobs/process', token,
     });
     expect(restartedProcess.status).toBe(200);
     await restarted.runQueuedJobs();
-    expect(restarted.listPending(true)[0].job.status).toBe('queued');
+    expect(restarted.resolveCanonicalStatus(identity).status).toBe('needs_review');
     expect(restartedProvider.generate).not.toHaveBeenCalled();
+  });
+
+  it('rejects free-form legacy requests using the backend service token', async () => {
+    const generate = vi.fn();
+    const requestToken = 'server-to-server-request-token-for-legacy-auth-test';
+    const { pipeline } = await setup({ requestToken, provider: { generate } });
+    const result = await invokeServer(pipeline.server(), {
+      method: 'POST', url: '/requests', token: requestToken,
+      body: { vehicle: { make: 'Chevrolet', model: 'Spark', year: 2020, marketRegion: 'US' } },
+    });
+    expect(result.status).toBe(403);
+    expect(pipeline.listPending(true)).toHaveLength(0);
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it('enforces a persisted daily provider call ceiling across retries and restarts', async () => {
+    const generate = vi.fn(async () => { throw new Error('simulated provider failure'); });
+    const { pipeline, dataDir } = await setup({
+      provider: { generate }, generationEnabled: true, maxAttempts: 3,
+      maxProviderCallsPerDay: 1,
+    });
+    const { job } = await pipeline.submitRequest({ make: 'BYD', model: 'Han', year: 2024 });
+    await pipeline.runQueuedJobs();
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(pipeline.listPending(true)[0].job).toMatchObject({
+      status: 'failed', lastError: 'daily-provider-call-limit', attempts: 1,
+    });
+    const persisted = JSON.parse(await readFile(path.join(dataDir, 'metadata.json'), 'utf8'));
+    expect(Object.values(persisted.providerCallLedger)).toEqual([1]);
+    const restartedGenerate = vi.fn();
+    const restarted = createVehicleImagePipeline({
+      dataDir, adminToken: token, provider: { generate: restartedGenerate },
+      generationEnabled: true, maxProviderCallsPerDay: 1,
+    });
+    await restarted.initialize();
+    const another = await restarted.submitRequest({ make: 'Toyota', model: 'Camry', year: 2020 });
+    await restarted.runQueuedJobs();
+    expect(restartedGenerate).not.toHaveBeenCalled();
+    expect(restarted.listPending(true).find((item) => item.id === another.request.id).job)
+      .toMatchObject({ status: 'failed', lastError: 'daily-provider-call-limit' });
+    expect(job).toBeTruthy();
   });
 
   it('reports health only after the persistent registry is initialized', async () => {
@@ -324,6 +357,7 @@ describe('vehicle image pipeline', () => {
     expect(duplicate.reused).toBe(true);
     expect(duplicate.asset.version).toBe(1);
     expect(duplicate.job).toBeNull();
+    await expect(pipeline.regenerateRequest(request.id, true)).rejects.toMatchObject({ status: 409 });
     expect(generate).not.toHaveBeenCalled();
   });
 
