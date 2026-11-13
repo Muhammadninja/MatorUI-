@@ -59,9 +59,9 @@ describe('the shipped Chevrolet manifest', () => {
     expect(validateManifest(CHEVROLET_IMAGE_MANIFEST)).toEqual([]);
   });
 
-  test('every live model has an image except the four with no matching render', () => {
+  test('only live models with approved matching renders show an image', () => {
     // A 2020 record of each live model, with a trim id the rules don't know.
-    const NO_RENDER = ['tracker-2', 'genrta-lacetti', 'tacuma', 'cruze'];
+    const NO_RENDER = ['tracker-2', 'genrta-lacetti', 'tacuma', 'cruze', 'nexia-2'];
     // `nexia` needs its trim to say which generation it is.
     const TRIM_DECIDES = ['nexia'];
     for (const modelId of LIVE_CHEVROLET_MODEL_IDS) {
@@ -69,7 +69,7 @@ describe('the shipped Chevrolet manifest', () => {
       expect([modelId, result.kind]).toEqual([modelId, NO_RENDER.includes(modelId) || TRIM_DECIDES.includes(modelId) ? 'placeholder' : 'image']);
     }
     const withoutImages = CHEVROLET_IMAGE_MANIFEST.bodies.filter((b) => Object.keys(b.assets).length === 0);
-    expect(withoutImages.map((b) => b.key)).toEqual(['malibu-gen2', 'tracker-gen2', 'cruze', 'tacuma']);
+    expect(withoutImages.map((b) => b.key)).toEqual(['malibu-gen2', 'nexia-n150', 'tracker-gen2', 'cruze', 'tacuma']);
   });
 
   test('each model shows its own body', () => {
@@ -87,8 +87,6 @@ describe('the shipped Chevrolet manifest', () => {
       ['damas', {}, 'damas-classic'],
       ['labo', {}, 'labo'],
       ['nexia-1', {}, 'nexia-n100'],
-      ['nexia-2', {}, 'nexia-n150'],
-      ['nexia', { trimId: 'nexia-2-dlx' }, 'nexia-n150'],
       ['malibu', { trimId: 'malibu-1-ltz' }, 'malibu-gen1'],
     ];
     for (const [modelId, extra, bodyKey] of expected) {
@@ -124,11 +122,12 @@ describe('the shipped Chevrolet manifest', () => {
     expect(resolveVehicleImage(chevy('genrta-lacetti'))).toEqual({ kind: 'placeholder', reason: 'catalog-issue' });
   });
 
-  test('Nexia 3 is one body for both backend records; Nexia generations never mix', () => {
-    // Both records reach the same R3 image; the N150 (nexia-2-*) never does.
+  test('Nexia 3 is one body for both backend records; unapproved Nexia 2 art stays on the placeholder', () => {
+    // Both R3 records reach the same approved image; pending N150 art stays hidden.
     expect(resolveVehicleImage(chevy('nexia-3'))).toMatchObject({ kind: 'image', bodyKey: 'nexia-r3' });
     expect(resolveVehicleImage(chevy('nexia', { trimId: 'nexia-3-ls' }))).toMatchObject({ kind: 'image', bodyKey: 'nexia-r3' });
-    expect(resolveVehicleImage(chevy('nexia', { trimId: 'nexia-2-dlx' }))).toMatchObject({ kind: 'image', bodyKey: 'nexia-n150' });
+    expect(resolveVehicleImage(chevy('nexia-2'))).toEqual({ kind: 'placeholder', reason: 'body-unverified' });
+    expect(resolveVehicleImage(chevy('nexia', { trimId: 'nexia-2-dlx' }))).toEqual({ kind: 'placeholder', reason: 'body-unverified', bodyType: 'sedan' });
     expect(resolveVehicleImage(chevy('nexia-1'))).toMatchObject({ kind: 'image', bodyKey: 'nexia-n100' });
     expect(resolveVehicleImage(chevy('nexia', { trimId: 'nexia-9-zz' }))).toEqual({ kind: 'placeholder', reason: 'generation-unverified' });
   });

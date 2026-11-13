@@ -56,15 +56,15 @@ describe('parseVehicleGeneration', () => {
   });
 });
 
-describe('the picture follows the backend, with the existing approved images', () => {
+  describe('the picture follows the backend, while unapproved art stays hidden', () => {
   const chevy = (modelId: string | undefined, trimId?: string) =>
     resolveVehicleImage({ brandId: 'chevrolet', modelId, trimId, year: 2016 });
 
-  test('a resolved Nexia shows that generation’s approved image', () => {
+  test('a resolved Nexia 3 shows its image and Nexia 2 stays on the placeholder', () => {
     const r3 = parseVehicleGeneration({ status: 'resolved', source: 'owner', model: { id: 'nexia-3', name: 'Nexia 3' }, options: [N150, R3] });
     const n150 = parseVehicleGeneration({ status: 'resolved', source: 'owner', model: { id: 'nexia-2', name: 'Nexia 2' }, options: [N150, R3] });
     expect(chevy(pictureModelId('nexia', r3))).toMatchObject({ kind: 'image', bodyKey: 'nexia-r3' });
-    expect(chevy(pictureModelId('nexia', n150))).toMatchObject({ kind: 'image', bodyKey: 'nexia-n150' });
+    expect(chevy(pictureModelId('nexia', n150))).toEqual({ kind: 'placeholder', reason: 'body-unverified' });
   });
 
   test('an open or unresolved generation keeps the placeholder: nothing is guessed', () => {
@@ -80,8 +80,8 @@ describe('the picture follows the backend, with the existing approved images', (
     }
   });
 
-  test('a trim keeps its own path (the backend sends no generation then)', () => {
-    expect(chevy(pictureModelId('nexia', undefined), 'nexia-2-dlx')).toMatchObject({ bodyKey: 'nexia-n150' });
+  test('an N150 trim stays on the placeholder until its image is approved', () => {
+    expect(chevy(pictureModelId('nexia', undefined), 'nexia-2-dlx')).toEqual({ kind: 'placeholder', reason: 'body-unverified', bodyType: 'sedan' });
   });
 
   test('other models are untouched', () => {

@@ -10,7 +10,6 @@ import malibuGen1White from '@/assets/vehicles/chevrolet/malibu-gen1/white.webp'
 import malibuGen2FaceliftWhite from '@/assets/vehicles/chevrolet/malibu-gen2-facelift/white.webp';
 import matizWhite from '@/assets/vehicles/chevrolet/matiz/white.webp';
 import nexiaN100White from '@/assets/vehicles/chevrolet/nexia-n100/white.webp';
-import nexiaN150White from '@/assets/vehicles/chevrolet/nexia-n150/white.webp';
 import nexiaR3White from '@/assets/vehicles/chevrolet/nexia-r3/white.webp';
 import onixWhite from '@/assets/vehicles/chevrolet/onix/white.webp';
 import orlandoWhite from '@/assets/vehicles/chevrolet/orlando/white.webp';
@@ -134,14 +133,9 @@ export const CHEVROLET_IMAGE_MANIFEST: VehicleImageManifest = {
       verified: true,
       assets: { white: malibuGen2FaceliftWhite },
     },
-    {
-      ...body('nexia-n150', 'sedan', 'Backend model `nexia` with trims nexia-2-*.'),
-      // PREVIEW, pending owner approval: owner-supplied render, Vision subject lift (2026-11-11).
-      verified: true,
-      // The `nexia-2` record is the same Nexia 2 (N150) sold since 2008.
-      sharedBy: ['nexia-2'],
-      assets: { white: nexiaN150White },
-    },
+    // Nexia 2 image is intentionally unresolved until its candidate and shared-body
+    // mapping receive explicit owner approval. Keep the existing placeholder.
+    body('nexia-n150', 'sedan', 'Image pending explicit owner approval.'),
     {
       ...body('nexia-r3', 'sedan', 'Backend model `nexia` with trims nexia-3-*; sold as Ravon Nexia R3.'),
       // Same car as the separate "Nexia 3" record (Aveo T250 sedan; section 11).
@@ -269,7 +263,7 @@ export const CHEVROLET_IMAGE_MANIFEST: VehicleImageManifest = {
     },
     nexia: { kind: 'trim-prefix', prefixes: { 'nexia-2-': 'nexia-n150', 'nexia-3-': 'nexia-r3' } },
     'nexia-1': { kind: 'body', bodyKey: 'nexia-n100' },
-    'nexia-2': { kind: 'body', bodyKey: 'nexia-n150' },
+    'nexia-2': { kind: 'placeholder', reason: 'body-unverified' },
     'nexia-3': { kind: 'body', bodyKey: 'nexia-r3' },
     // The 2004–13 sedan or a 2020+ "Lacetti", which is a Gentra body. Only the
     // year decides; 2014–2019 (sold as Gentra) stays unresolved.
