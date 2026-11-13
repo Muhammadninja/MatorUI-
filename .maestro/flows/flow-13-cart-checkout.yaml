@@ -216,7 +216,12 @@ tags:
     timeout: 15000
 - tapOn:
     id: checkout-review-payment
-- tapOn: "Cash"
+- extendedWaitUntil:
+    visible:
+      id: checkout-sheet-payment
+    timeout: 8000
+- tapOn:
+    text: ".*(Наличные|Naqd pul|Cash).*"
 - tapOn:
     id: checkout-sheet-payment-close
 - assertVisible:
