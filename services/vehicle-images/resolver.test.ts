@@ -59,52 +59,26 @@ describe('the shipped Chevrolet manifest', () => {
     expect(validateManifest(CHEVROLET_IMAGE_MANIFEST)).toEqual([]);
   });
 
-  test('only live models with approved matching renders show an image', () => {
+  test('only explicitly owner-approved bodies show an image', () => {
     // A 2020 record of each live model, with a trim id the rules don't know.
-    const NO_RENDER = ['tracker-2', 'genrta-lacetti', 'tacuma', 'cruze', 'nexia-2'];
-    // `nexia` needs its trim to say which generation it is.
-    const TRIM_DECIDES = ['nexia'];
+    const APPROVED_MODELS = new Set(['cobalt', 'gentra', 'nexia-3', 'lacetti']);
+    const APPROVED_BODIES = ['cobalt-gen2', 'gentra', 'nexia-r3'];
     for (const modelId of LIVE_CHEVROLET_MODEL_IDS) {
       const result = resolveVehicleImage(chevy(modelId, { trimId: `${modelId}-x`, year: 2020, colorHex: '#F4F5F7' }));
-      expect([modelId, result.kind]).toEqual([modelId, NO_RENDER.includes(modelId) || TRIM_DECIDES.includes(modelId) ? 'placeholder' : 'image']);
+      const expected = APPROVED_MODELS.has(modelId) ? 'image' : 'placeholder';
+      if (result.kind === 'image') expect(APPROVED_BODIES).toContain(result.bodyKey);
+      expect([modelId, result.kind]).toEqual([modelId, expected]);
     }
     const withoutImages = CHEVROLET_IMAGE_MANIFEST.bodies.filter((b) => Object.keys(b.assets).length === 0);
-    expect(withoutImages.map((b) => b.key)).toEqual(['malibu-gen2', 'nexia-n150', 'tracker-gen2', 'cruze', 'tacuma']);
+    expect(withoutImages.length).toBe(CHEVROLET_IMAGE_MANIFEST.bodies.length - 3);
+    expect(CHEVROLET_IMAGE_MANIFEST.bodies.filter((b) => Object.keys(b.assets).length > 0).map((b) => b.key).sort())
+      .toEqual([...APPROVED_BODIES].sort());
   });
 
-  test('each model shows its own body', () => {
-    const expected: [string, Record<string, unknown>, string][] = [
-      ['tahoe', { year: 2025 }, 'tahoe'],
-      ['traverse', {}, 'traverse'],
-      ['trailblazer', {}, 'trailblazer'],
-      ['equinox', {}, 'equinox'],
-      ['tracker', { trimId: 'tracker-3-premier' }, 'tracker-gen3'],
-      ['onix', { trimId: 'onix-1-premier' }, 'onix'],
-      ['captiva', {}, 'captiva'],
-      ['orlando', {}, 'orlando'],
-      ['epica', {}, 'epica'],
-      ['chevrolet-matiz', {}, 'matiz'],
-      ['damas', {}, 'damas-classic'],
-      ['labo', {}, 'labo'],
-      ['nexia-1', {}, 'nexia-n100'],
-      ['malibu', { trimId: 'malibu-1-ltz' }, 'malibu-gen1'],
-    ];
-    for (const [modelId, extra, bodyKey] of expected) {
-      expect([modelId, resolveVehicleImage(chevy(modelId, extra))]).toMatchObject([modelId, { kind: 'image', bodyKey, paint: 'white' }]);
+  test('non-approved year and trim matches remain placeholders', () => {
+    for (const input of [chevy('lacetti', { year: 2008 }), chevy('tahoe', { year: 2025 }), chevy('traverse'), chevy('tracker', { trimId: 'tracker-3-premier' }), chevy('nexia-1'), chevy('malibu', { trimId: 'malibu-1-ltz' })]) {
+      expect(resolveVehicleImage(input).kind).toBe('placeholder');
     }
-  });
-
-  test('a Lacetti takes its body from the year: the J200 to 2013, the Gentra body from 2020', () => {
-    expect(resolveVehicleImage(chevy('lacetti', { year: 2008 }))).toMatchObject({ kind: 'image', bodyKey: 'lacetti-j200' });
-    expect(resolveVehicleImage(chevy('lacetti', { year: 2021 }))).toMatchObject({ kind: 'image', bodyKey: 'gentra' });
-    for (const extra of [{ year: 2016 }, {}]) {
-      expect(resolveVehicleImage(chevy('lacetti', extra))).toEqual({ kind: 'placeholder', reason: 'generation-unverified' });
-    }
-  });
-
-  test('a 2025 Tahoe shows the Tahoe, and a Traverse shows the Traverse', () => {
-    expect(resolveVehicleImage(chevy('tahoe', { year: 2025 }))).toMatchObject({ kind: 'image', bodyKey: 'tahoe' });
-    expect(resolveVehicleImage(chevy('traverse'))).toMatchObject({ kind: 'image', bodyKey: 'traverse' });
   });
 
   test('every Cobalt trim, and a Cobalt with no or an unknown trim, is the one pre-restyle body', () => {
@@ -128,7 +102,7 @@ describe('the shipped Chevrolet manifest', () => {
     expect(resolveVehicleImage(chevy('nexia', { trimId: 'nexia-3-ls' }))).toMatchObject({ kind: 'image', bodyKey: 'nexia-r3' });
     expect(resolveVehicleImage(chevy('nexia-2'))).toEqual({ kind: 'placeholder', reason: 'body-unverified' });
     expect(resolveVehicleImage(chevy('nexia', { trimId: 'nexia-2-dlx' }))).toEqual({ kind: 'placeholder', reason: 'body-unverified', bodyType: 'sedan' });
-    expect(resolveVehicleImage(chevy('nexia-1'))).toMatchObject({ kind: 'image', bodyKey: 'nexia-n100' });
+    expect(resolveVehicleImage(chevy('nexia-1'))).toMatchObject({ kind: 'placeholder', reason: 'body-unverified' });
     expect(resolveVehicleImage(chevy('nexia', { trimId: 'nexia-9-zz' }))).toEqual({ kind: 'placeholder', reason: 'generation-unverified' });
   });
 });
@@ -166,11 +140,11 @@ describe('id schemes', () => {
 });
 
 describe('Spark M300', () => {
-  test('every Spark record shows the M300 image, whatever its trim id says (the backend mislabels it M400)', () => {
+  test('the unapproved Spark preview stays hidden for every trim', () => {
     for (const trimId of ['spark-m400-ls', undefined, 'unknown']) {
-      expect(resolveVehicleImage(chevy('spark', { trimId }))).toMatchObject({ kind: 'image', bodyKey: 'spark-m300' });
+      expect(resolveVehicleImage(chevy('spark', { trimId }))).toMatchObject({ kind: 'placeholder', reason: 'body-unverified' });
     }
-    expect(resolveVehicleImage({ brandId: 'make_chevrolet', modelId: 'model_chevrolet_spark' })).toMatchObject({ bodyKey: 'spark-m300' });
+    expect(resolveVehicleImage({ brandId: 'make_chevrolet', modelId: 'model_chevrolet_spark' })).toMatchObject({ kind: 'placeholder' });
   });
 
   test('the Spark image never appears for the other small cars', () => {
@@ -184,10 +158,10 @@ describe('Spark M300', () => {
 describe('years and trims that do not change the exterior', () => {
   const malibu = (extra: Record<string, unknown>) => resolveVehicleImage(chevy('malibu', extra));
 
-  test('a facelift Malibu shows its image for 2020 onwards, with any or no trim', () => {
+  test('a facelift Malibu remains a placeholder until its image is approved', () => {
     for (const year of [2020, 2022, 2024]) {
       for (const trimId of [undefined, '', 'malibu-2-lt', 'malibu-2-premier', 'trim_ltz', 'unknown']) {
-        expect(malibu({ year, trimId })).toMatchObject({ kind: 'image', bodyKey: 'malibu-gen2-facelift' });
+        expect(malibu({ year, trimId })).toMatchObject({ kind: 'placeholder', reason: 'body-unverified' });
       }
     }
   });
@@ -201,25 +175,25 @@ describe('years and trims that do not change the exterior', () => {
     expect(malibu({ year: 2017, trimId: 'malibu-2-lt' })).toEqual({ kind: 'placeholder', reason: 'body-unverified', bodyType: 'sedan' });
     expect(malibu({ year: 2017 })).toEqual({ kind: 'placeholder', reason: 'generation-unverified' });
     // The trim names the generation; the year can't move a Malibu 1 onto the newer body.
-    expect(malibu({ year: 2022, trimId: 'malibu-1-ltz' })).toMatchObject({ kind: 'image', bodyKey: 'malibu-gen1' });
+    expect(malibu({ year: 2022, trimId: 'malibu-1-ltz' })).toMatchObject({ kind: 'placeholder', reason: 'body-unverified' });
     expect(malibu({})).toEqual({ kind: 'placeholder', reason: 'generation-unverified' });
   });
 
   test('a saved colour keeps the white facelift image, flagged as unmatched', () => {
-    expect(malibu({ year: 2022, colorHex: '#14161A' })).toMatchObject({ bodyKey: 'malibu-gen2-facelift', paint: 'white', paintMatched: false });
-    expect(malibu({ year: 2022, colorHex: '#F4F5F7' })).toMatchObject({ paint: 'white', paintMatched: true });
+    expect(malibu({ year: 2022, colorHex: '#14161A' })).toMatchObject({ kind: 'placeholder', reason: 'body-unverified' });
+    expect(malibu({ year: 2022, colorHex: '#F4F5F7' })).toMatchObject({ kind: 'placeholder', reason: 'body-unverified' });
   });
 
   test('Cobalt, Gentra and Nexia 3 resolve across every year', () => {
     for (let year = 2013; year <= 2026; year++) {
       expect(resolveVehicleImage(chevy('cobalt', { year }))).toMatchObject({ bodyKey: 'cobalt-gen2' });
-      expect(resolveVehicleImage(chevy('gentra', { year }))).toMatchObject({ bodyKey: 'gentra' });
+      expect(resolveVehicleImage(chevy('gentra', { year }))).toMatchObject({ kind: 'image', bodyKey: 'gentra' });
       expect(resolveVehicleImage(chevy('nexia-3', { year }))).toMatchObject({ bodyKey: 'nexia-r3' });
     }
   });
 
   test('the two Trackers never share an image, and unknown models stay unknown', () => {
-    expect(resolveVehicleImage(chevy('tracker', { year: 2023 }))).toMatchObject({ kind: 'image', bodyKey: 'tracker-gen3' });
+    expect(resolveVehicleImage(chevy('tracker', { year: 2023 })).kind).toBe('placeholder');
     // The earlier Trax-based body has no render yet; it never borrows the new one.
     expect(resolveVehicleImage(chevy('tracker-2', { year: 2018 }))).toEqual({ kind: 'placeholder', reason: 'body-unverified', bodyType: 'suv' });
     expect(resolveVehicleImage(chevy('malibu-3', { year: 2022 }))).toEqual({ kind: 'placeholder', reason: 'unknown-model' });
