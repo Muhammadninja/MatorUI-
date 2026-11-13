@@ -61,9 +61,12 @@ async function main() {
   for (const [key, title, price, status] of products) {
     const id = `part_local_${key}`;
     const values = { title, priceUzs: price, stockQty: 100, inStock: true,
-      isUniversal: key === 'universal', oemNumbers: [`LOCAL-${key}`] };
+      isUniversal: key === 'universal', oemNumbers: [`LOCAL-${key}`],
+      // The buyer compatibility endpoint requires a listed fixture to have at
+      // least one ready image. This synthetic URL is never fetched by tests.
+      images: ['https://example.test/local-fixture.webp'] };
     await prisma.catalogPart.upsert({ where: { id }, update: values, create: {
-      id, ...values, categoryId: category.id, sellerId: 'seller_local_test', gmNumbers: [], images: [],
+      id, ...values, categoryId: category.id, sellerId: 'seller_local_test', gmNumbers: [],
     } });
     if (status) {
       const values = { partId: id, trimId: trim.id, engineId: engine.id, years: [2024], status, source: 'LOCAL_SYNTHETIC' };

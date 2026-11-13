@@ -7,5 +7,5 @@
   "database": "mator_integration",
   "databaseUser": "mator_local",
   "externalProviders": "disabled; synthetic test data only",
-  "backendRevisionVerified": "0381bc5637969069e7fd22c96423775f31e27c7b"
+  "backendRevisionVerified": "e3d66c51aae0f48361e7613262c0d77a99e4fcdb"
 }

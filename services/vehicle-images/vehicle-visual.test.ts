@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
+import { parseVehicleImage } from './image-status';
+import { resolveVehicleImage } from './resolver';
 import { chooseVehicleVisual } from './vehicle-visual';
 
 const BUNDLED = { kind: 'image', bodyKey: 'cobalt', bodyType: 'sedan', paint: 'white', paintMatched: true, source: 42 } as never;
@@ -38,5 +40,30 @@ describe('chooseVehicleVisual', () => {
 
   test('no backend field (older backend) keeps the existing placeholder', () => {
     expect(chooseVehicleVisual(NONE, undefined)).toEqual({ kind: 'placeholder' });
+  });
+
+  test.each([
+    ['cobalt', 2024, 'cobalt-gen2'],
+    ['gentra', 2020, 'gentra'],
+    ['nexia-3', 2018, 'nexia-r3'],
+  ])('the backend catalog key selects the matching approved %s asset', (modelId, year, assetKey) => {
+    const bundled = resolveVehicleImage({ brandId: 'chevrolet', modelId, year });
+    const image = parseVehicleImage({
+      status: 'approved', url: null, version: 1, catalog_asset_key: assetKey,
+    });
+    if (bundled.kind !== 'image') throw new Error(`Expected approved bundled ${modelId} image`);
+    expect(bundled.bodyKey).toBe(assetKey);
+    expect(chooseVehicleVisual(bundled, image)).toEqual({ kind: 'image', source: bundled.source });
+  });
+
+  test('a pending or review-required image cannot display an unapproved model asset', () => {
+    const spark = resolveVehicleImage({ brandId: 'chevrolet', modelId: 'spark', year: 2020 });
+    const pending = parseVehicleImage({ status: 'pending', url: null, version: null });
+    expect(chooseVehicleVisual(spark, pending)).toEqual({ kind: 'placeholder', status: 'pending' });
+
+    const needsReview = parseVehicleImage({
+      status: 'unavailable', url: null, version: null, reason: 'needs_review',
+    });
+    expect(chooseVehicleVisual(spark, needsReview)).toEqual({ kind: 'placeholder', status: 'unavailable' });
   });
 });
