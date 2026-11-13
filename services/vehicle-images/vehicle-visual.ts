@@ -20,6 +20,16 @@ export function chooseVehicleVisual(
 ): VehicleVisual {
   const url = approvedImageUrl(image);
   if (url) return { kind: 'image', source: { uri: url } };
+  if (image?.status === 'approved' && image.catalogAssetKey) {
+    return bundled.kind === 'image' && bundled.bodyKey === image.catalogAssetKey
+      ? { kind: 'image', source: bundled.source }
+      : { kind: 'placeholder', status: 'unavailable' };
+  }
+  if (image?.status === 'unavailable' && (image.reason === 'rejected' || image.reason === 'needs_review'))
+    return { kind: 'placeholder', status: image.status };
+  // The bundled manifest is itself an owner-approved catalog source. Keep it
+  // available when the backend has not yet synchronized that catalog identity.
+  // Pending/unapproved artwork never enters this manifest.
   if (bundled.kind === 'image') return { kind: 'image', source: bundled.source };
   return image ? { kind: 'placeholder', status: image.status } : { kind: 'placeholder' };
 }

@@ -2,6 +2,7 @@ import cobaltGen2White from '@/assets/vehicles/chevrolet/cobalt-gen2/white.webp'
 import gentraWhite from '@/assets/vehicles/chevrolet/gentra/white.webp';
 import nexiaR3White from '@/assets/vehicles/chevrolet/nexia-r3/white.webp';
 
+import { approvedCatalogAssetForBody } from './catalog';
 import type { PaintKey } from './paint';
 
 /**
@@ -84,6 +85,24 @@ const body = (
   note?: string,
 ): VehicleBody => ({ key, bodyType, verified: false, assets: {}, ...(note ? { note } : {}) });
 
+const approvedBody = (
+  key: string,
+  bodyType: BodyType,
+  source: VehicleImageSource,
+  note?: string,
+  sharedBy?: string[],
+): VehicleBody => {
+  if (!approvedCatalogAssetForBody(key)) return body(key, bodyType, note ?? 'Catalog approval is missing; using the placeholder.');
+  return {
+    key,
+    bodyType,
+    verified: true,
+    ...(sharedBy ? { sharedBy } : {}),
+    assets: { white: source },
+    ...(note ? { note } : {}),
+  };
+};
+
 /**
  * Chevrolet, all 25 live models. Only bodies with explicit owner approval
  * have assets here. Pending previews remain on disk but are not bundled or
@@ -93,39 +112,34 @@ const body = (
 export const CHEVROLET_IMAGE_MANIFEST: VehicleImageManifest = {
   makeId: 'chevrolet',
   bodies: [
-    {
-      key: 'cobalt-gen2',
-      bodyType: 'sedan',
-      // Owner-approved body: the pre-restyle exterior sold since 2013. "Positions"
-      // are equipment levels, so every Cobalt trim shares it. Midnight and the
-      // announced restyle are out of scope (section 11 of the asset matrix).
-      verified: true,
-      assets: { white: cobaltGen2White },
-    },
+    approvedBody(
+      'cobalt-gen2',
+      'sedan',
+      cobaltGen2White,
+      undefined,
+    ),
     body('malibu-gen1', 'sedan', 'Backend trims malibu-1-*; image awaits owner approval.'),
     body('malibu-gen2', 'sedan', '9th generation before its facelift: 2016–2018 in Uzbekistan.'),
     body('malibu-gen2-facelift', 'sedan', '9th generation facelift; image awaits owner approval.'),
     // Nexia 2 image is intentionally unresolved until its candidate and shared-body
     // mapping receive explicit owner approval. Keep the existing placeholder.
     body('nexia-n150', 'sedan', 'Image pending explicit owner approval.'),
-    {
-      ...body('nexia-r3', 'sedan', 'Backend model `nexia` with trims nexia-3-*; sold as Ravon Nexia R3.'),
-      // Same car as the separate "Nexia 3" record (Aveo T250 sedan; section 11).
-      sharedBy: ['nexia-3'],
-      // Owner-approved 2026-11-10: replacement candidate, Vision subject lift (section 15).
-      verified: true,
-      assets: { white: nexiaR3White },
-    },
+    approvedBody(
+      'nexia-r3',
+      'sedan',
+      nexiaR3White,
+      'Backend model `nexia` with trims nexia-3-*; sold as Ravon Nexia R3.',
+      ['nexia-3'],
+    ),
     body('nexia-n100', 'sedan', 'Image awaits owner approval.'),
     body('lacetti-j200', 'sedan', 'Image awaits owner approval.'),
-    {
-      ...body('gentra', 'sedan', 'Kept apart from Lacetti (owner decision 3).'),
-      // Owner-approved 2026-11-10. Cut out with Vision subject lift + edge refinement (section 14).
-      verified: true,
-      // A 2020+ `lacetti` is this car under its old name (see LACETTI_SOURCE).
-      sharedBy: ['lacetti'],
-      assets: { white: gentraWhite },
-    },
+    approvedBody(
+      'gentra',
+      'sedan',
+      gentraWhite,
+      'Kept apart from Lacetti; 2020+ Uzbekistan Lacetti alias is the same verified body.',
+      ['lacetti'],
+    ),
     body('spark-m300', 'hatchback', 'Uzbek Spark is the M300; image awaits owner approval.'),
     body('tracker-gen3', 'suv', 'Backend model `tracker`; image awaits owner approval.'),
     body('tracker-gen2', 'suv', 'Backend model `tracker-2`; same display name as `tracker`.'),

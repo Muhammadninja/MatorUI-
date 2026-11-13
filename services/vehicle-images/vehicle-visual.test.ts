@@ -18,7 +18,7 @@ describe('chooseVehicleVisual', () => {
     });
   });
 
-  test('otherwise the bundled approved image stays', () => {
+  test('an explicitly approved bundled catalog image remains the fallback while backend sync is pending', () => {
     expect(chooseVehicleVisual(BUNDLED, { status: 'pending', url: null, version: null })).toEqual({
       kind: 'image',
       source: 42,

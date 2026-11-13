@@ -2,13 +2,18 @@ import { createServer } from 'node:http';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createRequire } from 'node:module';
 import { processGeneratedImage } from './vehicle-image-processing.mjs';
+
+const require = createRequire(import.meta.url);
+const VEHICLE_IMAGE_CATALOG = require('./vehicle-image-catalog.json');
 
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const ACTIVE_JOB_STATES = new Set(['queued', 'running', 'awaiting_approval']);
 const ADMIN_ONLY_TERMINAL_JOB_STATES = new Set(['failed', 'rejected']);
 const CANONICAL_IDENTITY_VERSION = 'mator-vehicle-image-v1';
+const MARKET_IDENTITY_VERSION = 'mator-vehicle-image-v2';
 const TRANSPORT_DIAGNOSTIC_FIELDS = [
   'errorName',
   'errorCode',
@@ -51,6 +56,7 @@ export function vehicleIdentityKey(vehicle) {
     vehicle.bodyStyle ?? '',
     vehicle.trim ?? '',
     vehicle.exteriorColor ?? '',
+    vehicle.marketRegion ?? '',
   ]
     .map(normalize)
     .join('|');
@@ -82,14 +88,17 @@ function optionalCanonicalTextId(value, name, maxLength = 64) {
 export function validateCanonicalVehicleIdentity(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw new Error('canonical identity is required');
-  const requiredFields = ['makeId', 'modelId', 'modelYear', 'generationId', 'faceliftId', 'bodyType', 'trimId'];
+  const legacyFields = ['makeId', 'modelId', 'modelYear', 'generationId', 'faceliftId', 'bodyType', 'trimId'];
+  const marketFields = [...legacyFields, 'marketRegion'];
+  const hasMarket = Object.hasOwn(value, 'marketRegion');
+  const requiredFields = hasMarket ? marketFields : legacyFields;
   if (Object.keys(value).some((field) => !requiredFields.includes(field)))
     throw new Error('canonical identity contains unsupported fields');
   if (requiredFields.some((field) => !Object.hasOwn(value, field)))
     throw new Error('canonical identity must include every ordered identity field');
   if (!Number.isInteger(value.modelYear) || value.modelYear < 1886 || value.modelYear > 2200)
     throw new Error('modelYear must be a valid model year');
-  return {
+  const identity = {
     makeId: canonicalCatalogId(value.makeId, 'makeId'),
     modelId: canonicalCatalogId(value.modelId, 'modelId'),
     modelYear: value.modelYear,
@@ -98,12 +107,18 @@ export function validateCanonicalVehicleIdentity(value) {
     bodyType: value.bodyType === null ? null : canonicalTextId(value.bodyType, 'bodyType', 60),
     trimId: optionalCanonicalTextId(value.trimId, 'trimId'),
   };
+  if (hasMarket) {
+    if (typeof value.marketRegion !== 'string' || !/^[A-Z]{2}$/.test(value.marketRegion))
+      throw new Error('marketRegion must be a two-letter uppercase region code');
+    identity.marketRegion = value.marketRegion;
+  }
+  return identity;
 }
 
 export function canonicalVehicleIdentityTuple(identity) {
   const value = validateCanonicalVehicleIdentity(identity);
   return [
-    CANONICAL_IDENTITY_VERSION,
+    value.marketRegion ? MARKET_IDENTITY_VERSION : CANONICAL_IDENTITY_VERSION,
     value.makeId,
     value.modelId,
     value.modelYear,
@@ -111,6 +126,7 @@ export function canonicalVehicleIdentityTuple(identity) {
     value.faceliftId,
     value.bodyType,
     value.trimId,
+    ...(value.marketRegion ? [value.marketRegion] : []),
   ];
 }
 
@@ -150,7 +166,7 @@ function validateVehicle(value) {
 function validateCanonicalDisplay(value, identity) {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw new Error('vehicle display facts are required');
-  const allowedFields = ['manufacturer', 'model', 'generation', 'facelift', 'trim'];
+  const allowedFields = ['manufacturer', 'model', 'generation', 'facelift', 'trim', 'marketRegion'];
   if (Object.keys(value).some((field) => !allowedFields.includes(field)))
     throw new Error('vehicle display contains unsupported fields');
   const manufacturer = canonicalTextId(value.manufacturer, 'vehicle.manufacturer', 120);
@@ -162,10 +178,12 @@ function validateCanonicalDisplay(value, identity) {
   const generation = optionalLabel('generation');
   const facelift = optionalLabel('facelift');
   const trim = optionalLabel('trim');
+  const marketRegion = optionalLabel('marketRegion');
   for (const [id, label, field] of [
     [identity.generationId, generation, 'generation'],
     [identity.faceliftId, facelift, 'facelift'],
     [identity.trimId, trim, 'trim'],
+    [identity.marketRegion ?? null, marketRegion, 'marketRegion'],
   ]) {
     if ((id === null) !== (label === null))
       throw new Error(`vehicle.${field} must be supplied only with its canonical ID`);
@@ -179,6 +197,7 @@ function validateCanonicalDisplay(value, identity) {
     facelift,
     bodyStyle: identity.bodyType,
     trim,
+    marketRegion,
     exteriorColor: null,
   };
 }
@@ -200,15 +219,17 @@ export function createVehicleImagePipeline({
   maxAttempts = 3,
   jobTimeoutMs = 120_000,
   retryDelayMs = 250,
+  catalog = VEHICLE_IMAGE_CATALOG,
 } = {}) {
   if (!dataDir) throw new Error('dataDir is required');
   if (!adminToken || adminToken.length < 16)
     throw new Error('adminToken must be at least 16 characters');
   if (!Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 10)
     throw new Error('maxAttempts must be between 1 and 10');
+  if (!catalog || !Array.isArray(catalog.assets)) throw new Error('vehicle image catalog is invalid');
   const dbPath = path.join(dataDir, 'metadata.json');
   const privateDir = path.join(dataDir, 'private');
-  let db = { requests: [], candidates: [], published: [], jobs: [], identityLinks: [] };
+  let db = { requests: [], candidates: [], published: [], jobs: [], identityLinks: [], catalogDecisions: {} };
   let writeQueue = Promise.resolve();
   let workerPromise = null;
   let initialized = false;
@@ -221,6 +242,7 @@ export function createVehicleImagePipeline({
       db = JSON.parse(await readFile(dbPath, 'utf8'));
       db.jobs ??= [];
       db.identityLinks ??= [];
+      db.catalogDecisions ??= {};
       const remap = new Map();
       for (const request of db.requests) {
         request.vehicle = validateVehicle(request.vehicle);
@@ -249,6 +271,12 @@ export function createVehicleImagePipeline({
           job.status = 'failed';
           job.lastError = 'interrupted-provider-outcome-unknown';
           job.completedAt = new Date().toISOString();
+        }
+        const request = db.requests.find((item) => item.id === job.requestId);
+        if (job.status === 'queued' && request?.canonicalIdentity && !generationIdentityIsVerified(request.canonicalIdentity)) {
+          job.status = 'cancelled';
+          job.completedAt = new Date().toISOString();
+          request.identityReviewRequired = true;
         }
       }
       await persist();
@@ -294,6 +322,73 @@ export function createVehicleImagePipeline({
 
   function latestJob(identityKey) {
     return [...db.jobs].reverse().find((job) => job.identityKey === identityKey) ?? null;
+  }
+
+  function effectiveCatalogStatus(asset) {
+    return db.catalogDecisions[asset.id]?.status ?? asset.approvalStatus;
+  }
+
+  function identityMatchesCatalogMapping(identity, mapping) {
+    if (identity.modelId !== mapping.modelId) return false;
+    if (identity.modelYear < mapping.yearFrom || identity.modelYear > mapping.yearTo) return false;
+    if (mapping.generationId && identity.generationId !== mapping.generationId) return false;
+    if (mapping.faceliftId && identity.faceliftId !== mapping.faceliftId) return false;
+    if (mapping.trimPrefixes?.length && !mapping.trimPrefixes.some((prefix) => identity.trimId?.startsWith(prefix))) return false;
+    return true;
+  }
+
+  function matchingCatalogAssets(identity, { approvedOnly = true } = {}) {
+    if (!identity.marketRegion) return [];
+    return catalog.assets.filter((asset) => {
+      if (asset.makeId !== identity.makeId || asset.marketRegion !== identity.marketRegion) return false;
+      if (approvedOnly && effectiveCatalogStatus(asset) !== 'approved') return false;
+      if (!asset.identityVerified || !asset.assetKey) return false;
+      return asset.modelMappings?.some((mapping) => identityMatchesCatalogMapping(identity, mapping)) ?? false;
+    });
+  }
+
+  function approvedCatalogAsset(identity) {
+    const matches = matchingCatalogAssets(identity);
+    return matches.length === 1 ? matches[0] : null;
+  }
+
+  function generationIdentityIsVerified(identity) {
+    if (!identity.marketRegion) return false;
+    if (identity.generationId) return true;
+    return matchingCatalogAssets(identity, { approvedOnly: false }).some((asset) =>
+      effectiveCatalogStatus(asset) !== 'rejected' && asset.generationVerified === true,
+    );
+  }
+
+  function catalogAssetResponse(asset) {
+    return asset ? { url: asset.assetUrl ?? null, version: 1, catalogAssetKey: asset.assetKey } : null;
+  }
+
+  function listCatalogAssets(authorized) {
+    requireAdmin(authorized);
+    return catalog.assets.map((asset) => ({
+      ...asset,
+      approvalStatus: effectiveCatalogStatus(asset),
+      decision: db.catalogDecisions[asset.id] ?? null,
+    }));
+  }
+
+  async function decideCatalogAsset(id, decision, approvalReference, authorized) {
+    requireAdmin(authorized);
+    const asset = catalog.assets.find((entry) => entry.id === id);
+    if (!asset) throw Object.assign(new Error('catalog asset not found'), { status: 404 });
+    if (!['approve', 'reject'].includes(decision)) throw new Error('decision must be approve or reject');
+    if (typeof approvalReference !== 'string' || approvalReference.trim().length < 4 || approvalReference.length > 240)
+      throw new Error('approvalReference is required');
+    if (decision === 'approve' && (!asset.identityVerified || !asset.generationVerified || !asset.assetKey || !asset.marketRegion || !asset.modelMappings?.length || typeof asset.assetUrl !== 'string' || !asset.assetUrl.startsWith('https://')))
+      throw Object.assign(new Error('verified identity and HTTPS asset location are required for approval'), { status: 409 });
+    db.catalogDecisions[id] = {
+      status: decision === 'approve' ? 'approved' : 'rejected',
+      approvalReference: approvalReference.trim(),
+      decidedAt: new Date().toISOString(),
+    };
+    await persist();
+    return { id, approvalStatus: db.catalogDecisions[id].status };
   }
 
   function createJob(request, forceRegenerate = false) {
@@ -378,6 +473,19 @@ export function createVehicleImagePipeline({
     const identity = validateCanonicalVehicleIdentity(input.identity);
     const identityKey = canonicalVehicleIdentityKey(identity);
     const vehicle = validateCanonicalDisplay(input.vehicle, identity);
+    const catalogAsset = approvedCatalogAsset(identity);
+    if (catalogAsset) {
+      return {
+        request: null,
+        duplicate: false,
+        reused: true,
+        asset: catalogAssetResponse(catalogAsset),
+        job: null,
+        activeJob: null,
+        previousJob: null,
+        identityKey,
+      };
+    }
     let request = db.requests.find(
       (item) => item.identityKey === identityKey && item.canonicalIdentity,
     );
@@ -396,8 +504,21 @@ export function createVehicleImagePipeline({
     }
     const reusableAsset = resolve(identityKey);
     const previousJob = latestJob(identityKey);
+    const generationVerified = generationIdentityIsVerified(identity);
+    const rejectedCatalogAsset = matchingCatalogAssets(identity, { approvedOnly: false })
+      .some((asset) => effectiveCatalogStatus(asset) === 'rejected');
+    if (!generationVerified || rejectedCatalogAsset) {
+      request.identityReviewRequired = true;
+      for (const queued of db.jobs) {
+        if (queued.identityKey === identityKey && queued.status === 'queued') {
+          queued.status = 'cancelled';
+          queued.completedAt = new Date().toISOString();
+        }
+      }
+    }
     let job = null;
     if (
+      generationVerified &&
       !reusableAsset && !activeJob(identityKey) &&
       !ADMIN_ONLY_TERMINAL_JOB_STATES.has(previousJob?.status)
     ) job = createJob(request);
@@ -421,7 +542,7 @@ export function createVehicleImagePipeline({
       .filter(
         (request) =>
           request.status !== 'rejected' &&
-          (request.status === 'pending' ||
+          (request.identityReviewRequired || request.status === 'pending' ||
             activeJob(request.identityKey) ||
             db.candidates.some(
               (candidate) => candidate.requestId === request.id && candidate.status === 'pending',
@@ -435,7 +556,7 @@ export function createVehicleImagePipeline({
             .find(
               (job) =>
                 job.requestId === request.id &&
-                ['queued', 'running', 'failed', 'awaiting_approval', 'rejected'].includes(
+                ['queued', 'running', 'failed', 'awaiting_approval', 'rejected', 'cancelled'].includes(
                   job.status,
                 ),
             ) ?? null,
@@ -528,6 +649,13 @@ export function createVehicleImagePipeline({
     if (!provider) return;
     const request = db.requests.find((item) => item.id === job.requestId);
     if (!request || activeJob(job.identityKey) !== job) return;
+    if (request.canonicalIdentity && !generationIdentityIsVerified(request.canonicalIdentity)) {
+      request.identityReviewRequired = true;
+      job.status = 'cancelled';
+      job.completedAt = new Date().toISOString();
+      await persist();
+      return;
+    }
     job.status = 'running';
     job.startedAt = new Date().toISOString();
     await persist();
@@ -652,6 +780,8 @@ export function createVehicleImagePipeline({
     requireAdmin(authorized);
     const request = db.requests.find((item) => item.id === requestId);
     if (!request) throw Object.assign(new Error('request not found'), { status: 404 });
+    if (request.canonicalIdentity && !generationIdentityIsVerified(request.canonicalIdentity))
+      throw Object.assign(new Error('canonical identity requires review before generation'), { status: 409 });
     if (activeJob(request.identityKey))
       throw Object.assign(new Error('generation is already active'), { status: 409 });
     const job = createJob(request, true);
@@ -748,6 +878,22 @@ export function createVehicleImagePipeline({
   function resolveCanonicalStatus(identityInput) {
     const identity = validateCanonicalVehicleIdentity(identityInput);
     const identityKey = canonicalVehicleIdentityKey(identity);
+    const catalogAsset = approvedCatalogAsset(identity);
+    if (catalogAsset) {
+      return {
+        identityKey,
+        identity,
+        status: 'approved',
+        requestId: null,
+        jobId: null,
+        asset: catalogAssetResponse(catalogAsset),
+      };
+    }
+    const rejectedCatalogAsset = matchingCatalogAssets(identity, { approvedOnly: false })
+      .some((asset) => effectiveCatalogStatus(asset) === 'rejected');
+    if (rejectedCatalogAsset) {
+      return { identityKey, identity, status: 'needs_review', requestId: null, jobId: null, asset: null };
+    }
     const request = db.requests.find(
       (item) => item.identityKey === identityKey && item.canonicalIdentity,
     );
@@ -758,7 +904,9 @@ export function createVehicleImagePipeline({
     const job = latestJob(identityKey);
     const status = asset
       ? 'approved'
-      : ACTIVE_JOB_STATES.has(job?.status)
+      : request.identityReviewRequired
+        ? 'needs_review'
+        : ACTIVE_JOB_STATES.has(job?.status)
         ? job.status
         : ADMIN_ONLY_TERMINAL_JOB_STATES.has(job?.status)
           ? job.status
@@ -964,6 +1112,19 @@ export function createVehicleImagePipeline({
           await runQueuedJobs();
           return send(200, { ok: true });
         }
+        if (req.method === 'GET' && url.pathname === '/admin/catalog-assets')
+          return send(200, listCatalogAssets(isAdmin));
+        const catalogDecisionMatch = /^\/admin\/catalog-assets\/([^/]+)\/decision$/.exec(url.pathname);
+        if (req.method === 'POST' && catalogDecisionMatch) {
+          requireAdmin(isAdmin);
+          const body = await readJson(req);
+          return send(200, await decideCatalogAsset(
+            decodeURIComponent(catalogDecisionMatch[1]),
+            body.decision,
+            body.approvalReference,
+            true,
+          ));
+        }
         const regenMatch = /^\/admin\/requests\/([^/]+)\/regenerate$/.exec(url.pathname);
         if (req.method === 'POST' && regenMatch)
           return send(202, await regenerateRequest(decodeURIComponent(regenMatch[1]), isAdmin));
@@ -1032,6 +1193,8 @@ export function createVehicleImagePipeline({
     resolveCanonicalStatus,
     linkLegacyIdentity,
     listPending,
+    listCatalogAssets,
+    decideCatalogAsset,
     uploadCandidate,
     decideCandidate,
     resolve,

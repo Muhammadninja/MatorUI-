@@ -14,9 +14,12 @@ export type VehicleImageStatus = 'pending' | 'approved' | 'unavailable';
 
 export type VehicleImageState = {
   status: VehicleImageStatus;
-  /** Public https URL, set only when `status` is `approved`. */
+  /** Published HTTPS URL; null for a bundled catalog asset. */
   url: string | null;
   version: number | null;
+  /** Bundled catalog key for an approved asset that does not need publication. */
+  catalogAssetKey?: string | null;
+  reason?: 'not_requested' | 'needs_review' | 'generation_failed' | 'rejected' | 'request_failed' | null;
 };
 
 const STATUSES: readonly string[] = ['pending', 'approved', 'unavailable'];
@@ -33,20 +36,25 @@ function isHttpsUrl(value: unknown): value is string {
 
 /**
  * Validate the backend's `vehicle_image`. Missing or malformed → undefined (older
- * backend: the card keeps its existing behaviour). `approved` without a usable https
- * URL is shown as `pending`, never as a broken image.
+ * backend: the card keeps its existing behaviour). `approved` without a usable HTTPS
+ * URL needs a catalog key; otherwise it is shown as pending, never as a broken image.
  */
 export function parseVehicleImage(raw: unknown): VehicleImageState | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const r = raw as Record<string, unknown>;
   if (typeof r.status !== 'string' || !STATUSES.includes(r.status)) return undefined;
   const version = Number.isInteger(r.version) && (r.version as number) > 0 ? (r.version as number) : null;
+  const reason = ['not_requested', 'needs_review', 'generation_failed', 'rejected', 'request_failed'].includes(String(r.reason))
+    ? r.reason as VehicleImageState['reason']
+    : null;
   if (r.status === 'approved') {
-    return isHttpsUrl(r.url)
-      ? { status: 'approved', url: r.url, version }
-      : { status: 'pending', url: null, version: null };
+    if (isHttpsUrl(r.url)) return { status: 'approved', url: r.url, version, ...(reason ? { reason } : {}) };
+    if (typeof r.catalog_asset_key === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(r.catalog_asset_key)) {
+      return { status: 'approved', url: null, version, catalogAssetKey: r.catalog_asset_key, reason };
+    }
+    return { status: 'pending', url: null, version: null };
   }
-  return { status: r.status as VehicleImageStatus, url: null, version: null };
+  return { status: r.status as VehicleImageStatus, url: null, version: null, ...(reason ? { reason } : {}) };
 }
 
 /** The approved image's URL, or null. */

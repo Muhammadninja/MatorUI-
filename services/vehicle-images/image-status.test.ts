@@ -32,6 +32,7 @@ describe('parseVehicleImage (backend vehicle_image)', () => {
       status: 'unavailable',
       url: null,
       version: null,
+      reason: 'rejected',
     });
   });
 

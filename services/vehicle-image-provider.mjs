@@ -28,10 +28,11 @@ export function buildVehicleImagePrompt(vehicle) {
     vehicle.facelift && `Facelift: ${vehicle.facelift}`,
     vehicle.bodyStyle && `Body style: ${vehicle.bodyStyle}`,
     vehicle.trim && `Trim: ${vehicle.trim}`,
+    vehicle.marketRegion && `Market/region: ${vehicle.marketRegion}`,
     vehicle.exteriorColor && `Exterior color: ${vehicle.exteriorColor}`,
   ].filter(Boolean);
   return [
-    'Create a photorealistic catalog cutout as a provisional candidate for human review. Use only the vehicle identity facts listed below; do not invent or infer generation, facelift, body style, trim, or visual specifications that are absent. If the identity is uncertain from these facts and supplied reference images, do not imply certainty; the candidate will require manual identity review.',
+    'Create a photorealistic catalog cutout as a provisional candidate for human review. Use only the vehicle identity facts listed below; do not invent or infer generation, facelift, body style, trim, market, or visual specifications that are absent. Match the stated market and do not substitute a visually similar vehicle from another market. If the identity is uncertain from these facts and supplied reference images, do not imply certainty; the candidate will require manual identity review.',
     ...facts,
     'Show the entire vehicle in a consistent front three-quarter view, centered with even scale and generous transparent margin. Transparent background only. No scenery, floor, cast shadow, text, labels, watermark, people, or extra objects. Keep wheels, bumpers, mirrors, roof, and all body edges fully inside the frame.',
   ].join('\n');

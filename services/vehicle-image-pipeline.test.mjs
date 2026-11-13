@@ -120,8 +120,9 @@ describe('vehicle image pipeline', () => {
     const identity = {
       makeId: 'daewoo', modelId: 'nexia', modelYear: 2016,
       generationId: 'nexia-2', faceliftId: null, bodyType: null, trimId: null,
+      marketRegion: 'UZ',
     };
-    const vehicle = { manufacturer: 'Daewoo', model: 'Nexia', generation: 'Nexia 2' };
+    const vehicle = { manufacturer: 'Daewoo', model: 'Nexia', generation: 'Nexia 2', marketRegion: 'UZ' };
     const requestBody = { identity, vehicle };
     const first = await invokeServer(pipeline.server(), {
       method: 'POST', url: '/internal/v1/vehicle-images/requests',

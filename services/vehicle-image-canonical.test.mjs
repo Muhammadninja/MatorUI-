@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import os from 'node:os';
 import path from 'node:path';
@@ -16,9 +16,10 @@ const adminToken = 'local-admin-token-for-canonical-tests';
 const requestToken = 'server-to-server-request-token-for-tests';
 const byrHanIdentity = {
   makeId: 'byd', modelId: 'byd-han', modelYear: 2024,
-  generationId: null, faceliftId: null, bodyType: null, trimId: null,
+  generationId: 'byd-han-gen1', faceliftId: null, bodyType: null, trimId: null,
+  marketRegion: 'UZ',
 };
-const bydHanDisplay = { manufacturer: 'BYD', model: 'Han' };
+const bydHanDisplay = { manufacturer: 'BYD', model: 'Han', generation: 'Han generation 1', marketRegion: 'UZ' };
 
 async function fixtureImage() {
   const raw = Buffer.alloc(320 * 160 * 4);
@@ -81,7 +82,7 @@ afterEach(async () => {
 
 describe('canonical vehicle identity integration', () => {
   it('hashes the exact ordered tuple deterministically and rejects incomplete or extra identity data', () => {
-    const tuple = ['mator-vehicle-image-v1', 'byd', 'byd-han', 2024, null, null, null, null];
+    const tuple = ['mator-vehicle-image-v2', 'byd', 'byd-han', 2024, 'byd-han-gen1', null, null, null, 'UZ'];
     expect(canonicalVehicleIdentityTuple(byrHanIdentity)).toEqual(tuple);
     expect(canonicalVehicleIdentityKey(byrHanIdentity)).toBe(
       createHash('sha256').update(JSON.stringify(tuple)).digest('hex'),
@@ -120,6 +121,129 @@ describe('canonical vehicle identity integration', () => {
     });
     await expect(pipeline.readCandidate(candidate.id, true)).resolves.toMatchObject({ contentType: 'image/png' });
     expect(generate).not.toHaveBeenCalled();
+  });
+
+  it('reuses approved catalog identities before creating generation work and rejects market mismatches', async () => {
+    const generate = vi.fn();
+    const { pipeline } = await setup({ provider: { generate } });
+    const cobalt = {
+      makeId: 'chevrolet', modelId: 'cobalt', modelYear: 2020,
+      generationId: null, faceliftId: null, bodyType: 'sedan', trimId: null,
+      marketRegion: 'UZ',
+    };
+    const reused = await pipeline.submitCanonicalRequest({
+      identity: cobalt,
+      vehicle: { manufacturer: 'Chevrolet', model: 'Cobalt', marketRegion: 'UZ' },
+    });
+    expect(reused).toMatchObject({ reused: true, job: null, asset: { catalogAssetKey: 'cobalt-gen2', url: null } });
+    expect(pipeline.resolveCanonicalStatus(cobalt)).toMatchObject({ status: 'approved', asset: { catalogAssetKey: 'cobalt-gen2' } });
+
+    const wrongMarket = { ...cobalt, marketRegion: 'US' };
+    const missing = await pipeline.submitCanonicalRequest({
+      identity: wrongMarket,
+      vehicle: { manufacturer: 'Chevrolet', model: 'Cobalt', marketRegion: 'US' },
+    });
+    expect(missing.job).toBeNull();
+    expect(pipeline.resolveCanonicalStatus(wrongMarket).status).toBe('needs_review');
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it('keeps the Spark candidate pending and never queues it when catalog identity is uncertain', async () => {
+    const generate = vi.fn();
+    const { pipeline, dataDir } = await setup({ provider: { generate } });
+    const spark = {
+      makeId: 'chevrolet', modelId: 'spark', modelYear: 2020,
+      generationId: null, faceliftId: null, bodyType: 'hatchback', trimId: null,
+      marketRegion: 'UZ',
+    };
+    const result = await pipeline.submitCanonicalRequest({
+      identity: spark,
+      vehicle: { manufacturer: 'Chevrolet', model: 'Spark', marketRegion: 'UZ' },
+    });
+    expect(result.job).toBeNull();
+    expect(pipeline.resolveCanonicalStatus(spark).status).toBe('needs_review');
+    await pipeline.runQueuedJobs();
+    const restarted = createVehicleImagePipeline({
+      dataDir, adminToken, requestToken, provider: { generate },
+      generationEnabled: true, autoRun: false,
+    });
+    await restarted.initialize();
+    expect(restarted.resolveCanonicalStatus(spark).status).toBe('needs_review');
+    await restarted.runQueuedJobs();
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it('quarantines previously queued market-ambiguous canonical jobs on restart', async () => {
+    const dataDir = await mkdtemp(path.join(os.tmpdir(), 'vehicle-image-legacy-queue-'));
+    dirs.push(dataDir);
+    const legacyIdentity = {
+      makeId: 'chevrolet', modelId: 'spark', modelYear: 2020,
+      generationId: null, faceliftId: null, bodyType: 'hatchback', trimId: null,
+    };
+    const identityKey = canonicalVehicleIdentityKey(legacyIdentity);
+    const requestId = 'legacy-request';
+    await writeFile(path.join(dataDir, 'metadata.json'), JSON.stringify({
+      requests: [{
+        id: requestId, vehicle: { manufacturer: 'Chevrolet', model: 'Spark', year: 2020 },
+        canonicalIdentity: legacyIdentity, identityKey, status: 'pending', createdAt: new Date().toISOString(),
+      }],
+      candidates: [], published: [],
+      jobs: [{ id: 'legacy-job', requestId, identityKey, status: 'queued', attempts: 0, maxAttempts: 3 }],
+      identityLinks: [],
+    }));
+    const generate = vi.fn();
+    const pipeline = createVehicleImagePipeline({
+      dataDir, adminToken, requestToken, provider: { generate },
+      generationEnabled: true, autoRun: true,
+    });
+    await pipeline.initialize();
+    expect(pipeline.resolveCanonicalStatus(legacyIdentity).status).toBe('needs_review');
+    expect(pipeline.listPending(true)[0].job.status).toBe('cancelled');
+    await pipeline.runQueuedJobs();
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it('keeps Nexia 2 and Nexia 3 identities distinct while reusing only the approved Nexia 3 asset', async () => {
+    const generate = vi.fn();
+    const { pipeline } = await setup({ provider: { generate }, generationEnabled: false });
+    const nexia2 = {
+      makeId: 'chevrolet', modelId: 'nexia-2', modelYear: 2016,
+      generationId: null, faceliftId: null, bodyType: 'sedan', trimId: null,
+      marketRegion: 'UZ',
+    };
+    const nexia3 = { ...nexia2, modelId: 'nexia-3' };
+    expect(canonicalVehicleIdentityKey(nexia2)).not.toBe(canonicalVehicleIdentityKey(nexia3));
+    const n2 = await pipeline.submitCanonicalRequest({ identity: nexia2, vehicle: { manufacturer: 'Chevrolet', model: 'Nexia 2', marketRegion: 'UZ' } });
+    const n3 = await pipeline.submitCanonicalRequest({ identity: nexia3, vehicle: { manufacturer: 'Chevrolet', model: 'Nexia 3', marketRegion: 'UZ' } });
+    expect(n2.job?.status).toBe('queued');
+    expect(n3).toMatchObject({ reused: true, job: null, asset: { catalogAssetKey: 'nexia-r3' } });
+    await pipeline.runQueuedJobs();
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it('keeps pending catalog art private until an admin has both approval provenance and a deliverable asset', async () => {
+    const { pipeline } = await setup();
+    expect(() => pipeline.listCatalogAssets(false)).toThrow(/administrator authorization/);
+    const before = pipeline.listCatalogAssets(true).find((asset) => asset.id === 'spark-m300');
+    expect(before.approvalStatus).toBe('pending');
+    await expect(pipeline.decideCatalogAsset('spark-m300', 'approve', 'owner approved', true))
+      .rejects.toMatchObject({ status: 409 });
+    expect(pipeline.listCatalogAssets(true).find((asset) => asset.id === 'spark-m300').approvalStatus)
+      .toBe('pending');
+  });
+
+  it('removes a rejected catalog mapping from resolution and preserves the review decision after restart', async () => {
+    const { pipeline, dataDir } = await setup();
+    const cobalt = {
+      makeId: 'chevrolet', modelId: 'cobalt', modelYear: 2020,
+      generationId: null, faceliftId: null, bodyType: 'sedan', trimId: null,
+      marketRegion: 'UZ',
+    };
+    await pipeline.decideCatalogAsset('cobalt-gen2', 'reject', 'owner review', true);
+    expect(pipeline.resolveCanonicalStatus(cobalt).status).toBe('needs_review');
+    const restarted = createVehicleImagePipeline({ dataDir, adminToken, requestToken });
+    await restarted.initialize();
+    expect(restarted.resolveCanonicalStatus(cobalt).status).toBe('needs_review');
   });
 
   it('authenticates internal request and resolve routes with the service token', async () => {
@@ -229,7 +353,7 @@ describe('canonical vehicle identity integration', () => {
     await expect(pipeline.linkLegacyIdentity({
       legacyIdentityKey: legacy.request.identityKey,
       identity: byrHanIdentity,
-      vehicle: { manufacturer: 'BYD', model: 'Tang' },
+      vehicle: { manufacturer: 'BYD', model: 'Tang', generation: 'Han generation 1', marketRegion: 'UZ' },
     }, true)).rejects.toMatchObject({ status: 409 });
   });
 });
