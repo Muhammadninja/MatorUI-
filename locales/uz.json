@@ -1084,6 +1084,11 @@
     "preparing": "Rasm tayyorlanmoqda",
     "unavailable": "Hozircha rasm yoʻq"
   },
+  "vehicleGeneration": {
+    "title": "Sizdagi {{model}} qaysi avlod?",
+    "body": "{{year}}-yilda ikki avlod ishlab chiqarilgan. Toʻgʻri avtomobilni koʻrsatishimiz uchun oʻzingiznikini tanlang. Faqat rasm oʻzgaradi, mos ehtiyot qismlar oʻzgarmaydi.",
+    "saveFailed": "Tanlovni saqlab boʻlmadi. Qayta urinib koʻring."
+  },
   "vehiclePicker": {
     "searchMake": "Markani qidirish",
     "searchModel": "Modelni qidirish",

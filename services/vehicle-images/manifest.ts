@@ -1,24 +1,6 @@
-import captivaWhite from '@/assets/vehicles/chevrolet/captiva/white.webp';
 import cobaltGen2White from '@/assets/vehicles/chevrolet/cobalt-gen2/white.webp';
-import damasClassicWhite from '@/assets/vehicles/chevrolet/damas-classic/white.webp';
-import epicaWhite from '@/assets/vehicles/chevrolet/epica/white.webp';
-import equinoxWhite from '@/assets/vehicles/chevrolet/equinox/white.webp';
 import gentraWhite from '@/assets/vehicles/chevrolet/gentra/white.webp';
-import laboWhite from '@/assets/vehicles/chevrolet/labo/white.webp';
-import lacettiJ200White from '@/assets/vehicles/chevrolet/lacetti-j200/white.webp';
-import malibuGen1White from '@/assets/vehicles/chevrolet/malibu-gen1/white.webp';
-import malibuGen2FaceliftWhite from '@/assets/vehicles/chevrolet/malibu-gen2-facelift/white.webp';
-import matizWhite from '@/assets/vehicles/chevrolet/matiz/white.webp';
-import nexiaN100White from '@/assets/vehicles/chevrolet/nexia-n100/white.webp';
-import nexiaN150White from '@/assets/vehicles/chevrolet/nexia-n150/white.webp';
 import nexiaR3White from '@/assets/vehicles/chevrolet/nexia-r3/white.webp';
-import onixWhite from '@/assets/vehicles/chevrolet/onix/white.webp';
-import orlandoWhite from '@/assets/vehicles/chevrolet/orlando/white.webp';
-import sparkM300White from '@/assets/vehicles/chevrolet/spark-m300/white.webp';
-import tahoeWhite from '@/assets/vehicles/chevrolet/tahoe/white.webp';
-import trackerGen3White from '@/assets/vehicles/chevrolet/tracker-gen3/white.webp';
-import trailblazerWhite from '@/assets/vehicles/chevrolet/trailblazer/white.webp';
-import traverseWhite from '@/assets/vehicles/chevrolet/traverse/white.webp';
 
 import type { PaintKey } from './paint';
 
@@ -103,11 +85,10 @@ const body = (
 ): VehicleBody => ({ key, bodyType, verified: false, assets: {}, ...(note ? { note } : {}) });
 
 /**
- * Chevrolet, all 25 live models. Every model has an image except the ones
- * with no matching render: Tracker 2 (the earlier Trax-based body), Cruze,
- * Tacuma, the pre-facelift 9th-generation Malibu, and the misspelled
- * `genrta-lacetti` record. Those resolve to the placeholder. The
- * Explore hero keeps its own decorative copy of the Cobalt artwork.
+ * Chevrolet, all 25 live models. Only bodies with explicit owner approval
+ * have assets here. Pending previews remain on disk but are not bundled or
+ * returned by the Garage resolver. The Explore hero keeps its own decorative
+ * copy of the Cobalt artwork.
  */
 export const CHEVROLET_IMAGE_MANIFEST: VehicleImageManifest = {
   makeId: 'chevrolet',
@@ -121,27 +102,12 @@ export const CHEVROLET_IMAGE_MANIFEST: VehicleImageManifest = {
       verified: true,
       assets: { white: cobaltGen2White },
     },
-    {
-      ...body('malibu-gen1', 'sedan', 'Backend trims malibu-1-*.'),
-      // PREVIEW, pending owner approval: owner-supplied render, Vision subject lift (2026-11-11).
-      verified: true,
-      assets: { white: malibuGen1White },
-    },
+    body('malibu-gen1', 'sedan', 'Backend trims malibu-1-*; image awaits owner approval.'),
     body('malibu-gen2', 'sedan', '9th generation before its facelift: 2016–2018 in Uzbekistan.'),
-    {
-      ...body('malibu-gen2-facelift', 'sedan', '9th generation facelift (new grille, lamps, bumper).'),
-      // PREVIEW, pending owner approval: owner-supplied candidate, Vision subject lift (section 18).
-      verified: true,
-      assets: { white: malibuGen2FaceliftWhite },
-    },
-    {
-      ...body('nexia-n150', 'sedan', 'Backend model `nexia` with trims nexia-2-*.'),
-      // PREVIEW, pending owner approval: owner-supplied render, Vision subject lift (2026-11-11).
-      verified: true,
-      // The `nexia-2` record is the same Nexia 2 (N150) sold since 2008.
-      sharedBy: ['nexia-2'],
-      assets: { white: nexiaN150White },
-    },
+    body('malibu-gen2-facelift', 'sedan', '9th generation facelift; image awaits owner approval.'),
+    // Nexia 2 image is intentionally unresolved until its candidate and shared-body
+    // mapping receive explicit owner approval. Keep the existing placeholder.
+    body('nexia-n150', 'sedan', 'Image pending explicit owner approval.'),
     {
       ...body('nexia-r3', 'sedan', 'Backend model `nexia` with trims nexia-3-*; sold as Ravon Nexia R3.'),
       // Same car as the separate "Nexia 3" record (Aveo T250 sedan; section 11).
@@ -150,18 +116,8 @@ export const CHEVROLET_IMAGE_MANIFEST: VehicleImageManifest = {
       verified: true,
       assets: { white: nexiaR3White },
     },
-    {
-      ...body('nexia-n100', 'sedan', 'Backend model `nexia-1`.'),
-      // PREVIEW, pending owner approval: owner-supplied render, Vision subject lift (2026-11-11).
-      verified: true,
-      assets: { white: nexiaN100White },
-    },
-    {
-      ...body('lacetti-j200', 'sedan'),
-      // PREVIEW, pending owner approval: owner-supplied render, Vision subject lift (2026-11-11).
-      verified: true,
-      assets: { white: lacettiJ200White },
-    },
+    body('nexia-n100', 'sedan', 'Image awaits owner approval.'),
+    body('lacetti-j200', 'sedan', 'Image awaits owner approval.'),
     {
       ...body('gentra', 'sedan', 'Kept apart from Lacetti (owner decision 3).'),
       // Owner-approved 2026-11-10. Cut out with Vision subject lift + edge refinement (section 14).
@@ -170,87 +126,22 @@ export const CHEVROLET_IMAGE_MANIFEST: VehicleImageManifest = {
       sharedBy: ['lacetti'],
       assets: { white: gentraWhite },
     },
-    {
-      ...body('spark-m300', 'hatchback', 'Uzbek Spark is the M300 (Ravon R2); the backend trim id says M400.'),
-      // PREVIEW, pending owner approval: owner-supplied cutout with real alpha (section 16).
-      verified: true,
-      assets: { white: sparkM300White },
-    },
-    {
-      ...body('tracker-gen3', 'suv', 'Backend model `tracker` (trim tracker-3-premier).'),
-      // PREVIEW, pending owner approval: owner-supplied render, Vision subject lift (2026-11-11).
-      verified: true,
-      assets: { white: trackerGen3White },
-    },
+    body('spark-m300', 'hatchback', 'Uzbek Spark is the M300; image awaits owner approval.'),
+    body('tracker-gen3', 'suv', 'Backend model `tracker`; image awaits owner approval.'),
     body('tracker-gen2', 'suv', 'Backend model `tracker-2`; same display name as `tracker`.'),
-    {
-      ...body('captiva', 'suv', 'Image: 1st generation (C140) after its 2016 facelift.'),
-      // PREVIEW, pending owner approval: owner-supplied render, Vision subject lift (2026-11-11).
-      verified: true,
-      assets: { white: captivaWhite },
-    },
-    {
-      ...body('onix', 'sedan', 'Image: 2nd generation sedan, sold in Uzbekistan from 2020.'),
-      // PREVIEW, pending owner approval: owner-supplied render, Vision subject lift (2026-11-11).
-      verified: true,
-      assets: { white: onixWhite },
-    },
-    {
-      ...body('damas-classic', 'microvan', 'Classic passenger Damas; not the 2025 Damas Move/Max.'),
-      // PREVIEW, pending owner approval: owner-supplied render, Vision subject lift (2026-11-11).
-      verified: true,
-      assets: { white: damasClassicWhite },
-    },
-    {
-      ...body('labo', 'pickup', 'Shares the Damas cab, but the bed shows in a 3/4 view: own image.'),
-      // PREVIEW, pending owner approval: owner-supplied render, Vision subject lift (2026-11-11).
-      verified: true,
-      assets: { white: laboWhite },
-    },
-    {
-      ...body('matiz', 'hatchback', 'Image: the M200 Matiz built in Uzbekistan.'),
-      // PREVIEW, pending owner approval: owner-supplied render, Vision subject lift (2026-11-11).
-      verified: true,
-      assets: { white: matizWhite },
-    },
-    {
-      ...body('orlando', 'mpv'),
-      // PREVIEW, pending owner approval: owner-supplied render, Vision subject lift (2026-11-11).
-      verified: true,
-      assets: { white: orlandoWhite },
-    },
+    body('captiva', 'suv', 'Image awaits owner approval.'),
+    body('onix', 'sedan', 'Image awaits owner approval.'),
+    body('damas-classic', 'microvan', 'Image awaits owner approval.'),
+    body('labo', 'pickup', 'Image awaits owner approval.'),
+    body('matiz', 'hatchback', 'Image awaits owner approval.'),
+    body('orlando', 'mpv', 'Image awaits owner approval.'),
     body('cruze', 'sedan', 'Generation unverified.'),
-    {
-      ...body('epica', 'sedan'),
-      // PREVIEW, pending owner approval: owner-supplied render, Vision subject lift (2026-11-11).
-      verified: true,
-      assets: { white: epicaWhite },
-    },
+    body('epica', 'sedan', 'Image awaits owner approval.'),
     body('tacuma', 'mpv'),
-    {
-      ...body('equinox', 'suv', 'Image: 3rd generation after its 2021 facelift.'),
-      // PREVIEW, pending owner approval: owner-supplied render, Vision subject lift (2026-11-11).
-      verified: true,
-      assets: { white: equinoxWhite },
-    },
-    {
-      ...body('traverse', 'suv', '2nd generation (2018–2023), shown in its 2022 facelift.'),
-      // PREVIEW, pending owner approval: owner-supplied render, Vision subject lift (2026-11-11).
-      verified: true,
-      assets: { white: traverseWhite },
-    },
-    {
-      ...body('tahoe', 'suv', '5th generation (2021+); the render is the pre-2025 front.'),
-      // PREVIEW, pending owner approval: owner-supplied render, Vision subject lift (2026-11-11).
-      verified: true,
-      assets: { white: tahoeWhite },
-    },
-    {
-      ...body('trailblazer', 'suv', 'Image: the body-on-frame 7-seat SUV (2nd generation, facelift).'),
-      // PREVIEW, pending owner approval: owner-supplied render, Vision subject lift (2026-11-11).
-      verified: true,
-      assets: { white: trailblazerWhite },
-    },
+    body('equinox', 'suv', 'Image awaits owner approval.'),
+    body('traverse', 'suv', 'Image awaits owner approval.'),
+    body('tahoe', 'suv', 'Image awaits owner approval.'),
+    body('trailblazer', 'suv', 'Image awaits owner approval.'),
   ],
   models: {
     cobalt: { kind: 'body', bodyKey: 'cobalt-gen2' },
@@ -269,7 +160,7 @@ export const CHEVROLET_IMAGE_MANIFEST: VehicleImageManifest = {
     },
     nexia: { kind: 'trim-prefix', prefixes: { 'nexia-2-': 'nexia-n150', 'nexia-3-': 'nexia-r3' } },
     'nexia-1': { kind: 'body', bodyKey: 'nexia-n100' },
-    'nexia-2': { kind: 'body', bodyKey: 'nexia-n150' },
+    'nexia-2': { kind: 'placeholder', reason: 'body-unverified' },
     'nexia-3': { kind: 'body', bodyKey: 'nexia-r3' },
     // The 2004–13 sedan or a 2020+ "Lacetti", which is a Gentra body. Only the
     // year decides; 2014–2019 (sold as Gentra) stays unresolved.

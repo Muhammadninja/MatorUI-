@@ -1084,6 +1084,11 @@
     "preparing": "Image in preparation",
     "unavailable": "No image yet"
   },
+  "vehicleGeneration": {
+    "title": "Which {{model}} is yours?",
+    "body": "Two generations were built in {{year}}. Choose yours so we show the right car. This changes the picture only, not which parts fit.",
+    "saveFailed": "Couldn’t save your choice. Try again."
+  },
   "vehiclePicker": {
     "searchMake": "Search makes",
     "searchModel": "Search models",

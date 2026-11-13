@@ -197,6 +197,28 @@ describe('UzAuto evidence patterns (WMI XWB)', () => {
     }
   });
 
+  test('the supported Nexia VIN resolves to the distinct canonical Nexia 3 identity', async () => {
+    serveReference();
+    const decoded = await decoder().decode(pad('XWBTF69V9HA'));
+    expect(decoded).toMatchObject({ model: 'Nexia 3', year: 2017, isVerified: true });
+    const ids = await resolveCatalogIds(decoded.make, decoded.model);
+    expect(ids).toEqual({ makeId: 'chevrolet', modelId: 'nexia-3' });
+
+    const payload = toServerVehicleCreatePayload({
+      make: decoded.make,
+      model: decoded.model,
+      year: decoded.year,
+      brandId: ids.makeId,
+      modelId: ids.modelId,
+      vin: decoded.vin,
+      color: 'midnight',
+      setAsPrimary: true,
+    });
+    expect(payload).toMatchObject({
+      make_id: 'chevrolet', model_id: 'nexia-3', year: 2017,
+    });
+  });
+
   test('every pattern cites its evidence by prefix, never a full VIN', () => {
     for (const p of UZAUTO_VIN_PATTERNS) {
       expect(p.evidence).toContain(`XWB${p.vds}`);

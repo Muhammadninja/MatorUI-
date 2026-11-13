@@ -1,3 +1,4 @@
+import type { VehicleGeneration } from '@/services/vehicle-images/generation';
 import type { VehicleImageState } from '@/services/vehicle-images/image-status';
 import {
   HttpGarageTransport,
@@ -117,13 +118,19 @@ export type Vehicle = {
   /** The backend's `vehicle_image` (pending | approved + url | unavailable). Read-only:
    *  absent from an older backend, from the mock, and never sent back. */
   image?: VehicleImageState;
+  /** The backend's `generation` for a generic model (resolved, or the options to
+   *  choose from). Read-only: absent from an older backend and from the mock. */
+  generation?: VehicleGeneration;
 };
 
-export type VehicleInput = Omit<Vehicle, 'id' | 'isPrimary' | 'addedAt' | 'image'> & {
+export type VehicleInput = Omit<Vehicle, 'id' | 'isPrimary' | 'addedAt' | 'image' | 'generation'> & {
   setAsPrimary?: boolean;
 };
 
-export type VehiclePatch = Partial<Omit<Vehicle, 'id' | 'addedAt' | 'image'>>;
+export type VehiclePatch = Partial<Omit<Vehicle, 'id' | 'addedAt' | 'image' | 'generation'>> & {
+  /** One of `generation.options[].id`, or null to clear the pick. Picture only. */
+  variantModelId?: string | null;
+};
 
 // ── Realtime contract ────────────────────────────────────────────────
 //
