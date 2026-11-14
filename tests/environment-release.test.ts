@@ -138,7 +138,10 @@ describe('staging app identity', () => {
     const before = { ...process.env };
     try {
       Object.assign(process.env, env);
-      return appConfig({ config: JSON.parse(JSON.stringify(base)) });
+      const config = JSON.parse(JSON.stringify(base));
+      // As app.json has it once the iOS AutoFill branch lands.
+      config.ios.associatedDomains = ['webcredentials:mator.uz'];
+      return appConfig({ config });
     } finally {
       for (const key of Object.keys(process.env)) if (!(key in before)) delete process.env[key];
       Object.assign(process.env, before);
@@ -167,6 +170,12 @@ describe('staging app identity', () => {
     expect(config.extra.sentry.environment).toBe('staging');
     expect(config.extra.appEnvironment).toEqual({ name: 'staging', apiBaseUrl: 'https://api.staging.mator.uz',
       httpDomains: '', allowDevOtp: false });
+  });
+
+  test('a staging build does not claim mator.uz, which names only the production app', () => {
+    expect(resolve(stagingProfile).ios.associatedDomains).toBeUndefined();
+    expect(resolve({ ...production, EAS_BUILD_PROFILE: 'production' }).ios.associatedDomains)
+      .toEqual(['webcredentials:mator.uz']);
   });
 
   test('the production identity is untouched', () => {
