@@ -41,6 +41,7 @@ const mocks = vi.hoisted(() => ({
   staging: false,
   stagingLookup: vi.fn(),
   toasts: [] as string[],
+  os: 'android' as 'android' | 'ios',
 }));
 
 vi.mock('expo-router', () => ({
@@ -76,7 +77,7 @@ vi.mock('react-native', () => ({
   // Android — the platform of the QA report. RN's own KeyboardAvoidingView is
   // stubbed so a regression back to it renders (and fails the keyboard test)
   // instead of crashing the whole file.
-  Platform: { OS: 'android', select: (o: Record<string, unknown>) => o.android ?? o.default },
+  Platform: { get OS() { return mocks.os; }, select: (o: Record<string, unknown>) => o.android ?? o.default },
   KeyboardAvoidingView: host('rn-keyboard-avoiding-view'),
 }));
 vi.mock('react-native-keyboard-controller', () => ({
@@ -157,6 +158,7 @@ beforeEach(() => {
   mocks.staging = false;
   mocks.stagingLookup.mockReset();
   mocks.toasts = [];
+  mocks.os = 'android';
   mocks.language = 'ru';
   mocks.focused = true;
   mocks.backHandlers = [];
@@ -327,6 +329,46 @@ describe('OTP field', () => {
     await enter('12345');
     expect(byTestID('auth-otp-field').props.value).toBe('1234');
     expect(byTestID('auth-verify-btn').props.disabled).toBe(false);
+  });
+
+  test('on iOS, one native field offers the SMS code above the number pad', async () => {
+    mocks.os = 'ios';
+    const { r, byTestID } = await openOtp();
+    const field = byTestID('auth-otp-field').props;
+    expect(field.textContentType).toBe('oneTimeCode');
+    expect(field.autoComplete).toBeUndefined();
+    expect(field.keyboardType).toBe('number-pad');
+    expect(field.autoFocus).toBe(true);
+    expect(r.root.findAll((n) => (n.type as string) === 'field')).toHaveLength(1);
+  });
+
+  test('a whole code arriving in one event fills the field, domain-bound SMS included', async () => {
+    const { byTestID, enter } = await openOtp();
+    await enter('Your Mator verification code is 483917.\n\n@mator.uz #483917');
+    expect(byTestID('auth-otp-field').props.value).toBe('483917');
+    await enter('12');
+    await enter('12750361');
+    expect(byTestID('auth-otp-field').props.value).toBe('750361');
+  });
+
+  test('resend clears the old code and verifies against the new request', async () => {
+    mocks.verifyOtp.mockResolvedValue(undefined);
+    const { r, byTestID, enter } = await openOtp();
+    await enter('483917');
+    mocks.requestOtp.mockResolvedValue({ otpToken: 'otp_2', expiresIn: 300 });
+    const resend = r.root.find(
+      (n) => (n.type as string) === 'pressable' && n.props.accessibilityLabel === 'auth.resendCode',
+    );
+    await act(async () => {
+      await resend.props.onPress();
+    });
+    expect(byTestID('auth-otp-field').props.value).toBe('');
+    expect(byTestID('auth-verify-btn').props.disabled).toBe(true);
+    await enter('750361');
+    await act(async () => {
+      await byTestID('auth-verify-btn').props.onPress();
+    });
+    expect(mocks.verifyOtp.mock.calls[0]![0]).toMatchObject({ otpToken: 'otp_2', code: '750361' });
   });
 
   test('assumes 6 digits when the backend reports no usable length', async () => {
