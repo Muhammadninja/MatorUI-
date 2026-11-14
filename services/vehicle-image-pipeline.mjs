@@ -2,11 +2,12 @@ import { createServer } from 'node:http';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
-import { createRequire } from 'node:module';
-import { processGeneratedImage } from './vehicle-image-processing.mjs';
+import { processFramedArtwork, processGeneratedImage } from './vehicle-image-processing.mjs';
+import { catalogObjectFingerprint, loadRegistryFile } from './vehicle-image-registry.mjs';
+import { artworkEntriesFor, publicationDecision, sha256Hex } from './vehicle-image-acquisition.mjs';
 
-const require = createRequire(import.meta.url);
-const VEHICLE_IMAGE_CATALOG = require('./vehicle-image-catalog.json');
+const REGISTRY = loadRegistryFile();
+const VEHICLE_IMAGE_CATALOG = REGISTRY.catalog;
 
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -14,6 +15,15 @@ const ACTIVE_JOB_STATES = new Set(['queued', 'running', 'awaiting_approval']);
 const ADMIN_ONLY_TERMINAL_JOB_STATES = new Set(['failed', 'rejected']);
 const CANONICAL_IDENTITY_VERSION = 'mator-vehicle-image-v1';
 const MARKET_IDENTITY_VERSION = 'mator-vehicle-image-v2';
+/**
+ * A catalog-valid identity whose market and generation the registry does not
+ * verify. It may enter candidate acquisition, but nothing for it is published
+ * without an administrator confirming the identity.
+ */
+const UNVERIFIED_IDENTITY_VERSION = 'mator-vehicle-image-unverified-v1';
+/** Clients that send this contract version get the full status vocabulary. */
+export const PIPELINE_CONTRACT_VERSION = 2;
+const CONTRACT_HEADER = 'x-mator-vehicle-image-contract';
 const TRANSPORT_DIAGNOSTIC_FIELDS = [
   'errorName',
   'errorCode',
@@ -37,6 +47,41 @@ function sanitizeTransportDiagnostics(value) {
     }
   }
   return Object.keys(result).length ? result : undefined;
+}
+
+/** Who made an admin decision, as the backend admin proxy reports it. Display data only. */
+export function sanitizeActor(actor) {
+  if (!actor || typeof actor !== 'object' || Array.isArray(actor)) return null;
+  const text = (value, max) =>
+    typeof value === 'string' && value.trim() && !/[\u0000-\u001f\u007f]/.test(value) ? value.trim().slice(0, max) : null;
+  const result = { id: text(actor.id, 64), email: text(actor.email, 255), name: text(actor.name, 120) };
+  return result.id || result.email || result.name ? result : null;
+}
+
+/**
+ * The reviewer's statement that the picture shows exactly this vehicle (make,
+ * model, generation, body and market) with a reference to what they checked.
+ * Required to publish anything for an unverified identity.
+ */
+export function validateConfirmation(input, required) {
+  if (input == null) {
+    if (required)
+      throw Object.assign(new Error('identity confirmation is required for an unverified identity'), { status: 409 });
+    return null;
+  }
+  if (typeof input !== 'object' || Array.isArray(input) || input.confirmed !== true)
+    throw Object.assign(new Error('identityConfirmation.confirmed must be true'), { status: 400 });
+  const reference = typeof input.reference === 'string' ? input.reference.trim() : '';
+  if (reference.length < 4 || reference.length > 500 || /[\u0000-\u001f\u007f]/.test(reference))
+    throw Object.assign(new Error('identityConfirmation.reference must say what was checked (4-500 characters)'), { status: 400 });
+  return { confirmed: true, reference };
+}
+
+export function validateReason(input) {
+  if (input == null || input === '') return null;
+  if (typeof input !== 'string' || input.length > 500 || /[\u0000-\u0008\u000b-\u001f\u007f]/.test(input))
+    throw Object.assign(new Error('reason must be text up to 500 characters'), { status: 400 });
+  return input.trim() || null;
 }
 
 function normalize(value) {
@@ -90,8 +135,12 @@ export function validateCanonicalVehicleIdentity(value) {
     throw new Error('canonical identity is required');
   const legacyFields = ['makeId', 'modelId', 'modelYear', 'generationId', 'faceliftId', 'bodyType', 'trimId'];
   const marketFields = [...legacyFields, 'marketRegion'];
+  const unverifiedFields = [...legacyFields, 'identityStatus'];
   const hasMarket = Object.hasOwn(value, 'marketRegion');
-  const requiredFields = hasMarket ? marketFields : legacyFields;
+  const unverified = Object.hasOwn(value, 'identityStatus');
+  if (hasMarket && unverified)
+    throw new Error('canonical identity cannot carry both a verified market and an unverified status');
+  const requiredFields = hasMarket ? marketFields : unverified ? unverifiedFields : legacyFields;
   if (Object.keys(value).some((field) => !requiredFields.includes(field)))
     throw new Error('canonical identity contains unsupported fields');
   if (requiredFields.some((field) => !Object.hasOwn(value, field)))
@@ -112,13 +161,21 @@ export function validateCanonicalVehicleIdentity(value) {
       throw new Error('marketRegion must be a two-letter uppercase region code');
     identity.marketRegion = value.marketRegion;
   }
+  if (unverified) {
+    if (value.identityStatus !== 'unverified') throw new Error('identityStatus must be unverified');
+    identity.identityStatus = 'unverified';
+  }
   return identity;
 }
 
 export function canonicalVehicleIdentityTuple(identity) {
   const value = validateCanonicalVehicleIdentity(identity);
   return [
-    value.marketRegion ? MARKET_IDENTITY_VERSION : CANONICAL_IDENTITY_VERSION,
+    value.marketRegion
+      ? MARKET_IDENTITY_VERSION
+      : value.identityStatus
+        ? UNVERIFIED_IDENTITY_VERSION
+        : CANONICAL_IDENTITY_VERSION,
     value.makeId,
     value.modelId,
     value.modelYear,
@@ -215,12 +272,18 @@ export function createVehicleImagePipeline({
   publicationEnabled = false,
   autoRun = false,
   imageValidator = defaultImageValidator,
+  /** Validator for artwork already in the Garage framing (repository artwork, uploads). */
+  framedImageValidator = processFramedArtwork,
   assetStore = null,
   maxAttempts = 3,
   jobTimeoutMs = 120_000,
   retryDelayMs = 250,
   maxProviderCallsPerDay = 25,
   catalog = VEHICLE_IMAGE_CATALOG,
+  /** Free repository-artwork provider (vehicle-image-acquisition.mjs); null = off. */
+  artworkProvider = null,
+  /** Paid generation for unverified identities stays off unless explicitly allowed. */
+  allowUnverifiedGeneration = false,
 } = {}) {
   if (!dataDir) throw new Error('dataDir is required');
   if (!adminToken || adminToken.length < 16)
@@ -232,13 +295,26 @@ export function createVehicleImagePipeline({
   if (!catalog || !Array.isArray(catalog.assets)) throw new Error('vehicle image catalog is invalid');
   const dbPath = path.join(dataDir, 'metadata.json');
   const privateDir = path.join(dataDir, 'private');
-  let db = { requests: [], candidates: [], published: [], jobs: [], identityLinks: [], catalogDecisions: {}, providerCallLedger: {} };
+  const emptyDb = () => ({
+    requests: [], candidates: [], published: [], jobs: [], identityLinks: [], catalogDecisions: {},
+    providerCallLedger: {}, subjects: {}, scopes: [], rejectedFingerprints: {}, decisions: [], counters: {},
+  });
+  let db = emptyDb();
   let writeQueue = Promise.resolve();
   let workerPromise = null;
   let initialized = false;
   const generationAvailable = Boolean(provider && generationEnabled);
+  const acquisitionAvailable = generationAvailable || Boolean(artworkProvider);
+  const registry = {
+    version: catalog.version ?? null,
+    sha256: catalog === VEHICLE_IMAGE_CATALOG ? REGISTRY.sha256 : catalogObjectFingerprint(catalog),
+  };
   const publishInProgress = new Set();
   const identityLinkInProgress = new Set();
+
+  function count(name, by = 1) {
+    db.counters[name] = (db.counters[name] ?? 0) + by;
+  }
 
   async function initialize() {
     await mkdir(privateDir, { recursive: true, mode: 0o700 });
@@ -248,6 +324,11 @@ export function createVehicleImagePipeline({
       db.identityLinks ??= [];
       db.catalogDecisions ??= {};
       db.providerCallLedger ??= {};
+      db.subjects ??= {};
+      db.scopes ??= [];
+      db.rejectedFingerprints ??= {};
+      db.decisions ??= [];
+      db.counters ??= {};
       const remap = new Map();
       for (const request of db.requests) {
         request.vehicle = validateVehicle(request.vehicle);
@@ -271,19 +352,31 @@ export function createVehicleImagePipeline({
           throw new Error('persisted identity link key does not match its tuple');
         link.legacyIdentityKey = remap.get(link.legacyIdentityKey) ?? link.legacyIdentityKey;
       }
+      for (const request of db.requests) {
+        if (request.canonicalIdentity && !request.subjectKey) request.subjectKey = `identity:${request.identityKey}`;
+      }
       for (const job of db.jobs) {
         if (job.status === 'running') {
-          job.status = 'failed';
-          job.lastError = 'interrupted-provider-outcome-unknown';
-          job.completedAt = new Date().toISOString();
+          if (job.phase === 'artwork') {
+            // Repository artwork is free, local and has no side effect: run it again.
+            job.status = 'queued';
+            delete job.phase;
+          } else {
+            // A paid provider may have completed a billable call: never repeat it automatically.
+            job.status = 'failed';
+            job.lastError = 'interrupted-provider-outcome-unknown';
+            job.completedAt = new Date().toISOString();
+          }
         }
         const request = db.requests.find((item) => item.id === job.requestId);
-        if (job.status === 'queued' && request?.canonicalIdentity && !generationIdentityIsVerified(request.canonicalIdentity)) {
+        if (job.status !== 'queued' || !request?.canonicalIdentity) continue;
+        if (!identityAcquirable(request.canonicalIdentity)) {
           job.status = 'cancelled';
           job.completedAt = new Date().toISOString();
           request.identityReviewRequired = true;
+          continue;
         }
-        if (job.status === 'queued' && request?.canonicalIdentity && !generationAvailable) {
+        if (!acquisitionPlan(request).eligible) {
           job.status = 'cancelled';
           job.completedAt = new Date().toISOString();
           request.generationDisabled = true;
@@ -294,7 +387,7 @@ export function createVehicleImagePipeline({
       if (error.code !== 'ENOENT') throw error;
       await persist();
     }
-    if (provider && generationEnabled && autoRun) queueMicrotask(() => void runQueuedJobs());
+    if (acquisitionAvailable && autoRun) queueMicrotask(() => void runQueuedJobs());
     initialized = true;
   }
 
@@ -372,6 +465,96 @@ export function createVehicleImagePipeline({
 
   function catalogAssetResponse(asset) {
     return asset ? { url: asset.assetUrl ?? null, version: 1, catalogAssetKey: asset.assetKey } : null;
+  }
+
+  /**
+   * Identities acquisition may work on: market- and generation-verified ones, and
+   * explicitly unverified ones (review only). A market that is claimed but not
+   * verified by the registry stays in identity review, as before.
+   */
+  function identityAcquirable(identity) {
+    return identity.identityStatus === 'unverified' || generationIdentityIsVerified(identity);
+  }
+
+  function scopeCovers(scope, identity) {
+    return scope.status === 'active' &&
+      scope.makeId === identity.makeId && scope.modelId === identity.modelId &&
+      scope.trimId === identity.trimId && scope.bodyType === identity.bodyType &&
+      scope.generationId === identity.generationId && scope.faceliftId === identity.faceliftId &&
+      scope.marketRegion === (identity.marketRegion ?? null) &&
+      scope.identityStatus === (identity.identityStatus ?? null) &&
+      identity.modelYear >= scope.yearFrom && identity.modelYear <= scope.yearTo;
+  }
+
+  /**
+   * The image subject: what the picture shows, shared by every identity that
+   * shows the same car, so one job and one publication serve all of them.
+   *
+   *   catalog:<entry>  exactly one identity- and generation-verified registry
+   *                    entry covers the market-verified identity (all its years)
+   *   scope:<id>       an administrator approved an image for a year range that
+   *                    covers the identity (same make, model, trim, body, market)
+   *   identity:<key>   otherwise the identity alone; years are never merged
+   *                    without verified facts or an administrator's decision
+   */
+  function subjectKeyFor(identity, identityKey) {
+    if (identity.marketRegion) {
+      const entries = matchingCatalogAssets(identity, { approvedOnly: false })
+        .filter((asset) => asset.generationVerified === true && effectiveCatalogStatus(asset) !== 'rejected');
+      if (entries.length === 1) return `catalog:${entries[0].id}`;
+    }
+    const scopes = db.scopes.filter((scope) => scopeCovers(scope, identity));
+    if (scopes.length === 1) return `scope:${scopes[0].id}`;
+    return `identity:${identityKey}`;
+  }
+
+  /** Point a canonical request at its subject; the first request of a subject holds its work. */
+  function attachToSubject(request) {
+    request.subjectKey = subjectKeyFor(request.canonicalIdentity, request.identityKey);
+    const subject = db.subjects[request.subjectKey];
+    if (!subject || !db.requests.some((item) => item.id === subject.primaryRequestId)) {
+      db.subjects[request.subjectKey] = { primaryRequestId: request.id, createdAt: new Date().toISOString() };
+    }
+  }
+
+  /** The request that holds a request's jobs, candidates and publications. */
+  function primaryFor(request) {
+    const subject = request?.subjectKey ? db.subjects[request.subjectKey] : null;
+    return (subject && db.requests.find((item) => item.id === subject.primaryRequestId)) ?? request;
+  }
+
+  function hasPendingCandidate(request) {
+    return db.candidates.some((candidate) => candidate.requestId === request.id && candidate.status === 'pending');
+  }
+
+  function rejectedFor(subjectKey) {
+    return new Set(db.rejectedFingerprints[subjectKey] ?? []);
+  }
+
+  /** What acquisition could do for a request right now, with no side effects. */
+  function acquisitionPlan(request) {
+    const identity = request?.canonicalIdentity;
+    if (!identity || !identityAcquirable(identity)) return { eligible: false, artwork: [], generation: false };
+    const rejected = rejectedFor(request.subjectKey);
+    const artwork = artworkProvider
+      ? artworkEntriesFor(catalog, identity, {
+          effectiveStatus: effectiveCatalogStatus,
+          coversMapping: identityMatchesCatalogMapping,
+        }).filter(({ asset }) => !rejected.has(`artwork:${asset.id}`))
+      : [];
+    const generation = generationAvailable &&
+      (identity.identityStatus === 'unverified' ? allowUnverifiedGeneration : generationIdentityIsVerified(identity));
+    return { eligible: artwork.length > 0 || generation, artwork, generation };
+  }
+
+  /** Status vocabulary for contract-2 clients (the backend since the acquisition release). */
+  function contractStatus(request, primary, asset, job) {
+    if (asset) return 'approved';
+    if (request.identityReviewRequired) return 'needs_review';
+    if (job && (job.status === 'queued' || job.status === 'running')) return job.status;
+    if (hasPendingCandidate(primary)) return 'awaiting_approval';
+    if (job && ADMIN_ONLY_TERMINAL_JOB_STATES.has(job.status)) return job.status;
+    return 'awaiting_source';
   }
 
   function listCatalogAssets(authorized) {
@@ -483,8 +666,11 @@ export function createVehicleImagePipeline({
     const identity = validateCanonicalVehicleIdentity(input.identity);
     const identityKey = canonicalVehicleIdentityKey(identity);
     const vehicle = validateCanonicalDisplay(input.vehicle, identity);
+    count('requestsReceived');
     const catalogAsset = approvedCatalogAsset(identity);
     if (catalogAsset) {
+      count('catalogReuses');
+      await persist();
       return {
         request: null,
         duplicate: false,
@@ -494,6 +680,7 @@ export function createVehicleImagePipeline({
         activeJob: null,
         previousJob: null,
         identityKey,
+        subjectKey: `catalog:${catalogAsset.id}`,
       };
     }
     let request = db.requests.find(
@@ -512,12 +699,15 @@ export function createVehicleImagePipeline({
       };
       db.requests.push(request);
     }
-    const reusableAsset = resolve(identityKey);
-    const previousJob = latestJob(identityKey);
-    const generationVerified = generationIdentityIsVerified(identity);
+    // Re-evaluated on every request: a newer scope or registry entry applies to waiting requests too.
+    attachToSubject(request);
+    const primary = primaryFor(request);
+    const reusableAsset = resolve(primary.identityKey);
+    const previousJob = latestJob(primary.identityKey);
+    const acquirable = identityAcquirable(identity);
     const rejectedCatalogAsset = matchingCatalogAssets(identity, { approvedOnly: false })
       .some((asset) => effectiveCatalogStatus(asset) === 'rejected');
-    if (!generationVerified || rejectedCatalogAsset) {
+    if (!acquirable || rejectedCatalogAsset) {
       request.identityReviewRequired = true;
       for (const queued of db.jobs) {
         if (queued.identityKey === identityKey && queued.status === 'queued') {
@@ -526,27 +716,31 @@ export function createVehicleImagePipeline({
         }
       }
     }
-    if (generationVerified && !rejectedCatalogAsset) {
-      if (generationAvailable) delete request.generationDisabled;
+    const plan = acquirable && !rejectedCatalogAsset ? acquisitionPlan(primary) : { eligible: false };
+    if (acquirable && !rejectedCatalogAsset) {
+      if (plan.eligible) delete request.generationDisabled;
       else request.generationDisabled = true;
     }
     let job = null;
     if (
-      generationVerified && generationAvailable &&
-      !reusableAsset && !activeJob(identityKey) &&
+      plan.eligible && primary === request &&
+      !reusableAsset && !activeJob(identityKey) && !hasPendingCandidate(request) &&
       !ADMIN_ONLY_TERMINAL_JOB_STATES.has(previousJob?.status)
     ) job = createJob(request);
+    if (reusableAsset) count('publicationReuses');
+    else if (!job && (duplicate || primary !== request || activeJob(primary.identityKey))) count('requestsDeduplicated');
     await persist();
-    if (job && generationAvailable && autoRun) queueMicrotask(() => void runQueuedJobs());
+    if (job && acquisitionAvailable && autoRun) queueMicrotask(() => void runQueuedJobs());
     return {
       request,
       duplicate,
       reused: Boolean(reusableAsset),
       asset: reusableAsset,
       job,
-      activeJob: activeJob(identityKey) ?? job,
+      activeJob: activeJob(primary.identityKey) ?? job,
       previousJob: !job && !reusableAsset ? previousJob : null,
       identityKey,
+      subjectKey: request.subjectKey,
     };
   }
 
@@ -612,19 +806,31 @@ export function createVehicleImagePipeline({
       throw Object.assign(new Error('request not found'), { status: 404 });
     const id = randomUUID();
     await writeFile(path.join(privateDir, id), bytes, { mode: 0o600, flag: 'wx' });
+    const unverifiedIdentity = request.canonicalIdentity?.identityStatus === 'unverified';
     const candidate = {
       id,
       requestId,
+      subjectKey: request.subjectKey,
       contentType,
       size: bytes.length,
+      contentSha256: sha256Hex(bytes),
       status: 'pending',
       source: metadata.source ?? 'manual',
       provider: metadata.provider,
       model: metadata.model,
+      license: metadata.license,
+      provenance: metadata.provenance,
+      catalogAssetId: metadata.catalogAssetId,
+      sourceRef: metadata.sourceRef,
+      sourceFingerprint: metadata.sourceFingerprint,
+      basis: metadata.basis,
+      confidence: metadata.confidence,
+      uploadedBy: metadata.uploadedBy,
       width: metadata.width,
       height: metadata.height,
       quality: metadata.quality,
-      identityReviewRequired: metadata.source === 'generated' ? true : undefined,
+      identityReviewRequired:
+        metadata.source === 'generated' || unverifiedIdentity || metadata.basis === 'hint' ? true : undefined,
       providerLatencyMs: metadata.providerLatencyMs,
       providerRequestId: metadata.providerRequestId,
       providerUsage: metadata.providerUsage,
@@ -637,7 +843,7 @@ export function createVehicleImagePipeline({
     return candidate;
   }
 
-  async function uploadCandidate(requestId, { contentType, bytes }, authorized) {
+  async function uploadCandidate(requestId, { contentType, bytes, uploadedBy }, authorized) {
     requireAdmin(authorized);
     if (!IMAGE_TYPES.has(contentType))
       throw Object.assign(new Error('only JPEG, PNG and WebP images are accepted'), {
@@ -656,22 +862,153 @@ export function createVehicleImagePipeline({
       throw Object.assign(new Error('image content does not match its declared type'), {
         status: 415,
       });
-    return saveCandidate(requestId, bytes, contentType, { source: 'manual' });
+    // Decode and check it now (format, size, transparency, clipping): a file that
+    // cannot become a Garage image is refused at upload, not at approval.
+    let checks;
+    try {
+      checks = (await framedImageValidator(bytes)).checks;
+    } catch (error) {
+      throw Object.assign(new Error(error?.name === 'ImageQualityError' ? error.message : 'image could not be processed'), {
+        status: 422,
+      });
+    }
+    // An upload belongs to the request that holds its subject's work, so the
+    // published image serves every identity of that subject.
+    const request = db.requests.find((item) => item.id === requestId);
+    const target = request?.canonicalIdentity ? primaryFor(request) : request;
+    if (target?.subjectKey && rejectedFor(target.subjectKey).has(sha256Hex(bytes)))
+      throw Object.assign(new Error('this image was rejected for this vehicle before'), { status: 409 });
+    const candidate = await saveCandidate(target?.id ?? requestId, bytes, contentType, {
+      source: 'manual',
+      provider: 'manual-upload',
+      license: 'owner-supplied',
+      quality: checks,
+      uploadedBy: uploadedBy ? sanitizeActor(uploadedBy) : undefined,
+    });
+    count('candidatesCreated');
+    return candidate;
+  }
+
+  /** Propose each eligible repository artwork once as a private candidate. */
+  async function runArtwork(job, request, entries) {
+    const created = [];
+    const rejected = rejectedFor(request.subjectKey);
+    job.artworkResults = [];
+    for (const { asset, basis, confidence } of entries) {
+      let source;
+      try {
+        source = await artworkProvider.read(asset);
+      } catch {
+        job.artworkResults.push({ catalogAssetId: asset.id, outcome: 'unreadable' });
+        count('providerFailures');
+        continue;
+      }
+      const proposed = db.candidates.some(
+        (candidate) => candidate.requestId === request.id && candidate.sourceFingerprint === source.fingerprint,
+      );
+      if (rejected.has(source.fingerprint) || proposed) {
+        job.artworkResults.push({ catalogAssetId: asset.id, outcome: rejected.has(source.fingerprint) ? 'rejected-before' : 'already-proposed' });
+        continue;
+      }
+      const startedAt = Date.now();
+      let processed;
+      try {
+        processed = await framedImageValidator(source.bytes);
+      } catch (error) {
+        job.artworkResults.push({
+          catalogAssetId: asset.id,
+          outcome: error?.name === 'ImageQualityError' ? `quality:${error.message}` : 'processing-failed',
+        });
+        continue;
+      }
+      const candidate = await saveCandidate(request.id, processed.bytes, processed.contentType, {
+        source: 'repository-artwork',
+        provider: artworkProvider.id,
+        license: artworkProvider.license,
+        provenance: asset.provenance,
+        catalogAssetId: asset.id,
+        sourceRef: asset.storageRef,
+        sourceFingerprint: source.fingerprint,
+        basis,
+        confidence,
+        width: processed.width,
+        height: processed.height,
+        quality: processed.checks,
+        processingLatencyMs: Date.now() - startedAt,
+      });
+      created.push(candidate);
+      job.artworkResults.push({ catalogAssetId: asset.id, outcome: 'candidate', candidateId: candidate.id });
+    }
+    return created;
+  }
+
+  /** Record the publication decision on a new candidate and publish when policy allows it. */
+  async function applyPublicationPolicy(candidate, request, candidateProvider) {
+    const decision = publicationDecision({
+      identityVerified: Boolean(request.canonicalIdentity) && request.canonicalIdentity.identityStatus !== 'unverified' &&
+        generationIdentityIsVerified(request.canonicalIdentity),
+      provider: candidateProvider,
+      quality: candidate.quality,
+      publicationEnabled,
+    });
+    candidate.policy = decision;
+    await persist();
+    if (decision.autoPublish) {
+      await decideCandidate(candidate.id, 'approve', true, {
+        actor: { id: 'policy', email: null, name: 'automatic publication policy' },
+        automatic: true,
+      });
+    }
   }
 
   async function runJob(job) {
-    if (!provider) return;
     const request = db.requests.find((item) => item.id === job.requestId);
     if (!request || activeJob(job.identityKey) !== job) return;
-    if (request.canonicalIdentity && !generationIdentityIsVerified(request.canonicalIdentity)) {
+    if (!request.canonicalIdentity && !provider) return;
+    if (request.canonicalIdentity && !identityAcquirable(request.canonicalIdentity)) {
       request.identityReviewRequired = true;
       job.status = 'cancelled';
       job.completedAt = new Date().toISOString();
       await persist();
       return;
     }
+    const plan = request.canonicalIdentity
+      ? acquisitionPlan(request)
+      : { eligible: true, artwork: [], generation: true };
+    if (!plan.eligible) {
+      job.status = 'cancelled';
+      job.completedAt = new Date().toISOString();
+      request.generationDisabled = true;
+      await persist();
+      return;
+    }
     job.status = 'running';
     job.startedAt = new Date().toISOString();
+    if (plan.artwork.length) {
+      job.phase = 'artwork';
+      await persist();
+      const created = await runArtwork(job, request, plan.artwork);
+      delete job.phase;
+      if (created.length) {
+        job.status = 'awaiting_approval';
+        job.resultCandidateId = created[0].id;
+        job.provider = artworkProvider.id;
+        job.completedAt = new Date().toISOString();
+        count('candidatesCreated', created.length);
+        await persist();
+        for (const candidate of created) await applyPublicationPolicy(candidate, request, artworkProvider);
+        return;
+      }
+    }
+    if (!plan.generation) {
+      job.status = 'no_source';
+      job.lastError = 'no-candidate-source';
+      job.completedAt = new Date().toISOString();
+      count('jobsWithoutSource');
+      await persist();
+      return;
+    }
+    job.phase = 'generation';
     await persist();
     let lastFailure = 'provider failure';
     while (job.attempts < maxAttempts) {
@@ -739,9 +1076,13 @@ export function createVehicleImagePipeline({
         job.estimatedCostUsd = generated.estimatedCostUsd;
         job.processingLatencyMs = processingLatencyMs;
         job.completedAt = new Date().toISOString();
+        job.provider = candidate.provider;
+        delete job.phase;
         delete job.lastError;
         delete job.transportDiagnostics;
+        count('candidatesCreated');
         await persist();
+        await applyPublicationPolicy(candidate, request, provider);
         return;
       } catch (error) {
         clearTimeout(timer);
@@ -781,16 +1122,30 @@ export function createVehicleImagePipeline({
     job.status = 'failed';
     job.completedAt = new Date().toISOString();
     job.lastError = lastFailure;
+    // Dead letter: retries are exhausted; only an administrator restarts it.
+    job.deadLetter = true;
+    delete job.phase;
+    count('providerFailures');
+    count('jobsFailed');
     await persist();
   }
 
   async function runQueuedJobs() {
-    if (!provider || !generationEnabled) return false;
+    if (!acquisitionAvailable) return false;
     if (workerPromise) return workerPromise;
+    // Each queued job is taken at most once per pass, and only when something can
+    // run it (free-form legacy requests need the generation provider), so a job
+    // that runJob leaves queued can never spin the loop.
+    const runnable = (job) => {
+      const request = db.requests.find((item) => item.id === job.requestId);
+      return Boolean(request) && (Boolean(request.canonicalIdentity) || generationAvailable);
+    };
     workerPromise = (async () => {
+      const taken = new Set();
       while (true) {
-        const job = db.jobs.find((item) => item.status === 'queued');
+        const job = db.jobs.find((item) => item.status === 'queued' && !taken.has(item.id) && runnable(item));
         if (!job) return;
+        taken.add(job.id);
         await runJob(job);
       }
     })().finally(() => {
@@ -818,7 +1173,243 @@ export function createVehicleImagePipeline({
     return job;
   }
 
-  async function decideCandidate(candidateId, decision, authorized) {
+  /** An approval may name the years its image applies to: one subject for all of them. */
+  function validateScope(input, request) {
+    const identity = request.canonicalIdentity;
+    if (!identity) throw Object.assign(new Error('a scope needs a canonical identity'), { status: 400 });
+    if (request.subjectKey?.startsWith('catalog:'))
+      throw Object.assign(new Error('verified registry years already define this subject'), { status: 400 });
+    const { yearFrom, yearTo } = input ?? {};
+    if (!Number.isInteger(yearFrom) || !Number.isInteger(yearTo) || yearFrom > identity.modelYear ||
+      yearTo < identity.modelYear || yearTo - yearFrom > 30)
+      throw Object.assign(new Error('scope must be whole years around the vehicle year, at most 30 years'), { status: 400 });
+    const scope = {
+      makeId: identity.makeId,
+      modelId: identity.modelId,
+      trimId: identity.trimId,
+      bodyType: identity.bodyType,
+      generationId: identity.generationId,
+      faceliftId: identity.faceliftId,
+      marketRegion: identity.marketRegion ?? null,
+      identityStatus: identity.identityStatus ?? null,
+      yearFrom,
+      yearTo,
+    };
+    const overlap = db.scopes.some((other) => other.status === 'active' &&
+      ['makeId', 'modelId', 'trimId', 'bodyType', 'generationId', 'faceliftId', 'marketRegion', 'identityStatus']
+        .every((field) => other[field] === scope[field]) &&
+      other.yearFrom <= yearTo && yearFrom <= other.yearTo);
+    if (overlap) throw Object.assign(new Error('another approved scope already covers some of these years'), { status: 409 });
+    return scope;
+  }
+
+  /** Create an approved scope and move every waiting request it covers onto it. */
+  function createScope(scope, request, candidate, actor) {
+    const id = randomUUID();
+    const record = { id, status: 'active', ...scope, primaryRequestId: request.id, candidateId: candidate.id,
+      createdBy: actor, createdAt: new Date().toISOString() };
+    db.scopes.push(record);
+    db.subjects[`scope:${id}`] = { primaryRequestId: request.id, createdAt: record.createdAt };
+    request.subjectKey = `scope:${id}`;
+    for (const other of db.requests) {
+      if (other === request || !other.canonicalIdentity || !scopeCovers(record, other.canonicalIdentity)) continue;
+      other.subjectKey = `scope:${id}`;
+      for (const job of db.jobs) {
+        if (job.requestId === other.id && job.status === 'queued') {
+          job.status = 'cancelled';
+          job.completedAt = record.createdAt;
+          job.lastError = 'superseded-by-scope';
+        }
+      }
+      for (const pending of db.candidates) {
+        if (pending.requestId === other.id && pending.status === 'pending') pending.status = 'superseded';
+      }
+    }
+    return record;
+  }
+
+  /**
+   * Administrator retry of acquisition (free providers first, paid generation
+   * only where it is allowed). Unlike `regenerateRequest` it does not need the
+   * generation provider; it never runs for an identity still in review.
+   */
+  async function retryAcquisition(requestId, authorized, options = {}) {
+    requireAdmin(authorized);
+    const request = db.requests.find((item) => item.id === requestId && item.canonicalIdentity);
+    if (!request) throw Object.assign(new Error('request not found'), { status: 404 });
+    const primary = primaryFor(request);
+    if (resolve(primary.identityKey))
+      throw Object.assign(new Error('an approved image already exists for this identity'), { status: 409 });
+    if (activeJob(primary.identityKey) || hasPendingCandidate(primary))
+      throw Object.assign(new Error('acquisition is already active'), { status: 409 });
+    if (!identityAcquirable(primary.canonicalIdentity) || primary.identityReviewRequired)
+      throw Object.assign(new Error('canonical identity requires review before acquisition'), { status: 409 });
+    const plan = acquisitionPlan(primary);
+    if (!plan.eligible)
+      throw Object.assign(new Error('no candidate source is available for this identity'), { status: 409 });
+    delete primary.generationDisabled;
+    delete request.generationDisabled;
+    const job = createJob(primary, true);
+    db.decisions.push({
+      at: job.createdAt, action: 'retry', requestId: primary.id, identityKey: primary.identityKey,
+      subjectKey: primary.subjectKey ?? null, actor: sanitizeActor(options.actor),
+    });
+    count('retries');
+    await persist();
+    if (autoRun) queueMicrotask(() => void runQueuedJobs());
+    return job;
+  }
+
+  const candidateSummary = (candidate) => ({
+    id: candidate.id,
+    status: candidate.status,
+    createdAt: candidate.createdAt,
+    decidedAt: candidate.decidedAt,
+    source: candidate.source,
+    provider: candidate.provider,
+    model: candidate.model,
+    license: candidate.license,
+    provenance: candidate.provenance,
+    catalogAssetId: candidate.catalogAssetId,
+    basis: candidate.basis,
+    confidence: candidate.confidence,
+    quality: candidate.quality,
+    policy: candidate.policy,
+    identityReviewRequired: candidate.identityReviewRequired,
+    width: candidate.width,
+    height: candidate.height,
+    size: candidate.size,
+    contentSha256: candidate.contentSha256,
+    rejectionReason: candidate.rejectionReason,
+    decidedBy: candidate.decidedBy,
+    uploadedBy: candidate.uploadedBy,
+    processingLatencyMs: candidate.processingLatencyMs,
+    providerLatencyMs: candidate.providerLatencyMs,
+    estimatedCostUsd: candidate.estimatedCostUsd,
+  });
+
+  const jobSummary = (job) => job && ({
+    id: job.id,
+    status: job.status,
+    attempts: job.attempts,
+    maxAttempts: job.maxAttempts,
+    provider: job.provider,
+    lastError: job.lastError,
+    deadLetter: job.deadLetter === true,
+    createdAt: job.createdAt,
+    startedAt: job.startedAt,
+    completedAt: job.completedAt,
+    artworkResults: job.artworkResults,
+    providerHttpStatus: job.providerHttpStatus,
+    providerErrorCode: job.providerErrorCode,
+    transportDiagnostics: job.transportDiagnostics,
+  });
+
+  /** Canonical work by subject, for the administrator review queue. */
+  function reviewQueue(authorized) {
+    requireAdmin(authorized);
+    const canonical = db.requests.filter((request) => request.canonicalIdentity);
+    return canonical
+      .filter((request) => primaryFor(request) === request)
+      .map((request) => {
+        const job = latestJob(request.identityKey);
+        const asset = resolve(request.identityKey);
+        const members = canonical.filter((other) => other !== request && primaryFor(other) === request);
+        return {
+          requestId: request.id,
+          identityKey: request.identityKey,
+          subjectKey: request.subjectKey ?? null,
+          identity: request.canonicalIdentity,
+          vehicle: {
+            manufacturer: request.vehicle.manufacturer,
+            model: request.vehicle.model,
+            year: request.vehicle.year,
+            generation: request.vehicle.generation,
+            facelift: request.vehicle.facelift,
+            trim: request.vehicle.trim,
+            marketRegion: request.vehicle.marketRegion,
+            bodyStyle: request.vehicle.bodyStyle,
+          },
+          verification: request.canonicalIdentity.identityStatus === 'unverified' ? 'unverified' : 'verified',
+          status: contractStatus(request, request, asset, job),
+          identityReviewRequired: request.identityReviewRequired === true,
+          job: jobSummary(job),
+          candidates: db.candidates
+            .filter((candidate) => candidate.requestId === request.id && candidate.status !== 'superseded')
+            .map(candidateSummary),
+          members: members.map((other) => ({ identityKey: other.identityKey, year: other.canonicalIdentity.modelYear })),
+          publication: asset ? { version: asset.version, url: asset.url, identityConfirmed: asset.identityConfirmed } : null,
+          createdAt: request.createdAt,
+        };
+      });
+  }
+
+  /** Everything recorded about one request's subject: jobs, candidates, publications, decisions. */
+  function requestHistory(requestId, authorized) {
+    requireAdmin(authorized);
+    const request = db.requests.find((item) => item.id === requestId);
+    if (!request) throw Object.assign(new Error('request not found'), { status: 404 });
+    const primary = primaryFor(request);
+    const ids = new Set([request.id, primary.id]);
+    return {
+      requestId: request.id,
+      primaryRequestId: primary.id,
+      identityKey: request.identityKey,
+      subjectKey: request.subjectKey ?? null,
+      identity: request.canonicalIdentity ?? null,
+      jobs: db.jobs.filter((job) => ids.has(job.requestId)).map(jobSummary),
+      candidates: db.candidates.filter((candidate) => ids.has(candidate.requestId)).map(candidateSummary),
+      publications: db.published
+        .filter((item) => item.identityKey === primary.identityKey)
+        .map(({ version, publicUrl, thumbnailUrl, contentSha256, identityConfirmed, confirmation, decidedBy, createdAt, candidateId }) =>
+          ({ version, url: publicUrl ?? null, thumbnailUrl, contentSha256, identityConfirmed, confirmation, decidedBy, createdAt, candidateId,
+            active: primary.activeVersion === version })),
+      decisions: db.decisions.filter((entry) => ids.has(entry.requestId) ||
+        (entry.subjectKey && entry.subjectKey === request.subjectKey)),
+      scopes: db.scopes.filter((scope) => ids.has(scope.primaryRequestId)),
+    };
+  }
+
+  /** Operational counters for the backend status report (no secrets, no image data). */
+  function metrics(authorized) {
+    requireAdmin(authorized);
+    const tally = (items, key) => items.reduce((acc, item) => {
+      acc[item[key]] = (acc[item[key]] ?? 0) + 1;
+      return acc;
+    }, {});
+    const canonical = db.requests.filter((request) => request.canonicalIdentity);
+    const statuses = canonical.reduce((acc, request) => {
+      const primary = primaryFor(request);
+      const status = contractStatus(request, primary, resolve(primary.identityKey), latestJob(primary.identityKey));
+      acc[status] = (acc[status] ?? 0) + 1;
+      return acc;
+    }, {});
+    const average = (values) => {
+      const numbers = values.filter((value) => Number.isFinite(value));
+      return numbers.length ? Math.round(numbers.reduce((a, b) => a + b, 0) / numbers.length) : null;
+    };
+    const today = new Date().toISOString().slice(0, 10);
+    return {
+      registry,
+      capabilities: { artwork: Boolean(artworkProvider), generation: generationAvailable, publication: publicationEnabled },
+      requests: { canonical: canonical.length, byStatus: statuses },
+      subjects: canonical.filter((request) => primaryFor(request) === request).length,
+      activeScopes: db.scopes.filter((scope) => scope.status === 'active').length,
+      jobs: tally(db.jobs, 'status'),
+      deadLetters: db.jobs.filter((job) => job.deadLetter === true && job.status === 'failed').length,
+      candidates: tally(db.candidates, 'status'),
+      reviewQueue: db.candidates.filter((candidate) => candidate.status === 'pending').length,
+      providerCallsToday: db.providerCallLedger[today] ?? 0,
+      providerCallLimitPerDay: maxProviderCallsPerDay,
+      latencyMs: {
+        processingAverage: average(db.candidates.map((candidate) => candidate.processingLatencyMs)),
+        providerAverage: average(db.candidates.map((candidate) => candidate.providerLatencyMs)),
+      },
+      counters: { ...db.counters },
+    };
+  }
+
+  async function decideCandidate(candidateId, decision, authorized, options = {}) {
     requireAdmin(authorized);
     if (!['approve', 'reject'].includes(decision))
       throw new Error('decision must be approve or reject');
@@ -830,6 +1421,12 @@ export function createVehicleImagePipeline({
       throw Object.assign(new Error('image publication is disabled'), { status: 503 });
     const request = db.requests.find((item) => item.id === candidate.requestId);
     if (!request) throw Object.assign(new Error('request not found'), { status: 404 });
+    const actor = sanitizeActor(options.actor);
+    const unverified = request.canonicalIdentity?.identityStatus === 'unverified';
+    // An unverified identity is published only once a person states it is the right car.
+    const confirmation = validateConfirmation(options.identityConfirmation, decision === 'approve' && unverified);
+    const scope = decision === 'approve' && options.scope != null ? validateScope(options.scope, request) : null;
+    const reason = decision === 'reject' ? validateReason(options.reason) : null;
     if (decision === 'approve' && publishInProgress.has(request.identityKey))
       throw Object.assign(new Error('candidate approval is already in progress'), { status: 409 });
     if (decision === 'approve') publishInProgress.add(request.identityKey);
@@ -849,16 +1446,23 @@ export function createVehicleImagePipeline({
       }
     candidate.status = decision === 'approve' ? 'approved' : 'rejected';
     candidate.decidedAt = new Date().toISOString();
+    candidate.decidedBy = actor;
     if (decision === 'approve') {
       const prior = db.published.filter((item) => item.identityKey === request.identityKey);
       const version = Math.max(0, ...prior.map((item) => item.version)) + 1;
       candidate.version = version;
       db.published.push({
         identityKey: request.identityKey,
+        subjectKey: request.subjectKey,
         candidateId,
         version,
         publicUrl: publishedAsset?.url,
         storageKey: publishedAsset?.key,
+        thumbnailUrl: publishedAsset?.thumbnailUrl,
+        contentSha256: publishedAsset?.sha256 ?? candidate.contentSha256,
+        identityConfirmed: !unverified || Boolean(confirmation),
+        confirmation: confirmation ?? undefined,
+        decidedBy: actor,
         createdAt: candidate.decidedAt,
       });
       request.status = 'approved';
@@ -875,11 +1479,40 @@ export function createVehicleImagePipeline({
           waiting.completedAt = new Date().toISOString();
         }
       }
+      for (const other of db.candidates) {
+        if (other.requestId === request.id && other.status === 'pending') other.status = 'superseded';
+      }
+      if (scope) createScope(scope, request, candidate, actor);
     } else {
-      const job = db.jobs.find((item) => item.resultCandidateId === candidate.id);
-      if (job) job.status = 'rejected';
+      candidate.rejectionReason = reason;
+      // Never propose the same picture for this subject again.
+      const rejected = rejectedFor(request.subjectKey);
+      for (const mark of [candidate.contentSha256, candidate.sourceFingerprint,
+        candidate.catalogAssetId ? `artwork:${candidate.catalogAssetId}` : null]) {
+        if (mark) rejected.add(mark);
+      }
+      if (request.subjectKey) db.rejectedFingerprints[request.subjectKey] = [...rejected];
+      const job = db.jobs.find((item) =>
+        item.requestId === request.id && item.status === 'awaiting_approval');
+      const stillPending = db.candidates.find((item) => item.requestId === request.id && item.status === 'pending');
+      if (job && stillPending) job.resultCandidateId = stillPending.id;
+      else if (job) job.status = 'rejected';
       if (!request.activeVersion) request.status = 'pending';
     }
+    db.decisions.push({
+      at: candidate.decidedAt,
+      action: decision,
+      candidateId,
+      requestId: request.id,
+      identityKey: request.identityKey,
+      subjectKey: request.subjectKey ?? null,
+      actor,
+      automatic: options.automatic === true,
+      reason,
+      confirmation,
+      scope,
+    });
+    count(decision === 'approve' ? 'approvals' : 'rejections');
     await persist();
     return candidate;
     } finally {
@@ -899,13 +1532,25 @@ export function createVehicleImagePipeline({
           identityKey: key,
           version: request.activeVersion,
           url: published?.publicUrl ?? `/published/${encodeURIComponent(key)}/v${request.activeVersion}`,
+          // Market-verified identities, legacy free-form requests and every approval that
+          // carried an explicit identity confirmation count as confirmed.
+          identityConfirmed: published?.identityConfirmed ?? request.canonicalIdentity?.identityStatus !== 'unverified',
+          ...(published?.thumbnailUrl ? { thumbnailUrl: published.thumbnailUrl } : {}),
         }
       : null;
   }
 
-  function resolveCanonicalStatus(identityInput) {
+  /**
+   * Status of one canonical identity. Contract-1 clients (backends before the
+   * acquisition release) keep the original vocabulary; contract-2 clients also get
+   * `awaiting_source`, the subject key, the registry fingerprint and whether a
+   * person confirmed the identity of the published image.
+   */
+  function resolveCanonicalStatus(identityInput, { contract = 1 } = {}) {
     const identity = validateCanonicalVehicleIdentity(identityInput);
     const identityKey = canonicalVehicleIdentityKey(identity);
+    const v2 = contract >= PIPELINE_CONTRACT_VERSION;
+    const extra = (subjectKey) => (v2 ? { subjectKey, registry } : {});
     const catalogAsset = approvedCatalogAsset(identity);
     if (catalogAsset) {
       return {
@@ -915,37 +1560,49 @@ export function createVehicleImagePipeline({
         requestId: null,
         jobId: null,
         asset: catalogAssetResponse(catalogAsset),
+        ...extra(`catalog:${catalogAsset.id}`),
       };
     }
     const rejectedCatalogAsset = matchingCatalogAssets(identity, { approvedOnly: false })
       .some((asset) => effectiveCatalogStatus(asset) === 'rejected');
     if (rejectedCatalogAsset) {
-      return { identityKey, identity, status: 'needs_review', requestId: null, jobId: null, asset: null };
+      return { identityKey, identity, status: 'needs_review', requestId: null, jobId: null, asset: null, ...extra(null) };
     }
     const request = db.requests.find(
       (item) => item.identityKey === identityKey && item.canonicalIdentity,
     );
     if (!request) {
-      return { identityKey, identity, status: 'not_found', requestId: null, jobId: null, asset: null };
+      return { identityKey, identity, status: 'not_found', requestId: null, jobId: null, asset: null, ...extra(null) };
     }
-    const asset = resolve(identityKey);
-    const job = latestJob(identityKey);
-    const status = asset
-      ? 'approved'
-      : request.identityReviewRequired || request.generationDisabled
-        ? 'needs_review'
-        : ACTIVE_JOB_STATES.has(job?.status)
-        ? job.status
-        : ADMIN_ONLY_TERMINAL_JOB_STATES.has(job?.status)
-          ? job.status
-          : 'pending';
+    const primary = primaryFor(request);
+    const asset = resolve(primary.identityKey);
+    const job = latestJob(primary.identityKey);
+    const status = v2
+      ? contractStatus(request, primary, asset, job)
+      : asset
+        ? 'approved'
+        : request.identityReviewRequired || request.generationDisabled
+          ? 'needs_review'
+          : ACTIVE_JOB_STATES.has(job?.status)
+            ? job.status
+            : ADMIN_ONLY_TERMINAL_JOB_STATES.has(job?.status)
+              ? job.status
+              : 'pending';
     return {
       identityKey,
       identity,
       status,
       requestId: request.id,
       jobId: job?.id ?? null,
-      asset: asset ? { url: asset.url, version: asset.version } : null,
+      asset: asset
+        ? {
+            url: asset.url,
+            version: asset.version,
+            ...(v2 ? { identityConfirmed: asset.identityConfirmed === true } : {}),
+            ...(v2 && asset.thumbnailUrl ? { thumbnailUrl: asset.thumbnailUrl } : {}),
+          }
+        : null,
+      ...extra(request.subjectKey ?? null),
     };
   }
 
@@ -1102,13 +1759,30 @@ export function createVehicleImagePipeline({
         res.end(type === 'application/json' ? JSON.stringify(body) : body);
       };
       const isAdmin = isAuthorized(req.headers.authorization);
+      const contract = Number(req.headers?.[CONTRACT_HEADER]) || 1;
       try {
         const url = new URL(req.url, 'http://localhost');
         if (req.method === 'GET' && (url.pathname === '/health/live' || url.pathname === '/health/ready')) {
           const ready = initialized;
-          return send(url.pathname.endsWith('/live') || ready ? 200 : 503, {
-            status: url.pathname.endsWith('/live') ? 'live' : ready ? 'ready' : 'starting',
+          const live = url.pathname.endsWith('/live');
+          return send(live || ready ? 200 : 503, {
+            status: live ? 'live' : ready ? 'ready' : 'starting',
+            ...(live ? {} : {
+              registry,
+              contract: PIPELINE_CONTRACT_VERSION,
+              capabilities: { artwork: Boolean(artworkProvider), generation: generationAvailable, publication: publicationEnabled },
+            }),
           });
+        }
+        if (req.method === 'GET' && url.pathname.startsWith('/assets/') && assetStore?.serve) {
+          const file = await assetStore.serve(url.pathname.slice('/assets/'.length));
+          if (!file) return send(404, { error: 'image not found' });
+          res.writeHead(200, {
+            'content-type': file.contentType,
+            'cache-control': 'public, max-age=31536000, immutable',
+            'x-content-type-options': 'nosniff',
+          });
+          return res.end(file.bytes);
         }
         if (req.method === 'POST' && url.pathname === '/requests') {
           requireAdmin(isAdmin);
@@ -1119,7 +1793,7 @@ export function createVehicleImagePipeline({
           requireRequestService(req.headers.authorization);
           const body = await readJson(req);
           const result = await submitCanonicalRequest(body);
-          const status = resolveCanonicalStatus(body.identity);
+          const status = resolveCanonicalStatus(body.identity, { contract });
           return send(status.status === 'approved' ? 200 : 202, {
             ...status,
             duplicate: result.duplicate,
@@ -1130,10 +1804,23 @@ export function createVehicleImagePipeline({
         if (req.method === 'POST' && url.pathname === '/internal/v1/vehicle-images/resolve') {
           requireRequestService(req.headers.authorization);
           const body = await readJson(req);
-          return send(200, resolveCanonicalStatus(body.identity));
+          return send(200, resolveCanonicalStatus(body.identity, { contract }));
         }
         if (req.method === 'GET' && url.pathname === '/admin/requests')
           return send(200, listPending(isAdmin));
+        if (req.method === 'GET' && url.pathname === '/admin/review-queue')
+          return send(200, reviewQueue(isAdmin));
+        if (req.method === 'GET' && url.pathname === '/admin/metrics')
+          return send(200, metrics(isAdmin));
+        const historyMatch = /^\/admin\/requests\/([^/]+)\/history$/.exec(url.pathname);
+        if (req.method === 'GET' && historyMatch)
+          return send(200, requestHistory(decodeURIComponent(historyMatch[1]), isAdmin));
+        const retryMatch = /^\/admin\/requests\/([^/]+)\/retry$/.exec(url.pathname);
+        if (req.method === 'POST' && retryMatch) {
+          requireAdmin(isAdmin);
+          const body = await readOptionalJson(req);
+          return send(202, await retryAcquisition(decodeURIComponent(retryMatch[1]), true, { actor: body.actor }));
+        }
         if (req.method === 'POST' && url.pathname === '/admin/jobs/process') {
           requireAdmin(isAdmin);
           await runQueuedJobs();
@@ -1159,11 +1846,13 @@ export function createVehicleImagePipeline({
         if (req.method === 'POST' && candidateMatch) {
           requireAdmin(isAdmin);
           const body = await readJson(req);
+          if (typeof body.data !== 'string' || typeof body.contentType !== 'string')
+            throw Object.assign(new Error('contentType and base64 data are required'), { status: 400 });
           return send(
             201,
             await uploadCandidate(
               decodeURIComponent(candidateMatch[1]),
-              { contentType: body.contentType, bytes: Buffer.from(body.data, 'base64') },
+              { contentType: body.contentType, bytes: Buffer.from(body.data, 'base64'), uploadedBy: body.actor },
               true,
             ),
           );
@@ -1177,11 +1866,19 @@ export function createVehicleImagePipeline({
             : send(404, { error: 'candidate not found' });
         }
         const decisionMatch = /^\/admin\/candidates\/([^/]+)\/(approve|reject)$/.exec(url.pathname);
-        if (req.method === 'POST' && decisionMatch)
+        if (req.method === 'POST' && decisionMatch) {
+          requireAdmin(isAdmin);
+          const body = await readOptionalJson(req);
           return send(
             200,
-            await decideCandidate(decodeURIComponent(decisionMatch[1]), decisionMatch[2], isAdmin),
+            await decideCandidate(decodeURIComponent(decisionMatch[1]), decisionMatch[2], true, {
+              actor: body.actor,
+              identityConfirmation: body.identityConfirmation,
+              scope: body.scope,
+              reason: body.reason,
+            }),
           );
+        }
         if (req.method === 'POST' && url.pathname === '/admin/rollback') {
           requireAdmin(isAdmin);
           const body = await readJson(req);
@@ -1229,10 +1926,32 @@ export function createVehicleImagePipeline({
     readCandidate,
     readPublished,
     regenerateRequest,
+    retryAcquisition,
+    reviewQueue,
+    requestHistory,
+    metrics,
     runQueuedJobs,
+    registry,
     health: () => ({ live: true, ready: initialized }),
     server,
   };
+}
+
+/** A JSON body that may be empty (decisions sent without details). */
+async function readOptionalJson(req) {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > 64 * 1024) throw Object.assign(new Error('request body too large'), { status: 413 });
+    chunks.push(chunk);
+  }
+  const text = Buffer.concat(chunks).toString('utf8').trim();
+  if (!text) return {};
+  const parsed = JSON.parse(text);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+    throw Object.assign(new Error('request body must be a JSON object'), { status: 400 });
+  return parsed;
 }
 
 async function readJson(req) {

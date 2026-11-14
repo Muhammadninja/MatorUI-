@@ -66,4 +66,25 @@ describe('chooseVehicleVisual', () => {
     });
     expect(chooseVehicleVisual(spark, needsReview)).toEqual({ kind: 'placeholder', status: 'unavailable' });
   });
+
+  test('an unverified or ambiguous identity never borrows the model-level bundled picture', () => {
+    // A 2012 Cobalt is outside the registry's verified 2013-2026 years.
+    const cobalt = resolveVehicleImage({ brandId: 'chevrolet', modelId: 'cobalt', year: 2012 });
+    expect(cobalt.kind).toBe('image');
+    const waiting = parseVehicleImage({ status: 'pending', stage: 'awaiting_review', url: null, version: null });
+    expect(chooseVehicleVisual(cobalt, waiting, 'unverified')).toEqual({
+      kind: 'placeholder', status: 'pending', stage: 'awaiting_review',
+    });
+    expect(chooseVehicleVisual(cobalt, waiting, 'needs_review')).toMatchObject({ kind: 'placeholder' });
+    const notRequested = parseVehicleImage({ status: 'unavailable', url: null, version: null, reason: 'not_requested' });
+    expect(chooseVehicleVisual(cobalt, notRequested, 'unverified')).toEqual({ kind: 'placeholder', status: 'unavailable' });
+    // A vehicle saved before identities existed, or a verified one, keeps the approved bundle.
+    expect(chooseVehicleVisual(cobalt, notRequested, 'unresolved')).toMatchObject({ kind: 'image' });
+    expect(chooseVehicleVisual(cobalt, waiting, 'verified')).toMatchObject({ kind: 'image' });
+    // A confirmed publication for the unverified identity is shown.
+    expect(chooseVehicleVisual(cobalt, { status: 'approved', url: URL, version: 1 }, 'unverified')).toEqual({
+      kind: 'image', source: { uri: URL },
+    });
+  });
 });
+

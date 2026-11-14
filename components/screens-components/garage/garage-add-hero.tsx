@@ -10,7 +10,7 @@ import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import VehicleImagePlaceholder from '@/components/screens-components/garage/vehicle-image-placeholder';
-import type { VehicleImageStatus } from '@/services/vehicle-images/image-status';
+import type { VehicleImageStage, VehicleImageStatus } from '@/services/vehicle-images/image-status';
 import type { VehicleImageSource } from '@/services/vehicle-images/manifest';
 import { triggerHaptic } from '@/utils/haptics';
 
@@ -37,7 +37,7 @@ export type GarageHeroVisual =
   /** An approved image of this exact vehicle (from the vehicle image resolver). */
   | { kind: 'image'; source: VehicleImageSource }
   /** No approved image yet: the universal placeholder, with the pipeline's status when known. */
-  | { kind: 'placeholder'; status?: VehicleImageStatus | null };
+  | { kind: 'placeholder'; status?: VehicleImageStatus | null; stage?: VehicleImageStage };
 
 type GarageHeroCardProps = {
   testID: string;
@@ -204,6 +204,7 @@ export function GarageHeroCard({
             width={carWidth}
             height={carHeight}
             status={visual.status}
+            stage={visual.stage}
           />
         </AppView>
       ) : emptyGarage && onImagePress ? (

@@ -65,6 +65,7 @@ vi.mock('@/contexts/active-vehicle.context', () => ({
 }));
 vi.mock('@/hooks/use-garage', () => ({ useGarage: () => ({ vehicles: [] }) }));
 vi.mock('@/hooks/use-vehicle-image', () => ({ useVehicleImage: () => undefined }));
+vi.mock('@/hooks/use-garage-foreground-refresh', () => ({ useGarageForegroundRefresh: () => {} }));
 vi.mock('@/services/vehicle-images/resolver', () => ({ resolveVehicleImage: () => null }));
 vi.mock('@/services/vehicle-images/vehicle-visual', () => ({
   chooseVehicleVisual: () => ({ kind: 'placeholder' }),

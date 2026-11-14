@@ -1,5 +1,6 @@
 import type { VehicleGeneration } from '@/services/vehicle-images/generation';
 import type { VehicleImageState } from '@/services/vehicle-images/image-status';
+import type { VehicleIdentityStatus } from '@/services/vehicle-images/vehicle-visual';
 import {
   HttpGarageTransport,
   type GarageTransport,
@@ -121,13 +122,16 @@ export type Vehicle = {
   /** The backend's `generation` for a generic model (resolved, or the options to
    *  choose from). Read-only: absent from an older backend and from the mock. */
   generation?: VehicleGeneration;
+  /** The backend's `identity.status`: whether the vehicle's identity is verified.
+   *  Read-only: absent from an older backend and from the mock. */
+  identityStatus?: VehicleIdentityStatus;
 };
 
-export type VehicleInput = Omit<Vehicle, 'id' | 'isPrimary' | 'addedAt' | 'image' | 'generation'> & {
+export type VehicleInput = Omit<Vehicle, 'id' | 'isPrimary' | 'addedAt' | 'image' | 'generation' | 'identityStatus'> & {
   setAsPrimary?: boolean;
 };
 
-export type VehiclePatch = Partial<Omit<Vehicle, 'id' | 'addedAt' | 'image' | 'generation'>> & {
+export type VehiclePatch = Partial<Omit<Vehicle, 'id' | 'addedAt' | 'image' | 'generation' | 'identityStatus'>> & {
   /** One of `generation.options[].id`, or null to clear the pick. Picture only. */
   variantModelId?: string | null;
 };

@@ -32,6 +32,7 @@ import type {
 import { colorEnumToHex, colorHexToEnum } from '@/utils/vehicle-color';
 import { parseVehicleGeneration } from '@/services/vehicle-images/generation';
 import { parseVehicleImage, type VehicleImageState } from '@/services/vehicle-images/image-status';
+import { parseIdentityStatus } from '@/services/vehicle-images/vehicle-visual';
 
 const API_BASE = '/v1/garage';
 
@@ -77,6 +78,8 @@ type ServerVehicle = {
   vehicle_image?: unknown;
   /** { status: resolved|choice_required|unresolved, source, model, options }. */
   generation?: unknown;
+  /** { status: verified|unverified|needs_review|unresolved, reason, model_id, … }. */
+  identity?: unknown;
   created_at: string;
   updated_at?: string;
 };
@@ -146,6 +149,7 @@ export function toClientVehicle(raw: ServerVehicle): Vehicle {
     model3d: raw.model_3d ? mapModel3d(raw.model_3d) : undefined,
     image: parseVehicleImage(raw.vehicle_image),
     generation: parseVehicleGeneration(raw.generation),
+    identityStatus: parseIdentityStatus(raw.identity),
   };
 }
 

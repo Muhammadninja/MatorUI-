@@ -1104,6 +1104,7 @@
   },
   "vehicleImage": {
     "preparing": "Изображение готовится",
+    "awaitingReview": "Изображение на проверке",
     "unavailable": "Изображения пока нет"
   },
   "vehicleGeneration": {

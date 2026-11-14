@@ -1082,6 +1082,7 @@
   },
   "vehicleImage": {
     "preparing": "Rasm tayyorlanmoqda",
+    "awaitingReview": "Rasm tekshirilmoqda",
     "unavailable": "Hozircha rasm yoʻq"
   },
   "vehicleGeneration": {

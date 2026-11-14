@@ -24,7 +24,10 @@ export async function loadVehicleImageEnv() {
       'VEHICLE_IMAGE_PUBLICATION_ENABLED',
       'VEHICLE_IMAGE_MAX_PROVIDER_CALLS_PER_DAY',
       'VEHICLE_IMAGE_ADMIN_TOKEN', 'VEHICLE_IMAGE_REQUEST_TOKEN', 'VEHICLE_IMAGE_DATA_DIR', 'PORT', 'CLOUDINARY_CLOUD_NAME',
-      'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'].includes(match[1])) continue;
+      'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET',
+      'VEHICLE_IMAGE_REPOSITORY_ARTWORK_ENABLED', 'VEHICLE_IMAGE_ARTWORK_ROOT',
+      'VEHICLE_IMAGE_ALLOW_UNVERIFIED_GENERATION', 'VEHICLE_IMAGE_STORE',
+      'VEHICLE_IMAGE_LOCAL_STORE_DIR', 'VEHICLE_IMAGE_PUBLIC_BASE_URL'].includes(match[1])) continue;
     const [, key, raw] = match;
     if (process.env[key]) continue;
     let value = raw;
@@ -33,6 +36,23 @@ export async function loadVehicleImageEnv() {
     else value = value.replace(/\s+#.*$/, '').trim();
     if (value) process.env[key] = value;
   }
+}
+
+/** Free repository artwork: on unless explicitly 'false' (it only creates private candidates). */
+export function isRepositoryArtworkEnabled(value) {
+  return value !== 'false';
+}
+
+/** Paid generation for unverified identities: only the exact opt-in 'true'. */
+export function isUnverifiedGenerationAllowed(value) {
+  return value === 'true';
+}
+
+/** Where approved images are published: Cloudinary (default) or the local filesystem store. */
+export function vehicleImageStoreKind(value) {
+  if (value === undefined || value === '' || value === 'cloudinary') return 'cloudinary';
+  if (value === 'local') return 'local';
+  throw new Error('VEHICLE_IMAGE_STORE must be cloudinary or local');
 }
 
 export function vehicleImageMaxProviderCallsPerDay(value) {

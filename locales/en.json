@@ -1082,6 +1082,7 @@
   },
   "vehicleImage": {
     "preparing": "Image in preparation",
+    "awaitingReview": "Image being checked",
     "unavailable": "No image yet"
   },
   "vehicleGeneration": {

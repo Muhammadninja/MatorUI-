@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { processGeneratedImage } from './vehicle-image-processing.mjs';
+import { processFramedArtwork } from './vehicle-image-processing.mjs';
 
 /** Publishes approved assets only. Credentials are read server-side at construction. */
 export function createCloudinaryAssetStore({
@@ -16,7 +16,7 @@ export function createCloudinaryAssetStore({
       if (!Number.isInteger(version) || version < 1 || typeof candidateId !== 'string' || !candidateId)
         throw new Error('published image version and candidate identity are required');
       if (!Buffer.isBuffer(bytes)) throw new Error('approved cloud asset must be an image buffer');
-      const normalized = await processGeneratedImage(bytes);
+      const normalized = await processFramedArtwork(bytes);
       const identityHash = createHash('sha256').update(identityKey).digest('hex').slice(0, 32);
       const publicId = `mator/vehicle-images/${identityHash}/v${version}-${candidateId}`;
       const timestamp = Math.floor(Date.now() / 1000).toString();
@@ -58,7 +58,17 @@ export function createCloudinaryAssetStore({
         !result.secure_url.startsWith('https://res.cloudinary.com/') ||
         result.public_id !== publicId
       ) throw new Error('approved image storage returned unexpected asset metadata');
-      return { url: result.secure_url, key: publicId };
+      // The delivery URL carries Cloudinary's version segment; the thumbnail is a
+      // derived 600 px rendition of the same immutable object.
+      const thumbnailUrl = result.secure_url.includes('/image/upload/')
+        ? result.secure_url.replace('/image/upload/', '/image/upload/c_limit,w_600/')
+        : undefined;
+      return {
+        url: result.secure_url,
+        key: publicId,
+        sha256: createHash('sha256').update(normalized.bytes).digest('hex'),
+        ...(thumbnailUrl ? { thumbnailUrl } : {}),
+      };
     },
   };
 }
