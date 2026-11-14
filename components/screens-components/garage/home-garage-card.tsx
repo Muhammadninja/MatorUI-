@@ -25,6 +25,7 @@ import { resolveVehicleImage } from '@/services/vehicle-images/resolver';
 import { chooseVehicleVisual } from '@/services/vehicle-images/vehicle-visual';
 import type { VehicleImageState } from '@/services/vehicle-images/image-status';
 import { useVehicleImage } from '@/hooks/use-vehicle-image';
+import { useGarageForegroundRefresh } from '@/hooks/use-garage-foreground-refresh';
 import { pictureModelId } from '@/services/vehicle-images/generation';
 import VehicleGenerationChoice from '@/components/screens-components/garage/vehicle-generation-choice';
 import { triggerHaptic } from '@/utils/haptics';
@@ -100,7 +101,7 @@ function heroVisual(
     year: vehicle?.year,
     colorHex: vehicle?.colorHex,
   });
-  return chooseVehicleVisual(resolved, image);
+  return chooseVehicleVisual(resolved, image, vehicle?.identityStatus);
 }
 
 /**
@@ -125,6 +126,9 @@ function HomeGarageCard() {
   const summary = isHydrating ? null : summarize(currentActiveVehicle, vehicle);
   // Refreshes only while pending, on a backing-off schedule; never blocks the card.
   const image = useVehicleImage(vehicle?.id, vehicle?.image);
+  // Back in the foreground: re-read the Garage, so an image approved meanwhile
+  // (also for a vehicle saved long ago) shows without any action from the owner.
+  useGarageForegroundRefresh(vehicles.length > 0);
   // The saved colour, named as the Garage screen names it. It's the car's real
   // colour even when the picture is the white fallback.
   const colorName = vehicle?.colorHex ? t(nearestSwatch(vehicle.colorHex).labelKey) : '';

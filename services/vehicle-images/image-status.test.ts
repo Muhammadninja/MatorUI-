@@ -80,4 +80,17 @@ describe('pending refresh schedule', () => {
     expect(nextImagePollDelay(IMAGE_STATUS_POLL_DELAYS_MS.length)).toBe(false);
     expect(nextImagePollDelay(100)).toBe(false);
   });
+
+  test('a pending image says why: being prepared or being checked by a person', async () => {
+    const { parseVehicleImage: parse, placeholderMessageKey: key } = await import('./image-status');
+    expect(parse({ status: 'pending', stage: 'awaiting_review', url: null, version: null }))
+      .toEqual({ status: 'pending', url: null, version: null, stage: 'awaiting_review' });
+    expect(parse({ status: 'pending', stage: 'bogus', url: null, version: null }))
+      .toEqual({ status: 'pending', url: null, version: null });
+    expect(key('pending', 'awaiting_review')).toBe('vehicleImage.awaitingReview');
+    expect(key('pending', 'processing')).toBe('vehicleImage.preparing');
+    expect(key('pending')).toBe('vehicleImage.preparing');
+    expect(key('unavailable', 'awaiting_review')).toBe('vehicleImage.unavailable');
+  });
 });
+

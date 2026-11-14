@@ -5,7 +5,11 @@ import { useTranslation } from 'react-i18next';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
-import { placeholderMessageKey, type VehicleImageStatus } from '@/services/vehicle-images/image-status';
+import {
+  placeholderMessageKey,
+  type VehicleImageStage,
+  type VehicleImageStatus,
+} from '@/services/vehicle-images/image-status';
 
 import universalPlaceholderArt from '@/assets/vehicles/placeholder/universal.webp';
 
@@ -27,15 +31,17 @@ export default function VehicleImagePlaceholder({
   width,
   height,
   status,
+  stage,
 }: {
   testID?: string;
   width: number;
   height: number;
   status?: VehicleImageStatus | null;
+  stage?: VehicleImageStage;
 }) {
   const { t } = useTranslation();
   const { tokens, scheme } = useThemeContext();
-  const message = t(placeholderMessageKey(status));
+  const message = t(placeholderMessageKey(status, stage));
 
   return (
     <AppView

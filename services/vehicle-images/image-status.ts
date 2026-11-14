@@ -11,9 +11,16 @@
  * The app only reads this. It never starts or retries a generation.
  */
 export type VehicleImageStatus = 'pending' | 'approved' | 'unavailable';
+/**
+ * Why a `pending` image is not there yet: `processing` (a job prepares a
+ * candidate) or `awaiting_review` (a person checks a candidate, or supplies one).
+ */
+export type VehicleImageStage = 'processing' | 'awaiting_review';
 
 export type VehicleImageState = {
   status: VehicleImageStatus;
+  /** Only while `pending`; absent from older backends. */
+  stage?: VehicleImageStage;
   /** Published HTTPS URL; null for a bundled catalog asset. */
   url: string | null;
   version: number | null;
@@ -54,6 +61,10 @@ export function parseVehicleImage(raw: unknown): VehicleImageState | undefined {
     }
     return { status: 'pending', url: null, version: null };
   }
+  if (r.status === 'pending') {
+    const stage = r.stage === 'processing' || r.stage === 'awaiting_review' ? r.stage : null;
+    return { status: 'pending', url: null, version: null, ...(stage ? { stage } : {}) };
+  }
   return { status: r.status as VehicleImageStatus, url: null, version: null, ...(reason ? { reason } : {}) };
 }
 
@@ -62,9 +73,16 @@ export function approvedImageUrl(state: VehicleImageState | null | undefined): s
   return state?.status === 'approved' && state.url ? state.url : null;
 }
 
-/** What the placeholder says: an image on its way, or simply none yet. Never a time. */
-export function placeholderMessageKey(status: VehicleImageStatus | null | undefined): string {
-  return status === 'unavailable' ? 'vehicleImage.unavailable' : 'vehicleImage.preparing';
+/**
+ * What the placeholder says: an image being prepared, being checked by a
+ * person, or simply none yet. Never a time, never a technical reason.
+ */
+export function placeholderMessageKey(
+  status: VehicleImageStatus | null | undefined,
+  stage?: VehicleImageStage | null,
+): string {
+  if (status === 'unavailable') return 'vehicleImage.unavailable';
+  return stage === 'awaiting_review' ? 'vehicleImage.awaitingReview' : 'vehicleImage.preparing';
 }
 
 /**
