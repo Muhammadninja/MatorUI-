@@ -74,14 +74,23 @@ export function approvedImageUrl(state: VehicleImageState | null | undefined): s
 }
 
 /**
- * What the placeholder says: an image being prepared, being checked by a
- * person, or simply none yet. Never a time, never a technical reason.
+ * Mator 1.0 ships with the image pipeline frozen (publication off), so a pending
+ * image may never arrive: the placeholder promises nothing and always says "No
+ * image yet". Set to true once the pipeline publishes, to restore the
+ * "being prepared" / "being checked" messages.
+ */
+export const PIPELINE_PROGRESS_MESSAGES = false;
+
+/**
+ * What the placeholder says. Never a time, never a technical reason; while the
+ * pipeline is frozen, never a promise either.
  */
 export function placeholderMessageKey(
   status: VehicleImageStatus | null | undefined,
   stage?: VehicleImageStage | null,
+  progressMessages: boolean = PIPELINE_PROGRESS_MESSAGES,
 ): string {
-  if (status === 'unavailable') return 'vehicleImage.unavailable';
+  if (status === 'unavailable' || !progressMessages) return 'vehicleImage.unavailable';
   return stage === 'awaiting_review' ? 'vehicleImage.awaitingReview' : 'vehicleImage.preparing';
 }
 

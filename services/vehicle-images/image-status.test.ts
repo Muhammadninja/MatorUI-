@@ -55,8 +55,14 @@ describe('parseVehicleImage (backend vehicle_image)', () => {
 });
 
 describe('placeholderMessageKey', () => {
-  test.each(['pending', null, undefined] as const)('%s reads as being prepared', (status) => {
-    expect(placeholderMessageKey(status)).toBe('vehicleImage.preparing');
+  test.each(['pending', null, undefined] as const)('1.0 (pipeline frozen): %s promises nothing', (status) => {
+    expect(placeholderMessageKey(status)).toBe('vehicleImage.unavailable');
+    expect(placeholderMessageKey(status, 'awaiting_review')).toBe('vehicleImage.unavailable');
+  });
+
+  test.each(['pending', null, undefined] as const)('with pipeline progress on, %s reads as being prepared', (status) => {
+    expect(placeholderMessageKey(status, null, true)).toBe('vehicleImage.preparing');
+    expect(placeholderMessageKey(status, 'awaiting_review', true)).toBe('vehicleImage.awaitingReview');
   });
 
   test('unavailable promises nothing', () => {
@@ -87,9 +93,9 @@ describe('pending refresh schedule', () => {
       .toEqual({ status: 'pending', url: null, version: null, stage: 'awaiting_review' });
     expect(parse({ status: 'pending', stage: 'bogus', url: null, version: null }))
       .toEqual({ status: 'pending', url: null, version: null });
-    expect(key('pending', 'awaiting_review')).toBe('vehicleImage.awaitingReview');
-    expect(key('pending', 'processing')).toBe('vehicleImage.preparing');
-    expect(key('pending')).toBe('vehicleImage.preparing');
+    expect(key('pending', 'awaiting_review', true)).toBe('vehicleImage.awaitingReview');
+    expect(key('pending', 'processing', true)).toBe('vehicleImage.preparing');
+    expect(key('pending', null, true)).toBe('vehicleImage.preparing');
     expect(key('unavailable', 'awaiting_review')).toBe('vehicleImage.unavailable');
   });
 });
