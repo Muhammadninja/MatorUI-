@@ -1,12 +1,18 @@
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createVehicleImagePipeline } from '../services/vehicle-image-pipeline.mjs';
 import { createImageProvider } from '../services/vehicle-image-provider.mjs';
 import { createCloudinaryAssetStore } from '../services/vehicle-image-cloudinary-store.mjs';
+import { createLocalAssetStore } from '../services/vehicle-image-local-store.mjs';
+import { createRepositoryArtworkProvider } from '../services/vehicle-image-acquisition.mjs';
 import {
+  isRepositoryArtworkEnabled,
+  isUnverifiedGenerationAllowed,
   isVehicleImageGenerationEnabled,
   isVehicleImagePublicationEnabled,
   loadVehicleImageEnv,
   vehicleImageMaxProviderCallsPerDay,
+  vehicleImageStoreKind,
 } from '../services/vehicle-image-env.mjs';
 
 await loadVehicleImageEnv();
@@ -22,15 +28,31 @@ const generationEnabled = isVehicleImageGenerationEnabled(
 const publicationEnabled = isVehicleImagePublicationEnabled(
   process.env.VEHICLE_IMAGE_PUBLICATION_ENABLED,
 );
+// Free, local, private: repository artwork only ever becomes a candidate for review.
+const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const artworkProvider = isRepositoryArtworkEnabled(process.env.VEHICLE_IMAGE_REPOSITORY_ARTWORK_ENABLED)
+  ? createRepositoryArtworkProvider({ rootDir: process.env.VEHICLE_IMAGE_ARTWORK_ROOT || repositoryRoot })
+  : null;
+const storeKind = vehicleImageStoreKind(process.env.VEHICLE_IMAGE_STORE);
+const assetStore = !publicationEnabled
+  ? null
+  : storeKind === 'local'
+    ? createLocalAssetStore({
+        dir: process.env.VEHICLE_IMAGE_LOCAL_STORE_DIR,
+        publicBaseUrl: process.env.VEHICLE_IMAGE_PUBLIC_BASE_URL,
+      })
+    : createCloudinaryAssetStore();
 const pipeline = createVehicleImagePipeline({
   dataDir: path.resolve(process.env.VEHICLE_IMAGE_DATA_DIR ?? '/var/lib/mator-vehicle-images'),
   adminToken,
   requestToken,
   provider: generationEnabled ? createImageProvider() : null,
   generationEnabled,
-  assetStore: publicationEnabled ? createCloudinaryAssetStore() : null,
+  artworkProvider,
+  allowUnverifiedGeneration: isUnverifiedGenerationAllowed(process.env.VEHICLE_IMAGE_ALLOW_UNVERIFIED_GENERATION),
+  assetStore,
   publicationEnabled,
-  autoRun: generationEnabled,
+  autoRun: generationEnabled || Boolean(artworkProvider),
   maxAttempts: 3,
   maxProviderCallsPerDay: vehicleImageMaxProviderCallsPerDay(
     process.env.VEHICLE_IMAGE_MAX_PROVIDER_CALLS_PER_DAY,
@@ -42,7 +64,17 @@ const port = Number(process.env.PORT ?? 8047);
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('PORT is invalid');
 const server = pipeline.server();
 server.listen(port, '127.0.0.1', () => {
-  console.log(JSON.stringify({ service: 'vehicle-image-pipeline', status: 'listening', host: '127.0.0.1', port }));
+  console.log(JSON.stringify({
+    service: 'vehicle-image-pipeline',
+    status: 'listening',
+    host: '127.0.0.1',
+    port,
+    registrySha256: pipeline.registry.sha256,
+    artwork: Boolean(artworkProvider),
+    generation: generationEnabled,
+    publication: publicationEnabled,
+    store: publicationEnabled ? storeKind : null,
+  }));
 });
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, () => server.close(() => process.exit(0)));
