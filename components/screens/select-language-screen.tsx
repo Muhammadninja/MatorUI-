@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { CheckCircle2, Globe } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/shared/app-button';
@@ -66,173 +66,181 @@ export default function SelectLanguageScreen() {
   };
 
   return (
-    <AppView
-      testID="language-screen"
-      flex={1}
-      colorName="background"
-      style={{
-        paddingTop: insets.top + 12,
-        paddingBottom: insets.bottom + 16,
-        paddingHorizontal: 20,
-      }}
-    >
-      {/* Close button — edit mode only */}
-      {!isOnboarding ? (
-        <View style={{ alignItems: 'flex-end' }}>
-          <Pressable
-            onPress={handleClose}
-            accessibilityRole="button"
-            accessibilityLabel={closeLabels[pick]}
-            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-            style={({ pressed }) => ({
-              width: 36,
-              height: 36,
-              borderRadius: 999,
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderWidth: 1,
-              borderColor: tokens.border,
-              backgroundColor: scheme === 'dark' ? tokens.card : tokens.white,
-              opacity: pressed ? 0.7 : 1,
-            })}
-          >
-            <AppText textVariant="bodySm" weight="bold">
-              ×
-            </AppText>
-          </Pressable>
-        </View>
-      ) : null}
-
-      {/* Headline */}
-      <AppView align="center" gap={14} mt={isOnboarding ? 40 : 16}>
-        <AppView
-          center
-          rounded={999}
-          style={{
-            width: 72,
-            height: 72,
-            backgroundColor: `${tokens.brand}1F`,
-            borderWidth: 1,
-            borderColor: `${tokens.brand}40`,
-          }}
-        >
-          <Globe size={32} strokeWidth={2} color={tokens.brand} />
-        </AppView>
-        <AppView gap={6} align="center">
-          <AppText
-            textVariant="title"
-            family="heading"
-            weight="bold"
-            align="center"
-            colorName="text"
-          >
-            {headline.title}
-          </AppText>
-          <AppText
-            textVariant="bodySm"
-            colorName="gray400"
-            align="center"
-            style={{ maxWidth: 320 }}
-          >
-            {headline.subtitle}
-          </AppText>
-        </AppView>
-      </AppView>
-
-      {/* Spacer pushes the options + CTA to the bottom of the screen */}
-      <View style={{ flex: 1 }} />
-
-      {/* Options */}
-      <AppView gap="md" mb="lg">
-        {LANGUAGE_OPTIONS.map((opt) => {
-          const selected = opt.code === pick;
-          return (
+    <AppView testID="language-screen" flex={1} colorName="background">
+      {/* Scrolls so the options and CTA stay reachable at the largest
+       *  accessibility text sizes; flexGrow keeps the bottom-pinned layout
+       *  at normal sizes. */}
+      <ScrollView
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingTop: insets.top + 12,
+          paddingBottom: insets.bottom + 16,
+          paddingHorizontal: 20,
+        }}
+      >
+        {/* Close button — edit mode only */}
+        {!isOnboarding ? (
+          <View style={{ alignItems: 'flex-end' }}>
             <Pressable
-              key={opt.code}
-              testID={`language-option-${opt.code}`}
-              onPress={() => {
-                triggerHaptic('selection');
-                setPick(opt.code);
-              }}
+              onPress={handleClose}
               accessibilityRole="button"
-              accessibilityLabel={`${opt.englishName}, ${opt.nativeName}`}
-              accessibilityState={{ selected }}
+              accessibilityLabel={closeLabels[pick]}
+              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               style={({ pressed }) => ({
-                flexDirection: 'row',
+                width: 36,
+                height: 36,
+                borderRadius: 999,
                 alignItems: 'center',
-                gap: 14,
-                paddingHorizontal: 16,
-                paddingVertical: 14,
-                borderRadius: 16,
+                justifyContent: 'center',
                 borderWidth: 1,
-                borderColor: selected ? tokens.brand : tokens.border,
-                backgroundColor: selected
-                  ? `${tokens.brand}10`
-                  : scheme === 'dark'
-                    ? tokens.card
-                    : tokens.white,
-                opacity: pressed ? 0.9 : 1,
+                borderColor: tokens.border,
+                backgroundColor: scheme === 'dark' ? tokens.card : tokens.white,
+                opacity: pressed ? 0.7 : 1,
               })}
             >
-              <View
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 999,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: selected
-                    ? `${tokens.brand}25`
-                    : tokens.backgroundSecondary,
-                  borderWidth: 1,
-                  borderColor: selected ? `${tokens.brand}40` : tokens.border,
-                  overflow: 'hidden',
+              <AppText textVariant="bodySm" weight="bold">
+                ×
+              </AppText>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {/* Headline */}
+        <AppView align="center" gap={14} mt={isOnboarding ? 40 : 16}>
+          <AppView
+            center
+            rounded={999}
+            style={{
+              width: 72,
+              height: 72,
+              backgroundColor: `${tokens.brand}1F`,
+              borderWidth: 1,
+              borderColor: `${tokens.brand}40`,
+            }}
+          >
+            <Globe size={32} strokeWidth={2} color={tokens.brand} />
+          </AppView>
+          <AppView gap={6} align="center">
+            <AppText
+              textVariant="title"
+              family="heading"
+              weight="bold"
+              align="center"
+              colorName="text"
+              // Caps growth so "language" doesn't break mid-word at the
+              // largest accessibility sizes.
+              maxFontSizeMultiplier={1.6}
+            >
+              {headline.title}
+            </AppText>
+            <AppText
+              textVariant="bodySm"
+              colorName="gray400"
+              align="center"
+              style={{ maxWidth: 320 }}
+            >
+              {headline.subtitle}
+            </AppText>
+          </AppView>
+        </AppView>
+
+        {/* Spacer pushes the options + CTA to the bottom of the screen */}
+        <View style={{ flex: 1 }} />
+
+        {/* Options */}
+        <AppView gap="md" mb="lg">
+          {LANGUAGE_OPTIONS.map((opt) => {
+            const selected = opt.code === pick;
+            return (
+              <Pressable
+                key={opt.code}
+                testID={`language-option-${opt.code}`}
+                onPress={() => {
+                  triggerHaptic('selection');
+                  setPick(opt.code);
                 }}
+                accessibilityRole="button"
+                accessibilityLabel={`${opt.englishName}, ${opt.nativeName}`}
+                accessibilityState={{ selected }}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 14,
+                  paddingHorizontal: 16,
+                  paddingVertical: 14,
+                  borderRadius: 16,
+                  borderWidth: 1,
+                  borderColor: selected ? tokens.brand : tokens.border,
+                  backgroundColor: selected
+                    ? `${tokens.brand}10`
+                    : scheme === 'dark'
+                      ? tokens.card
+                      : tokens.white,
+                  opacity: pressed ? 0.9 : 1,
+                })}
               >
-                <AppText style={{ fontSize: 26, lineHeight: 30 }}>
-                  {opt.flag}
-                </AppText>
-              </View>
-              <View style={{ flex: 1, gap: 2 }}>
-                <AppText
-                  textVariant="bodySemibold"
-                  weight="semibold"
-                >
-                  {opt.nativeName}
-                </AppText>
-                <AppText
-                  textVariant="bodyXs"
-                  colorName="gray400"
-                >
-                  {opt.englishName}
-                </AppText>
-              </View>
-              {selected ? (
-                <CheckCircle2 size={22} strokeWidth={2.2} color={tokens.brand} />
-              ) : (
                 <View
                   style={{
-                    width: 22,
-                    height: 22,
+                    width: 44,
+                    height: 44,
                     borderRadius: 999,
-                    borderWidth: 2,
-                    borderColor: tokens.border,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: selected
+                      ? `${tokens.brand}25`
+                      : tokens.backgroundSecondary,
+                    borderWidth: 1,
+                    borderColor: selected ? `${tokens.brand}40` : tokens.border,
+                    overflow: 'hidden',
                   }}
-                />
-              )}
-            </Pressable>
-          );
-        })}
-      </AppView>
+                >
+                  <AppText style={{ fontSize: 26, lineHeight: 30 }}>
+                    {opt.flag}
+                  </AppText>
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <AppText
+                    textVariant="bodySemibold"
+                    weight="semibold"
+                  >
+                    {opt.nativeName}
+                  </AppText>
+                  <AppText
+                    textVariant="bodyXs"
+                    colorName="gray400"
+                  >
+                    {opt.englishName}
+                  </AppText>
+                </View>
+                {selected ? (
+                  <CheckCircle2 size={22} strokeWidth={2.2} color={tokens.brand} />
+                ) : (
+                  <View
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: 999,
+                      borderWidth: 2,
+                      borderColor: tokens.border,
+                    }}
+                  />
+                )}
+              </Pressable>
+            );
+          })}
+        </AppView>
 
-      <AppButton
-        testID="language-continue-btn"
-        title={ctaLabel}
-        kind="brand"
-        size="lg"
-        fullWidth
-        onPress={handleConfirm}
-      />
+        <AppButton
+          testID="language-continue-btn"
+          title={ctaLabel}
+          kind="brand"
+          size="lg"
+          fullWidth
+          onPress={handleConfirm}
+        />
+      </ScrollView>
     </AppView>
   );
 }
