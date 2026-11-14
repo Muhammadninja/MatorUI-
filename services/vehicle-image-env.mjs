@@ -27,7 +27,8 @@ export async function loadVehicleImageEnv() {
       'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET',
       'VEHICLE_IMAGE_REPOSITORY_ARTWORK_ENABLED', 'VEHICLE_IMAGE_ARTWORK_ROOT',
       'VEHICLE_IMAGE_ALLOW_UNVERIFIED_GENERATION', 'VEHICLE_IMAGE_STORE',
-      'VEHICLE_IMAGE_LOCAL_STORE_DIR', 'VEHICLE_IMAGE_PUBLIC_BASE_URL'].includes(match[1])) continue;
+      'VEHICLE_IMAGE_LOCAL_STORE_DIR', 'VEHICLE_IMAGE_PUBLIC_BASE_URL',
+      'VEHICLE_IMAGE_REGISTRY_SHA256'].includes(match[1])) continue;
     const [, key, raw] = match;
     if (process.env[key]) continue;
     let value = raw;
@@ -36,6 +37,18 @@ export async function loadVehicleImageEnv() {
     else value = value.replace(/\s+#.*$/, '').trim();
     if (value) process.env[key] = value;
   }
+}
+
+/**
+ * VEHICLE_IMAGE_REGISTRY_SHA256: the registry fingerprint the backend this
+ * pipeline serves pins (Backend VEHICLE_IMAGE_CATALOG_SHA256). Unset → null:
+ * the pipeline runs but readiness stays 503 'registry_unconfigured'. A value
+ * that is not 64 hex characters is passed through so readiness reports
+ * 'registry_invalid' instead of guessing.
+ */
+export function expectedRegistrySha256(value) {
+  if (value === undefined || value.trim() === '') return null;
+  return value.trim();
 }
 
 /** Free repository artwork: on unless explicitly 'false' (it only creates private candidates). */

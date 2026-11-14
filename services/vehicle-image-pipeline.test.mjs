@@ -52,7 +52,8 @@ async function setup(options = {}) {
   await pipeline.initialize();
   return { pipeline, dataDir };
 }
-function invokeServer(server, { method, url, token, body }) {
+/** Internal routes get the backend's contract header unless a test passes `contract: null`. */
+function invokeServer(server, { method, url, token, body, contract = url.startsWith('/internal/') ? '2' : null }) {
   return new Promise((resolve) => {
     const request = Readable.from(body ? [Buffer.from(JSON.stringify(body))] : []);
     request.method = method;
@@ -60,6 +61,7 @@ function invokeServer(server, { method, url, token, body }) {
     request.headers = {
       ...(token ? { authorization: `Bearer ${token}` } : {}),
       ...(body ? { 'content-type': 'application/json' } : {}),
+      ...(contract != null ? { 'x-mator-vehicle-image-contract': contract } : {}),
     };
     const response = {
       writeHead(status) { this.status = status; },
@@ -133,7 +135,8 @@ describe('vehicle image pipeline', () => {
       token: requestToken, body: requestBody,
     });
     expect(first.status, JSON.stringify(first.body)).toBe(202);
-    expect(first.body.status).toBe('needs_review');
+    // Contract 2 vocabulary: verified identity, no artwork and generation off.
+    expect(first.body.status).toBe('awaiting_source');
     const duplicate = await invokeServer(pipeline.server(), {
       method: 'POST', url: '/internal/v1/vehicle-images/requests',
       token: requestToken, body: requestBody,
@@ -243,9 +246,9 @@ describe('vehicle image pipeline', () => {
     const dataDir = await mkdtemp(path.join(os.tmpdir(), 'vehicle-image-health-'));
     dirs.push(dataDir);
     const pipeline = createVehicleImagePipeline({ dataDir, adminToken: token });
-    expect(pipeline.health()).toEqual({ live: true, ready: false });
+    expect(pipeline.health()).toEqual({ live: true, ready: false, registryCheck: 'not_enforced' });
     await pipeline.initialize();
-    expect(pipeline.health()).toEqual({ live: true, ready: true });
+    expect(pipeline.health()).toEqual({ live: true, ready: true, registryCheck: 'not_enforced' });
   });
 
   it('does not automatically repeat a provider call after an interrupted running job', async () => {

@@ -1,0 +1,155 @@
+{
+  "requests": [
+    {
+      "id": "2cb0261a-0e80-40bd-9c9a-ce3e29f49007",
+      "vehicle": {
+        "manufacturer": "BYD",
+        "make": "BYD",
+        "model": "Han",
+        "year": 2024,
+        "generation": null,
+        "facelift": null,
+        "bodyStyle": null,
+        "trim": null,
+        "exteriorColor": null
+      },
+      "canonicalIdentity": {
+        "makeId": "byd",
+        "modelId": "byd-han",
+        "modelYear": 2024,
+        "generationId": null,
+        "faceliftId": null,
+        "bodyType": null,
+        "trimId": null
+      },
+      "identityKey": "c35f59f25a1783cef099ae687bd3b067e2e7d3429679d27b508a3eb08ba36cdb",
+      "status": "approved",
+      "createdAt": "2026-11-14T20:05:50.630Z",
+      "referenceAssets": [],
+      "activeVersion": 1
+    },
+    {
+      "id": "b606bed1-cd1b-404f-9cc7-e16d1939e21e",
+      "vehicle": {
+        "manufacturer": "Chevrolet",
+        "make": "Chevrolet",
+        "model": "Cobalt",
+        "year": 2022,
+        "generation": null,
+        "facelift": null,
+        "bodyStyle": "sedan",
+        "trim": "LTZ",
+        "exteriorColor": null
+      },
+      "canonicalIdentity": {
+        "makeId": "chevrolet",
+        "modelId": "cobalt",
+        "modelYear": 2022,
+        "generationId": null,
+        "faceliftId": null,
+        "bodyType": "sedan",
+        "trimId": "cobalt-p4-ltz"
+      },
+      "identityKey": "43c116d7c2187bd37fee4f14f764c00e4e8b098bd791aa4e817199a9abed5f0f",
+      "status": "pending",
+      "createdAt": "2026-11-14T20:05:50.637Z",
+      "referenceAssets": []
+    },
+    {
+      "id": "a12c7db9-e42b-4d49-bd2c-dc1eca61c18b",
+      "vehicle": {
+        "manufacturer": "Chevrolet",
+        "make": "Chevrolet",
+        "model": "Nexia",
+        "year": 2016,
+        "generation": null,
+        "facelift": null,
+        "bodyStyle": null,
+        "trim": null,
+        "exteriorColor": null
+      },
+      "identityKey": "chevrolet|nexia|2016|||||",
+      "status": "approved",
+      "createdAt": "2026-11-14T20:05:50.638Z",
+      "referenceAssets": [],
+      "activeVersion": 1
+    }
+  ],
+  "candidates": [
+    {
+      "id": "d8a38581-bfba-4d5d-b60c-cd89663bbe47",
+      "requestId": "2cb0261a-0e80-40bd-9c9a-ce3e29f49007",
+      "contentType": "image/png",
+      "size": 1105,
+      "status": "approved",
+      "source": "manual",
+      "createdAt": "2026-11-14T20:05:50.637Z",
+      "decidedAt": "2026-11-14T20:05:50.637Z",
+      "version": 1
+    },
+    {
+      "id": "ebb7e98d-0c36-4050-b3fd-f532aa2b32e1",
+      "requestId": "a12c7db9-e42b-4d49-bd2c-dc1eca61c18b",
+      "contentType": "image/png",
+      "size": 1105,
+      "status": "approved",
+      "source": "manual",
+      "createdAt": "2026-11-14T20:05:50.639Z",
+      "decidedAt": "2026-11-14T20:05:50.639Z",
+      "version": 1
+    }
+  ],
+  "published": [
+    {
+      "identityKey": "c35f59f25a1783cef099ae687bd3b067e2e7d3429679d27b508a3eb08ba36cdb",
+      "candidateId": "d8a38581-bfba-4d5d-b60c-cd89663bbe47",
+      "version": 1,
+      "publicUrl": "https://cdn.example.test/d8a38581-bfba-4d5d-b60c-cd89663bbe47/v1.webp",
+      "storageKey": "d8a38581-bfba-4d5d-b60c-cd89663bbe47",
+      "createdAt": "2026-11-14T20:05:50.637Z"
+    },
+    {
+      "identityKey": "chevrolet|nexia|2016|||||",
+      "candidateId": "ebb7e98d-0c36-4050-b3fd-f532aa2b32e1",
+      "version": 1,
+      "publicUrl": "https://cdn.example.test/ebb7e98d-0c36-4050-b3fd-f532aa2b32e1/v1.webp",
+      "storageKey": "ebb7e98d-0c36-4050-b3fd-f532aa2b32e1",
+      "createdAt": "2026-11-14T20:05:50.639Z"
+    }
+  ],
+  "jobs": [
+    {
+      "id": "ce7cbea2-0a67-4d93-8617-5868de35c992",
+      "requestId": "2cb0261a-0e80-40bd-9c9a-ce3e29f49007",
+      "identityKey": "c35f59f25a1783cef099ae687bd3b067e2e7d3429679d27b508a3eb08ba36cdb",
+      "status": "cancelled",
+      "attempts": 0,
+      "maxAttempts": 3,
+      "forceRegenerate": false,
+      "createdAt": "2026-11-14T20:05:50.633Z",
+      "completedAt": "2026-11-14T20:05:50.637Z"
+    },
+    {
+      "id": "7038721b-4f5c-4f2e-85f3-d0a4e04c71d4",
+      "requestId": "b606bed1-cd1b-404f-9cc7-e16d1939e21e",
+      "identityKey": "43c116d7c2187bd37fee4f14f764c00e4e8b098bd791aa4e817199a9abed5f0f",
+      "status": "queued",
+      "attempts": 0,
+      "maxAttempts": 3,
+      "forceRegenerate": false,
+      "createdAt": "2026-11-14T20:05:50.637Z"
+    },
+    {
+      "id": "da515d3b-f17d-45c1-a464-23d8e2ba3294",
+      "requestId": "a12c7db9-e42b-4d49-bd2c-dc1eca61c18b",
+      "identityKey": "chevrolet|nexia|2016|||||",
+      "status": "cancelled",
+      "attempts": 0,
+      "maxAttempts": 3,
+      "forceRegenerate": false,
+      "createdAt": "2026-11-14T20:05:50.638Z",
+      "completedAt": "2026-11-14T20:05:50.639Z"
+    }
+  ],
+  "identityLinks": []
+}

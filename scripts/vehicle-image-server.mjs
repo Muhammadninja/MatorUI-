@@ -6,6 +6,7 @@ import { createCloudinaryAssetStore } from '../services/vehicle-image-cloudinary
 import { createLocalAssetStore } from '../services/vehicle-image-local-store.mjs';
 import { createRepositoryArtworkProvider } from '../services/vehicle-image-acquisition.mjs';
 import {
+  expectedRegistrySha256,
   isRepositoryArtworkEnabled,
   isUnverifiedGenerationAllowed,
   isVehicleImageGenerationEnabled,
@@ -58,6 +59,8 @@ const pipeline = createVehicleImagePipeline({
     process.env.VEHICLE_IMAGE_MAX_PROVIDER_CALLS_PER_DAY,
   ),
   jobTimeoutMs: 180_000,
+  // Always passed (null when unset) so readiness never claims a compatible deployment unchecked.
+  expectedRegistrySha256: expectedRegistrySha256(process.env.VEHICLE_IMAGE_REGISTRY_SHA256),
 });
 await pipeline.initialize();
 const port = Number(process.env.PORT ?? 8047);
@@ -70,6 +73,7 @@ server.listen(port, '127.0.0.1', () => {
     host: '127.0.0.1',
     port,
     registrySha256: pipeline.registry.sha256,
+    registryCheck: pipeline.registryCheck,
     artwork: Boolean(artworkProvider),
     generation: generationEnabled,
     publication: publicationEnabled,
