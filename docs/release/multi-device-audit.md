@@ -1,41 +1,56 @@
 # Multi-device release audit — 2026-11-14
 
 Base: `origin/main` @ `146ffcd`. Branch `claude/multi-device-audit-2026-11-14`.
+Static pass: `83b2cd5`. Device pass: this revision.
 
-## Device coverage
+## How builds were run
 
-| Class | Status | Note |
+- **iOS simulators.** Existing Mator dev-client build, loading `main` from this worktree's Metro in production mode (`--no-dev --minify`) with production env (`https://api.mator.uz`).
+- **Android emulator.** The RC APK (`5da6971`; since then only an `expo-navigation-bar` config option changed natively) was repacked with a `main` JS bundle. Its `app.config` was pointed at the production API and the APK was re-signed with a local debug key.
+  - Images added after `5da6971` have no Android resources in this repack, so Android image presentation is not evidence.
+  - Afterwards the original RC APK (sha256 `eeb3c5fd…`) was reinstalled.
+- **Guest only.** Sign-in, OTP, orders and adding a vehicle need a production SMS, which is out of scope, so no code was submitted.
+
+## Devices actually tested
+
+| Class | Device | Config |
 |---|---|---|
-| iPhone SE / standard / Pro Max | NOT TESTED | No simulator booted; owner verifies UI on own simulator/device |
-| Android small / standard / large | NOT TESTED | No emulator or device attached (`adb devices` empty) |
-| Android font/display scaling | NOT TESTED | |
-| iPad (`supportsTablet: true` in app.json) | NOT TESTED | Tablet is enabled, so it counts as supported |
-| Light / dark | NOT TESTED | |
-| Viewport simulation | NOT TESTED | Not run |
-
-All evidence below is static analysis and automated tests. None of it is device evidence.
+| Small iPhone | iPhone SE 3rd gen sim, iOS 18.3 | RU, light, default text |
+| Standard iPhone | iPhone 16 Pro sim, iOS 18.3 | EN, dark, default text |
+| Large iPhone | iPhone 17 Pro Max sim, iOS 26.1 | UZ, light, accessibility XXXL text |
+| iPad | iPad Air 11" (M3) sim, iOS 18.3 | EN, light |
+| Standard Android | Pixel 9 emulator, API 35 (1080×2424 @420) | RU, default font |
+| Small Android | Pixel 9 emulator with `wm size 720x1280`, density 320 (360×640 dp) | UZ, font scale 2.0 |
+| Large Android | — | NOT TESTED (the Pixel 9 Pro AVD is the same size class) |
+| Real devices | — | NOT TESTED |
 
 ## Checkpoints
 
 | | Checkpoint | Status | Evidence |
 |---|---|---|---|
-| A | iOS layout | NOT TESTED | No iOS runtime |
-| B | Android layout | NOT TESTED | No Android runtime |
-| C | RU / UZ / EN text and overflow | NOT TESTED (visual) / PASS (keys) | en 1024, uz 1024, ru 1046 keys: 0 missing, 0 empty, 0 `{{placeholder}}` mismatches. `numberOfLines` audit: 13 uses, all sanctioned (price shrink or 2–3 line titles) except P2-3 |
-| D | Keyboard, modals, safe areas, navigation | NOT TESTED (device) | Static: every input screen uses keyboard-controller / AppBottomSheet, or keeps its inputs above the fold. Unit tests pass: `app-bottom-sheet-keyboard`, `tab-root-bar`, `checkout-footer-spacing`, `route-navigation-states` |
-| E | Garage and vehicle-image presentation | NOT TESTED | Unit tests only (`home-garage-card`) |
-| F | Final regression | PASS | `tsc --noEmit` clean; vitest 2068/2068 pass (151/153 files; the other 2 files can't import `sharp` in this worktree's shared node_modules, which affects only the vehicle-image pipeline and is out of scope); `lint:tokens` clean. No code changed, so the production API config is unchanged |
+| A | iOS layout | FIXED | SE, 16 Pro, 17 Pro Max and iPad Air: Home, Garage (empty), Cart (empty), Profile (guest), Search with keyboard, empty search, item detail with buy bar, Sign-in. P0-1 found and fixed on Pro Max XXXL |
+| B | Android layout | PASS | Pixel 9 standard and small at 2.0×: gate, Home, Garage, Cart, Profile, item detail, Sign-in. The P0-1 fix is confirmed on small Android at 2.0× |
+| C | RU / UZ / EN text and overflow | PASS (default text) / P2 at max text | RU on SE and Pixel; EN on 16 Pro and iPad; UZ on Pro Max XXXL and small Android 2.0×. No clipping at default sizes. Overflow at max text is logged as P2-5…P2-7 |
+| D | Keyboard, modals, safe areas, navigation | PASS | Sign-in sheet keeps the phone field and Next above the keyboard on SE, 16 Pro, Pro Max XXXL (scrolls), iPad, Pixel and small Android 2.0×. Notch, Dynamic Island, home indicator and Android gesture bar are clear. Tab bar works on all devices. Notifications correctly requires sign-in for guests |
+| E | Garage and vehicle-image presentation | BLOCKED | Home hero car and item-detail gallery (iPad paging included) render on iOS. A Garage with a vehicle needs sign-in (production SMS). Android images are not representative (repack) |
+| F | Final regression | PASS | `tsc` clean. Vitest 2068/2068: 151/153 files; the other 2 can't import `sharp` from the shared node_modules (pre-existing, vehicle-image pipeline). `select-language` / navigation tests 8/8. Only `select-language-screen.tsx` changed; no API, EAS or env config changes |
 
 ## Issues
 
-P0: 0 · P1: 0 confirmed · P2: 4
+P0: 1 (fixed) · P1: 0 · P2: 7
 
-- **P2-1** `item-gallery.tsx:29`, `app-image-carousel.tsx:54` and `app-expandable-search.tsx:13` read the window width once, at module scope. With `supportsTablet: true`, the widths go stale under iPad Split View or Stage Manager.
-- **P2-2** `vehicle-detail-screen.tsx` edit form uses a plain `ScrollView` with no keyboard inset. The iOS `number-pad` has no Done key, so on SE-sized phones Save can sit under the keyboard. Tapping outside the field dismisses it.
-- **P2-3** `track-order-screen.tsx:190`: the order number uses `numberOfLines={1}` without `adjustsFontSizeToFit`, which conflicts with the no-truncation rule at large font scales.
-- **P2-4** `ru.json` has 22 keys that `en.json` does not have. They are orphans and render nothing.
+- **P0-1 FIXED, `5614087`.** The first-launch language gate did not scroll. At iOS accessibility text sizes the options and Continue were pushed off screen, so onboarding was blocked. The fix wraps the content in a ScrollView (`flexGrow` keeps the default layout) and caps the headline at `maxFontSizeMultiplier` 1.6. Verified on the Pro Max at XXXL and on small Android at 2.0×. Default-size gate unchanged on SE, 16 Pro, iPad and Pixel.
+- **P2-1 NOT REPRODUCED.** The window width read once at module scope gives correct full-width gallery paging on iPad. Split View was not exercised.
+- **P2-2 BLOCKED.** Vehicle-detail edit with the iOS number pad needs a signed-in Garage vehicle.
+- **P2-3 BLOCKED.** Track-order number clamp needs an authenticated order.
+- **P2-4 OPEN, not visual.** `ru.json` has 22 orphan keys.
+- **P2-5 NEW.** Cart empty state at XXXL: the centred empty-state block grows upward and overlaps the "Savat" title.
+- **P2-6 NEW.** Item-detail buy bar at XXXL (iOS) and at 2.0× (Android): the total price runs under the quantity stepper. Add-to-cart stays tappable.
+- **P2-7 NEW.** Words break mid-word at XXXL: "Garajingi/z" (Garage), the guest ID "YQZ4F/A" (Profile), "Avtomobili/ngizni" (Home banner). Language-option flags clip inside their 44 pt circles.
+- **Observation, not a defect.** iPad renders the phone layout stretched to full width. It is functional but has no tablet layout.
 
 ## Remaining blockers
 
-- Device runs for A, B, C (visual), D and E. These need an iOS simulator or device, an Android emulator or device, and a dev build.
-- Decide whether to keep `supportsTablet: true` or audit iPad layouts.
+- Signed-in flows on any device: Garage with a vehicle and its images, vehicle edit (P2-2), checkout, orders and track order (P2-3), notifications. These need a test account or staging OTP.
+- Real iPhone and Android hardware; a large Android class; iPad Split View.
+- Android image presentation needs a real `main` Android build (EAS).
