@@ -35,7 +35,7 @@ function environmentFrom(env, release = false) {
     // loopback, private IPv4/IPv6, custom DNS aliases and credentials in a URL.
     const allowed = {
       production: PRODUCTION_API,
-      staging: 'https://api.staging.matorui.com',
+      staging: 'https://api.staging.mator.uz',
       development: 'https://api.dev.matorui.com',
     };
     if (apiBaseUrl !== allowed[name]) {

@@ -6,11 +6,17 @@ module.exports = ({ config }) => {
   if ((process.env.MATOR_E2E === '1' || profile === 'e2e') && !e2e) {
     throw new Error('Test builds require both MATOR_E2E=1 and EAS_BUILD_PROFILE=e2e.');
   }
-  const release = process.env.NODE_ENV === 'production' || ['production', 'internal', 'preview'].includes(profile);
+  const release = process.env.NODE_ENV === 'production' || ['production', 'internal', 'preview', 'staging'].includes(profile);
   const appEnvironment = environmentFrom(process.env, release && !e2e);
   if (['production', 'internal'].includes(profile) && appEnvironment.name !== 'production') {
     throw new Error('The production build profile requires the production environment.');
   }
+  if (profile === 'staging' && appEnvironment.name !== 'staging') {
+    throw new Error('The staging build profile requires the staging environment.');
+  }
+  // Any build pointed at staging gets its own identity, so it installs beside the
+  // store app and never shares its keychain, storage, deep links or OTA channel.
+  const staging = appEnvironment.name === 'staging';
   if (e2e && (appEnvironment.name !== 'local' || appEnvironment.apiBaseUrl !== 'http://127.0.0.1:8080' || appEnvironment.allowDevOtp || appEnvironment.httpDomains)) {
     throw new Error('E2E requires the isolated loopback mock, all HTTP domains and no development OTP.');
   }
@@ -32,6 +38,12 @@ module.exports = ({ config }) => {
       ios: { ...config.ios, bundleIdentifier: 'com.mator.e2e' },
       updates: { enabled: false },
     } : {}),
+    ...(staging ? {
+      name: 'Mator Staging', scheme: 'mator-staging',
+      android: { ...config.android, package: 'com.mator.myapp.staging' },
+      ios: { ...config.ios, bundleIdentifier: 'com.fotih12.mator.staging' },
+      updates: { enabled: false },
+    } : {}),
     extra: {
       ...config.extra,
       googleMapsConfigured: Boolean(googleMapsKey),
@@ -42,6 +54,7 @@ module.exports = ({ config }) => {
       ...(appEnvironment.name === 'local' ? {
         sentry: { dsn: '', environment: 'local', enableInDev: false },
       } : {}),
+      ...(staging ? { sentry: { ...config.extra?.sentry, environment: 'staging' } } : {}),
     },
   };
 };

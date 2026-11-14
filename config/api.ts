@@ -25,7 +25,7 @@ export function getApiBaseUrl(): string | null {
   if (typeof __DEV__ !== 'undefined' && !__DEV__ && !isDedicatedE2EApp()) {
     const releaseEndpoints = {
       production: 'https://api.mator.uz',
-      staging: 'https://api.staging.matorui.com',
+      staging: 'https://api.staging.mator.uz',
       development: 'https://api.dev.matorui.com',
     };
     const expected = environment.name === 'local' ? undefined : releaseEndpoints[environment.name];

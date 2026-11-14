@@ -42,7 +42,25 @@
       "distribution": "internal",
       "channel": "preview",
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://api.staging.matorui.com",
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.staging.mator.uz",
+        "EXPO_PUBLIC_SENTRY_ENV": "staging",
+        "EXPO_PUBLIC_APP_ENV": "staging",
+        "EXPO_PUBLIC_ALLOW_DEV_OTP": "false",
+        "AUTH_DEV_MODE": "false"
+      },
+      "ios": {
+        "resourceClass": "m-medium",
+        "simulator": false
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "staging": {
+      "distribution": "internal",
+      "channel": "staging",
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.staging.mator.uz",
         "EXPO_PUBLIC_SENTRY_ENV": "staging",
         "EXPO_PUBLIC_APP_ENV": "staging",
         "EXPO_PUBLIC_ALLOW_DEV_OTP": "false",

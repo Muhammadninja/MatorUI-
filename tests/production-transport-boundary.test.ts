@@ -25,7 +25,7 @@ test('release enables every real HTTP domain', () => {
   }
 });
 test.each([
-  ['staging', 'https://api.staging.matorui.com'],
+  ['staging', 'https://api.staging.mator.uz'],
   ['development', 'https://api.dev.matorui.com'],
 ])('existing %s release profiles retain their official HTTP endpoints', (name, apiBaseUrl) => {
   Object.assign(environment, { name, apiBaseUrl });
