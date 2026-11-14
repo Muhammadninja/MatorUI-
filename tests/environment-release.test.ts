@@ -106,7 +106,10 @@ describe('dedicated E2E app boundary', () => {
         MATOR_E2E: '1', EAS_BUILD_PROFILE: 'e2e', EXPO_PUBLIC_APP_ENV: 'local',
         EXPO_PUBLIC_API_BASE_URL: 'http://127.0.0.1:8080',
       }, overrides);
-      return appConfig({ config: { android: { package: 'com.mator.myapp' }, scheme: 'mator' } });
+      return appConfig({ config: {
+        android: { package: 'com.mator.myapp' }, scheme: 'mator',
+        ios: { bundleIdentifier: 'com.fotih12.mator', associatedDomains: ['webcredentials:mator.uz'] },
+      } });
     } finally {
       for (const key of Object.keys(process.env)) if (!(key in before)) delete process.env[key];
       Object.assign(process.env, before);
@@ -121,6 +124,11 @@ describe('dedicated E2E app boundary', () => {
     expect(config.plugins.some((plugin: unknown) =>
       Array.isArray(plugin) && plugin[0] === 'react-native-maps')).toBe(true);
     expect(config.extra.appEnvironment.allowDevOtp).toBe(false);
+  });
+  test('does not claim mator.uz, which names only the production app', () => {
+    const config = resolve();
+    expect(config.ios.bundleIdentifier).toBe('com.mator.e2e');
+    expect(config.ios.associatedDomains).toBeUndefined();
   });
   test.each(['production', 'internal', 'preview', 'development'])('rejects test switch in %s', (profile) => {
     expect(() => resolve({ EAS_BUILD_PROFILE: profile })).toThrow();

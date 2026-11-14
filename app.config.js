@@ -1,5 +1,9 @@
 const { environmentFrom } = require('./config/environment-policy.cjs');
 
+// mator.uz's apple-app-site-association names only the production app, so any
+// other identity drops the association rather than claim the domain.
+const withoutProductionDomains = ({ associatedDomains, ...ios } = {}) => ios;
+
 module.exports = ({ config }) => {
   const profile = process.env.EAS_BUILD_PROFILE || '';
   const e2e = process.env.MATOR_E2E === '1' && profile === 'e2e';
@@ -29,7 +33,7 @@ module.exports = ({ config }) => {
     ...(e2e ? {
       name: 'Mator E2E', scheme: 'mator-e2e',
       android: { ...config.android, package: 'com.mator.e2e' },
-      ios: { ...config.ios, bundleIdentifier: 'com.mator.e2e' },
+      ios: { ...withoutProductionDomains(config.ios), bundleIdentifier: 'com.mator.e2e' },
       updates: { enabled: false },
     } : {}),
     extra: {
