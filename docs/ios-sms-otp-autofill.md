@@ -36,6 +36,19 @@ and the app only receives the text it inserts. It works the same in an EAS build
 as in Expo Go, apart from domain-bound codes, which need the entitlement below and
 so only work in an EAS build.
 
+## What was seen on the owner's iPhone (2026-11-04)
+
+- Builds `60f55a1` and `ebedbe00` (`693cf66`) already had `oneTimeCode`
+  (commit `7bfd779`). On two sign-ins on an iPhone 15 Pro, iOS still offered
+  no code, although AutoFill works in other apps on that phone.
+- On the one sign-in whose SMS language was recorded, the SMS came in **Uzbek**.
+- Likely cause, **not verified**: without the domain line, iOS finds the code by
+  recognising wording like "code" in languages it supports. The Uzbek text
+  ("tasdiqlash kodingiz …") and the Latin-transliterated Russian text are
+  probably not recognised. The English text is.
+- The `@mator.uz #123456` last line is a fixed format that does not depend on
+  wording, so it should also fix this. Confirm on a device.
+
 ## Domain-bound codes (`@mator.uz #123456`)
 
 From Apple's *Enabling AutoFill for domain-bound SMS codes* (iOS 14+):
@@ -88,7 +101,8 @@ entitlement.
    @mator.uz #{code}
    ```
 
-   - Not changed here: it is a production backend change, and it needs the
+   - Prepared on backend branch `claude/sms-domain-bound-otp` (`7aa0ae28`), not
+     deployed. It is a production backend change, and it needs the
      aggregator's approval.
 
 Before step 3, verify step 1 from outside:
