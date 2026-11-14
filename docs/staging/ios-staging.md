@@ -11,7 +11,10 @@ beside the App Store app on the same iPhone.
 | API selection | Build time only: EAS profile `staging` → `EXPO_PUBLIC_APP_ENV=staging`, URL resolved in `app.config.js` (`config/environment-policy.cjs`). A local `.env` cannot change it: EAS profile env wins, and a release build fails unless the URL is exactly the staging one. The `production`/`internal` profiles refuse the staging environment. |
 | Identity | `app.config.js` gives every staging-environment build its own name, bundle id, Android package and scheme, and turns OTA updates off. The production identity is untouched (resolved production config is byte-identical to `main`). |
 | Local data | Different bundle id → separate sandbox (AsyncStorage) and keychain on iOS. In addition, `services/storage-environment.ts` records which API the install's data belongs to and wipes session, Garage, cart, favorites, checkout attempts and caches before any provider hydrates if it ever changes. Existing production installs are not wiped (first run only writes the marker). |
-| Visible marker | `STAGING · api.staging.mator.uz` badge on every screen of a staging release build. |
+| Visible marker | Home-screen icon with an amber STAGING band (`assets/MATOR-app-icons/staging/icon.png`), and a `STAGING · api.staging.mator.uz` badge on every screen of a staging release build. |
+| Associated Domains | None. `webcredentials:mator.uz` (SMS code AutoFill) belongs to the production app only; `app.config.js` strips it from staging and E2E (mator.uz names only the production app). |
+| Push | Its own App ID, so EAS creates its own ad-hoc profile, and push tokens register only with the staging backend. The APNs key is team-wide in Apple's model; which key the staging server uses is a server setting (see below). |
+| Crash reports | Sentry environment `staging`. OTP codes and the tester token are never logged or attached (`services/debug-log.ts` redacts `code`, `otp_code` and auth headers; success bodies are not logged). |
 | Payments | `services/payments-service.ts` refuses to start Payme/Click in a staging build without calling the server. The server must refuse too (below). |
 | OTA | `updates.enabled=false` and channel `staging`; no production channel. |
 | Submission | No `submit.staging` profile; `eas submit --profile production` is the only submit target and is never used for this build. |
@@ -39,52 +42,33 @@ be extracted from any installed copy and cannot be revoked per person.
 - outside staging every function is inert; production requests are unchanged
   (covered by `tests/staging-access.test.ts`).
 
-**Required on the server (not deployed — needs approval).** Until this is in
-place, the app's token screen reports "refused" and nothing else works, which
-is the safe failure. Browsers keep using Basic Auth.
+**On the server.** Nginx maps each tester's token to a tester id, drops the
+token, and forwards the tester id with a proxy secret the backend checks. The
+current configuration is documented in the backend repo,
+`Backend/docs/STAGING_TESTER_OTP.md`; it supersedes the earlier "token → 1" map
+that used to be here. Hand each tester their token over a private channel.
+Revoke by deleting their map line and reloading Nginx.
 
-```nginx
-# http {} context, e.g. /etc/nginx/conf.d/mator-staging-access.conf
-map $http_x_mator_staging_access $mator_staging_token_ok {
-    default 0;
-    include /etc/nginx/mator-staging-access.map;   # root:root 0600
-}
-```
+## Getting a sign-in code (no SMS on staging)
 
-```nginx
-# /etc/nginx/mator-staging-access.map — one line per tester, revoke by deleting
-# "<openssl rand -hex 32>" 1;   # name, issued YYYY-MM-DD
-```
+Staging sends no SMS (`SMS_PROVIDER=log`). The backend keeps a code requested
+by a registered tester, for one of their own numbers, in that tester's inbox
+(`GET /v1/staging/otp/inbox`, see the backend doc).
 
-```nginx
-# server { server_name api.staging.mator.uz; … }
-location = /_mator_staging_gate {
-    internal;
-    if ($mator_staging_token_ok) { return 204; }
-    return 401;
-}
+In the app, on the code step, tap **Staging only — Get test code**:
 
-# In every proxied location (including the realtime/WebSocket one):
-location / {
-    satisfy any;                                   # Basic Auth OR a tester token
-    auth_basic "Mator Staging";
-    auth_basic_user_file /etc/nginx/.htpasswd-mator-staging;
-    auth_request /_mator_staging_gate;
-    proxy_set_header X-Mator-Staging-Access "";    # never forward the token
-    # … existing proxy_pass / headers unchanged …
-}
-```
+- it is rendered only in a staging build (`isStagingBuild()`), and makes no
+  request in any other build;
+- it reads the inbox through the tester token the device already sends. It
+  adds no credential, and the app bundle contains none;
+- it fills the code for the current request only. The tester still taps
+  "Agree & continue", so verification, attempt limits and rate limits are
+  unchanged;
+- the code is never shown in a toast or logged. A number that is not bound to
+  the tester gets 403 at "Next", and nothing is generated.
 
-Then `nginx -t && systemctl reload nginx`. Check from a laptop (token from the
-map, never pasted into chat or tickets):
-
-```sh
-curl -s -o /dev/null -w '%{http_code}\n' https://api.staging.mator.uz/health                       # 401
-curl -s -o /dev/null -w '%{http_code}\n' -H "X-Mator-Staging-Access: $TOKEN" https://api.staging.mator.uz/health   # 200
-```
-
-Hand each tester their token over a private channel. Revoke by deleting the
-line and reloading Nginx.
+Code: `services/staging-otp-inbox.ts`, `passwordless-auth-screen.tsx`; tests
+in `tests/staging-otp-inbox.test.ts` and the screen test.
 
 ## Backend side effects to confirm before testing orders
 
@@ -96,7 +80,7 @@ scenarios (read-only check; values are not to be printed):
 |---|---|
 | Payme / Click | `PAYMENT_PROVIDERS=` (empty → no provider; the code default is `payme`). `PAYME_*` and `CLICK_*` unset or sandbox credentials only. |
 | Payment return URL | Only if sandbox payments are ever tested: `PAYMENT_RETURN_URL_SCHEMES=mator-staging`. |
-| SMS / OTP | No production Eskiz/Playmobile/Sayqal credentials. Note: with `NODE_ENV=production` the server refuses to boot on `SMS_PROVIDER=log`, and the release app never shows a development OTP. Testers need either a sandbox SMS account limited to their own numbers, or email OTP via a staging Resend key. **Decision needed.** |
+| SMS / OTP | `SMS_PROVIDER=log`, no Eskiz/Playmobile/Sayqal credentials, staging tester OTP on (`STAGING_OTP_*`, backend doc). Testers read codes with the in-app button above. |
 | Telegram | `TELEGRAM_BOT_TOKEN` unset, or a staging bot. Polling disabled is not enough: dealer-group and escalation messages are *sent*, not polled (`TELEGRAM_DEALERS_GROUP_ID`, `TELEGRAM_SOURCING_ESCALATION_CHAT_ID`). |
 | Push | `EXPO_ACCESS_TOKEN`/`APNS_KEY_P8`/`FCM_SERVICE_ACCOUNT_JSON` only reach devices registered in `mator_staging`. If that database was ever copied from production, delete its device tokens first. |
 | Email | `RESEND_API_KEY` unset or a staging key; no customer addresses in `mator_staging`. |
@@ -135,6 +119,8 @@ Record pass/fail, device, iOS version, build number and time for each line.
 **Install and isolation**
 - [ ] Staging and App Store Mator both installed; names and icons distinguishable; staging shows the STAGING badge on every screen.
 - [ ] First launch shows the "Mator Staging" token screen; a wrong token is refused; the right one continues.
+- [ ] Sign in with the tester's own number: "Staging only — Get test code" fills the code, and verification still needs the tap. Another number is refused at "Next".
+- [ ] The App Store app shows no staging button and no badge.
 - [ ] Signed in on the App Store app → staging app is signed out, with an empty cart, Garage and favorites (and vice versa).
 - [ ] Revoke the tester token on the server → next request shows the token screen; the session is still there after re-entering a new token.
 

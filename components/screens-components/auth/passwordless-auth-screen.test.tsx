@@ -38,6 +38,9 @@ const mocks = vi.hoisted(() => ({
   requestOtp: vi.fn(),
   verifyOtp: vi.fn(),
   documents: [] as unknown[],
+  staging: false,
+  stagingLookup: vi.fn(),
+  toasts: [] as string[],
 }));
 
 vi.mock('expo-router', () => ({
@@ -101,8 +104,14 @@ vi.mock('@/components/shared/app-view', () => ({
 vi.mock('@/config/api', () => ({ getApiBaseUrl: () => 'https://api.test' }));
 vi.mock('@/services/api-client', () => ({ ApiError: class ApiError extends Error {} }));
 vi.mock('@/utils/haptics', () => ({ triggerHaptic: () => {} }));
+vi.mock('@/services/staging-access', () => ({ isStagingBuild: () => mocks.staging }));
+vi.mock('@/services/staging-otp-inbox', () => ({ fetchStagingOtpCode: mocks.stagingLookup }));
 vi.mock('@/hooks/use-toast', () => ({
-  useToast: () => ({ info: () => {}, danger: () => {}, success: () => {} }),
+  useToast: () => ({
+    info: (m: string) => mocks.toasts.push(m),
+    danger: (m: string) => mocks.toasts.push(m),
+    success: (m: string) => mocks.toasts.push(m),
+  }),
 }));
 vi.mock('@/contexts/theme.context', () => ({
   useThemeContext: () => ({ tokens: {}, scheme: 'dark' }),
@@ -145,6 +154,9 @@ const doc = (type: LegalDocumentType, title: string): LegalDocument => ({
 const TYPES: LegalDocumentType[] = ['TERMS_OF_USE', 'PRIVACY_POLICY', 'PERSONAL_DATA_CONSENT'];
 
 beforeEach(() => {
+  mocks.staging = false;
+  mocks.stagingLookup.mockReset();
+  mocks.toasts = [];
   mocks.language = 'ru';
   mocks.focused = true;
   mocks.backHandlers = [];
@@ -511,5 +523,49 @@ describe('dismissing once', () => {
     await act(async () => r.unmount());
     expect(mocks.backHandlers).toHaveLength(0);
     restore();
+  });
+});
+
+describe('staging-only test code', () => {
+  async function openOtp() {
+    mocks.requestOtp.mockResolvedValue({ otpToken: 'req-1', expiresIn: 300 });
+    const sheet = await renderSheet();
+    await sheet.typePhone('+998 90 123 45 67');
+    await sheet.sendCode();
+    const button = () =>
+      sheet.r.root.findAll(
+        (n) => (n.type as string) === 'pressable' && n.props.testID === 'staging-get-test-code-btn',
+      );
+    return { ...sheet, button };
+  }
+
+  test('is absent from a production build', async () => {
+    const { button } = await openOtp();
+    expect(button()).toHaveLength(0);
+    expect(mocks.stagingLookup).not.toHaveBeenCalled();
+  });
+
+  test('fills the code for this request without verifying or showing it', async () => {
+    mocks.staging = true;
+    mocks.stagingLookup.mockResolvedValue({ status: 'found', code: '483917' });
+    const { byTestID, button } = await openOtp();
+    await act(async () => {
+      await button()[0]!.props.onPress();
+    });
+    expect(mocks.stagingLookup).toHaveBeenCalledWith('req-1');
+    expect(byTestID('auth-otp-field').props.value).toBe('483917');
+    expect(mocks.verifyOtp).not.toHaveBeenCalled();
+    expect(mocks.toasts.join(' ')).not.toContain('483917');
+  });
+
+  test('says so when there is no code, and leaves the field alone', async () => {
+    mocks.staging = true;
+    mocks.stagingLookup.mockResolvedValue({ status: 'unavailable' });
+    const { byTestID, button } = await openOtp();
+    await act(async () => {
+      await button()[0]!.props.onPress();
+    });
+    expect(byTestID('auth-otp-field').props.value).toBe('');
+    expect(mocks.toasts).toContain('Staging code inbox is not available for this device');
   });
 });

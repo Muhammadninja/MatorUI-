@@ -17,6 +17,8 @@ import { useUserContext } from '@/contexts/user.context';
 import { useToast } from '@/hooks/use-toast';
 import { useAcceptLegal, useLegalDocuments } from '@/hooks/use-legal';
 import { ApiError } from '@/services/api-client';
+import { isStagingBuild } from '@/services/staging-access';
+import { fetchStagingOtpCode } from '@/services/staging-otp-inbox';
 import {
   LEGAL_ACCEPTANCE_REQUIRED,
   legalDocumentSlug,
@@ -294,6 +296,26 @@ export default function PasswordlessAuthScreen() {
     }
   };
 
+  // STAGING ONLY: fill the code from this tester's staging inbox (no SMS is sent
+  // there). Fills the field and nothing more — the verify tap stays the user's,
+  // and the code is never logged or shown in a toast.
+  const getStagingTestCode = async () => {
+    if (!otpToken) return;
+    try {
+      const result = await fetchStagingOtpCode(otpToken);
+      if (result.status === 'found') {
+        setCode(normalizeOtpInput(result.code, otpLength));
+        toast.info('Staging test code filled');
+      } else if (result.status === 'none') {
+        toast.danger('No pending staging code for this request');
+      } else {
+        toast.danger('Staging code inbox is not available for this device');
+      }
+    } catch {
+      toast.danger('Could not reach the staging code inbox');
+    }
+  };
+
   const onBack = () => {
     triggerHaptic('selection');
     if (phase === 'otp') setPhase('phone');
@@ -521,6 +543,22 @@ export default function PasswordlessAuthScreen() {
                   {t('auth.didntGetItResend')}
                 </AppText>
               </AppPressableView>
+
+              {isStagingBuild() ? (
+                <AppPressableView
+                  testID="staging-get-test-code-btn"
+                  onPress={getStagingTestCode}
+                  disabled={isLoading}
+                  center
+                  accessibilityRole="button"
+                  accessibilityLabel="Staging only: get test code"
+                  style={{ borderWidth: 1, borderStyle: 'dashed', borderColor: tokens.border, borderRadius: 12, paddingVertical: 10 }}
+                >
+                  <AppText family="accent" weight="semibold" style={{ fontSize: 13, color: tokens.textMuted }}>
+                    Staging only — Get test code
+                  </AppText>
+                </AppPressableView>
+              ) : null}
             </>
           )}
         </ScrollView>

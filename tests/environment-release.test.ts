@@ -166,6 +166,8 @@ describe('staging app identity', () => {
     expect(config.scheme).toBe('mator-staging');
     expect(config.ios.bundleIdentifier).toBe('com.fotih12.mator.staging');
     expect(config.android.package).toBe('com.mator.myapp.staging');
+    expect(config.ios.icon).toBe('./assets/MATOR-app-icons/staging/icon.png');
+    expect(config.icon).toBe('./assets/MATOR-app-icons/staging/icon.png');
     expect(config.updates).toEqual({ enabled: false });
     expect(config.extra.sentry.environment).toBe('staging');
     expect(config.extra.appEnvironment).toEqual({ name: 'staging', apiBaseUrl: 'https://api.staging.mator.uz',
@@ -184,6 +186,8 @@ describe('staging app identity', () => {
     expect(config.scheme).toBe('mator');
     expect(config.ios.bundleIdentifier).toBe('com.fotih12.mator');
     expect(config.android.package).toBe('com.mator.myapp');
+    expect(config.icon).toBe(base.icon);
+    expect(config.ios.icon).toEqual(base.ios.icon);
     expect(config.updates).toEqual(base.updates);
     expect(config.extra.sentry.environment).toBe('production');
   });

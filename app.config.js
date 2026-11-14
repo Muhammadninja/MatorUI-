@@ -2,6 +2,8 @@ const { environmentFrom } = require('./config/environment-policy.cjs');
 
 // mator.uz's apple-app-site-association names only the production app, so any
 // other identity drops the association rather than claim the domain.
+const STAGING_ICON = './assets/MATOR-app-icons/staging/icon.png';
+
 const withoutProductionDomains = ({ associatedDomains, ...ios } = {}) => ios;
 
 module.exports = ({ config }) => {
@@ -44,8 +46,11 @@ module.exports = ({ config }) => {
     } : {}),
     ...(staging ? {
       name: 'Mator Staging', scheme: 'mator-staging',
+      // A banded icon, so the two apps can't be confused on the home screen.
+      icon: STAGING_ICON,
       android: { ...config.android, package: 'com.mator.myapp.staging' },
-      ios: { ...withoutProductionDomains(config.ios), bundleIdentifier: 'com.fotih12.mator.staging' },
+      ios: { ...withoutProductionDomains(config.ios), bundleIdentifier: 'com.fotih12.mator.staging',
+        icon: STAGING_ICON },
       updates: { enabled: false },
     } : {}),
     extra: {
