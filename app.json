@@ -24,7 +24,8 @@
         "NSLocationWhenInUseUsageDescription": "Mator uses your location to find nearby parts providers and mechanics, and to set where your order is delivered when you choose to.",
         "NSFaceIDUsageDescription": "Mator uses Face ID to securely sign you in to your account."
       },
-      "appleTeamId": "DXP9AG6TPN"
+      "appleTeamId": "DXP9AG6TPN",
+      "associatedDomains": ["webcredentials:mator.uz"]
     },
     "android": {
       "predictiveBackGestureEnabled": false,

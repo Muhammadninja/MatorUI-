@@ -154,9 +154,10 @@ export function PhoneChangeSheet({
                 label={t('account.currentPhoneCode', { current: currentMasked })}
                 placeholder={otpPlaceholder(otpLength)}
                 value={currentCode}
-                onChangeText={(v) => setCurrentCode(v.replace(/\D/g, '').slice(0, otpLength))}
+                onChangeText={(v) => setCurrentCode((previous) => normalizeOtpInput(v, otpLength, previous))}
                 keyboardType="number-pad"
                 autoCorrect={false}
+                {...otpAutofillProps()}
               />
             ) : null}
             <AppButton
