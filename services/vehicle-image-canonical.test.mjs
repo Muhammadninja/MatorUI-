@@ -57,12 +57,16 @@ async function publishManualCandidate(pipeline, requestId) {
   return candidate;
 }
 
-function invokeServer(server, { method, url, token, body }) {
+/** Internal routes get the backend's contract header unless a test passes `contract: null`. */
+function invokeServer(server, { method, url, token, body, contract = url.startsWith('/internal/') ? '2' : null }) {
   return new Promise((resolve) => {
     const request = Readable.from(body === undefined ? [] : [Buffer.from(JSON.stringify(body))]);
     request.method = method;
     request.url = url;
-    request.headers = token ? { authorization: `Bearer ${token}` } : {};
+    request.headers = {
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...(contract != null ? { 'x-mator-vehicle-image-contract': contract } : {}),
+    };
     const response = {
       writeHead(status, headers) {
         this.status = status;
@@ -261,14 +265,15 @@ describe('canonical vehicle identity integration', () => {
       method: 'POST', url: '/internal/v1/vehicle-images/requests', token: requestToken, body,
     });
     expect(accepted.status, JSON.stringify(accepted.body)).toBe(202);
-    expect(accepted.body).toMatchObject({ identityKey: canonicalVehicleIdentityKey(byrHanIdentity), status: 'needs_review' });
+    // Contract 2: a verified identity with no image source is awaiting a source, not in identity review.
+    expect(accepted.body).toMatchObject({ identityKey: canonicalVehicleIdentityKey(byrHanIdentity), status: 'awaiting_source' });
 
     const resolved = await invokeServer(server, {
       method: 'POST', url: '/internal/v1/vehicle-images/resolve', token: requestToken,
       body: { identity: byrHanIdentity },
     });
     expect(resolved.status).toBe(200);
-    expect(resolved.body).toMatchObject({ status: 'needs_review', requestId: accepted.body.requestId });
+    expect(resolved.body).toMatchObject({ status: 'awaiting_source', requestId: accepted.body.requestId });
   });
 
   it('does not restart a failed canonical job unless an administrator regenerates it', async () => {

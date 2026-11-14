@@ -121,7 +121,9 @@ describe('registry fingerprint handshake', () => {
     const ready = await call(server, { method: 'GET', url: '/health/ready' });
     expect(ready.body).toMatchObject({ status: 'ready', registry: { sha256: sha }, contract: 2 });
     const body = { identity: verified('nexia-3', 2019, { bodyType: 'sedan' }) };
+    // A client without the contract header no longer gets a contract-1 answer.
     const legacy = await call(server, { method: 'POST', url: '/internal/v1/vehicle-images/resolve', token: requestToken, body });
+    expect(legacy.status).toBe(428);
     expect(legacy.body.registry).toBeUndefined();
     const current = await call(server, { method: 'POST', url: '/internal/v1/vehicle-images/resolve', token: requestToken, body, headers: v2 });
     expect(current.body).toMatchObject({ status: 'approved', registry: { sha256: sha }, subjectKey: 'catalog:nexia-r3' });

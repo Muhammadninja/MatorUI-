@@ -23,7 +23,43 @@ const MARKET_IDENTITY_VERSION = 'mator-vehicle-image-v2';
 const UNVERIFIED_IDENTITY_VERSION = 'mator-vehicle-image-unverified-v1';
 /** Clients that send this contract version get the full status vocabulary. */
 export const PIPELINE_CONTRACT_VERSION = 2;
+/** Contract versions the internal routes answer; anything else is refused. */
+export const SUPPORTED_CONTRACT_VERSIONS = Object.freeze([2]);
 const CONTRACT_HEADER = 'x-mator-vehicle-image-contract';
+const SHA256_HEX = /^[0-9a-f]{64}$/;
+
+/**
+ * The contract version a request asks for, or an error code. Only a plain
+ * decimal header naming a supported version passes; a missing, repeated,
+ * malformed or unknown version is refused (HTTP 428, which the backend treats
+ * as retryable, so an older or newer client never marks a vehicle as failed).
+ */
+export function requestedContract(headers) {
+  const raw = headers?.[CONTRACT_HEADER];
+  if (raw === undefined) return { error: 'contract_header_required' };
+  if (typeof raw !== 'string' || !/^[0-9]{1,3}$/.test(raw.trim())) return { error: 'contract_header_invalid' };
+  const version = Number(raw.trim());
+  if (!SUPPORTED_CONTRACT_VERSIONS.includes(version)) return { error: 'contract_unsupported' };
+  return { version };
+}
+
+/**
+ * Compare the registry the pipeline loaded with the fingerprint the deployment
+ * says the backend pins (VEHICLE_IMAGE_REGISTRY_SHA256).
+ *
+ *   undefined  no check requested (library use, unit tests): 'not_enforced'
+ *   null / ''  the deployment did not configure it:          'unconfigured'
+ *   not hex64  malformed configuration:                       'invalid'
+ *   other sha  the deployment expects another registry:      'mismatch'
+ *
+ * Only 'ok' and 'not_enforced' let readiness say "ready".
+ */
+export function registryHandshake(loadedSha256, expected) {
+  if (expected === undefined) return 'not_enforced';
+  if (expected === null || expected === '') return 'unconfigured';
+  if (typeof expected !== 'string' || !SHA256_HEX.test(expected.trim().toLowerCase())) return 'invalid';
+  return expected.trim().toLowerCase() === loadedSha256 ? 'ok' : 'mismatch';
+}
 const TRANSPORT_DIAGNOSTIC_FIELDS = [
   'errorName',
   'errorCode',
@@ -284,6 +320,11 @@ export function createVehicleImagePipeline({
   artworkProvider = null,
   /** Paid generation for unverified identities stays off unless explicitly allowed. */
   allowUnverifiedGeneration = false,
+  /**
+   * The registry SHA-256 the backend pins (VEHICLE_IMAGE_REGISTRY_SHA256). The
+   * server script always passes it (null when unset); undefined skips the check.
+   */
+  expectedRegistrySha256 = undefined,
 } = {}) {
   if (!dataDir) throw new Error('dataDir is required');
   if (!adminToken || adminToken.length < 16)
@@ -309,6 +350,8 @@ export function createVehicleImagePipeline({
     version: catalog.version ?? null,
     sha256: catalog === VEHICLE_IMAGE_CATALOG ? REGISTRY.sha256 : catalogObjectFingerprint(catalog),
   };
+  const registryCheck = registryHandshake(registry.sha256, expectedRegistrySha256);
+  const registryCompatible = registryCheck === 'ok' || registryCheck === 'not_enforced';
   const publishInProgress = new Set();
   const identityLinkInProgress = new Set();
 
@@ -1577,6 +1620,15 @@ export function createVehicleImagePipeline({
     const primary = primaryFor(request);
     const asset = resolve(primary.identityKey);
     const job = latestJob(primary.identityKey);
+    // An unverified identity is only ever answered as approved with an image a
+    // person confirmed for it. Anything else (legacy data, a subject shared by
+    // mistake) goes back to review instead of being shown.
+    if (v2 && asset && identity.identityStatus === 'unverified' && asset.identityConfirmed !== true) {
+      return {
+        identityKey, identity, status: 'needs_review', requestId: request.id,
+        jobId: job?.id ?? null, asset: null, ...extra(request.subjectKey ?? null),
+      };
+    }
     const status = v2
       ? contractStatus(request, primary, asset, job)
       : asset
@@ -1759,19 +1811,29 @@ export function createVehicleImagePipeline({
         res.end(type === 'application/json' ? JSON.stringify(body) : body);
       };
       const isAdmin = isAuthorized(req.headers.authorization);
-      const contract = Number(req.headers?.[CONTRACT_HEADER]) || 1;
+      /** Internal routes: service token first, then the contract and the registry handshake. */
+      const internalGate = () => {
+        requireRequestService(req.headers.authorization);
+        const asked = requestedContract(req.headers);
+        if (asked.error)
+          throw Object.assign(new Error(asked.error), { status: 428, supportedContracts: SUPPORTED_CONTRACT_VERSIONS });
+        if (!registryCompatible)
+          throw Object.assign(new Error(`registry_${registryCheck}`), { status: 503 });
+        return asked.version;
+      };
       try {
         const url = new URL(req.url, 'http://localhost');
         if (req.method === 'GET' && (url.pathname === '/health/live' || url.pathname === '/health/ready')) {
-          const ready = initialized;
           const live = url.pathname.endsWith('/live');
-          return send(live || ready ? 200 : 503, {
-            status: live ? 'live' : ready ? 'ready' : 'starting',
-            ...(live ? {} : {
-              registry,
-              contract: PIPELINE_CONTRACT_VERSION,
-              capabilities: { artwork: Boolean(artworkProvider), generation: generationAvailable, publication: publicationEnabled },
-            }),
+          if (live) return send(200, { status: 'live' });
+          // Ready means: initialised AND serving the registry the deployment pins.
+          const ready = initialized && registryCompatible;
+          return send(ready ? 200 : 503, {
+            status: !initialized ? 'starting' : ready ? 'ready' : `registry_${registryCheck}`,
+            registry: { version: registry.version, sha256: registry.sha256, check: registryCheck },
+            contract: PIPELINE_CONTRACT_VERSION,
+            supportedContracts: SUPPORTED_CONTRACT_VERSIONS,
+            capabilities: { artwork: Boolean(artworkProvider), generation: generationAvailable, publication: publicationEnabled },
           });
         }
         if (req.method === 'GET' && url.pathname.startsWith('/assets/') && assetStore?.serve) {
@@ -1790,7 +1852,7 @@ export function createVehicleImagePipeline({
           return send(201, await submitRequest(body.vehicle, body.referenceImages ?? []));
         }
         if (req.method === 'POST' && url.pathname === '/internal/v1/vehicle-images/requests') {
-          requireRequestService(req.headers.authorization);
+          const contract = internalGate();
           const body = await readJson(req);
           const result = await submitCanonicalRequest(body);
           const status = resolveCanonicalStatus(body.identity, { contract });
@@ -1802,7 +1864,7 @@ export function createVehicleImagePipeline({
           });
         }
         if (req.method === 'POST' && url.pathname === '/internal/v1/vehicle-images/resolve') {
-          requireRequestService(req.headers.authorization);
+          const contract = internalGate();
           const body = await readJson(req);
           return send(200, resolveCanonicalStatus(body.identity, { contract }));
         }
@@ -1905,7 +1967,10 @@ export function createVehicleImagePipeline({
         }
         return send(404, { error: 'not found' });
       } catch (error) {
-        return send(error.status ?? 400, { error: error.message });
+        return send(error.status ?? 400, {
+          error: error.message,
+          ...(error.supportedContracts ? { supportedContracts: error.supportedContracts } : {}),
+        });
       }
     });
   }
@@ -1932,7 +1997,8 @@ export function createVehicleImagePipeline({
     metrics,
     runQueuedJobs,
     registry,
-    health: () => ({ live: true, ready: initialized }),
+    registryCheck,
+    health: () => ({ live: true, ready: initialized && registryCompatible, registryCheck }),
     server,
   };
 }
