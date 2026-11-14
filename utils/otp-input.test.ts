@@ -20,6 +20,7 @@ describe('normalizeOtpInput', () => {
     ['a phone number before the code', '+998901234567 483917', '483917'],
     ['letters only', 'abc', ''],
     ['too many digits', '48391755', '483917'],
+    ['a domain-bound SMS', 'Your Mator verification code is 483917.\n\n@mator.uz #483917', '483917'],
   ])('%s', (_name, raw, expected) => {
     expect(normalizeOtpInput(raw, 6)).toBe(expected);
   });
