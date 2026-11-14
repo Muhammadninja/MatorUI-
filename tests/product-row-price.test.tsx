@@ -1,11 +1,12 @@
 /**
- * The listing card's price line (physical iPhone, Dark Mode report): the amount
- * shrank to a few pixels and "сум" drifted away from it.
+ * The listing card's price line.
  *
- *   - The amount clears the `body` line height. A hard `lineHeight` paired with
- *     `adjustsFontSizeToFit` is what makes iOS shrink past `minimumFontScale`.
- *   - Amount and currency sit on one line that never wraps.
- *   - The add button stays beside them.
+ *   - Physical iPhone, Dark Mode: the amount shrank to a few pixels. A hard
+ *     `lineHeight` paired with `adjustsFontSizeToFit` is what makes iOS shrink
+ *     past `minimumFontScale`, so the amount clears the `body` line height.
+ *   - Physical Android, 360dp: cards had dead space between the fitment link
+ *     and the price. The card now shows the bare amount (no "сум") in larger
+ *     type beside a 36dp add button.
  */
 import React from 'react';
 import { act, create, type ReactTestInstance } from 'react-test-renderer';
@@ -76,39 +77,77 @@ function render(price: string, title = 'Колодки') {
   return root.root;
 }
 
-function priceLine(tree: ReactTestInstance) {
-  const line = tree.find((n) => n.props.testID === 'part-price-p1' && String(n.type) === 'rn-view');
-  const [amount, currency] = line.findAll((n) => String(n.type) === 'text');
-  return { line, amount, currency };
+function priceText(tree: ReactTestInstance) {
+  return tree.find((n) => n.props.testID === 'part-price-p1' && String(n.type) === 'text');
+}
+
+/** Every string a sighted user sees on the card. */
+function visibleStrings(tree: ReactTestInstance): string[] {
+  return tree
+    .findAll((n) => String(n.type) === 'text')
+    .flatMap((n) => [n.props.children].flat())
+    .filter((c): c is string => typeof c === 'string');
 }
 
 describe('product card price line', () => {
-  test.each(['UZS 89 000', '1 250 000 сум', 'UZS 12 345 678.50'])(
-    'keeps %s and its currency together on one line',
-    (price) => {
-      const { line, amount, currency } = priceLine(render(price));
-      expect(line.props.style.flexWrap).toBe('nowrap');
-      expect(amount.props.numberOfLines).toBe(1);
-      expect(currency.props.children).toBe('сум');
-      expect(currency.props.style.flexShrink).toBe(0);
-    },
-  );
-
-  test('the amount clears the inherited line height it auto-shrinks with', () => {
-    const { amount } = priceLine(render('1 250 000 сум'));
-    expect(amount.props.adjustsFontSizeToFit).toBe(true);
-    expect('lineHeight' in amount.props.style).toBe(true);
-    expect(amount.props.style.lineHeight).toBeUndefined();
-    expect(amount.props.style.flexShrink).toBe(1);
-    expect(amount.props.style.minWidth).toBe(0);
-    // Digit groups are non-breaking, so the amount cannot split.
-    expect(amount.props.children).toBe('1 250 000');
+  test.each([
+    ['UZS 89 000', '89\u00a0000'],
+    ['1 250 000 сум', '1\u00a0250\u00a0000'],
+  ])('shows %s as the bare amount, on one line', (price, amount) => {
+    const tree = render(price);
+    const text = priceText(tree);
+    expect(text.props.children).toBe(amount);
+    expect(text.props.numberOfLines).toBe(1);
+    expect(visibleStrings(tree).some((s) => /сум|UZS/.test(s))).toBe(false);
   });
 
-  test('large amounts step down to a readable size, never below 14', () => {
-    expect(priceFontSize('89 000')).toBe(18);
-    expect(priceFontSize('1 250 000')).toBe(16);
-    expect(priceFontSize('12 345 678.50')).toBe(14);
+  test('screen readers still hear the currency', () => {
+    expect(priceText(render('1 250 000 сум')).props.accessibilityLabel).toBe(
+      '1\u00a0250\u00a0000 сум',
+    );
+  });
+
+  test('the amount clears the inherited line height it auto-shrinks with', () => {
+    const text = priceText(render('1 250 000 сум'));
+    expect(text.props.adjustsFontSizeToFit).toBe(true);
+    expect('lineHeight' in text.props.style).toBe(true);
+    expect(text.props.style.lineHeight).toBeUndefined();
+    expect(text.props.style.minWidth).toBe(0);
+  });
+
+  test('prices are set larger, and long amounts step down, never below 15', () => {
+    expect(priceFontSize('89 000')).toBe(21);
+    expect(priceFontSize('1 250 000')).toBe(18);
+    expect(priceFontSize('12 345 678.50')).toBe(15);
+  });
+
+  test('the add button is compact and sits level with the price', () => {
+    const tree = render('545 000 сум');
+    const button = tree.find((n) => String(n.type) === 'icon-button');
+    expect(button.props.size).toBe(36);
+    const row = tree.find(
+      (n) =>
+        String(n.type) === 'view' &&
+        n.props.row === true &&
+        n.findAll((c) => String(c.type) === 'icon-button').length === 1,
+    );
+    expect(row.props.align).toBe('center');
+  });
+
+  test('the fitment link and the price share one footer pinned to the card foot', () => {
+    const tree = render('545 000 сум');
+    const footer = tree.find(
+      (n) => String(n.type) === 'view' && n.props.style?.marginTop === 'auto',
+    );
+    const host = (type: string) => (n: ReactTestInstance) => String(n.type) === type;
+    expect(
+      footer
+        .findAll(host('pressable'))
+        .filter((n) => n.props.accessibilityLabel === 'catalog.checkFitAccessibility'),
+    ).toHaveLength(1);
+    expect(
+      footer.findAll(host('text')).filter((n) => n.props.testID === 'part-price-p1'),
+    ).toHaveLength(1);
   });
 
   test('a long title does not displace the add button', () => {

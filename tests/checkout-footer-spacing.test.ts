@@ -26,4 +26,25 @@ describe('checkout footer bottom spacing', () => {
     const source = readFileSync(join(__dirname, '../components/screens/checkout-screen.tsx'), 'utf8');
     expect(source).toMatch(/paddingBottom: checkoutFooterBottom\(insets\.bottom, Platform\.OS\)/);
   });
+
+  // Physical Android report: like / share / add to cart sat flush on the
+  // three-button bar.
+  test('the Item Detail buy bar uses it', () => {
+    const source = readFileSync(
+      join(__dirname, '../components/screens-components/item-detail/item-buy-bar.tsx'),
+      'utf8',
+    );
+    expect(source).toMatch(/paddingBottom: checkoutFooterBottom\(insetBottom, Platform\.OS\)/);
+  });
+
+  // Without this Android draws a translucent scrim behind three-button
+  // navigation; expo-modules-core re-applies the theme value after React
+  // Native's edge-to-edge setup forces contrast on.
+  test('the Android navigation bar is transparent', () => {
+    const app = JSON.parse(readFileSync(join(__dirname, '../app.json'), 'utf8'));
+    const plugin = app.expo.plugins.find(
+      (p: unknown) => Array.isArray(p) && p[0] === 'expo-navigation-bar',
+    );
+    expect(plugin?.[1]?.enforceContrast).toBe(false);
+  });
 });

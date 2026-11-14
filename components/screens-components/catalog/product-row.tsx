@@ -61,30 +61,23 @@ export function productCellStyle(index: number, columns: number): ViewStyle {
 }
 
 /**
- * Price type size. Every real price gets the SAME one (18) — the steps below
- * exist only for an amount long enough to crowd the add button out of the row,
- * which in UZS means eight figures and up.
+ * Price type size, stepped by length so the amount fills the column beside
+ * the add button. The card shows the bare amount (no "сум"), which leaves
+ * ~90dp on a 360dp phone: "545 000" fits at 21 and "1 600 000" at 18 in Inter
+ * Bold.
  *
  * It cannot be left to `adjustsFontSizeToFit` alone: paired with an explicit
  * `lineHeight` that prop shrinks the text to a few pixels on iOS while its box
- * keeps the full width, which is what stranded the currency mid-card. The
- * amount is only ever digits and non-breaking separators, so the size that
- * fits the copy column follows from the character count.
+ * keeps the full width. The amount is only ever digits and non-breaking
+ * separators, so the size that fits follows from the character count, and
+ * the auto-shrink stays a backstop for narrower screens.
  */
 export function priceFontSize(amount: string): number {
   const n = amount.length;
-  if (n <= 7) return 18;
-  if (n <= 10) return 16;
-  return 14;
+  if (n <= 7) return 21;
+  if (n <= 10) return 18;
+  return 15;
 }
-
-/** Amount and currency on one baseline, never wrapped apart. */
-const PRICE_LINE: ViewStyle = {
-  flexDirection: 'row',
-  flexWrap: 'nowrap',
-  alignItems: 'baseline',
-  columnGap: 4,
-};
 
 /**
  * `ProductRow` — the listing card behind every result screen (category,
@@ -356,96 +349,98 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
         </AppView>
       ) : null}
 
-      {/* ── Fitment: a verdict badge, only from real data ── */}
-      {item.isUniversal ? (
-        <FitBadge
-          label={t('catalog.universalFit')}
-          color={tokens.success}
-          bg={tokens.successSoft}
-          Icon={Check}
-        />
-      ) : fitState === 'answered' && fit ? (
-        <FitBadge
-          label={t(compatibilityLabelKey(fit.status))}
-          color={fitTone.color}
-          bg={fitTone.bg}
-          Icon={fitTone.Icon}
-        />
-      ) : (
-        <AppPressableView
-          onPress={handleCheckFit}
-          disabled={fitState === 'checking'}
-          androidRipple={false}
-          pressedOpacity={0.6}
-          row
-          align="center"
-          gap={4}
-          hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
-          accessibilityRole="button"
-          accessibilityLabel={t('catalog.checkFitAccessibility')}
-          accessibilityState={{ busy: fitState === 'checking' }}
-          style={{ alignSelf: 'flex-start' }}
-        >
-          {fitState === 'checking' ? <WheelLoader size={11} color={tokens.textMuted} /> : null}
-          <AppText
-            weight="semibold"
-            style={{
-              fontSize: 12,
-              lineHeight: 16,
-              color: fitState === 'checking' ? tokens.textMuted : tokens.brandText,
-            }}
+      {/* ── Footer: fitment, then price + add, pinned together to the card's
+       *  foot. FlashList gives every card in a row the tallest card's height;
+       *  the slack goes above the fitment link, never between it and the
+       *  price, and both line up across the row. ── */}
+      <AppView gap="sm" style={{ marginTop: 'auto' }}>
+        {/* Fitment: a verdict badge, only from real data. */}
+        {item.isUniversal ? (
+          <FitBadge
+            label={t('catalog.universalFit')}
+            color={tokens.success}
+            bg={tokens.successSoft}
+            Icon={Check}
+          />
+        ) : fitState === 'answered' && fit ? (
+          <FitBadge
+            label={t(compatibilityLabelKey(fit.status))}
+            color={fitTone.color}
+            bg={fitTone.bg}
+            Icon={fitTone.Icon}
+          />
+        ) : (
+          <AppPressableView
+            onPress={handleCheckFit}
+            disabled={fitState === 'checking'}
+            androidRipple={false}
+            pressedOpacity={0.6}
+            row
+            align="center"
+            gap={4}
+            hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel={t('catalog.checkFitAccessibility')}
+            accessibilityState={{ busy: fitState === 'checking' }}
+            style={{ alignSelf: 'flex-start' }}
           >
-            {fitState === 'checking'
-              ? t('catalog.checking')
-              : vehicleLabel
-                ? t('catalog.checkFitFor', { vehicle: vehicleLabel })
-                : t('catalog.checkFit')}
-          </AppText>
-        </AppPressableView>
-      )}
-
-      {/* ── Price and add, pinned to the card's foot so they line up across the
-       *  row whatever the copy above them runs to. ── */}
-      <AppView row align="flex-end" gap="sm" style={{ marginTop: 'auto' }}>
-        <AppView flex={1} gap={2} style={{ minWidth: 0 }}>
-          {wasLabel || savePct > 0 ? (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 4 }}>
-              {wasLabel ? (
-                <AppText
-                  textVariant="bodyXs"
-                  colorName="textMuted"
-                  style={{ textDecorationLine: 'line-through' }}
-                >
-                  {wasLabel}
-                </AppText>
-              ) : null}
-              {savePct > 0 ? (
-                <AppText
-                  family="accent"
-                  weight="bold"
-                  style={{ fontSize: 12, color: tokens.error }}
-                >
-                  {`−${savePct}%`}
-                </AppText>
-              ) : null}
-            </View>
-          ) : null}
-          {/* Amount + currency are ONE line that never wraps, so "сум" can't
-           *  drop away from its number. The currency keeps its size; only the
-           *  amount gives way, and `priceFontSize` already fits it, so the
-           *  auto-shrink is a backstop. `lineHeight: undefined` clears the 24
-           *  AppText inherits from `body`: that hard line height paired with
-           *  `adjustsFontSizeToFit` is what shrank prices to a few pixels on
-           *  iOS (see `AppPrice`). */}
-          <View testID={`part-price-${item.id}`} style={PRICE_LINE}>
+            {fitState === 'checking' ? <WheelLoader size={11} color={tokens.textMuted} /> : null}
             <AppText
+              weight="semibold"
+              style={{
+                fontSize: 12,
+                lineHeight: 16,
+                color: fitState === 'checking' ? tokens.textMuted : tokens.brandText,
+              }}
+            >
+              {fitState === 'checking'
+                ? t('catalog.checking')
+                : vehicleLabel
+                  ? t('catalog.checkFitFor', { vehicle: vehicleLabel })
+                  : t('catalog.checkFit')}
+            </AppText>
+          </AppPressableView>
+        )}
+
+        <AppView row align="center" gap="sm">
+          <AppView flex={1} gap={2} style={{ minWidth: 0 }}>
+            {wasLabel || savePct > 0 ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 4 }}>
+                {wasLabel ? (
+                  <AppText
+                    textVariant="bodyXs"
+                    colorName="textMuted"
+                    style={{ textDecorationLine: 'line-through' }}
+                  >
+                    {wasLabel}
+                  </AppText>
+                ) : null}
+                {savePct > 0 ? (
+                  <AppText
+                    family="accent"
+                    weight="bold"
+                    style={{ fontSize: 12, color: tokens.error }}
+                  >
+                    {`−${savePct}%`}
+                  </AppText>
+                ) : null}
+              </View>
+            ) : null}
+            {/* The bare amount, one line: the card drops "сум" to give the
+             *  digits the room (screen readers still hear the currency).
+             *  `priceFontSize` fits it, so the auto-shrink is a backstop.
+             *  `lineHeight: undefined` clears the 24 AppText inherits from
+             *  `body`: that hard line height paired with `adjustsFontSizeToFit`
+             *  is what shrank prices to a few pixels on iOS (see `AppPrice`). */}
+            <AppText
+              testID={`part-price-${item.id}`}
               family="heading"
               weight="bold"
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.75}
+              accessibilityLabel={`${priceAmount} ${t('common.currency')}`}
               style={{
-                flexShrink: 1,
                 minWidth: 0,
                 fontSize: priceSize,
                 lineHeight: undefined,
@@ -455,54 +450,43 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
             >
               {priceAmount}
             </AppText>
-            <AppText
-              family="accent"
-              weight="semibold"
-              style={{
-                flexShrink: 0,
-                fontSize: 13,
-                lineHeight: undefined,
-                color: tokens.text,
-              }}
-            >
-              {t('common.currency')}
-            </AppText>
-          </View>
-          {/* Stock first — it decides whether the delivery promise means
-           *  anything — then the ETA when the part carries one. */}
-          {outOfStock ? (
-            <AppText
-              family="accent"
-              weight="semibold"
-              style={{ fontSize: 12, lineHeight: 16, color: tokens.error }}
-            >
-              {t('catalog.outOfStock')}
-            </AppText>
-          ) : eta ? (
-            <AppText textVariant="bodyXs" colorName="textMuted">
-              {eta}
-            </AppText>
-          ) : null}
-        </AppView>
+            {/* Stock first — it decides whether the delivery promise means
+             *  anything — then the ETA when the part carries one. */}
+            {outOfStock ? (
+              <AppText
+                family="accent"
+                weight="semibold"
+                style={{ fontSize: 12, lineHeight: 16, color: tokens.error }}
+              >
+                {t('catalog.outOfStock')}
+              </AppText>
+            ) : eta ? (
+              <AppText textVariant="bodyXs" colorName="textMuted">
+                {eta}
+              </AppText>
+            ) : null}
+          </AppView>
 
-        <AppIconButton
-          Icon={added ? Check : Plus}
-          onPress={handleAdd}
-          disabled={outOfStock}
-          size={48}
-          rounded={12}
-          iconSize={22}
-          strokeWidth={2.6}
-          backgroundColor={outOfStock ? tokens.disabledBg : tokens.brand}
-          color={outOfStock ? tokens.disabledFg : tokens.onBrand}
-          accessibilityLabel={
-            outOfStock
-              ? t('catalog.outOfStock')
-              : added
-                ? t('catalog.addedToCart')
-                : t('catalog.addToCartAccessibility', { title: item.title })
-          }
-        />
+          <AppIconButton
+            Icon={added ? Check : Plus}
+            onPress={handleAdd}
+            disabled={outOfStock}
+            // 36 visible; AppIconButton's hitSlop keeps the tap target at 44.
+            size={36}
+            rounded={10}
+            iconSize={18}
+            strokeWidth={2.6}
+            backgroundColor={outOfStock ? tokens.disabledBg : tokens.brand}
+            color={outOfStock ? tokens.disabledFg : tokens.onBrand}
+            accessibilityLabel={
+              outOfStock
+                ? t('catalog.outOfStock')
+                : added
+                  ? t('catalog.addedToCart')
+                  : t('catalog.addToCartAccessibility', { title: item.title })
+            }
+          />
+        </AppView>
       </AppView>
     </AppView>
   );

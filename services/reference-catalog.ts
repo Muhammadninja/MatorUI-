@@ -180,6 +180,16 @@ export async function fetchMakes(signal?: AbortSignal): Promise<RefMake[]> {
   }));
 }
 
+/**
+ * Live model rows no list offers as a choice. `genrta-lacetti` is a misspelled
+ * ("Genrta") legacy admin row that sorts right before the real `gentra`, so
+ * Chevrolet's model list read "Gentra" twice. The backend keeps the row because
+ * garage vehicles reference it, pending its own cleanup migration (Backend
+ * `REFERENCE_KNOWN_ISSUES`, G-2 decision 2). Vehicles already saved with it
+ * keep working; it just can't be picked again.
+ */
+const HIDDEN_MODEL_IDS: ReadonlySet<string> = new Set(['genrta-lacetti']);
+
 export async function fetchModels(
   makeId: string,
   signal?: AbortSignal,
@@ -190,11 +200,13 @@ export async function fetchModels(
     `${BASE}/models?makeId=${encodeURIComponent(makeId)}`,
     { signal },
   );
-  return asItems(res).map((m) => ({
-    id: str(m.id),
-    makeId: str(m.make_id) || makeId,
-    name: str(m.name),
-  }));
+  return asItems(res)
+    .map((m) => ({
+      id: str(m.id),
+      makeId: str(m.make_id) || makeId,
+      name: str(m.name),
+    }))
+    .filter((m) => !HIDDEN_MODEL_IDS.has(m.id));
 }
 
 /**
