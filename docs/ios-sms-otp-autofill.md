@@ -67,7 +67,11 @@ entitlement.
      (`app-site-association.cdn-apple.com/a/v1/mator.uz` also returned 404).
    - `mator.uz` is served by the mator-admin Next.js site on Vercel. Branch
      `claude/ios-sms-domain-association` adds the file:
-     `{"webcredentials":{"apps":["DXP9AG6TPN.com.fotih12.mator"]}}`.
+     `{"webcredentials":{"apps":["G5876A655Y.com.fotih12.mator"]}}`.
+     The prefix is the signing team G5876A655Y (MATOR INNOVATIONS, MCHJ), read from
+     the EAS provisioning profile. `app.json`'s `appleTeamId` (DXP9AG6TPN) is not
+     the app's identifier. PR #14 shipped the DXP9AG6TPN ID by mistake; PR #15
+     corrects it.
    - It is served as `application/json`, with no redirect and no `applinks`, so
      mator.uz links keep opening in the browser.
    - **Not deployed.**
