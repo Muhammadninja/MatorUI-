@@ -80,6 +80,20 @@ describe('fetchModels', () => {
     expect(await fetchModels('')).toEqual([]);
     expect(get).not.toHaveBeenCalled();
   });
+
+  // Live Chevrolet list (2026-11-14): the misspelled legacy "Genrta" row sorted
+  // beside the real Gentra, so the add-vehicle picker showed Gentra twice.
+  test('drops the misspelled legacy Genrta row and keeps the real Gentra', async () => {
+    get.mockResolvedValueOnce({
+      items: [
+        { id: 'genrta-lacetti', make_id: 'chevrolet', name: 'Genrta' },
+        { id: 'gentra', make_id: 'chevrolet', name: 'Gentra' },
+        { id: 'lacetti', make_id: 'chevrolet', name: 'Lacetti' },
+      ],
+    });
+    const models = await fetchModels('chevrolet');
+    expect(models.map((m) => m.id)).toEqual(['gentra', 'lacetti']);
+  });
 });
 
 describe('fetchTrims', () => {

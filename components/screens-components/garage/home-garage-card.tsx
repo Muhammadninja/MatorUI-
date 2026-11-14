@@ -180,34 +180,49 @@ function HomeGarageCard() {
       testID="home-garage-card"
       visual={visual}
       action={{ testID: 'home-garage-shop-parts', title: t('explore.shopParts'), onPress: shopParts }}
-    >
-      <AppText textVariant="h4" weight="bold" style={{ color: tokens.onVehicleBanner }}>
-        {summary.name}
-      </AppText>
-      <AppView row align="center" gap="sm">
-        {spec ? (
-          // The banner's own ink at 70%: secondary to the name, but readable on the mint.
-          <AppText textVariant="bodySm" style={{ color: `${tokens.onVehicleBanner}B3`, flex: 1, minWidth: 0 }}>
-            {spec}
-          </AppText>
-        ) : <AppView style={{ flex: 1 }} />}
+      secondaryAction={
+        // Under the car, on the "shop parts" line, in its label's type (the
+        // `lg` button's 16px SemiBold) and at its 48pt height. One line: where
+        // the slot is narrow the label shrinks instead of wrapping. An app
+        // action, not a web link: a swap glyph instead of an underline.
         <AppPressableView
+          testID="home-garage-change-vehicle"
           onPress={openGarage}
           androidRipple={false}
           pressedOpacity={0.7}
           accessibilityRole="button"
           accessibilityLabel={t('explore.changeVehicleAccessibility', { name: summary.name })}
-          style={{ flexShrink: 0, minHeight: 48, minWidth: 48, justifyContent: 'center' }}
+          row
+          align="center"
+          gap={6}
+          style={{ minHeight: 48, maxWidth: '100%', paddingHorizontal: 8, justifyContent: 'center' }}
         >
-          {/* An app action, not a web link: a small swap glyph instead of an underline. */}
-          <AppView row align="center" gap={6}>
-            <ArrowLeftRight size={14} strokeWidth={2.4} color={tokens.brandText} />
-            <AppText textVariant="bodySm" weight="semibold" style={{ color: tokens.brandText }}>
-              {t('explore.changeVehicle')}
-            </AppText>
-          </AppView>
+          <ArrowLeftRight size={18} strokeWidth={2.4} color={tokens.brandText} />
+          {/* `lineHeight: undefined` clears the variant's 20: a hard line
+           *  height with `adjustsFontSizeToFit` over-shrinks on iOS (see
+           *  `AppPrice`). */}
+          <AppText
+            textVariant="button"
+            weight="semibold"
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
+            style={{ flexShrink: 1, minWidth: 0, lineHeight: undefined, color: tokens.brandText }}
+          >
+            {t('explore.changeVehicle')}
+          </AppText>
         </AppPressableView>
-      </AppView>
+      }
+    >
+      <AppText textVariant="h4" weight="bold" style={{ color: tokens.onVehicleBanner }}>
+        {summary.name}
+      </AppText>
+      {spec ? (
+        // The banner's own ink at 70%: secondary to the name, but readable on the mint.
+        <AppText textVariant="bodySm" style={{ color: `${tokens.onVehicleBanner}B3` }}>
+          {spec}
+        </AppText>
+      ) : null}
     </GarageHeroCard>
   );
 

@@ -1,6 +1,7 @@
 import { Heart, Share2 } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Platform } from 'react-native';
 
 import { AppButton } from '@/components/shared/app-button';
 import { AppPrice } from '@/components/shared/app-price';
@@ -8,6 +9,7 @@ import { AppQtyStepper } from '@/components/shared/app-qty-stepper';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
+import { checkoutFooterBottom } from '@/utils/sticky-footer';
 
 export type ItemBuyBarProps = {
   /** Pre-formatted line total (unit price × qty). */
@@ -90,7 +92,8 @@ export function ItemBuyBar({
       colorName={scheme === 'dark' ? 'background' : 'surface'}
       style={{
         paddingTop: 11,
-        paddingBottom: Math.max(insetBottom, 12),
+        // Android: a real gap above the system navigation bar, not flush on it.
+        paddingBottom: checkoutFooterBottom(insetBottom, Platform.OS),
         borderTopWidth: 1,
         borderTopColor: tokens.divider,
       }}
@@ -98,7 +101,10 @@ export function ItemBuyBar({
       <AppView row align="center" justify="space-between" gap={12}>
         <AppView flex={1} gap={2}>
           <AppView row align="center" gap={7}>
-            <AppText family="default" style={{ fontSize: 12, lineHeight: 16, color: tokens.textMuted }}>
+            <AppText
+              family="default"
+              style={{ fontSize: 12, lineHeight: 16, color: tokens.textMuted }}
+            >
               {t('itemDetail.total')}
             </AppText>
             {savingsLabel ? (

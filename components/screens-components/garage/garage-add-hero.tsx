@@ -19,6 +19,8 @@ import emptyGarageArt from '@/assets/hero/corvette-c8-red.webp';
 /** Vehicle images are 2:1: the car spans ~82% of the width, tyres on the
  *  bottom edge (docs/vehicle-images/chevrolet-asset-matrix.md §10). */
 const CAR_ASPECT = 2;
+/** Share of a vehicle image's width the car body spans (9.5–90.5%). */
+const CAR_BODY_SHARE = 0.81;
 const PADDING = 16;
 const RADIUS = 16;
 /** Explore's horizontal gutter, used until the card reports its own width. */
@@ -47,9 +49,13 @@ type GarageHeroCardProps = {
   groundShadow?: boolean;
   /** Optional image action; used only by the decorative empty-state Corvette. */
   onImagePress?: () => void;
-  /** Copy column: title, supporting text, and any inline action. */
+  /** Copy column: title and supporting text. */
   children: ReactNode;
   action: { testID: string; title: string; onPress: () => void };
+  /** A second control on the action's line, centred under the car. When the
+   *  button leaves too little room its slot narrows, so the control must be
+   *  able to shrink (see `HomeGarageCard`). */
+  secondaryAction?: ReactNode;
 };
 
 /**
@@ -68,6 +74,7 @@ export function GarageHeroCard({
   onImagePress,
   children,
   action,
+  secondaryAction,
 }: GarageHeroCardProps) {
   const { tokens } = useThemeContext();
   const { t } = useTranslation();
@@ -100,6 +107,38 @@ export function GarageHeroCard({
     const { width: w, height: h } = event.nativeEvent.layout;
     if (!measured || measured.width !== w || measured.height !== h) setMeasured({ width: w, height: h });
   };
+
+  const actionButton = (
+    <AppButton
+      testID={action.testID}
+      title={action.title}
+      kind="brand"
+      // The empty-state action is secondary to the artwork: one size down.
+      size={emptyGarage ? 'md' : 'lg'}
+      // Beside a secondary action the button keeps its own width, so the
+      // right of the line stays free under the car.
+      fullWidth={stacked && !secondaryAction}
+      style={stacked || secondaryAction ? undefined : { alignSelf: 'flex-start' }}
+      onPress={action.onPress}
+    />
+  );
+
+  // The secondary action's slot: centred under the car body, on the button's
+  // line, never closer than half a padding to the card's edge. The slot may
+  // reach into the right padding (negative margin), since the car does too.
+  const carCenterX = width - carRight - carWidth / 2;
+  const slotHalf = Math.max(
+    0,
+    Math.min((carWidth * CAR_BODY_SHARE) / 2, width - PADDING / 2 - carCenterX),
+  );
+  const secondarySlot = {
+    width: slotHalf * 2,
+    marginRight: width - PADDING - (carCenterX + slotHalf),
+    // Gives way to the button on a narrow card; the control shrinks with it.
+    flexShrink: 1,
+    minWidth: 0,
+    alignItems: 'center',
+  } as const;
 
   // Where the car's tyres meet the ground, for the soft shadow. Every approved
   // cutout ends at its tyres (~99.7% of the frame) and spans 9.5–90.5% of its width.
@@ -215,16 +254,17 @@ export function GarageHeroCard({
           {children}
         </AppView>
 
-        <AppButton
-          testID={action.testID}
-          title={action.title}
-          kind="brand"
-          // The empty-state action is secondary to the artwork: one size down.
-          size={emptyGarage ? 'md' : 'lg'}
-          fullWidth={stacked}
-          style={stacked ? undefined : { alignSelf: 'flex-start' }}
-          onPress={action.onPress}
-        />
+        {secondaryAction ? (
+          <AppView row align="center">
+            {actionButton}
+            <AppView style={{ flex: 1, minWidth: 8 }} />
+            <AppView testID={`${testID}-secondary-slot`} style={secondarySlot}>
+              {secondaryAction}
+            </AppView>
+          </AppView>
+        ) : (
+          actionButton
+        )}
       </AppView>
     </AppView>
   );
