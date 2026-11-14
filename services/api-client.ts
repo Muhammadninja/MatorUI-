@@ -26,6 +26,11 @@
 
 import { getApiBaseUrl, getAuthToken } from '@/config/api';
 import { debugLog } from '@/services/debug-log';
+import {
+  isStagingGateRejection,
+  reportStagingAccessRejected,
+  stagingAccessHeaders,
+} from '@/services/staging-access';
 
 // ── Error type ─────────────────────────────────────────────────────────
 
@@ -176,6 +181,9 @@ async function request<T>(
         ...(opts.skipLanguage ? null : { 'Accept-Language': appLanguage }),
         ...(body !== undefined ? { 'Content-Type': 'application/json' } : null),
         ...opts.headers,
+        // Staging proxy credential (empty outside staging). A separate header,
+        // so the Bearer token below keeps the `Authorization` header to itself.
+        ...stagingAccessHeaders(),
       };
       if (!opts.skipAuth) {
         const token = await getAuthToken();
@@ -206,6 +214,13 @@ async function request<T>(
 
       if (!res.ok) {
         debugLog('api', `✗ ${res.status} ${method} ${path}`, parsed);
+        if (isStagingGateRejection(res.status, res.headers.get('WWW-Authenticate'))) {
+          // The staging proxy, not the API, refused the request: the session is
+          // fine, so no refresh and no sign-out. Status 0 ("never reached the
+          // application") keeps every auth caller from reading it as a 401.
+          reportStagingAccessRejected();
+          throw new ApiError(0, 'STAGING_ACCESS_DENIED', 'Staging access token was refused.');
+        }
         if (res.status === 401) {
           // The access token likely expired mid-request. Let the auth layer
           // refresh it (persisting a new session), then retry ONCE with the

@@ -4,6 +4,7 @@ import {
   garageService,
   type GarageSocketEvent,
 } from '@/services/garage-service';
+import { stagingAccessHeaders } from '@/services/staging-access';
 
 /**
  * Native-WebSocket consumer for the garage realtime channel.
@@ -39,6 +40,13 @@ export type GarageRealtimeConfig = {
 
 /** Marker subprotocol; the token follows it. Must match the backend gateway. */
 export const WS_BEARER_PROTOCOL = 'mator.bearer';
+
+/** React Native's WebSocket takes handshake headers; the DOM typing does not say so. */
+type NativeWebSocket = new (
+  url: string,
+  protocols: string[] | null,
+  options: { headers: Record<string, string> },
+) => WebSocket;
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const HEARTBEAT_TIMEOUT_MS = 45_000;
@@ -145,9 +153,12 @@ export class GarageRealtimeClient {
       // The access token rides in the `Sec-WebSocket-Protocol` handshake
       // header, not the URL: URLs end up in proxy access logs. The gateway
       // selects the marker protocol and never echoes the token.
-      socket = token
-        ? new WebSocket(url, [WS_BEARER_PROTOCOL, token])
-        : new WebSocket(url);
+      // Staging only: the proxy credential rides as a header (React Native's
+      // third WebSocket argument); production sockets are opened as before.
+      const proxy = stagingAccessHeaders();
+      const protocols = token ? [WS_BEARER_PROTOCOL, token] : null;
+      if (Object.keys(proxy).length) socket = new (WebSocket as unknown as NativeWebSocket)(url, protocols, { headers: proxy });
+      else socket = protocols ? new WebSocket(url, protocols) : new WebSocket(url);
     } catch {
       this.scheduleReconnect();
       return;

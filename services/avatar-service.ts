@@ -37,6 +37,7 @@ export interface AvatarTransport {
 
 import { getApiBaseUrl, getAuthToken } from '@/config/api';
 import * as FileSystem from 'expo-file-system/legacy';
+import { stagingAccessHeaders } from '@/services/staging-access';
 
 export class HttpAvatarTransport implements AvatarTransport {
   async upload(uri: LocalImageUri, signal?: AbortSignal): Promise<string> {
@@ -62,7 +63,7 @@ export class HttpAvatarTransport implements AvatarTransport {
         uploadType: FileSystem.FileSystemUploadType.MULTIPART,
         fieldName: 'avatar',
         mimeType: 'image/jpeg',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: { ...stagingAccessHeaders(), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
     } catch (err) {
       // A thrown upload is a transport-level failure — network reset, ATS block,
