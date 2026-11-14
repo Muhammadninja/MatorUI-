@@ -51,6 +51,7 @@ import { getApiBaseUrl, getAuthToken, shouldUseHttpTransport } from '@/config/ap
 import { sourcingChatSupported } from '@/services/sourcing-capabilities';
 import { interpretSourcingReply, type SourcingChatResponse } from '@/services/sourcing-chat-reply';
 import { apiClient, ApiError } from '@/services/api-client';
+import { stagingAccessHeaders } from '@/services/staging-access';
 
 /**
  * HTTP impl. The non-streaming endpoints flow through the unified
@@ -133,6 +134,7 @@ export class HttpChatTransport implements ChatTransport {
           headers: {
             'Content-Type': 'application/json',
             Accept: 'text/event-stream',
+            ...stagingAccessHeaders(),
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
           body: JSON.stringify(input),

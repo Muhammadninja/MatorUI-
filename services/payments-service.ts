@@ -31,6 +31,7 @@
 import { shouldUseHttpTransport } from '@/config/api';
 import { apiClient, ApiError } from '@/services/api-client';
 import { debugLog } from '@/services/debug-log';
+import { isStagingBuild } from '@/services/staging-access';
 
 /** Online gateways the backend can create an invoice with. */
 export type PaymentProvider = 'payme' | 'click';
@@ -73,6 +74,12 @@ class HttpPaymentsTransport implements PaymentsTransport {
     input: StartPaymentInput,
     signal?: AbortSignal,
   ): Promise<StartPaymentResult> {
+    // Staging never opens a real Payme/Click checkout, whatever the staging
+    // server is configured with. The server must also refuse (see
+    // docs/staging/ios-staging.md); this only keeps the app from asking.
+    if (isStagingBuild()) {
+      throw new ApiError(403, 'STAGING_PAYMENTS_DISABLED', 'Online payment is disabled in staging builds.');
+    }
     const r = await apiClient.post<RawInvoice>(
       `/v1/payments/${input.provider}/invoices`,
       { order_id: input.orderId, return_url: input.returnUrl },

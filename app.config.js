@@ -1,16 +1,28 @@
 const { environmentFrom } = require('./config/environment-policy.cjs');
 
+// mator.uz's apple-app-site-association names only the production app, so any
+// other identity drops the association rather than claim the domain.
+const STAGING_ICON = './assets/MATOR-app-icons/staging/icon.png';
+
+const withoutProductionDomains = ({ associatedDomains, ...ios } = {}) => ios;
+
 module.exports = ({ config }) => {
   const profile = process.env.EAS_BUILD_PROFILE || '';
   const e2e = process.env.MATOR_E2E === '1' && profile === 'e2e';
   if ((process.env.MATOR_E2E === '1' || profile === 'e2e') && !e2e) {
     throw new Error('Test builds require both MATOR_E2E=1 and EAS_BUILD_PROFILE=e2e.');
   }
-  const release = process.env.NODE_ENV === 'production' || ['production', 'internal', 'preview'].includes(profile);
+  const release = process.env.NODE_ENV === 'production' || ['production', 'internal', 'preview', 'staging'].includes(profile);
   const appEnvironment = environmentFrom(process.env, release && !e2e);
   if (['production', 'internal'].includes(profile) && appEnvironment.name !== 'production') {
     throw new Error('The production build profile requires the production environment.');
   }
+  if (profile === 'staging' && appEnvironment.name !== 'staging') {
+    throw new Error('The staging build profile requires the staging environment.');
+  }
+  // Any build pointed at staging gets its own identity, so it installs beside the
+  // store app and never shares its keychain, storage, deep links or OTA channel.
+  const staging = appEnvironment.name === 'staging';
   if (e2e && (appEnvironment.name !== 'local' || appEnvironment.apiBaseUrl !== 'http://127.0.0.1:8080' || appEnvironment.allowDevOtp || appEnvironment.httpDomains)) {
     throw new Error('E2E requires the isolated loopback mock, all HTTP domains and no development OTP.');
   }
@@ -29,7 +41,16 @@ module.exports = ({ config }) => {
     ...(e2e ? {
       name: 'Mator E2E', scheme: 'mator-e2e',
       android: { ...config.android, package: 'com.mator.e2e' },
-      ios: { ...config.ios, bundleIdentifier: 'com.mator.e2e' },
+      ios: { ...withoutProductionDomains(config.ios), bundleIdentifier: 'com.mator.e2e' },
+      updates: { enabled: false },
+    } : {}),
+    ...(staging ? {
+      name: 'Mator Staging', scheme: 'mator-staging',
+      // A banded icon, so the two apps can't be confused on the home screen.
+      icon: STAGING_ICON,
+      android: { ...config.android, package: 'com.mator.myapp.staging' },
+      ios: { ...withoutProductionDomains(config.ios), bundleIdentifier: 'com.fotih12.mator.staging',
+        icon: STAGING_ICON },
       updates: { enabled: false },
     } : {}),
     extra: {
@@ -42,6 +63,7 @@ module.exports = ({ config }) => {
       ...(appEnvironment.name === 'local' ? {
         sentry: { dsn: '', environment: 'local', enableInDev: false },
       } : {}),
+      ...(staging ? { sentry: { ...config.extra?.sentry, environment: 'staging' } } : {}),
     },
   };
 };

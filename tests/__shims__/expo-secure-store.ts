@@ -36,3 +36,12 @@ export async function deleteItemAsync(key: string): Promise<void> {
 export function __resetSecureStore(): void {
   store.clear();
 }
+
+// Keychain accessibility constants (values match expo-secure-store).
+export const AFTER_FIRST_UNLOCK = 0;
+export const AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY = 1;
+export const ALWAYS = 2;
+export const WHEN_PASSCODE_SET_THIS_DEVICE_ONLY = 3;
+export const ALWAYS_THIS_DEVICE_ONLY = 4;
+export const WHEN_UNLOCKED = 5;
+export const WHEN_UNLOCKED_THIS_DEVICE_ONLY = 6;

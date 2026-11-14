@@ -52,6 +52,9 @@ initSentry();
 
 import { AppToastHost } from '@/components/shared/app-toast';
 import { DevelopmentEnvironmentBadge } from '@/components/shared/development-environment-badge';
+import { StagingAccessGate } from '@/components/shared/staging-access-gate';
+import { loadStagingAccess } from '@/services/staging-access';
+import { ensureStorageEnvironment } from '@/services/storage-environment';
 import { AppView } from '@/components/shared/app-view';
 import GlobalModalHost from '@/components/shared/global-modal-host';
 import LikesListSuggestionHost from '@/components/shared/likes-list-suggestion-host';
@@ -104,10 +107,21 @@ export default function RootLayout() {
     if (error) throw error;
   }, [error]);
 
-  // Splash hide-async now lives in RootNavigation so it can also wait
-  // for the language hydration. We only block render here on fonts.
+  // Before any provider hydrates: drop local data stored for another API, then
+  // read the staging access token (a no-op outside staging).
+  const [storageReady, setStorageReady] = useState(false);
+  useEffect(() => {
+    ensureStorageEnvironment()
+      .catch(() => undefined)
+      .then(loadStagingAccess)
+      .catch(() => undefined)
+      .finally(() => setStorageReady(true));
+  }, []);
 
-  if (!loaded) {
+  // Splash hide-async now lives in RootNavigation so it can also wait
+  // for the language hydration. We only block render here on fonts and storage.
+
+  if (!loaded || !storageReady) {
     return null;
   }
 
@@ -325,8 +339,9 @@ function RootNavigation() {
           />
         </Stack>
       </NavigationThemeProvider>
-      {__DEV__ ? <DevelopmentEnvironmentBadge /> : null}
+      <DevelopmentEnvironmentBadge />
       {splashVisible ? <SplashOverlay onFinish={() => setSplashVisible(false)} /> : null}
+      <StagingAccessGate />
     </AppView>
   );
 }

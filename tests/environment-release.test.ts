@@ -131,3 +131,80 @@ describe('dedicated E2E app boundary', () => {
     expect(() => resolve({ EXPO_PUBLIC_ALLOW_DEV_OTP: 'true' })).toThrow();
   });
 });
+
+describe('staging app identity', () => {
+  const base = require('../app.json').expo;
+  function resolve(env: Record<string, string>) {
+    const before = { ...process.env };
+    try {
+      Object.assign(process.env, env);
+      const config = JSON.parse(JSON.stringify(base));
+      // As app.json has it once the iOS AutoFill branch lands.
+      config.ios.associatedDomains = ['webcredentials:mator.uz'];
+      return appConfig({ config });
+    } finally {
+      for (const key of Object.keys(process.env)) if (!(key in before)) delete process.env[key];
+      Object.assign(process.env, before);
+    }
+  }
+  const stagingProfile = { NODE_ENV: 'production', EAS_BUILD_PROFILE: 'staging', ...eas.build.staging.env };
+
+  test('the staging profile points at the staging API only, with no development auth', () => {
+    expect(eas.build.staging.env).toMatchObject({ EXPO_PUBLIC_APP_ENV: 'staging',
+      EXPO_PUBLIC_API_BASE_URL: 'https://api.staging.mator.uz', EXPO_PUBLIC_ALLOW_DEV_OTP: 'false', AUTH_DEV_MODE: 'false' });
+    expect(environmentFrom(eas.build.staging.env, true)).toMatchObject({ name: 'staging',
+      apiBaseUrl: 'https://api.staging.mator.uz', allowDevOtp: false, httpDomains: '' });
+    expect(eas.build.staging.channel).toBe('staging');
+    expect(eas.build.staging.distribution).toBe('internal');
+    expect(eas.submit.staging).toBeUndefined();
+    expect(JSON.stringify(eas.build.staging)).not.toMatch(/PASSWORD|SECRET|TOKEN|mator-tester/i);
+  });
+
+  test('a staging build installs beside production under its own identity, with OTA off', () => {
+    const config = resolve(stagingProfile);
+    expect(config.name).toBe('Mator Staging');
+    expect(config.scheme).toBe('mator-staging');
+    expect(config.ios.bundleIdentifier).toBe('com.fotih12.mator.staging');
+    expect(config.android.package).toBe('com.mator.myapp.staging');
+    expect(config.ios.icon).toBe('./assets/MATOR-app-icons/staging/icon.png');
+    expect(config.icon).toBe('./assets/MATOR-app-icons/staging/icon.png');
+    expect(config.updates).toEqual({ enabled: false });
+    expect(config.extra.sentry.environment).toBe('staging');
+    expect(config.extra.appEnvironment).toEqual({ name: 'staging', apiBaseUrl: 'https://api.staging.mator.uz',
+      httpDomains: '', allowDevOtp: false });
+  });
+
+  test('a staging build does not claim mator.uz, which names only the production app', () => {
+    expect(resolve(stagingProfile).ios.associatedDomains).toBeUndefined();
+    expect(resolve({ ...production, EAS_BUILD_PROFILE: 'production' }).ios.associatedDomains)
+      .toEqual(['webcredentials:mator.uz']);
+  });
+
+  test('the production identity is untouched', () => {
+    const config = resolve({ ...production, EAS_BUILD_PROFILE: 'production' });
+    expect(config.name).toBe('Mator');
+    expect(config.scheme).toBe('mator');
+    expect(config.ios.bundleIdentifier).toBe('com.fotih12.mator');
+    expect(config.android.package).toBe('com.mator.myapp');
+    expect(config.icon).toBe(base.icon);
+    expect(config.ios.icon).toEqual(base.ios.icon);
+    expect(config.updates).toEqual(base.updates);
+    expect(config.extra.sentry.environment).toBe('production');
+  });
+
+  test.each([
+    { EXPO_PUBLIC_APP_ENV: 'production', EXPO_PUBLIC_API_BASE_URL: 'https://api.mator.uz' },
+    { EXPO_PUBLIC_API_BASE_URL: 'https://api.mator.uz' },
+    { EXPO_PUBLIC_API_BASE_URL: 'https://api.staging.matorui.com' },
+    { EXPO_PUBLIC_API_BASE_URL: 'https://mator-tester:pw@api.staging.mator.uz' },
+    { EXPO_PUBLIC_APP_ENV: 'stagng' },
+  ])('the staging profile fails the build on a wrong environment: %o', (patch) => {
+    expect(() => resolve({ ...stagingProfile, ...patch })).toThrow();
+  });
+
+  test('production profiles refuse the staging environment', () => {
+    for (const profile of ['production', 'internal']) {
+      expect(() => resolve({ ...stagingProfile, EAS_BUILD_PROFILE: profile })).toThrow();
+    }
+  });
+});
