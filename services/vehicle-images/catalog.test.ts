@@ -22,6 +22,16 @@ describe('owner-approved vehicle image catalog', () => {
     expect(resolution.kind).toBe('placeholder');
   });
 
+  it('maps the live Nexia 2 identity (model nexia, trims nexia-2-*) to N150, apart from R3', () => {
+    const covers = (id: string, modelId: string, year: number, trimId: string) =>
+      VEHICLE_IMAGE_CATALOG.assets.find((asset) => asset.id === id)!.modelMappings.some((m) =>
+        m.modelId === modelId && year >= m.yearFrom && year <= m.yearTo &&
+        (!m.trimPrefixes || m.trimPrefixes.some((prefix) => trimId.startsWith(prefix))));
+    expect(covers('nexia-n150', 'nexia', 2012, 'nexia-2-base')).toBe(true);
+    expect(covers('nexia-n150', 'nexia', 2016, 'nexia-3-ls')).toBe(false);
+    expect(covers('nexia-r3', 'nexia', 2016, 'nexia-2-dlx')).toBe(false);
+  });
+
   it('keeps an owner-approved bundled asset available during sync but honors explicit rejection/review', () => {
     const bundled = resolveVehicleImage({ brandId: 'chevrolet', modelId: 'cobalt', year: 2020 });
     expect(bundled.kind).toBe('image');
