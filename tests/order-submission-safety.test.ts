@@ -55,6 +55,8 @@ test('rapid submissions and taps after success produce only one order until expl
   state.createOrder.mockResolvedValueOnce({ orderId: 'next-unit-order', eta: 'unit', totalLabel: '1 UZS' });
   await act(async () => { await get().placeOrder(input); });
   expect(state.createOrder).toHaveBeenCalledTimes(2);
+  expect((state.createOrder.mock.calls[1]![0] as CreateOrderInput).idempotencyKey)
+    .not.toBe((state.createOrder.mock.calls[0]![0] as CreateOrderInput).idempotencyKey);
 });
 
 test('failed order creation is not automatically retried by React Query', async () => {

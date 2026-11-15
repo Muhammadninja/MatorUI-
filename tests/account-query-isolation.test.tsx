@@ -127,6 +127,9 @@ test('failed order can retry, while account changes discard stale results and gu
   state.createOrder.mockImplementationOnce(() => new Promise<CreateOrderResult>((done) => { resolve = done; }));
   let pending!: Promise<CreateOrderResult | null>;
   await act(async () => { pending = screen.current().placeOrder(input); });
+  const firstKey = state.createOrder.mock.calls[0]?.[0]?.idempotencyKey;
+  expect(firstKey).toEqual(expect.any(String));
+  expect(state.createOrder.mock.calls[1]?.[0]?.idempotencyKey).toBe(firstKey);
   await screen.update('account-b');
   expect(screen.current().phase).toBe('idle');
   await act(async () => { resolve(result); expect(await pending).toBeNull(); });
