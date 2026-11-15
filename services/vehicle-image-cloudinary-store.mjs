@@ -21,6 +21,7 @@ export function createCloudinaryAssetStore({
   fetchImpl = fetch,
 } = {}) {
   const prefix = vehicleImageCloudinaryPublicIdPrefix(publicIdPrefix, environment);
+  const overwrite = environment === 'staging' ? 'false' : 'true';
   if (![cloudName, apiKey, apiSecret].every((value) => typeof value === 'string' && value))
     throw new Error('Cloudinary credentials are required');
 
@@ -32,7 +33,7 @@ export function createCloudinaryAssetStore({
       const normalized = await processFramedArtwork(bytes);
       const publicId = vehicleImageCloudinaryPublicId(prefix, identityKey, version, candidateId);
       const timestamp = Math.floor(Date.now() / 1000).toString();
-      const signed = { overwrite: 'true', public_id: publicId, timestamp };
+      const signed = { overwrite, public_id: publicId, timestamp };
       const signaturePayload = Object.keys(signed)
         .sort()
         .map((key) => `${key}=${signed[key]}`)
@@ -43,7 +44,7 @@ export function createCloudinaryAssetStore({
       body.append('api_key', apiKey);
       body.append('timestamp', timestamp);
       body.append('public_id', publicId);
-      body.append('overwrite', 'true');
+      body.append('overwrite', overwrite);
       body.append('signature', signature);
       let response;
       try {

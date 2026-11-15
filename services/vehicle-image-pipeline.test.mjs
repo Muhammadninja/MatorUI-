@@ -339,8 +339,26 @@ describe('vehicle image pipeline', () => {
     expect(request.options.body.get('public_id')).toBe(vehicleImageCloudinaryPublicId(
       'mator/vehicle-images-staging', 'chevrolet|tracker|2024|||||', 1, 'approved-chevrolet-fixture',
     ));
+    expect(request.options.body.get('overwrite')).toBe('false');
     expect(result.key.startsWith('mator/vehicle-images-staging/')).toBe(true);
     expect(result.key).not.toContain('/products/');
+  });
+
+  it('fails a staging public-id collision without requesting replacement', async () => {
+    let request;
+    const store = createCloudinaryAssetStore({
+      cloudName: 'demo', apiKey: 'server-key', apiSecret: 'server-secret',
+      environment: 'staging', publicIdPrefix: 'mator/vehicle-images-staging',
+      fetchImpl: vi.fn(async (url, options) => {
+        request = { url, options };
+        return { ok: true, json: async () => ({ existing: true }) };
+      }),
+    });
+    await expect(store.publish({
+      bytes: await fixtureImage(), contentType: 'image/png', identityKey: 'chevrolet|cobalt|2020|UZ|cobalt-gen2',
+      version: 1, candidateId: 'existing-staging-candidate',
+    })).rejects.toThrow(/unexpected asset metadata/);
+    expect(request.options.body.get('overwrite')).toBe('false');
   });
 
   it('rejects production, product, and other prefixes for staging publication', () => {
