@@ -1,13 +1,26 @@
 import { createHash } from 'node:crypto';
 import { processFramedArtwork } from './vehicle-image-processing.mjs';
+import { vehicleImageCloudinaryPublicIdPrefix } from './vehicle-image-env.mjs';
+
+export function vehicleImageCloudinaryPublicId(prefix, identityKey, version, candidateId) {
+  if (typeof identityKey !== 'string' || !identityKey || !Number.isInteger(version) || version < 1 ||
+      typeof candidateId !== 'string' || !candidateId) {
+    throw new Error('published image version and candidate identity are required');
+  }
+  const identityHash = createHash('sha256').update(identityKey).digest('hex').slice(0, 32);
+  return `${prefix}/${identityHash}/v${version}-${candidateId}`;
+}
 
 /** Publishes approved assets only. Credentials are read server-side at construction. */
 export function createCloudinaryAssetStore({
   cloudName = process.env.CLOUDINARY_CLOUD_NAME,
   apiKey = process.env.CLOUDINARY_API_KEY,
   apiSecret = process.env.CLOUDINARY_API_SECRET,
+  publicIdPrefix = process.env.VEHICLE_IMAGE_CLOUDINARY_PUBLIC_ID_PREFIX,
+  environment = process.env.VEHICLE_IMAGE_ENVIRONMENT,
   fetchImpl = fetch,
 } = {}) {
+  const prefix = vehicleImageCloudinaryPublicIdPrefix(publicIdPrefix, environment);
   if (![cloudName, apiKey, apiSecret].every((value) => typeof value === 'string' && value))
     throw new Error('Cloudinary credentials are required');
 
@@ -17,8 +30,7 @@ export function createCloudinaryAssetStore({
         throw new Error('published image version and candidate identity are required');
       if (!Buffer.isBuffer(bytes)) throw new Error('approved cloud asset must be an image buffer');
       const normalized = await processFramedArtwork(bytes);
-      const identityHash = createHash('sha256').update(identityKey).digest('hex').slice(0, 32);
-      const publicId = `mator/vehicle-images/${identityHash}/v${version}-${candidateId}`;
+      const publicId = vehicleImageCloudinaryPublicId(prefix, identityKey, version, candidateId);
       const timestamp = Math.floor(Date.now() / 1000).toString();
       const signed = { overwrite: 'true', public_id: publicId, timestamp };
       const signaturePayload = Object.keys(signed)
