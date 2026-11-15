@@ -17,6 +17,7 @@ import {
   isVehicleImagePublicationEnabled,
   vehicleImageCloudinaryPublicIdPrefix,
   vehicleImageMaxProviderCallsPerDay,
+  vehicleImageStoreKind,
 } from './vehicle-image-env.mjs';
 
 const dirs = [];
@@ -385,6 +386,10 @@ describe('vehicle image pipeline', () => {
       .toBe('mator/vehicle-images');
     expect(() => vehicleImageCloudinaryPublicIdPrefix('mator/products/archive', 'production'))
       .toThrow(/dedicated/);
+  });
+
+  it('selects Cloudinary for the staging publisher when explicitly configured', () => {
+    expect(vehicleImageStoreKind('cloudinary')).toBe('cloudinary');
   });
 
   it('deduplicates equivalent requests including manufacturer and expanded identity fields', async () => {
