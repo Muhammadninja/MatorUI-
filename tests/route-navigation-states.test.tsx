@@ -2,7 +2,7 @@
 import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { beforeEach, expect, test, vi } from 'vitest';
-const state = vi.hoisted(() => ({ canBack: false, back: vi.fn(), replace: vi.fn(), post: vi.fn(), orderState: 'not_found' }));
+const state = vi.hoisted(() => ({ canBack: false, back: vi.fn(), replace: vi.fn(), post: vi.fn(), cancelOrder: vi.fn(), orderState: 'not_found' }));
 vi.mock('react-native', () => ({ TextInput: (props: any) => <input {...props} />, ScrollView: ({ children }: any) => <section>{children}</section> }));
 vi.mock('@/utils/haptics', () => ({ triggerHaptic: vi.fn() }));
 vi.mock('expo-router', () => ({ router: { canGoBack: () => state.canBack, back: state.back, replace: state.replace }, useLocalSearchParams: () => ({}), useFocusEffect: () => {} }));
@@ -13,7 +13,7 @@ vi.mock('@/contexts/theme.context', () => ({ useThemeContext: () => ({ tokens: {
 vi.mock('@/services/api-client', () => ({ apiClient: { post: state.post } }));
 vi.mock('@/hooks/use-orders', () => ({
   useOrder: () => ({ state: state.orderState, order: null, refresh: vi.fn() }),
-  useCancelOrder: () => ({ mutate: vi.fn(), isPending: false }),
+  useCancelOrder: () => ({ mutate: state.cancelOrder, isPending: false }),
   useRefreshOrders: () => vi.fn(),
 }));
 // Payment recovery is covered separately; these cases have no order to pay.
@@ -44,5 +44,6 @@ test('tracking not-found displays a recovery path instead of a blank body or per
   expect(output).toContain('trackOrder.backToShopping');
   expect(output).not.toContain('loading');
   expect(output).not.toContain('common.retry');
+  expect(state.cancelOrder).not.toHaveBeenCalled();
   await act(async () => tree.unmount());
 });

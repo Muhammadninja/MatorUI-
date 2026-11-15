@@ -8,11 +8,16 @@ import sharp from 'sharp';
 import { createVehicleImagePipeline, vehicleIdentityKey } from './vehicle-image-pipeline.mjs';
 import { processGeneratedImage } from './vehicle-image-processing.mjs';
 import { buildVehicleImagePrompt, OpenAIImageProvider } from './vehicle-image-provider.mjs';
-import { createCloudinaryAssetStore } from './vehicle-image-cloudinary-store.mjs';
+import {
+  createCloudinaryAssetStore,
+  vehicleImageCloudinaryPublicId,
+} from './vehicle-image-cloudinary-store.mjs';
 import {
   isVehicleImageGenerationEnabled,
   isVehicleImagePublicationEnabled,
+  vehicleImageCloudinaryPublicIdPrefix,
   vehicleImageMaxProviderCallsPerDay,
+  vehicleImageStoreKind,
 } from './vehicle-image-env.mjs';
 
 const dirs = [];
@@ -307,8 +312,84 @@ describe('vehicle image pipeline', () => {
     expect(request.options.headers).toBeUndefined();
     expect(request.options.body.get('api_key')).toBe('server-key');
     expect(request.options.body.get('overwrite')).toBe('true');
+    expect(result.key).toBe(vehicleImageCloudinaryPublicId(
+      'mator/vehicle-images', 'byd|han|2024|||||', 1, 'candidate',
+    ));
     const signed = `overwrite=true&public_id=${request.options.body.get('public_id')}&timestamp=${request.options.body.get('timestamp')}server-secret`;
     expect(request.options.body.get('signature')).toBe(createHash('sha1').update(signed).digest('hex'));
+  });
+
+  it('keeps staging vehicle uploads inside the staging-only Cloudinary prefix', async () => {
+    let request;
+    const store = createCloudinaryAssetStore({
+      cloudName: 'demo', apiKey: 'server-key', apiSecret: 'server-secret',
+      environment: 'staging',
+      publicIdPrefix: 'mator/vehicle-images-staging',
+      fetchImpl: vi.fn(async (url, options) => {
+        request = { url, options };
+        return { ok: true, json: async () => ({
+          secure_url: 'https://res.cloudinary.com/demo/image/upload/v1/example.webp',
+          public_id: options.body.get('public_id'),
+        }) };
+      }),
+    });
+    const result = await store.publish({
+      bytes: await fixtureImage(), contentType: 'image/png', identityKey: 'chevrolet|tracker|2024|||||',
+      version: 1, candidateId: 'approved-chevrolet-fixture',
+    });
+    expect(request.options.body.get('public_id')).toBe(vehicleImageCloudinaryPublicId(
+      'mator/vehicle-images-staging', 'chevrolet|tracker|2024|||||', 1, 'approved-chevrolet-fixture',
+    ));
+    expect(request.options.body.get('overwrite')).toBe('false');
+    expect(result.key.startsWith('mator/vehicle-images-staging/')).toBe(true);
+    expect(result.key).not.toContain('/products/');
+  });
+
+  it('fails a staging public-id collision without requesting replacement', async () => {
+    let request;
+    const store = createCloudinaryAssetStore({
+      cloudName: 'demo', apiKey: 'server-key', apiSecret: 'server-secret',
+      environment: 'staging', publicIdPrefix: 'mator/vehicle-images-staging',
+      fetchImpl: vi.fn(async (url, options) => {
+        request = { url, options };
+        return { ok: true, json: async () => ({ existing: true }) };
+      }),
+    });
+    await expect(store.publish({
+      bytes: await fixtureImage(), contentType: 'image/png', identityKey: 'chevrolet|cobalt|2020|UZ|cobalt-gen2',
+      version: 1, candidateId: 'existing-staging-candidate',
+    })).rejects.toThrow(/unexpected asset metadata/);
+    expect(request.options.body.get('overwrite')).toBe('false');
+  });
+
+  it('rejects production, product, and other prefixes for staging publication', () => {
+    expect(() => vehicleImageCloudinaryPublicIdPrefix(
+      'mator/vehicle-images', 'staging',
+    )).toThrow(/staging-only/);
+    expect(() => vehicleImageCloudinaryPublicIdPrefix(
+      'mator/products', 'staging',
+    )).toThrow(/dedicated/);
+    expect(() => createCloudinaryAssetStore({
+      cloudName: 'demo', apiKey: 'server-key', apiSecret: 'server-secret',
+      environment: 'staging', publicIdPrefix: 'mator/products',
+    })).toThrow(/dedicated/);
+    expect(() => createCloudinaryAssetStore({
+      cloudName: 'demo', apiKey: 'server-key', apiSecret: 'server-secret',
+      environment: 'staging', publicIdPrefix: 'mator/vehicle-images',
+    })).toThrow(/staging-only/);
+  });
+
+  it('preserves the historical production prefix by default and blocks product namespaces', () => {
+    expect(vehicleImageCloudinaryPublicIdPrefix(undefined, 'production'))
+      .toBe('mator/vehicle-images');
+    expect(vehicleImageCloudinaryPublicIdPrefix(undefined, undefined))
+      .toBe('mator/vehicle-images');
+    expect(() => vehicleImageCloudinaryPublicIdPrefix('mator/products/archive', 'production'))
+      .toThrow(/dedicated/);
+  });
+
+  it('selects Cloudinary for the staging publisher when explicitly configured', () => {
+    expect(vehicleImageStoreKind('cloudinary')).toBe('cloudinary');
   });
 
   it('deduplicates equivalent requests including manufacturer and expanded identity fields', async () => {

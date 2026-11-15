@@ -27,6 +27,7 @@ export async function loadVehicleImageEnv() {
       'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET',
       'VEHICLE_IMAGE_REPOSITORY_ARTWORK_ENABLED', 'VEHICLE_IMAGE_ARTWORK_ROOT',
       'VEHICLE_IMAGE_ALLOW_UNVERIFIED_GENERATION', 'VEHICLE_IMAGE_STORE',
+      'VEHICLE_IMAGE_ENVIRONMENT', 'VEHICLE_IMAGE_CLOUDINARY_PUBLIC_ID_PREFIX',
       'VEHICLE_IMAGE_LOCAL_STORE_DIR', 'VEHICLE_IMAGE_PUBLIC_BASE_URL',
       'VEHICLE_IMAGE_REGISTRY_SHA256'].includes(match[1])) continue;
     const [, key, raw] = match;
@@ -66,6 +67,42 @@ export function vehicleImageStoreKind(value) {
   if (value === undefined || value === '' || value === 'cloudinary') return 'cloudinary';
   if (value === 'local') return 'local';
   throw new Error('VEHICLE_IMAGE_STORE must be cloudinary or local');
+}
+
+const DEFAULT_VEHICLE_IMAGE_CLOUDINARY_PREFIX = 'mator/vehicle-images';
+const STAGING_VEHICLE_IMAGE_CLOUDINARY_PREFIX = 'mator/vehicle-images-staging';
+
+/**
+ * Resolve the Cloudinary namespace. Staging must opt into its isolated prefix;
+ * production keeps the historical prefix when no setting is supplied.
+ */
+export function vehicleImageCloudinaryPublicIdPrefix(
+  value = process.env.VEHICLE_IMAGE_CLOUDINARY_PUBLIC_ID_PREFIX,
+  environment = process.env.VEHICLE_IMAGE_ENVIRONMENT,
+) {
+  if (value !== undefined && typeof value !== 'string') {
+    throw new Error('vehicle image Cloudinary prefix must be a string');
+  }
+  const prefix = value === undefined || value.trim() === ''
+    ? DEFAULT_VEHICLE_IMAGE_CLOUDINARY_PREFIX
+    : value.trim();
+  const segments = prefix.split('/');
+  if (
+    prefix.length > 180 ||
+    segments.length < 2 ||
+    segments.some((segment) => !/^[A-Za-z0-9_-]+$/.test(segment)) ||
+    segments[0] !== 'mator' ||
+    segments[1] === 'products' ||
+    segments[1] === 'avatars' ||
+    segments[1] === 'dealers' ||
+    segments[1] === 'sourcing'
+  ) {
+    throw new Error('vehicle image Cloudinary prefix must use a dedicated mator vehicle-image namespace');
+  }
+  if (environment === 'staging' && prefix !== STAGING_VEHICLE_IMAGE_CLOUDINARY_PREFIX) {
+    throw new Error('staging vehicle image publication requires the staging-only Cloudinary prefix');
+  }
+  return prefix;
 }
 
 export function vehicleImageMaxProviderCallsPerDay(value) {
