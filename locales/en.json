@@ -682,6 +682,8 @@
     "modelPickerError": "Couldn't load the catalogue. Check your connection and try again.",
     "quickAddSuccess": "{{vehicle}} added to your garage",
     "quickAddFailed": "Couldn't add that car. Please try again.",
+    "yearUnsupported": "{{model}} was built from {{from}} to {{to}}. Choose a year in that range.",
+    "yearUnsupportedTo": "{{model}} was built up to {{to}}. Choose an earlier year.",
     "addByVinInstead": "Have a VIN? Add by VIN instead",
     "stepMakeTitle": "Pick your car's brand",
     "stepModelTitle": "Now the model",

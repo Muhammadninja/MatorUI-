@@ -13,14 +13,9 @@ import {
   type VehicleChoice,
 } from '@/components/screens-components/garage/vehicle-choice-list';
 import { useMakes, useModels } from '@/hooks/use-reference-catalog';
+import { modelYearChoices } from '@/services/vehicle-model-years';
 import { vehicleRequests } from '@/services/vehicle-requests';
 import { triggerHaptic } from '@/utils/haptics';
-
-/** Years offered, newest first. The reference API states no production years
- *  per model yet, so this is the same open range as before: 24 reaches the early
- *  2000s, which covers the Nexias and Damas still on the road here. When the
- *  catalog carries years, offer only those. */
-const YEARS_BACK = 24;
 
 const STEPS = ['make', 'model', 'year'] as const;
 type Step = (typeof STEPS)[number];
@@ -96,15 +91,15 @@ export function GarageVehiclePickerSheet({
         .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })),
     [models.data],
   );
-  const yearChoices = useMemo<VehicleChoice[]>(() => {
+  // Only the years this model was built (the backend's range), so a
+  // discontinued car offers no year after its last one.
+  const pickedModel = models.data?.find((m) => m.id === modelId);
+  const yearChoices = useMemo<VehicleChoice[]>(
     // Read per render, not at module load, so a session running across New
     // Year still offers the new year.
-    const current = new Date().getFullYear();
-    return Array.from({ length: YEARS_BACK }, (_, i) => {
-      const y = String(current - i);
-      return { value: y, label: y };
-    });
-  }, []);
+    () => modelYearChoices(pickedModel, new Date().getFullYear()).map((y) => ({ value: String(y), label: String(y) })),
+    [pickedModel],
+  );
 
   // Clear on the way OUT, not on submit. The parent keeps this sheet mounted
   // and only flips `visible`, so resetting here is what stops a second open

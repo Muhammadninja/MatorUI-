@@ -682,6 +682,8 @@
     "emptyOptionDetails": "Model va yil orqali",
     "quickAddSuccess": "{{vehicle}} garajga qoʻshildi",
     "quickAddFailed": "Avtomobilni qoʻshib boʻlmadi. Qayta urinib koʻring.",
+    "yearUnsupported": "{{model}} {{from}}–{{to}}-yillarda ishlab chiqarilgan. Shu oraliqdagi yilni tanlang.",
+    "yearUnsupportedTo": "{{model}} {{to}}-yilgacha ishlab chiqarilgan. Oldingi yilni tanlang.",
     "addByVinInstead": "VIN bormi? VIN orqali qoʻshing",
     "stepMakeTitle": "Mashinangiz markasini tanlang",
     "stepModelTitle": "Endi modelini tanlang",
@@ -1086,7 +1088,7 @@
     "unavailable": "Hozircha rasm yoʻq",
     "credit": "Surat: {{attribution}} · {{license}}",
     "source": "Rasm manbasi va litsenziyasi",
-    "modified": "O‘lchami o‘zgartirildi va WebP formatiga aylantirildi"
+    "modified": "Oʻlchami oʻzgartirildi va WebP formatiga aylantirildi"
   },
   "vehicleGeneration": {
     "title": "Sizdagi {{model}} qaysi avlod?",

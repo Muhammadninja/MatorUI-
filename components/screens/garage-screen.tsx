@@ -26,6 +26,7 @@ import { useUserContext } from '@/contexts/user.context';
 import { useToast } from '@/hooks/use-toast';
 import useGarage from '@/hooks/use-garage';
 import type { Vehicle } from '@/services/garage-service';
+import { unsupportedYearRange } from '@/services/vehicle-model-years';
 import { formatMileage } from '@/utils/mileage';
 import { DEFAULT_VEHICLE_COLOR_HEX, colorHexToEnum } from '@/utils/vehicle-color';
 
@@ -152,8 +153,18 @@ export default function GarageScreen() {
       });
       setPickingVehicle(false);
       toast.success(t('garage.quickAddSuccess', { vehicle: label }));
-    } catch {
-      toast.danger(t('garage.quickAddFailed'));
+    } catch (error) {
+      // The backend rejects a year the model was not built in; say which years
+      // it was, instead of a generic "try again" that would fail the same way.
+      const range = unsupportedYearRange(error);
+      const model = `${picked.makeName} ${picked.modelName}`.trim();
+      toast.danger(
+        range === null
+          ? t('garage.quickAddFailed')
+          : range.yearFrom === null
+            ? t('garage.yearUnsupportedTo', { model, to: range.yearTo })
+            : t('garage.yearUnsupported', { model, from: range.yearFrom, to: range.yearTo }),
+      );
     } finally {
       setQuickAdding(false);
     }
