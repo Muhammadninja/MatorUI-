@@ -114,10 +114,11 @@ function mount(onSubmit: (p: PickedVehicle) => void = () => {}, onUseVin?: () =>
 }
 
 describe('GarageVehiclePickerSheet', () => {
-  test('opens on makes alone, alphabetical, without makes that are coming soon', () => {
+  test('opens on makes alone, alphabetical, including makes that are coming soon', () => {
     const s = mount();
     expect(s.step()).toBe('make');
-    expect(s.options('make')).toEqual(['make_chevrolet', 'make_kia']);
+    // BYD is "coming soon" for parts, but its owners can still add their car.
+    expect(s.options('make')).toEqual(['make_byd', 'make_chevrolet', 'make_kia']);
     expect(s.next()!.props.disabled).toBe(true);
   });
 
