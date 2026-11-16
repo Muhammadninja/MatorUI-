@@ -1083,7 +1083,10 @@
   "vehicleImage": {
     "preparing": "Image in preparation",
     "awaitingReview": "Image being checked",
-    "unavailable": "No image yet"
+    "unavailable": "No image yet",
+    "credit": "Photo: {{attribution}} · {{license}}",
+    "source": "Image source and license",
+    "modified": "Resized and converted to WebP"
   },
   "vehicleGeneration": {
     "title": "Which {{model}} is yours?",

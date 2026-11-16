@@ -5,9 +5,11 @@ import { createImageProvider } from '../services/vehicle-image-provider.mjs';
 import { createCloudinaryAssetStore } from '../services/vehicle-image-cloudinary-store.mjs';
 import { createLocalAssetStore } from '../services/vehicle-image-local-store.mjs';
 import { createRepositoryArtworkProvider } from '../services/vehicle-image-acquisition.mjs';
+import { createWikimediaCommonsProvider } from '../services/vehicle-image-wikimedia-provider.mjs';
 import {
   expectedRegistrySha256,
   isRepositoryArtworkEnabled,
+  isWikimediaEnabled,
   isUnverifiedGenerationAllowed,
   isVehicleImageGenerationEnabled,
   isVehicleImagePublicationEnabled,
@@ -34,6 +36,9 @@ const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url))
 const artworkProvider = isRepositoryArtworkEnabled(process.env.VEHICLE_IMAGE_REPOSITORY_ARTWORK_ENABLED)
   ? createRepositoryArtworkProvider({ rootDir: process.env.VEHICLE_IMAGE_ARTWORK_ROOT || repositoryRoot })
   : null;
+const photoProvider = isWikimediaEnabled(process.env.VEHICLE_IMAGE_WIKIMEDIA_ENABLED)
+  ? createWikimediaCommonsProvider({ userAgent: process.env.VEHICLE_IMAGE_WIKIMEDIA_USER_AGENT || 'MatorVehicleImagePipeline/1.0 (https://mator.uz)' })
+  : null;
 const storeKind = vehicleImageStoreKind(process.env.VEHICLE_IMAGE_STORE);
 const assetStore = !publicationEnabled
   ? null
@@ -50,10 +55,13 @@ const pipeline = createVehicleImagePipeline({
   provider: generationEnabled ? createImageProvider() : null,
   generationEnabled,
   artworkProvider,
+  photoProvider,
   allowUnverifiedGeneration: isUnverifiedGenerationAllowed(process.env.VEHICLE_IMAGE_ALLOW_UNVERIFIED_GENERATION),
   assetStore,
   publicationEnabled,
-  autoRun: generationEnabled || Boolean(artworkProvider),
+  publicationCandidateAllowlist: (process.env.VEHICLE_IMAGE_PUBLICATION_CANDIDATE_ALLOWLIST || '')
+    .split(',').map((value) => value.trim()).filter(Boolean),
+  autoRun: generationEnabled || Boolean(artworkProvider) || Boolean(photoProvider),
   maxAttempts: 3,
   maxProviderCallsPerDay: vehicleImageMaxProviderCallsPerDay(
     process.env.VEHICLE_IMAGE_MAX_PROVIDER_CALLS_PER_DAY,
@@ -75,6 +83,7 @@ server.listen(port, '127.0.0.1', () => {
     registrySha256: pipeline.registry.sha256,
     registryCheck: pipeline.registryCheck,
     artwork: Boolean(artworkProvider),
+    wikimedia: Boolean(photoProvider),
     generation: generationEnabled,
     publication: publicationEnabled,
     store: publicationEnabled ? storeKind : null,

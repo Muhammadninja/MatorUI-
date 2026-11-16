@@ -26,6 +26,8 @@ export async function loadVehicleImageEnv() {
       'VEHICLE_IMAGE_ADMIN_TOKEN', 'VEHICLE_IMAGE_REQUEST_TOKEN', 'VEHICLE_IMAGE_DATA_DIR', 'PORT', 'CLOUDINARY_CLOUD_NAME',
       'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET',
       'VEHICLE_IMAGE_REPOSITORY_ARTWORK_ENABLED', 'VEHICLE_IMAGE_ARTWORK_ROOT',
+      'VEHICLE_IMAGE_WIKIMEDIA_ENABLED', 'VEHICLE_IMAGE_WIKIMEDIA_USER_AGENT',
+      'VEHICLE_IMAGE_PUBLICATION_CANDIDATE_ALLOWLIST',
       'VEHICLE_IMAGE_ALLOW_UNVERIFIED_GENERATION', 'VEHICLE_IMAGE_STORE',
       'VEHICLE_IMAGE_ENVIRONMENT', 'VEHICLE_IMAGE_CLOUDINARY_PUBLIC_ID_PREFIX',
       'VEHICLE_IMAGE_LOCAL_STORE_DIR', 'VEHICLE_IMAGE_PUBLIC_BASE_URL',
@@ -56,6 +58,9 @@ export function expectedRegistrySha256(value) {
 export function isRepositoryArtworkEnabled(value) {
   return value !== 'false';
 }
+
+/** Wikimedia stays opt-in until deployed with explicit owner review policy. */
+export function isWikimediaEnabled(value) { return value === 'true'; }
 
 /** Paid generation for unverified identities: only the exact opt-in 'true'. */
 export function isUnverifiedGenerationAllowed(value) {

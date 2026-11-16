@@ -1105,7 +1105,10 @@
   "vehicleImage": {
     "preparing": "Изображение готовится",
     "awaitingReview": "Изображение на проверке",
-    "unavailable": "Изображения пока нет"
+    "unavailable": "Изображения пока нет",
+    "credit": "Фото: {{attribution}} · {{license}}",
+    "source": "Источник изображения и лицензия",
+    "modified": "Размер изменён, формат преобразован в WebP"
   },
   "vehicleGeneration": {
     "title": "Какая у вас {{model}}?",

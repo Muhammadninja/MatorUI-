@@ -275,7 +275,7 @@ describe('vehicle image pipeline', () => {
     expect(restarted.listPending(true)[0].job.status).toBe('failed');
   });
 
-  it('publishes approved WebP through the storage adapter and resolves its stable URL', async () => {
+  it('keeps owner supplied artwork private without verified commercial provenance', async () => {
     const publish = vi.fn(async () => ({
       url: 'https://res.cloudinary.com/demo/image/upload/v123/mator/vehicle-images/hash/v1.webp',
       key: 'mator/vehicle-images/hash/v1',
@@ -286,9 +286,10 @@ describe('vehicle image pipeline', () => {
     const candidate = await pipeline.uploadCandidate(result.request.id,
       { contentType: 'image/png', bytes }, true);
     expect(publish).not.toHaveBeenCalled();
-    await pipeline.decideCandidate(candidate.id, 'approve', true);
-    expect(publish).toHaveBeenCalledOnce();
-    expect(pipeline.resolve(result.request.identityKey).url).toContain('https://res.cloudinary.com/');
+    await expect(pipeline.decideCandidate(candidate.id, 'approve', true))
+      .rejects.toMatchObject({ status: 409 });
+    expect(publish).not.toHaveBeenCalled();
+    expect(pipeline.resolve(result.request.identityKey)).toBeNull();
   });
 
   it('uploads approved WebP with signed server credentials and validates the provider URL', async () => {
@@ -317,6 +318,28 @@ describe('vehicle image pipeline', () => {
     ));
     const signed = `overwrite=true&public_id=${request.options.body.get('public_id')}&timestamp=${request.options.body.get('timestamp')}server-secret`;
     expect(request.options.body.get('signature')).toBe(createHash('sha1').update(signed).digest('hex'));
+  });
+
+  it('uploads licensed opaque photos without cutout processing and signs attribution into Cloudinary context', async () => {
+    let request;
+    const store = createCloudinaryAssetStore({
+      cloudName: 'demo', apiKey: 'server-key', apiSecret: 'server-secret',
+      fetchImpl: vi.fn(async (_url, options) => {
+        request = options;
+        return { ok: true, json: async () => ({ secure_url: 'https://res.cloudinary.com/demo/image/upload/v2/licensed.webp', public_id: options.body.get('public_id') }) };
+      }),
+    });
+    const jpeg = await sharp({ create: { width: 800, height: 600, channels: 3, background: '#777' } }).jpeg().toBuffer();
+    const rights = { attribution: 'Photographer / Commons', author: 'Photographer', license: 'CC-BY-4.0',
+      licenseUrl: 'https://creativecommons.org/licenses/by/4.0/', sourcePage: 'https://commons.wikimedia.org/wiki/File:Photo.jpg',
+      sourceUrl: 'https://upload.wikimedia.org/photo.jpg' };
+    await store.publish({ bytes: jpeg, contentType: 'image/jpeg', identityKey: 'chevrolet|spark|2024', version: 1,
+      candidateId: 'licensed-photo-candidate', kind: 'licensed-photo', rights });
+    const context = request.body.get('context');
+    expect(context).toContain('attribution=Photographer / Commons');
+    const signed = `context=${context}&overwrite=true&public_id=${request.body.get('public_id')}&timestamp=${request.body.get('timestamp')}server-secret`;
+    expect(request.body.get('signature')).toBe(createHash('sha1').update(signed).digest('hex'));
+    expect(request.body.get('file').type).toBe('image/webp');
   });
 
   it('keeps staging vehicle uploads inside the staging-only Cloudinary prefix', async () => {
@@ -425,7 +448,7 @@ describe('vehicle image pipeline', () => {
     );
   });
 
-  it('reuses an approved asset without scheduling a generation job', async () => {
+  it('does not reuse unlicensed owner supplied artwork as an approved asset', async () => {
     const generate = vi.fn();
     const { pipeline } = await setup({ provider: { generate } });
     const vehicle = { make: 'Lexus', model: 'TX', year: 2024 };
@@ -436,12 +459,13 @@ describe('vehicle image pipeline', () => {
       { contentType: 'image/png', bytes: image },
       true,
     );
-    await pipeline.decideCandidate(candidate.id, 'approve', true);
+    await expect(pipeline.decideCandidate(candidate.id, 'approve', true))
+      .rejects.toMatchObject({ status: 409 });
     const duplicate = await pipeline.submitRequest(vehicle);
-    expect(duplicate.reused).toBe(true);
-    expect(duplicate.asset.version).toBe(1);
+    expect(duplicate.reused).toBe(false);
+    expect(duplicate.asset).toBeNull();
     expect(duplicate.job).toBeNull();
-    await expect(pipeline.regenerateRequest(request.id, true)).rejects.toMatchObject({ status: 409 });
+    expect(duplicate.activeJob.status).toBe('queued');
     expect(generate).not.toHaveBeenCalled();
   });
 
@@ -471,8 +495,9 @@ describe('vehicle image pipeline', () => {
     const preview = await pipeline.readCandidate(candidate.id, true);
     const meta = await sharp(preview.bytes).metadata();
     expect(meta).toMatchObject({ format: 'webp', width: 1200, height: 600, hasAlpha: true });
-    await pipeline.decideCandidate(candidate.id, 'approve', true);
-    expect(pipeline.resolve(result.request.identityKey).version).toBe(1);
+    await expect(pipeline.decideCandidate(candidate.id, 'approve', true))
+      .rejects.toMatchObject({ status: 409 });
+    expect(pipeline.resolve(result.request.identityKey)).toBeNull();
   });
 
   it('coalesces concurrent equivalent requests into one generation job', async () => {
@@ -669,12 +694,13 @@ describe('vehicle image pipeline', () => {
     const replacement = pipeline
       .listPending(true)[0]
       .candidates.find((item) => item.status === 'pending');
-    await pipeline.decideCandidate(replacement.id, 'approve', true);
-    expect(pipeline.resolve(request.identityKey).version).toBe(1);
+    await expect(pipeline.decideCandidate(replacement.id, 'approve', true))
+      .rejects.toMatchObject({ status: 409 });
+    expect(pipeline.resolve(request.identityKey)).toBeNull();
     expect(generate).toHaveBeenCalledTimes(2);
   });
 
-  it('supports rollback and leaves an unrelated vehicle pending', async () => {
+  it('keeps unlicensed candidates private and unrelated requests pending', async () => {
     const { pipeline } = await setup();
     const genesis = await pipeline.submitRequest({ make: 'Genesis', model: 'GV80', year: 2025 });
     const lexus = await pipeline.submitRequest({ make: 'Lexus', model: 'TX', year: 2024 });
@@ -684,15 +710,16 @@ describe('vehicle image pipeline', () => {
       { contentType: 'image/png', bytes: firstImage },
       true,
     );
-    await pipeline.decideCandidate(first.id, 'approve', true);
+    await expect(pipeline.decideCandidate(first.id, 'approve', true))
+      .rejects.toMatchObject({ status: 409 });
     const second = await pipeline.uploadCandidate(
       genesis.request.id,
       { contentType: 'image/png', bytes: firstImage },
       true,
     );
-    await pipeline.decideCandidate(second.id, 'approve', true);
-    await pipeline.rollback(genesis.request.identityKey, 1, true);
-    expect(pipeline.resolve(genesis.request.identityKey).version).toBe(1);
+    await expect(pipeline.decideCandidate(second.id, 'approve', true))
+      .rejects.toMatchObject({ status: 409 });
+    expect(pipeline.resolve(genesis.request.identityKey)).toBeNull();
     expect(pipeline.listPending(true).some((item) => item.id === lexus.request.id)).toBe(true);
   });
 

@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { ArrowLeftRight } from 'lucide-react-native';
 import { memo } from 'react';
+import { Linking } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import GarageAddHero, {
@@ -230,12 +231,38 @@ function HomeGarageCard() {
     </GarageHeroCard>
   );
 
+  const attribution = image?.status === 'approved' && image.attribution && image.license
+    ? (
+      <AppView gap="xs" style={{ paddingHorizontal: 4 }}>
+        <AppText textVariant="bodyXs" colorName="textMuted">
+          {t('vehicleImage.credit', { attribution: image.attribution, license: image.license })}
+        </AppText>
+        {image.modifications ? <AppText textVariant="bodyXs" colorName="textMuted">{image.modifications}</AppText> : null}
+        {image.sourcePage ? (
+          <AppPressableView
+            testID="vehicle-image-attribution-source"
+            onPress={() => { void Linking.openURL(image.sourcePage!).catch(() => undefined); }}
+            accessibilityRole="link"
+            accessibilityLabel={t('vehicleImage.source')}
+            pressedOpacity={0.7}
+          >
+            <AppText textVariant="bodyXs" style={{ color: tokens.brandText, textDecorationLine: 'underline' }}>
+              {t('vehicleImage.source')}
+            </AppText>
+          </AppPressableView>
+        ) : null}
+      </AppView>
+    ) : null;
+
   // A year two generations share: the backend's options, under the card.
   return vehicle?.generation?.status === 'choice_required' ? (
     <AppView gap="sm">
       {card}
+      {attribution}
       <VehicleGenerationChoice vehicle={vehicle} />
     </AppView>
+  ) : attribution ? (
+    <AppView gap="xs">{card}{attribution}</AppView>
   ) : (
     card
   );

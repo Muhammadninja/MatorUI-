@@ -1083,7 +1083,10 @@
   "vehicleImage": {
     "preparing": "Rasm tayyorlanmoqda",
     "awaitingReview": "Rasm tekshirilmoqda",
-    "unavailable": "Hozircha rasm yoʻq"
+    "unavailable": "Hozircha rasm yoʻq",
+    "credit": "Surat: {{attribution}} · {{license}}",
+    "source": "Rasm manbasi va litsenziyasi",
+    "modified": "O‘lchami o‘zgartirildi va WebP formatiga aylantirildi"
   },
   "vehicleGeneration": {
     "title": "Sizdagi {{model}} qaysi avlod?",

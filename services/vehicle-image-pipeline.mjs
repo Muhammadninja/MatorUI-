@@ -2,9 +2,9 @@ import { createServer } from 'node:http';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
-import { processFramedArtwork, processGeneratedImage } from './vehicle-image-processing.mjs';
+import { processFramedArtwork, processGeneratedImage, processLicensedPhoto } from './vehicle-image-processing.mjs';
 import { catalogObjectFingerprint, loadRegistryFile } from './vehicle-image-registry.mjs';
-import { artworkEntriesFor, publicationDecision, sha256Hex } from './vehicle-image-acquisition.mjs';
+import { artworkEntriesFor, hasPublishableRights, publicationDecision, sha256Hex } from './vehicle-image-acquisition.mjs';
 
 const REGISTRY = loadRegistryFile();
 const VEHICLE_IMAGE_CATALOG = REGISTRY.catalog;
@@ -306,6 +306,7 @@ export function createVehicleImagePipeline({
   provider = null,
   generationEnabled = false,
   publicationEnabled = false,
+  publicationCandidateAllowlist = [],
   autoRun = false,
   imageValidator = defaultImageValidator,
   /** Validator for artwork already in the Garage framing (repository artwork, uploads). */
@@ -318,6 +319,8 @@ export function createVehicleImagePipeline({
   catalog = VEHICLE_IMAGE_CATALOG,
   /** Free repository-artwork provider (vehicle-image-acquisition.mjs); null = off. */
   artworkProvider = null,
+  /** Wikimedia or equivalent explicitly licensed photo source; always review-only. */
+  photoProvider = null,
   /** Paid generation for unverified identities stays off unless explicitly allowed. */
   allowUnverifiedGeneration = false,
   /**
@@ -345,12 +348,13 @@ export function createVehicleImagePipeline({
   let workerPromise = null;
   let initialized = false;
   const generationAvailable = Boolean(provider && generationEnabled);
-  const acquisitionAvailable = generationAvailable || Boolean(artworkProvider);
+  const acquisitionAvailable = generationAvailable || Boolean(artworkProvider) || Boolean(photoProvider);
   const registry = {
     version: catalog.version ?? null,
     sha256: catalog === VEHICLE_IMAGE_CATALOG ? REGISTRY.sha256 : catalogObjectFingerprint(catalog),
   };
   const registryCheck = registryHandshake(registry.sha256, expectedRegistrySha256);
+  const allowedPublicationCandidates = new Set(publicationCandidateAllowlist);
   const registryCompatible = registryCheck === 'ok' || registryCheck === 'not_enforced';
   const publishInProgress = new Set();
   const identityLinkInProgress = new Set();
@@ -577,7 +581,7 @@ export function createVehicleImagePipeline({
   /** What acquisition could do for a request right now, with no side effects. */
   function acquisitionPlan(request) {
     const identity = request?.canonicalIdentity;
-    if (!identity || !identityAcquirable(identity)) return { eligible: false, artwork: [], generation: false };
+    if (!identity || !identityAcquirable(identity)) return { eligible: false, artwork: [], photos: Boolean(photoProvider), generation: false };
     const rejected = rejectedFor(request.subjectKey);
     const artwork = artworkProvider
       ? artworkEntriesFor(catalog, identity, {
@@ -587,7 +591,7 @@ export function createVehicleImagePipeline({
       : [];
     const generation = generationAvailable &&
       (identity.identityStatus === 'unverified' ? allowUnverifiedGeneration : generationIdentityIsVerified(identity));
-    return { eligible: artwork.length > 0 || generation, artwork, generation };
+    return { eligible: artwork.length > 0 || Boolean(photoProvider) || generation, artwork, photos: Boolean(photoProvider), generation };
   }
 
   /** Status vocabulary for contract-2 clients (the backend since the acquisition release). */
@@ -689,7 +693,7 @@ export function createVehicleImagePipeline({
       !ADMIN_ONLY_TERMINAL_JOB_STATES.has(previousJob?.status)
     ) job = createJob(request);
     await persist();
-    if (job && provider && generationEnabled && autoRun) queueMicrotask(() => void runQueuedJobs());
+    if (job && autoRun && (generationAvailable || artworkProvider || photoProvider)) queueMicrotask(() => void runQueuedJobs());
     return {
       request,
       duplicate,
@@ -819,6 +823,22 @@ export function createVehicleImagePipeline({
               status,
               createdAt,
               source,
+              provider,
+              license,
+              licenseName,
+              licenseUrl,
+              licenseEvidence,
+              author,
+              attribution,
+              sourceUrl,
+              sourcePage,
+              sourceTitle,
+              modifications,
+              sourceWidth,
+              sourceHeight,
+              provenance,
+              sourceRef,
+              kind,
               quality,
               identityReviewRequired,
               model,
@@ -831,6 +851,22 @@ export function createVehicleImagePipeline({
               status,
               createdAt,
               source,
+              provider,
+              license,
+              licenseName,
+              licenseUrl,
+              licenseEvidence,
+              author,
+              attribution,
+              sourceUrl,
+              sourcePage,
+              sourceTitle,
+              modifications,
+              sourceWidth,
+              sourceHeight,
+              provenance,
+              sourceRef,
+              kind,
               quality,
               identityReviewRequired,
               model,
@@ -861,7 +897,19 @@ export function createVehicleImagePipeline({
       source: metadata.source ?? 'manual',
       provider: metadata.provider,
       model: metadata.model,
+      kind: metadata.kind,
       license: metadata.license,
+      licenseName: metadata.licenseName,
+      licenseUrl: metadata.licenseUrl,
+      licenseEvidence: metadata.licenseEvidence,
+      author: metadata.author,
+      attribution: metadata.attribution,
+      sourceUrl: metadata.sourceUrl,
+      sourcePage: metadata.sourcePage,
+      sourceTitle: metadata.sourceTitle,
+      modifications: metadata.modifications,
+      sourceWidth: metadata.sourceWidth,
+      sourceHeight: metadata.sourceHeight,
       provenance: metadata.provenance,
       catalogAssetId: metadata.catalogAssetId,
       sourceRef: metadata.sourceRef,
@@ -873,7 +921,7 @@ export function createVehicleImagePipeline({
       height: metadata.height,
       quality: metadata.quality,
       identityReviewRequired:
-        metadata.source === 'generated' || unverifiedIdentity || metadata.basis === 'hint' ? true : undefined,
+        metadata.source === 'generated' || metadata.source === 'licensed-photo' || unverifiedIdentity || metadata.basis === 'hint' ? true : undefined,
       providerLatencyMs: metadata.providerLatencyMs,
       providerRequestId: metadata.providerRequestId,
       providerUsage: metadata.providerUsage,
@@ -985,6 +1033,38 @@ export function createVehicleImagePipeline({
     return created;
   }
 
+  async function runLicensedPhotos(job, request) {
+    if (!photoProvider) return [];
+    const day = new Date().toISOString().slice(0, 10);
+    if ((db.providerCallLedger[day] ?? 0) >= maxProviderCallsPerDay) return [];
+    db.providerCallLedger[day] = (db.providerCallLedger[day] ?? 0) + 1;
+    await persist();
+      const photos = await photoProvider.acquire({ identity: request.canonicalIdentity, vehicle: request.vehicle,
+        subjectKey: request.subjectKey, signal: AbortSignal.timeout(jobTimeoutMs) });
+    const created = [];
+    for (const item of (photos ?? []).slice(0, 3)) {
+      const source = item?.source;
+      if (!Buffer.isBuffer(item?.bytes) || !source || source.provider !== photoProvider.id || !hasPublishableRights(source)) continue;
+      const fingerprint = source.sourceFingerprint || sha256Hex(item.bytes);
+      if (rejectedFor(request.subjectKey).has(fingerprint) || db.candidates.some((candidate) => candidate.requestId === request.id && candidate.sourceFingerprint === fingerprint)) continue;
+      const processed = await processLicensedPhoto(item.bytes);
+      const candidate = await saveCandidate(request.id, processed.bytes, processed.contentType, {
+        source: 'licensed-photo', provider: source.provider, kind: 'licensed-photo', license: source.license,
+        licenseName: source.licenseName, licenseUrl: source.licenseUrl, licenseEvidence: source.licenseEvidence,
+        author: source.author, attribution: source.attribution, sourceUrl: source.sourceUrl,
+        sourceTitle: source.title, modifications: source.modifications,
+        sourcePage: source.sourcePage, provenance: source.provenance, sourceRef: source.sourcePage,
+        sourceWidth: source.width, sourceHeight: source.height,
+        sourceFingerprint: fingerprint, basis: source.basis, confidence: source.confidence,
+        width: processed.width, height: processed.height, quality: processed.checks,
+      });
+      created.push(candidate);
+      job.photoResults ??= [];
+      job.photoResults.push({ outcome: 'candidate', candidateId: candidate.id, sourcePage: source.sourcePage });
+    }
+    return created;
+  }
+
   /** Record the publication decision on a new candidate and publish when policy allows it. */
   async function applyPublicationPolicy(candidate, request, candidateProvider) {
     const decision = publicationDecision({
@@ -1017,7 +1097,7 @@ export function createVehicleImagePipeline({
     }
     const plan = request.canonicalIdentity
       ? acquisitionPlan(request)
-      : { eligible: true, artwork: [], generation: true };
+      : { eligible: true, artwork: [], photos: false, generation: true };
     if (!plan.eligible) {
       job.status = 'cancelled';
       job.completedAt = new Date().toISOString();
@@ -1040,6 +1120,21 @@ export function createVehicleImagePipeline({
         count('candidatesCreated', created.length);
         await persist();
         for (const candidate of created) await applyPublicationPolicy(candidate, request, artworkProvider);
+        return;
+      }
+    }
+    if (plan.photos) {
+      job.phase = 'licensed-photo-source';
+      await persist();
+      let created = [];
+      try { created = await runLicensedPhotos(job, request); }
+      catch (error) { job.photoSourceError = error?.retryable ? 'provider-temporary-failure' : 'provider-failure'; }
+      delete job.phase;
+      if (created.length) {
+        job.status = 'awaiting_approval'; job.resultCandidateId = created[0].id;
+        job.provider = photoProvider.id; job.completedAt = new Date().toISOString();
+        count('candidatesCreated', created.length); await persist();
+        for (const candidate of created) await applyPublicationPolicy(candidate, request, photoProvider);
         return;
       }
     }
@@ -1212,7 +1307,7 @@ export function createVehicleImagePipeline({
       throw Object.assign(new Error('generation is already active'), { status: 409 });
     const job = createJob(request, true);
     await persist();
-    if (provider && generationEnabled && autoRun) queueMicrotask(() => void runQueuedJobs());
+    if (autoRun && (generationAvailable || artworkProvider || photoProvider)) queueMicrotask(() => void runQueuedJobs());
     return job;
   }
 
@@ -1312,7 +1407,20 @@ export function createVehicleImagePipeline({
     provider: candidate.provider,
     model: candidate.model,
     license: candidate.license,
+    licenseName: candidate.licenseName,
+    licenseUrl: candidate.licenseUrl,
+    licenseEvidence: candidate.licenseEvidence,
+    author: candidate.author,
+    attribution: candidate.attribution,
+    sourceUrl: candidate.sourceUrl,
+    sourcePage: candidate.sourcePage,
+    sourceTitle: candidate.sourceTitle,
+    modifications: candidate.modifications,
+    sourceWidth: candidate.sourceWidth,
+    sourceHeight: candidate.sourceHeight,
     provenance: candidate.provenance,
+    sourceRef: candidate.sourceRef,
+    kind: candidate.kind,
     catalogAssetId: candidate.catalogAssetId,
     basis: candidate.basis,
     confidence: candidate.confidence,
@@ -1343,6 +1451,8 @@ export function createVehicleImagePipeline({
     startedAt: job.startedAt,
     completedAt: job.completedAt,
     artworkResults: job.artworkResults,
+    photoResults: job.photoResults,
+    photoSourceError: job.photoSourceError,
     providerHttpStatus: job.providerHttpStatus,
     providerErrorCode: job.providerErrorCode,
     transportDiagnostics: job.transportDiagnostics,
@@ -1434,7 +1544,7 @@ export function createVehicleImagePipeline({
     const today = new Date().toISOString().slice(0, 10);
     return {
       registry,
-      capabilities: { artwork: Boolean(artworkProvider), generation: generationAvailable, publication: publicationEnabled },
+      capabilities: { artwork: Boolean(artworkProvider), wikimedia: Boolean(photoProvider), generation: generationAvailable, publication: publicationEnabled },
       requests: { canonical: canonical.length, byStatus: statuses },
       subjects: canonical.filter((request) => primaryFor(request) === request).length,
       activeScopes: db.scopes.filter((scope) => scope.status === 'active').length,
@@ -1467,9 +1577,17 @@ export function createVehicleImagePipeline({
     const actor = sanitizeActor(options.actor);
     const unverified = request.canonicalIdentity?.identityStatus === 'unverified';
     // An unverified identity is published only once a person states it is the right car.
-    const confirmation = validateConfirmation(options.identityConfirmation, decision === 'approve' && unverified);
+    const confirmation = validateConfirmation(options.identityConfirmation,
+      decision === 'approve' && (unverified || candidate.identityReviewRequired === true));
     const scope = decision === 'approve' && options.scope != null ? validateScope(options.scope, request) : null;
     const reason = decision === 'reject' ? validateReason(options.reason) : null;
+    if (decision === 'approve' && !hasPublishableRights(candidate))
+      throw Object.assign(new Error('candidate lacks verified commercial license and required provenance'), { status: 409 });
+    if (decision === 'approve' && allowedPublicationCandidates.size && !allowedPublicationCandidates.has(candidate.id))
+      throw Object.assign(new Error('candidate is outside the controlled publication allowlist'), { status: 403 });
+    if (decision === 'approve' && (!options.rightsConfirmation || options.rightsConfirmation.confirmed !== true ||
+        typeof options.rightsConfirmation.reference !== 'string' || options.rightsConfirmation.reference.trim().length < 4))
+      throw Object.assign(new Error('rights confirmation and evidence reference are required'), { status: 409 });
     if (decision === 'approve' && publishInProgress.has(request.identityKey))
       throw Object.assign(new Error('candidate approval is already in progress'), { status: 409 });
     if (decision === 'approve') publishInProgress.add(request.identityKey);
@@ -1485,11 +1603,16 @@ export function createVehicleImagePipeline({
           identityKey: request.identityKey,
           version,
           candidateId,
+          kind: candidate.kind,
+          rights: hasPublishableRights(candidate) ? candidate : undefined,
         });
       }
     candidate.status = decision === 'approve' ? 'approved' : 'rejected';
     candidate.decidedAt = new Date().toISOString();
     candidate.decidedBy = actor;
+    if (decision === 'approve') candidate.rightsConfirmation = {
+      confirmed: true, reference: options.rightsConfirmation.reference.trim(),
+    };
     if (decision === 'approve') {
       const prior = db.published.filter((item) => item.identityKey === request.identityKey);
       const version = Math.max(0, ...prior.map((item) => item.version)) + 1;
@@ -1503,7 +1626,16 @@ export function createVehicleImagePipeline({
         storageKey: publishedAsset?.key,
         thumbnailUrl: publishedAsset?.thumbnailUrl,
         contentSha256: publishedAsset?.sha256 ?? candidate.contentSha256,
-        identityConfirmed: !unverified || Boolean(confirmation),
+        identityConfirmed: !(unverified || candidate.identityReviewRequired === true) || Boolean(confirmation),
+        license: candidate.license,
+        licenseName: candidate.licenseName,
+        licenseUrl: candidate.licenseUrl,
+        author: candidate.author,
+        attribution: candidate.attribution,
+        sourceTitle: candidate.sourceTitle,
+        modifications: candidate.modifications,
+        sourceUrl: candidate.sourceUrl,
+        sourcePage: candidate.sourcePage,
         confirmation: confirmation ?? undefined,
         decidedBy: actor,
         createdAt: candidate.decidedAt,
@@ -1578,6 +1710,13 @@ export function createVehicleImagePipeline({
           // Market-verified identities, legacy free-form requests and every approval that
           // carried an explicit identity confirmation count as confirmed.
           identityConfirmed: published?.identityConfirmed ?? request.canonicalIdentity?.identityStatus !== 'unverified',
+          ...(published?.license ? { license: published.license } : {}),
+          ...(published?.licenseUrl ? { licenseUrl: published.licenseUrl } : {}),
+          ...(published?.author ? { author: published.author } : {}),
+          ...(published?.attribution ? { attribution: published.attribution } : {}),
+          ...(published?.sourceTitle ? { sourceTitle: published.sourceTitle } : {}),
+          ...(published?.modifications ? { modifications: published.modifications } : {}),
+          ...(published?.sourcePage ? { sourcePage: published.sourcePage } : {}),
           ...(published?.thumbnailUrl ? { thumbnailUrl: published.thumbnailUrl } : {}),
         }
       : null;
@@ -1652,6 +1791,13 @@ export function createVehicleImagePipeline({
             version: asset.version,
             ...(v2 ? { identityConfirmed: asset.identityConfirmed === true } : {}),
             ...(v2 && asset.thumbnailUrl ? { thumbnailUrl: asset.thumbnailUrl } : {}),
+            ...(v2 && asset.license ? { license: asset.license } : {}),
+            ...(v2 && asset.licenseUrl ? { licenseUrl: asset.licenseUrl } : {}),
+            ...(v2 && asset.author ? { author: asset.author } : {}),
+            ...(v2 && asset.attribution ? { attribution: asset.attribution } : {}),
+            ...(v2 && asset.sourcePage ? { sourcePage: asset.sourcePage } : {}),
+            ...(v2 && asset.sourceTitle ? { sourceTitle: asset.sourceTitle } : {}),
+            ...(v2 && asset.modifications ? { modifications: asset.modifications } : {}),
           }
         : null,
       ...extra(request.subjectKey ?? null),
@@ -1833,7 +1979,7 @@ export function createVehicleImagePipeline({
             registry: { version: registry.version, sha256: registry.sha256, check: registryCheck },
             contract: PIPELINE_CONTRACT_VERSION,
             supportedContracts: SUPPORTED_CONTRACT_VERSIONS,
-            capabilities: { artwork: Boolean(artworkProvider), generation: generationAvailable, publication: publicationEnabled },
+            capabilities: { artwork: Boolean(artworkProvider), wikimedia: Boolean(photoProvider), generation: generationAvailable, publication: publicationEnabled },
           });
         }
         if (req.method === 'GET' && url.pathname.startsWith('/assets/') && assetStore?.serve) {
@@ -1936,6 +2082,7 @@ export function createVehicleImagePipeline({
             await decideCandidate(decodeURIComponent(decisionMatch[1]), decisionMatch[2], true, {
               actor: body.actor,
               identityConfirmation: body.identityConfirmation,
+              rightsConfirmation: body.rightsConfirmation,
               scope: body.scope,
               reason: body.reason,
             }),

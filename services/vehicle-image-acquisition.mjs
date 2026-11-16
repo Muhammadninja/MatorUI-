@@ -26,6 +26,26 @@ import { artworkPath, hintCovers, validateCandidateHints } from './vehicle-image
  */
 
 export const ARTWORK_PROVIDER_ID = 'repository-artwork';
+const COMMERCIAL_IMAGE_LICENSES = new Set([
+  'CC0-1.0', 'CC-BY-2.0', 'CC-BY-2.5', 'CC-BY-3.0', 'CC-BY-4.0',
+  'CC-BY-SA-2.0', 'CC-BY-SA-2.5', 'CC-BY-SA-3.0', 'CC-BY-SA-4.0',
+]);
+const COMMERCIAL_LICENSE_URLS = new Map([
+  ['CC0-1.0', 'https://creativecommons.org/publicdomain/zero/1.0/'],
+  ...['2.0', '2.5', '3.0', '4.0'].flatMap((v) => [
+    [`CC-BY-${v}`, `https://creativecommons.org/licenses/by/${v}/`],
+    [`CC-BY-SA-${v}`, `https://creativecommons.org/licenses/by-sa/${v}/`],
+  ]),
+]);
+export function hasPublishableRights(candidate) {
+  const clean = (value, max) => typeof value === 'string' && value.trim().length > 0 &&
+    value.length <= max && !/[\u0000-\u001f\u007f]/.test(value);
+  return Boolean(candidate && candidate.provider === 'wikimedia-commons' &&
+    COMMERCIAL_IMAGE_LICENSES.has(candidate.license) && candidate.licenseUrl === COMMERCIAL_LICENSE_URLS.get(candidate.license) &&
+    typeof candidate.sourcePage === 'string' && /^https:\/\/commons\.wikimedia\.org\/wiki\//.test(candidate.sourcePage) &&
+    typeof candidate.sourceUrl === 'string' && /^https:\/\/upload\.wikimedia\.org\//.test(candidate.sourceUrl) &&
+    clean(candidate.author, 500) && clean(candidate.attribution, 1000) && clean(candidate.licenseEvidence, 1000));
+}
 const MAX_ARTWORK_BYTES = 8 * 1024 * 1024;
 const MAX_ARTWORK_CANDIDATES = 3;
 

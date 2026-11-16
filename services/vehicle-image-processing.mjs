@@ -180,3 +180,30 @@ export function processGeneratedImage(bytes) {
 export function processFramedArtwork(bytes) {
   return normalizeVehicleImage(bytes, { allowBottomContact: true });
 }
+
+/** Licensed photographs keep their full opaque frame: resize only, never crop or remove backgrounds. */
+export async function processLicensedPhoto(bytes) {
+  if (!Buffer.isBuffer(bytes) || bytes.length < 32)
+    throw new ImageQualityError('source photo is empty or truncated', { integrity: 'fail' });
+  let image;
+  let metadata;
+  try {
+    image = sharp(bytes, { failOn: 'error', limitInputPixels: 50_000_000 });
+    metadata = await image.metadata();
+  } catch {
+    throw new ImageQualityError('source photo is not a decodable raster image', { integrity: 'fail' });
+  }
+  if (!['jpeg', 'png', 'webp'].includes(metadata.format))
+    throw new ImageQualityError('licensed photo must be JPEG, PNG or WebP', { format: 'fail' });
+  if (!metadata.width || !metadata.height || metadata.width < 512 || metadata.height < 256)
+    throw new ImageQualityError('source photo dimensions are too small', { dimensions: 'fail' });
+  const output = await image.rotate().resize({ width: 1600, height: 1200, fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: 88, effort: 4 }).toBuffer();
+  const result = await sharp(output).metadata();
+  return {
+    bytes: output, contentType: 'image/webp', width: result.width, height: result.height,
+    checks: { integrity: 'pass', format: 'pass', dimensions: 'pass', transparency: 'not-applicable',
+      clipping: 'review-required', resolution: 'pass', framing: 'licensed-photo-preserved',
+      identity: 'unverified-manual-review-required' },
+  };
+}
