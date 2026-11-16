@@ -12,6 +12,7 @@ import {
   isRepositoryArtworkEnabled,
   isWikimediaEnabled,
   isGenerationFirst,
+  loadStyleReference,
   isUnverifiedGenerationAllowed,
   isVehicleImageGenerationEnabled,
   isVehicleImagePublicationEnabled,
@@ -62,6 +63,7 @@ const pipeline = createVehicleImagePipeline({
   photoSegmenter,
   allowUnverifiedGeneration: isUnverifiedGenerationAllowed(process.env.VEHICLE_IMAGE_ALLOW_UNVERIFIED_GENERATION),
   generationFirst: isGenerationFirst(process.env.VEHICLE_IMAGE_GENERATION_FIRST),
+  styleReference: await loadStyleReference(process.env.VEHICLE_IMAGE_STYLE_REFERENCE, repositoryRoot),
   assetStore,
   publicationEnabled,
   publicationCandidateAllowlist: (process.env.VEHICLE_IMAGE_PUBLICATION_CANDIDATE_ALLOWLIST || '')
@@ -95,6 +97,7 @@ server.listen(port, '127.0.0.1', () => {
     backgroundRemoval: backgroundRemovalReady,
     generation: generationEnabled,
     generationFirst: isGenerationFirst(process.env.VEHICLE_IMAGE_GENERATION_FIRST),
+    styleReference: process.env.VEHICLE_IMAGE_STYLE_REFERENCE || null,
     publication: publicationEnabled,
     store: publicationEnabled ? storeKind : null,
   }));

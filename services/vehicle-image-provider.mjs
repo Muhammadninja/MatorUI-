@@ -19,7 +19,7 @@ function transportDiagnostics(error) {
   };
 }
 
-export function buildVehicleImagePrompt(vehicle) {
+export function buildVehicleImagePrompt(vehicle, { styleReference = false } = {}) {
   const facts = [
     `Manufacturer: ${vehicle.manufacturer}`,
     `Model: ${vehicle.model}`,
@@ -34,14 +34,18 @@ export function buildVehicleImagePrompt(vehicle) {
     `Exterior color: ${vehicle.exteriorColor || 'solid white, non-metallic'}`,
   ].filter(Boolean);
   return [
+    // The style image is another car: it must set the look of the set, never the vehicle.
+    styleReference &&
+      'Image 1 is a STYLE REFERENCE showing a different car. Copy only its camera angle, framing, scale within the frame, lighting and transparent background. Do NOT copy its make, model, body shape, grille, lights, wheels or any design detail: the vehicle must be the one described by the facts below.',
     'Create a photorealistic catalog cutout as a provisional candidate for human review. Use only the vehicle identity facts listed below; do not invent or infer generation, facelift, body style, trim, market, or visual specifications that are absent. Match the stated market and do not substitute a visually similar vehicle from another market. If the identity is uncertain from these facts and supplied reference images, do not imply certainty; the candidate will require manual identity review.',
     ...facts,
     'Show the entire vehicle in a consistent front-left three-quarter view: the front of the car points toward the RIGHT side of the image and its left (driver\'s) side faces the viewer, never the mirror image. Center it with even scale and generous transparent margin. Transparent background only. No scenery, floor, cast shadow, text, labels, watermark, people, or extra objects. Keep wheels, bumpers, mirrors, roof, and all body edges fully inside the frame.',
     'License plates must be blank: an empty plate with no letters, numbers, model name or country code. No added lettering anywhere on the body, glass or bumpers (no model names, slogans, dealer badges or stickers); only the manufacturer emblem the real vehicle carries.',
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 }
 
-/** Provider contract: generate({ vehicle, referenceImages, signal }) -> { bytes, contentType }. */
+/** Provider contract: generate({ vehicle, referenceImages, styleReference, signal }) -> { bytes, contentType }.
+ *  `styleReference` ({ bytes, contentType }) is sent first and only sets angle, framing and light. */
 export class OpenAIImageProvider {
   constructor({
     apiKey = process.env.OPENAI_API_KEY,
@@ -56,9 +60,11 @@ export class OpenAIImageProvider {
     this.timeoutMs = timeoutMs;
   }
 
-  async generate({ vehicle, referenceImages = [], signal }) {
-    const prompt = buildVehicleImagePrompt(vehicle);
-    const hasReferences = referenceImages.length > 0;
+  async generate({ vehicle, referenceImages = [], styleReference = null, signal }) {
+    const prompt = buildVehicleImagePrompt(vehicle, { styleReference: Boolean(styleReference) });
+    // The style image goes first, matching "Image 1" in the prompt.
+    const images = styleReference ? [styleReference, ...referenceImages] : referenceImages;
+    const hasReferences = images.length > 0;
     const endpoint = hasReferences ? `${API_URL}/edits` : `${API_URL}/generations`;
     const options = {
       model: this.model,
@@ -76,7 +82,7 @@ export class OpenAIImageProvider {
     if (hasReferences) {
       body = new FormData();
       for (const [key, value] of Object.entries(options)) body.append(key, String(value));
-      for (const [index, reference] of referenceImages.entries()) {
+      for (const [index, reference] of images.entries()) {
         const ext =
           reference.contentType === 'image/jpeg'
             ? 'jpg'
