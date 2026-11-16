@@ -12,6 +12,7 @@ import {
   isRepositoryArtworkEnabled,
   isWikimediaEnabled,
   isGenerationFirst,
+  isWikimediaReferencesEnabled,
   loadStyleReference,
   isUnverifiedGenerationAllowed,
   isVehicleImageGenerationEnabled,
@@ -43,6 +44,10 @@ const photoProvider = isWikimediaEnabled(process.env.VEHICLE_IMAGE_WIKIMEDIA_ENA
   ? createWikimediaCommonsProvider({ userAgent: process.env.VEHICLE_IMAGE_WIKIMEDIA_USER_AGENT || 'MatorVehicleImagePipeline/1.0 (https://mator.uz)' })
   : null;
 const photoSegmenter = photoProvider ? createVehicleImageSegmenter() : null;
+// Commons photos that only guide generation: no segmenter, never a candidate.
+const referenceProvider = isWikimediaReferencesEnabled(process.env.VEHICLE_IMAGE_WIKIMEDIA_REFERENCES)
+  ? createWikimediaCommonsProvider({ userAgent: process.env.VEHICLE_IMAGE_WIKIMEDIA_USER_AGENT || 'MatorVehicleImagePipeline/1.0 (https://mator.uz)', maxCandidates: 2 })
+  : null;
 const storeKind = vehicleImageStoreKind(process.env.VEHICLE_IMAGE_STORE);
 const assetStore = !publicationEnabled
   ? null
@@ -64,6 +69,7 @@ const pipeline = createVehicleImagePipeline({
   allowUnverifiedGeneration: isUnverifiedGenerationAllowed(process.env.VEHICLE_IMAGE_ALLOW_UNVERIFIED_GENERATION),
   generationFirst: isGenerationFirst(process.env.VEHICLE_IMAGE_GENERATION_FIRST),
   styleReference: await loadStyleReference(process.env.VEHICLE_IMAGE_STYLE_REFERENCE, repositoryRoot),
+  referenceProvider,
   assetStore,
   publicationEnabled,
   publicationCandidateAllowlist: (process.env.VEHICLE_IMAGE_PUBLICATION_CANDIDATE_ALLOWLIST || '')
@@ -98,6 +104,7 @@ server.listen(port, '127.0.0.1', () => {
     generation: generationEnabled,
     generationFirst: isGenerationFirst(process.env.VEHICLE_IMAGE_GENERATION_FIRST),
     styleReference: process.env.VEHICLE_IMAGE_STYLE_REFERENCE || null,
+    wikimediaReferences: Boolean(referenceProvider),
     publication: publicationEnabled,
     store: publicationEnabled ? storeKind : null,
   }));
