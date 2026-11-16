@@ -857,6 +857,58 @@ describe('vehicle image pipeline', () => {
     expect(calls[0].url).toContain('/generations');
   });
 
+  it('names the vehicle photos after the style image in the prompt and sends them in that order', async () => {
+    const calls = [];
+    const provider = new OpenAIImageProvider({
+      apiKey: 'test-key-not-a-secret',
+      fetchImpl: async (url, options) => {
+        calls.push({ url, options });
+        return new Response(JSON.stringify({ data: [{ b64_json: Buffer.from('fake').toString('base64') }] }), { status: 200 });
+      },
+    });
+    const style = { bytes: await fixtureImage(), contentType: 'image/png' };
+    const photoA = { bytes: Buffer.from(await fixtureImage()), contentType: 'image/png' };
+    const photoB = { bytes: Buffer.from(await fixtureImage()), contentType: 'image/png' };
+    await provider.generate({
+      vehicle: { manufacturer: 'KGM', model: 'Torres', year: 2026 },
+      referenceImages: [photoA, photoB],
+      styleReference: style,
+    });
+    const prompt = calls[0].options.body.get('prompt');
+    expect(prompt).toContain('Images 2-3 are PHOTOS OF THIS EXACT VEHICLE');
+    expect(prompt).toContain('Ignore their colour, background, people, other cars, plates');
+    expect(calls[0].options.body.getAll('image[]')).toHaveLength(3);
+    expect(buildVehicleImagePrompt({ manufacturer: 'KGM', model: 'Torres', year: 2026 }, { vehiclePhotos: 1 }))
+      .toContain('Image 1 is a PHOTO OF THIS EXACT VEHICLE');
+  });
+
+  it('uses Commons photos only as generation references and records them on the candidate', async () => {
+    const captured = vi.fn(async () => ({ bytes: await fixtureImage(), provider: 'test' }));
+    const photo = await fixtureImage();
+    const source = { provider: 'wikimedia-commons', sourcePage: 'https://commons.wikimedia.org/wiki/File:Torres.jpg',
+      title: 'File:Torres.jpg', license: 'CC-BY-SA-4.0', author: 'Photographer' };
+    const referenceProvider = { acquire: vi.fn(async () => [{ bytes: photo, contentType: 'image/jpeg', source }]) };
+    const { pipeline } = await setup({ provider: { generate: captured }, referenceProvider });
+    await pipeline.submitRequest({ make: 'KGM', model: 'Torres', year: 2026 });
+    await pipeline.runQueuedJobs();
+    expect(captured).toHaveBeenCalledWith(expect.objectContaining({
+      referenceImages: [expect.objectContaining({ bytes: photo, contentType: 'image/jpeg' })],
+    }));
+    const candidates = pipeline.listPending(true).flatMap((item) => item.candidates ?? []);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].source).toBe('generated');
+    expect(candidates[0].identityReferences).toEqual([expect.objectContaining({ sourcePage: source.sourcePage, license: 'CC-BY-SA-4.0' })]);
+  });
+
+  it('still generates when the photo search fails', async () => {
+    const captured = vi.fn(async () => ({ bytes: await fixtureImage(), provider: 'test' }));
+    const referenceProvider = { acquire: vi.fn(async () => { throw new Error('commons down'); }) };
+    const { pipeline } = await setup({ provider: { generate: captured }, referenceProvider });
+    await pipeline.submitRequest({ make: 'KGM', model: 'Torres', year: 2026 });
+    await pipeline.runQueuedJobs();
+    expect(captured).toHaveBeenCalledWith(expect.objectContaining({ referenceImages: [] }));
+  });
+
   it('passes the configured style reference to every generation', async () => {
     const captured = vi.fn(async () => ({ bytes: await fixtureImage(), provider: 'test' }));
     const styleReference = { bytes: await fixtureImage(), contentType: 'image/png' };

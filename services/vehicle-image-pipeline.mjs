@@ -330,6 +330,10 @@ export function createVehicleImagePipeline({
   /** { bytes, contentType } of an approved image: every generation copies its angle,
    *  framing and light (never its vehicle), so the set looks consistent. */
   styleReference = null,
+  /** A photo source (Wikimedia Commons) used ONLY as vehicle references for
+   *  generation: its photos are never candidates and never published. */
+  referenceProvider = null,
+  maxReferencePhotos = 2,
   /**
    * The registry SHA-256 the backend pins (VEHICLE_IMAGE_REGISTRY_SHA256). The
    * server script always passes it (null when unset); undefined skips the check.
@@ -862,6 +866,7 @@ export function createVehicleImagePipeline({
               processingLatencyMs,
               providerUsage,
               estimatedCostUsd,
+              identityReferences,
             }) => ({
               id,
               status,
@@ -890,6 +895,7 @@ export function createVehicleImagePipeline({
               processingLatencyMs,
               providerUsage,
               estimatedCostUsd,
+              identityReferences,
             }),
           ),
       }));
@@ -925,6 +931,7 @@ export function createVehicleImagePipeline({
       provider: metadata.provider,
       model: metadata.model,
       kind: metadata.kind,
+      identityReferences: metadata.identityReferences,
       license: metadata.license,
       licenseName: metadata.licenseName,
       licenseUrl: metadata.licenseUrl,
@@ -1118,10 +1125,34 @@ export function createVehicleImagePipeline({
   }
 
   /** Paid generation: a candidate, or the last failure with the job left open. */
+  /** Licensed photos of the exact vehicle for the generator to follow. A failed
+   *  or empty search never blocks generation: it runs without them. */
+  async function vehicleReferencePhotos(request) {
+    if (!referenceProvider) return [];
+    try {
+      const photos = await referenceProvider.acquire({
+        identity: request.canonicalIdentity ?? {}, vehicle: request.vehicle,
+        subjectKey: request.subjectKey, signal: AbortSignal.timeout(60_000),
+      });
+      return (photos ?? [])
+        .filter((item) => Buffer.isBuffer(item?.bytes) && item.source?.sourcePage)
+        .slice(0, maxReferencePhotos);
+    } catch {
+      return [];
+    }
+  }
+
   async function runGeneration(job, request) {
     job.phase = 'generation';
     await persist();
     let lastFailure = 'provider failure';
+    const vehiclePhotos = await vehicleReferencePhotos(request);
+    // Recorded on the job and the candidate so a reviewer can compare with them.
+    const identityReferences = vehiclePhotos.map(({ source }) => ({
+      provider: source.provider, sourcePage: source.sourcePage, title: source.title,
+      license: source.license, author: source.author,
+    }));
+    if (identityReferences.length) job.identityReferences = identityReferences;
     while (job.attempts < maxAttempts) {
       const day = new Date().toISOString().slice(0, 10);
       const usedToday = db.providerCallLedger[day] ?? 0;
@@ -1140,12 +1171,15 @@ export function createVehicleImagePipeline({
       let generated;
       try {
         await persist();
-        const referenceImages = await Promise.all(
-          (request.referenceAssets ?? []).map(async (asset) => ({
-            bytes: await readFile(path.join(privateDir, asset.id)),
-            contentType: asset.contentType,
-          })),
-        );
+        const referenceImages = [
+          ...(await Promise.all(
+            (request.referenceAssets ?? []).map(async (asset) => ({
+              bytes: await readFile(path.join(privateDir, asset.id)),
+              contentType: asset.contentType,
+            })),
+          )),
+          ...vehiclePhotos.map(({ bytes, contentType }) => ({ bytes, contentType })),
+        ];
         const operation = provider.generate({
           vehicle: request.vehicle,
           referenceImages,
@@ -1177,6 +1211,7 @@ export function createVehicleImagePipeline({
           providerUsage: generated.providerUsage,
           estimatedCostUsd: generated.estimatedCostUsd,
           processingLatencyMs,
+          identityReferences: identityReferences.length ? identityReferences : undefined,
         });
         job.status = 'awaiting_approval';
         job.resultCandidateId = candidate.id;
@@ -1479,6 +1514,7 @@ export function createVehicleImagePipeline({
     provenance: candidate.provenance,
     sourceRef: candidate.sourceRef,
     kind: candidate.kind,
+    identityReferences: candidate.identityReferences,
     catalogAssetId: candidate.catalogAssetId,
     basis: candidate.basis,
     confidence: candidate.confidence,
