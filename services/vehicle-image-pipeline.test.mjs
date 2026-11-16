@@ -749,6 +749,8 @@ describe('vehicle image pipeline', () => {
     expect(prompt).toContain('License plates must be blank');
     // No stated colour: white, matching the approved Cobalt / Gentra / Nexia set.
     expect(prompt).toContain('Exterior color: solid white, non-metallic');
+    // Same direction as the approved Cobalt / Gentra / Nexia set: front to the right.
+    expect(prompt).toContain('front of the car points toward the RIGHT side of the image');
     expect(
       buildVehicleImagePrompt({
         manufacturer: 'Chevrolet',
