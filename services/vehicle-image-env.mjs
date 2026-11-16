@@ -20,7 +20,7 @@ export async function loadVehicleImageEnv() {
   for (const line of contents.split(/\r?\n/)) {
     const match = line.match(/^\s*(?:export\s+)?([A-Z][A-Z0-9_]*)\s*=\s*(.*?)\s*$/);
     if (!match || !['OPENAI_API_KEY', 'VEHICLE_IMAGE_MODEL', 'VEHICLE_IMAGE_PROVIDER',
-      'VEHICLE_IMAGE_GENERATION_ENABLED',
+      'VEHICLE_IMAGE_GENERATION_ENABLED', 'VEHICLE_IMAGE_GENERATION_FIRST',
       'VEHICLE_IMAGE_PUBLICATION_ENABLED',
       'VEHICLE_IMAGE_MAX_PROVIDER_CALLS_PER_DAY',
       'VEHICLE_IMAGE_ADMIN_TOKEN', 'VEHICLE_IMAGE_REQUEST_TOKEN', 'VEHICLE_IMAGE_DATA_DIR', 'PORT', 'CLOUDINARY_CLOUD_NAME',
@@ -64,6 +64,11 @@ export function isWikimediaEnabled(value) { return value === 'true'; }
 
 /** Paid generation for unverified identities: only the exact opt-in 'true'. */
 export function isUnverifiedGenerationAllowed(value) {
+  return value === 'true';
+}
+
+/** Generation before repository artwork and Commons photos: only an explicit `true`. */
+export function isGenerationFirst(value) {
   return value === 'true';
 }
 

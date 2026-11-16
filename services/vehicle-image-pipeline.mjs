@@ -325,6 +325,8 @@ export function createVehicleImagePipeline({
   photoSegmenter = null,
   /** Paid generation for unverified identities stays off unless explicitly allowed. */
   allowUnverifiedGeneration = false,
+  /** Try paid generation before repository artwork and Commons photos; they become the fallback. */
+  generationFirst = false,
   /**
    * The registry SHA-256 the backend pins (VEHICLE_IMAGE_REGISTRY_SHA256). The
    * server script always passes it (null when unset); undefined skips the check.
@@ -1112,68 +1114,8 @@ export function createVehicleImagePipeline({
     }
   }
 
-  async function runJob(job) {
-    const request = db.requests.find((item) => item.id === job.requestId);
-    if (!request || activeJob(job.identityKey) !== job) return;
-    if (!request.canonicalIdentity && !provider) return;
-    if (request.canonicalIdentity && !identityAcquirable(request.canonicalIdentity)) {
-      request.identityReviewRequired = true;
-      job.status = 'cancelled';
-      job.completedAt = new Date().toISOString();
-      await persist();
-      return;
-    }
-    const plan = request.canonicalIdentity
-      ? acquisitionPlan(request)
-      : { eligible: true, artwork: [], photos: false, generation: true };
-    if (!plan.eligible) {
-      job.status = 'cancelled';
-      job.completedAt = new Date().toISOString();
-      request.generationDisabled = true;
-      await persist();
-      return;
-    }
-    job.status = 'running';
-    job.startedAt = new Date().toISOString();
-    if (plan.artwork.length) {
-      job.phase = 'artwork';
-      await persist();
-      const created = await runArtwork(job, request, plan.artwork);
-      delete job.phase;
-      if (created.length) {
-        job.status = 'awaiting_approval';
-        job.resultCandidateId = created[0].id;
-        job.provider = artworkProvider.id;
-        job.completedAt = new Date().toISOString();
-        count('candidatesCreated', created.length);
-        await persist();
-        for (const candidate of created) await applyPublicationPolicy(candidate, request, artworkProvider);
-        return;
-      }
-    }
-    if (plan.photos) {
-      job.phase = 'licensed-photo-source';
-      await persist();
-      let created = [];
-      try { created = await runLicensedPhotos(job, request); }
-      catch (error) { job.photoSourceError = error?.retryable ? 'provider-temporary-failure' : 'provider-failure'; }
-      delete job.phase;
-      if (created.length) {
-        job.status = 'awaiting_approval'; job.resultCandidateId = created[0].id;
-        job.provider = photoProvider.id; job.completedAt = new Date().toISOString();
-        count('candidatesCreated', created.length); await persist();
-        for (const candidate of created) await applyPublicationPolicy(candidate, request, photoProvider);
-        return;
-      }
-    }
-    if (!plan.generation) {
-      job.status = 'no_source';
-      job.lastError = 'no-candidate-source';
-      job.completedAt = new Date().toISOString();
-      count('jobsWithoutSource');
-      await persist();
-      return;
-    }
+  /** Paid generation: a candidate, or the last failure with the job left open. */
+  async function runGeneration(job, request) {
     job.phase = 'generation';
     await persist();
     let lastFailure = 'provider failure';
@@ -1181,11 +1123,9 @@ export function createVehicleImagePipeline({
       const day = new Date().toISOString().slice(0, 10);
       const usedToday = db.providerCallLedger[day] ?? 0;
       if (usedToday >= maxProviderCallsPerDay) {
-        job.status = 'failed';
-        job.completedAt = new Date().toISOString();
         job.lastError = 'daily-provider-call-limit';
         await persist();
-        return;
+        return { created: false, failure: 'daily-provider-call-limit' };
       }
       db.providerCallLedger[day] = usedToday + 1;
       job.attempts += 1;
@@ -1249,7 +1189,7 @@ export function createVehicleImagePipeline({
         count('candidatesCreated');
         await persist();
         await applyPublicationPolicy(candidate, request, provider);
-        return;
+        return { created: true };
       } catch (error) {
         clearTimeout(timer);
         lastFailure = controller.signal.aborted
@@ -1285,15 +1225,101 @@ export function createVehicleImagePipeline({
           );
       }
     }
+    return { created: false, failure: lastFailure };
+  }
+
+  /** No source produced a candidate: dead-letter the job until an administrator retries it. */
+  async function failJob(job, failure) {
     job.status = 'failed';
     job.completedAt = new Date().toISOString();
-    job.lastError = lastFailure;
+    job.lastError = failure;
+    // The daily ceiling is not a provider failure: tomorrow's retry may succeed.
+    if (failure === 'daily-provider-call-limit') return persist();
     // Dead letter: retries are exhausted; only an administrator restarts it.
     job.deadLetter = true;
     delete job.phase;
     count('providerFailures');
     count('jobsFailed');
     await persist();
+  }
+
+  async function runJob(job) {
+    const request = db.requests.find((item) => item.id === job.requestId);
+    if (!request || activeJob(job.identityKey) !== job) return;
+    if (!request.canonicalIdentity && !provider) return;
+    if (request.canonicalIdentity && !identityAcquirable(request.canonicalIdentity)) {
+      request.identityReviewRequired = true;
+      job.status = 'cancelled';
+      job.completedAt = new Date().toISOString();
+      await persist();
+      return;
+    }
+    const plan = request.canonicalIdentity
+      ? acquisitionPlan(request)
+      : { eligible: true, artwork: [], photos: false, generation: true };
+    if (!plan.eligible) {
+      job.status = 'cancelled';
+      job.completedAt = new Date().toISOString();
+      request.generationDisabled = true;
+      await persist();
+      return;
+    }
+    job.status = 'running';
+    job.startedAt = new Date().toISOString();
+    // Generation first: one consistent style for every vehicle. Free sources
+    // remain the fallback when generation fails or hits its daily ceiling.
+    let generationFailure = null;
+    if (generationFirst && plan.generation) {
+      const generated = await runGeneration(job, request);
+      if (generated.created) return;
+      generationFailure = generated.failure;
+      delete job.phase;
+    }
+    if (plan.artwork.length) {
+      job.phase = 'artwork';
+      await persist();
+      const created = await runArtwork(job, request, plan.artwork);
+      delete job.phase;
+      if (created.length) {
+        job.status = 'awaiting_approval';
+        job.resultCandidateId = created[0].id;
+        job.provider = artworkProvider.id;
+        job.completedAt = new Date().toISOString();
+        count('candidatesCreated', created.length);
+        await persist();
+        for (const candidate of created) await applyPublicationPolicy(candidate, request, artworkProvider);
+        return;
+      }
+    }
+    if (plan.photos) {
+      job.phase = 'licensed-photo-source';
+      await persist();
+      let created = [];
+      try { created = await runLicensedPhotos(job, request); }
+      catch (error) { job.photoSourceError = error?.retryable ? 'provider-temporary-failure' : 'provider-failure'; }
+      delete job.phase;
+      if (created.length) {
+        job.status = 'awaiting_approval'; job.resultCandidateId = created[0].id;
+        job.provider = photoProvider.id; job.completedAt = new Date().toISOString();
+        count('candidatesCreated', created.length); await persist();
+        for (const candidate of created) await applyPublicationPolicy(candidate, request, photoProvider);
+        return;
+      }
+    }
+    if (generationFailure) {
+      await failJob(job, generationFailure);
+      return;
+    }
+    if (!plan.generation) {
+      job.status = 'no_source';
+      job.lastError = 'no-candidate-source';
+      job.completedAt = new Date().toISOString();
+      count('jobsWithoutSource');
+      await persist();
+      return;
+    }
+    const generated = await runGeneration(job, request);
+    if (!generated.created) await failJob(job, generated.failure);
   }
 
   async function runQueuedJobs() {
