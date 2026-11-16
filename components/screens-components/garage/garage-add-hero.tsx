@@ -144,8 +144,14 @@ export function GarageHeroCard({
 
   // Where the car's tyres meet the ground, for the soft shadow. Every approved
   // cutout ends at its tyres (~99.7% of the frame) and spans 9.5–90.5% of its width.
-  const groundX = width + carRight - carWidth / 2;
+  // In the front three-quarter view only the near front tyre reaches the bottom;
+  // the rear and far tyres stand ~10% higher, so the ambient pool is centred
+  // above the contact line and tall enough to reach all four.
+  const groundX = carCenterX;
   const groundY = carTop + carHeight * 0.975;
+  // The footprint's middle sits toward the rear: the car faces right.
+  const poolX = carCenterX - carWidth * 0.04;
+  const poolY = carTop + carHeight * 0.92;
 
   return (
     <AppView
@@ -172,6 +178,12 @@ export function GarageHeroCard({
               <Stop offset="0" stopColor={tokens.garageHeroShadow} />
               <Stop offset="1" stopColor={tokens.garageHeroShadow} stopOpacity={0} />
             </RadialGradient>
+            {/* The ambient pool keeps most of its density out to the far tyres, then fades at the rim. */}
+            <RadialGradient id="garage-hero-pool" cx="50%" cy="50%" rx="50%" ry="50%">
+              <Stop offset="0" stopColor={tokens.garageHeroShadow} />
+              <Stop offset="0.65" stopColor={tokens.garageHeroShadow} stopOpacity={0.75} />
+              <Stop offset="1" stopColor={tokens.garageHeroShadow} stopOpacity={0} />
+            </RadialGradient>
             {/* The tight contact shadow right under the tyres: dense core, quick falloff. */}
             <RadialGradient id="garage-hero-contact" cx="50%" cy="50%" rx="50%" ry="50%">
               <Stop offset="0" stopColor={tokens.garageHeroShadow} />
@@ -190,7 +202,7 @@ export function GarageHeroCard({
           {isPlaceholder || !groundShadow ? null : (
             <>
               {/* A faint ambient pool the width of the car, then the contact shadow. */}
-              <Ellipse cx={groundX} cy={groundY} rx={carWidth * 0.42} ry={carHeight * 0.06} fill="url(#garage-hero-ground)" opacity={0.6} />
+              <Ellipse cx={poolX} cy={poolY} rx={carWidth * 0.46} ry={carHeight * 0.12} fill="url(#garage-hero-pool)" />
               <Ellipse cx={groundX} cy={groundY} rx={carWidth * 0.36} ry={carHeight * 0.028} fill="url(#garage-hero-contact)" />
             </>
           )}
