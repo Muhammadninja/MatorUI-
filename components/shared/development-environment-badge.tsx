@@ -9,8 +9,10 @@ export function DevelopmentEnvironmentBadge() {
   const insets = useSafeAreaInsets();
   const { tokens } = useThemeContext();
   const env = getAppEnvironment();
-  // Development clients always; release builds only when they are staging.
-  if (!__DEV__ && env.name !== 'staging') return null;
+  // Only off production: there it would sit over the header for nothing a user
+  // can act on. Development clients show it for local/staging/development;
+  // release builds only for staging (testers).
+  if (env.name === 'production' || (!__DEV__ && env.name !== 'staging')) return null;
   let host = 'offline';
   try { host = new URL(env.apiBaseUrl).host; } catch { /* offline build */ }
   const label = `${env.name.toUpperCase()} · ${host}`;
