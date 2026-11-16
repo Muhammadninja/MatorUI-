@@ -327,6 +327,9 @@ export function createVehicleImagePipeline({
   allowUnverifiedGeneration = false,
   /** Try paid generation before repository artwork and Commons photos; they become the fallback. */
   generationFirst = false,
+  /** { bytes, contentType } of an approved image: every generation copies its angle,
+   *  framing and light (never its vehicle), so the set looks consistent. */
+  styleReference = null,
   /**
    * The registry SHA-256 the backend pins (VEHICLE_IMAGE_REGISTRY_SHA256). The
    * server script always passes it (null when unset); undefined skips the check.
@@ -1146,6 +1149,7 @@ export function createVehicleImagePipeline({
         const operation = provider.generate({
           vehicle: request.vehicle,
           referenceImages,
+          styleReference,
           signal: controller.signal,
         });
         const timeout = new Promise((_, reject) => {

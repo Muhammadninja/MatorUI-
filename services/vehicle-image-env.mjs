@@ -20,7 +20,7 @@ export async function loadVehicleImageEnv() {
   for (const line of contents.split(/\r?\n/)) {
     const match = line.match(/^\s*(?:export\s+)?([A-Z][A-Z0-9_]*)\s*=\s*(.*?)\s*$/);
     if (!match || !['OPENAI_API_KEY', 'VEHICLE_IMAGE_MODEL', 'VEHICLE_IMAGE_PROVIDER',
-      'VEHICLE_IMAGE_GENERATION_ENABLED', 'VEHICLE_IMAGE_GENERATION_FIRST',
+      'VEHICLE_IMAGE_GENERATION_ENABLED', 'VEHICLE_IMAGE_GENERATION_FIRST', 'VEHICLE_IMAGE_STYLE_REFERENCE',
       'VEHICLE_IMAGE_PUBLICATION_ENABLED',
       'VEHICLE_IMAGE_MAX_PROVIDER_CALLS_PER_DAY',
       'VEHICLE_IMAGE_ADMIN_TOKEN', 'VEHICLE_IMAGE_REQUEST_TOKEN', 'VEHICLE_IMAGE_DATA_DIR', 'PORT', 'CLOUDINARY_CLOUD_NAME',
@@ -121,4 +121,20 @@ export function vehicleImageMaxProviderCallsPerDay(value) {
   if (!Number.isInteger(parsed) || parsed < 1 || parsed > 10_000)
     throw new Error('VEHICLE_IMAGE_MAX_PROVIDER_CALLS_PER_DAY must be an integer from 1 to 10000');
   return parsed;
+}
+
+const STYLE_REFERENCE_TYPES = { '.png': 'image/png', '.webp': 'image/webp' };
+
+/**
+ * VEHICLE_IMAGE_STYLE_REFERENCE: an approved transparent PNG/WebP whose angle,
+ * framing and light every generation copies (relative paths resolve against the
+ * checkout). Unset → null, and generation runs without one. A set value that is
+ * not a readable PNG/WebP fails at startup instead of silently changing the look.
+ */
+export async function loadStyleReference(value, rootDir) {
+  if (value === undefined || value === '') return null;
+  const file = path.resolve(rootDir, value);
+  const contentType = STYLE_REFERENCE_TYPES[path.extname(file).toLowerCase()];
+  if (!contentType) throw new Error('VEHICLE_IMAGE_STYLE_REFERENCE must be a .png or .webp file');
+  return { bytes: await readFile(file), contentType };
 }

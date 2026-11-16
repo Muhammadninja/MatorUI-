@@ -815,4 +815,54 @@ describe('vehicle image pipeline', () => {
     );
     expect(request.referenceAssets[0]).not.toHaveProperty('bytes');
   });
+
+  it('sends the style reference first and tells the model it is another car', async () => {
+    const calls = [];
+    const provider = new OpenAIImageProvider({
+      apiKey: 'test-key-not-a-secret',
+      fetchImpl: async (url, options) => {
+        calls.push({ url, options });
+        return new Response(JSON.stringify({ data: [{ b64_json: Buffer.from('fake').toString('base64') }] }), { status: 200 });
+      },
+    });
+    const style = { bytes: await fixtureImage(), contentType: 'image/png' };
+    const identity = { bytes: await fixtureImage(), contentType: 'image/png' };
+    await provider.generate({
+      vehicle: { manufacturer: 'Chevrolet', model: 'Damas', year: 2019 },
+      referenceImages: [identity],
+      styleReference: style,
+    });
+    expect(calls[0].url).toContain('/edits');
+    const images = calls[0].options.body.getAll('image[]');
+    expect(images).toHaveLength(2);
+    expect(Buffer.from(await images[0].arrayBuffer()).equals(style.bytes)).toBe(true);
+    const prompt = calls[0].options.body.get('prompt');
+    expect(prompt.startsWith('Image 1 is a STYLE REFERENCE showing a different car.')).toBe(true);
+    expect(prompt).toContain('Do NOT copy its make, model, body shape');
+    expect(prompt).toContain('Model: Damas');
+  });
+
+  it('without a style reference the prompt and endpoint are unchanged', async () => {
+    expect(buildVehicleImagePrompt({ manufacturer: 'Chevrolet', model: 'Damas', year: 2019 }))
+      .not.toContain('STYLE REFERENCE');
+    const calls = [];
+    const provider = new OpenAIImageProvider({
+      apiKey: 'test-key-not-a-secret',
+      fetchImpl: async (url, options) => {
+        calls.push({ url, options });
+        return new Response(JSON.stringify({ data: [{ b64_json: Buffer.from('fake').toString('base64') }] }), { status: 200 });
+      },
+    });
+    await provider.generate({ vehicle: { manufacturer: 'Chevrolet', model: 'Damas', year: 2019 } });
+    expect(calls[0].url).toContain('/generations');
+  });
+
+  it('passes the configured style reference to every generation', async () => {
+    const captured = vi.fn(async () => ({ bytes: await fixtureImage(), provider: 'test' }));
+    const styleReference = { bytes: await fixtureImage(), contentType: 'image/png' };
+    const { pipeline } = await setup({ provider: { generate: captured }, styleReference });
+    await pipeline.submitRequest({ make: 'Chevrolet', model: 'Damas', year: 2019 });
+    await pipeline.runQueuedJobs();
+    expect(captured).toHaveBeenCalledWith(expect.objectContaining({ styleReference }));
+  });
 });
