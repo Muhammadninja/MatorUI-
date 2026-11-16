@@ -76,6 +76,9 @@ const pipeline = createVehicleImagePipeline({
 await pipeline.initialize();
 const port = Number(process.env.PORT ?? 8047);
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('PORT is invalid');
+const backgroundRemovalReady = photoSegmenter
+  ? await photoSegmenter.ready()
+  : false;
 const server = pipeline.server();
 server.listen(port, '127.0.0.1', () => {
   console.log(JSON.stringify({
@@ -87,7 +90,7 @@ server.listen(port, '127.0.0.1', () => {
     registryCheck: pipeline.registryCheck,
     artwork: Boolean(artworkProvider),
     wikimedia: Boolean(photoProvider),
-    backgroundRemoval: await photoSegmenter?.ready() ?? false,
+    backgroundRemoval: backgroundRemovalReady,
     generation: generationEnabled,
     publication: publicationEnabled,
     store: publicationEnabled ? storeKind : null,
