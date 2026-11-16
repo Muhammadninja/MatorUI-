@@ -29,7 +29,9 @@ export function buildVehicleImagePrompt(vehicle) {
     vehicle.bodyStyle && `Body style: ${vehicle.bodyStyle}`,
     vehicle.trim && `Trim: ${vehicle.trim}`,
     vehicle.marketRegion && `Market/region: ${vehicle.marketRegion}`,
-    vehicle.exteriorColor && `Exterior color: ${vehicle.exteriorColor}`,
+    // One picture serves every owner of the model; the app labels other paints
+    // "shown in white", so an unstated colour is white, like the approved set.
+    `Exterior color: ${vehicle.exteriorColor || 'solid white, non-metallic'}`,
   ].filter(Boolean);
   return [
     'Create a photorealistic catalog cutout as a provisional candidate for human review. Use only the vehicle identity facts listed below; do not invent or infer generation, facelift, body style, trim, market, or visual specifications that are absent. Match the stated market and do not substitute a visually similar vehicle from another market. If the identity is uncertain from these facts and supplied reference images, do not imply certainty; the candidate will require manual identity review.',

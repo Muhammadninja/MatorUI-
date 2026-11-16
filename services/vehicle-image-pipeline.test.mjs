@@ -747,6 +747,8 @@ describe('vehicle image pipeline', () => {
     expect(prompt).not.toContain('Generation:');
     // Earlier generations drew model names on fake plates (DAMAS, CAPTIVA).
     expect(prompt).toContain('License plates must be blank');
+    // No stated colour: white, matching the approved Cobalt / Gentra / Nexia set.
+    expect(prompt).toContain('Exterior color: solid white, non-metallic');
     expect(
       buildVehicleImagePrompt({
         manufacturer: 'Chevrolet',
