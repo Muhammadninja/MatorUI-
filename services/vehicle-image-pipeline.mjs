@@ -1611,8 +1611,9 @@ export function createVehicleImagePipeline({
       decision === 'approve' && (unverified || candidate.identityReviewRequired === true));
     const scope = decision === 'approve' && options.scope != null ? validateScope(options.scope, request) : null;
     const reason = decision === 'reject' ? validateReason(options.reason) : null;
-    if (decision === 'approve' && !hasPublishableRights(candidate))
-      throw Object.assign(new Error('candidate lacks verified commercial license and required provenance'), { status: 409 });
+    // Rights are checked by the person who approves: every source (Commons photo,
+    // repository artwork, manual upload, generation) needs their rights
+    // confirmation below. Commons provenance is still filtered at acquisition.
     if (decision === 'approve' && candidate.kind === 'licensed-photo' &&
         (candidate.quality?.backgroundRemoval !== 'pass' || candidate.quality?.resolution === 'low' ||
          candidate.quality?.clipping !== 'edge-check-pass'))

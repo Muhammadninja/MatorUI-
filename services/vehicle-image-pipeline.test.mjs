@@ -275,7 +275,7 @@ describe('vehicle image pipeline', () => {
     expect(restarted.listPending(true)[0].job.status).toBe('failed');
   });
 
-  it('keeps owner supplied artwork private without verified commercial provenance', async () => {
+  it('publishes owner supplied artwork only after a person confirms its rights', async () => {
     const publish = vi.fn(async () => ({
       url: 'https://res.cloudinary.com/demo/image/upload/v123/mator/vehicle-images/hash/v1.webp',
       key: 'mator/vehicle-images/hash/v1',
@@ -288,8 +288,16 @@ describe('vehicle image pipeline', () => {
     expect(publish).not.toHaveBeenCalled();
     await expect(pipeline.decideCandidate(candidate.id, 'approve', true))
       .rejects.toMatchObject({ status: 409 });
+    await expect(pipeline.decideCandidate(candidate.id, 'approve', true, {
+      rightsConfirmation: { confirmed: true, reference: '' },
+    })).rejects.toMatchObject({ status: 409 });
     expect(publish).not.toHaveBeenCalled();
     expect(pipeline.resolve(result.request.identityKey)).toBeNull();
+    await pipeline.decideCandidate(candidate.id, 'approve', true, {
+      rightsConfirmation: { confirmed: true, reference: 'Owner-supplied image, rights checked' },
+    });
+    expect(publish).toHaveBeenCalledWith(expect.objectContaining({ rights: undefined }));
+    expect(pipeline.resolve(result.request.identityKey)).not.toBeNull();
   });
 
   it('uploads approved WebP with signed server credentials and validates the provider URL', async () => {
