@@ -35,6 +35,14 @@ const BACKEND_STATUSES = [
 const confirmation = { confirmed: true, reference: 'Compared with chevrolet.uz model page' };
 const admin = { id: 'adm_1', email: 'owner@example.test', name: 'Owner' };
 const dirs = [];
+async function transparentFixture() {
+  const subject = Buffer.alloc(800 * 450 * 4);
+  for (let i = 0; i < subject.length; i += 4) subject.set([220, 40, 20, 255], i);
+  return sharp({ create: { width: 1200, height: 800, channels: 4,
+    background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+    .composite([{ input: subject, raw: { width: 800, height: 450, channels: 4 }, left: 200, top: 320 }])
+    .png().toBuffer();
+}
 
 const unverified = (modelId, modelYear, extra = {}) => ({
   makeId: 'chevrolet', modelId, modelYear, generationId: null, faceliftId: null,
@@ -53,12 +61,17 @@ async function tempDir() {
 
 async function setup(options = {}) {
   const dataDir = options.dataDir ?? await tempDir();
+  const photoSegmenter = options.photoSegmenter ?? (options.photoProvider ? {
+    ready: async () => true,
+    removeBackground: transparentFixture,
+  } : null);
   const pipeline = createVehicleImagePipeline({
     dataDir, adminToken, requestToken, autoRun: false, retryDelayMs: 0,
     artworkProvider: createRepositoryArtworkProvider({ rootDir: repoRoot }),
     publicationEnabled: true,
     assetStore: { publish: vi.fn(async ({ version, candidateId }) => ({ url: `https://cdn.example.test/${candidateId}/v${version}.webp`, key: candidateId })) },
     expectedRegistrySha256: REGISTRY_SHA,
+    photoSegmenter,
     ...options,
   });
   await pipeline.initialize();
@@ -77,6 +90,7 @@ function commonsFixture(bytes) {
     acquire: async () => [{ bytes, contentType: 'image/jpeg', source }] };
 }
 const rightsConfirmation = { confirmed: true, reference: 'Commons CC BY 4.0 license and attribution checked' };
+const imageQualityConfirmation = { confirmed: true, reference: 'Cutout edges and car parts checked' };
 
 function call(server, { method, url, token, body, headers = {} }) {
   return new Promise((resolve) => {
@@ -140,7 +154,7 @@ describe('readiness and the registry fingerprint', () => {
       registry: expect.objectContaining({ sha256: REGISTRY_SHA, check: 'ok' }),
       contract: 2,
       supportedContracts: [2],
-      capabilities: { artwork: true, wikimedia: false, generation: false, publication: true },
+      capabilities: { artwork: true, wikimedia: false, backgroundRemoval: false, generation: false, publication: true },
     });
   });
 
@@ -300,7 +314,7 @@ describe('unverified identities', () => {
 
   it('does not return an unconfirmed published image (legacy or shared data) as approved', async () => {
     const { pipeline, dataDir, spark, candidate } = await sparkWithCandidate();
-    await pipeline.decideCandidate(candidate.id, 'approve', true, { actor: admin, identityConfirmation: confirmation, rightsConfirmation });
+    await pipeline.decideCandidate(candidate.id, 'approve', true, { actor: admin, identityConfirmation: confirmation, rightsConfirmation, imageQualityConfirmation });
     // Simulate a published record without a confirmation, as only older or
     // hand-edited data could hold, and restart from disk.
     const { readFile, writeFile } = await import('node:fs/promises');
@@ -317,7 +331,7 @@ describe('unverified identities', () => {
 
   it('answers approved with identityConfirmed true once a person confirmed the identity', async () => {
     const { pipeline, spark, candidate } = await sparkWithCandidate();
-    await pipeline.decideCandidate(candidate.id, 'approve', true, { actor: admin, identityConfirmation: confirmation, rightsConfirmation });
+    await pipeline.decideCandidate(candidate.id, 'approve', true, { actor: admin, identityConfirmation: confirmation, rightsConfirmation, imageQualityConfirmation });
     const status = await resolveCall(pipeline.server(), spark);
     expectBackendAccepts(status.body, spark);
     expect(status.body).toMatchObject({
@@ -365,7 +379,7 @@ describe('persisted data and review', () => {
     expect((await call(server, { method: 'POST', url, token: requestToken, body: { identityConfirmation: confirmation } })).status).toBe(403);
     expect((await call(server, { method: 'POST', url, token: adminToken, body: {} })).status).toBe(409);
     const approved = await call(server, { method: 'POST', url, token: adminToken, body: {
-      identityConfirmation: confirmation, rightsConfirmation, actor: admin,
+      identityConfirmation: confirmation, rightsConfirmation, imageQualityConfirmation, actor: admin,
     } });
     expect(approved.status, JSON.stringify(approved.body)).toBe(200);
     const status = await resolveCall(server, spark);

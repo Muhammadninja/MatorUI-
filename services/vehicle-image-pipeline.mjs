@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
-import { processFramedArtwork, processGeneratedImage, processLicensedPhoto } from './vehicle-image-processing.mjs';
+import { processFramedArtwork, processGeneratedImage, processSegmentedPhoto } from './vehicle-image-processing.mjs';
 import { catalogObjectFingerprint, loadRegistryFile } from './vehicle-image-registry.mjs';
 import { artworkEntriesFor, hasPublishableRights, publicationDecision, sha256Hex } from './vehicle-image-acquisition.mjs';
 
@@ -321,6 +321,8 @@ export function createVehicleImagePipeline({
   artworkProvider = null,
   /** Wikimedia or equivalent explicitly licensed photo source; always review-only. */
   photoProvider = null,
+  /** Required to turn any licensed street photo into a private transparent cutout. */
+  photoSegmenter = null,
   /** Paid generation for unverified identities stays off unless explicitly allowed. */
   allowUnverifiedGeneration = false,
   /**
@@ -348,6 +350,7 @@ export function createVehicleImagePipeline({
   let workerPromise = null;
   let initialized = false;
   const generationAvailable = Boolean(provider && generationEnabled);
+  let backgroundRemovalReady = false;
   const acquisitionAvailable = generationAvailable || Boolean(artworkProvider) || Boolean(photoProvider);
   const registry = {
     version: catalog.version ?? null,
@@ -433,6 +436,14 @@ export function createVehicleImagePipeline({
     } catch (error) {
       if (error.code !== 'ENOENT') throw error;
       await persist();
+    }
+    if (photoProvider && photoSegmenter?.ready) {
+      try { backgroundRemovalReady = await photoSegmenter.ready(); } catch { backgroundRemovalReady = false; }
+      const checkSegmenter = async () => {
+        try { backgroundRemovalReady = await photoSegmenter.ready(); } catch { backgroundRemovalReady = false; }
+      };
+      const timer = setInterval(() => void checkSegmenter(), 15_000);
+      timer.unref?.();
     }
     if (acquisitionAvailable && autoRun) queueMicrotask(() => void runQueuedJobs());
     initialized = true;
@@ -883,14 +894,25 @@ export function createVehicleImagePipeline({
     const request = db.requests.find((item) => item.id === requestId);
     if (!request || request.status === 'rejected')
       throw Object.assign(new Error('request not found'), { status: 404 });
+    const originalBytes = Buffer.isBuffer(metadata.originalBytes) ? metadata.originalBytes : null;
+    if (originalBytes) {
+      if (originalBytes.length < 32 || originalBytes.length > 8 * 1024 * 1024 ||
+          !['image/jpeg', 'image/png', 'image/webp'].includes(metadata.originalContentType))
+        throw new Error('source original image does not meet the private archive contract');
+    }
     const id = randomUUID();
     await writeFile(path.join(privateDir, id), bytes, { mode: 0o600, flag: 'wx' });
+    if (originalBytes) {
+      await writeFile(path.join(privateDir, `${id}.original`), originalBytes, { mode: 0o600, flag: 'wx' });
+    }
     const unverifiedIdentity = request.canonicalIdentity?.identityStatus === 'unverified';
     const candidate = {
       id,
       requestId,
       subjectKey: request.subjectKey,
       contentType,
+      originalAvailable: Boolean(originalBytes),
+      originalContentType: originalBytes ? metadata.originalContentType : undefined,
       size: bytes.length,
       contentSha256: sha256Hex(bytes),
       status: 'pending',
@@ -1035,6 +1057,8 @@ export function createVehicleImagePipeline({
 
   async function runLicensedPhotos(job, request) {
     if (!photoProvider) return [];
+    if (!photoSegmenter?.removeBackground || !backgroundRemovalReady)
+      throw Object.assign(new Error('background segmentation service is not ready'), { retryable: true });
     const day = new Date().toISOString().slice(0, 10);
     if ((db.providerCallLedger[day] ?? 0) >= maxProviderCallsPerDay) return [];
     db.providerCallLedger[day] = (db.providerCallLedger[day] ?? 0) + 1;
@@ -1047,16 +1071,20 @@ export function createVehicleImagePipeline({
       if (!Buffer.isBuffer(item?.bytes) || !source || source.provider !== photoProvider.id || !hasPublishableRights(source)) continue;
       const fingerprint = source.sourceFingerprint || sha256Hex(item.bytes);
       if (rejectedFor(request.subjectKey).has(fingerprint) || db.candidates.some((candidate) => candidate.requestId === request.id && candidate.sourceFingerprint === fingerprint)) continue;
-      const processed = await processLicensedPhoto(item.bytes);
+      const cutout = await photoSegmenter.removeBackground(item.bytes);
+      const processed = await processSegmentedPhoto(cutout);
       const candidate = await saveCandidate(request.id, processed.bytes, processed.contentType, {
         source: 'licensed-photo', provider: source.provider, kind: 'licensed-photo', license: source.license,
         licenseName: source.licenseName, licenseUrl: source.licenseUrl, licenseEvidence: source.licenseEvidence,
         author: source.author, attribution: source.attribution, sourceUrl: source.sourceUrl,
         sourceTitle: source.title, modifications: source.modifications,
         sourcePage: source.sourcePage, provenance: source.provenance, sourceRef: source.sourcePage,
+        originalBytes: item.bytes, originalContentType: item.contentType,
         sourceWidth: source.width, sourceHeight: source.height,
         sourceFingerprint: fingerprint, basis: source.basis, confidence: source.confidence,
-        width: processed.width, height: processed.height, quality: processed.checks,
+        width: processed.width, height: processed.height,
+        modifications: 'Background removed with U2Net; low-confidence matte pixels removed; framed and converted to transparent WebP',
+        quality: { ...processed.checks, backgroundRemoval: 'pass', segmentationModel: 'u2net' },
       });
       created.push(candidate);
       job.photoResults ??= [];
@@ -1431,6 +1459,8 @@ export function createVehicleImagePipeline({
     height: candidate.height,
     size: candidate.size,
     contentSha256: candidate.contentSha256,
+    originalAvailable: candidate.originalAvailable === true,
+    imageQualityConfirmation: candidate.imageQualityConfirmation,
     rejectionReason: candidate.rejectionReason,
     decidedBy: candidate.decidedBy,
     uploadedBy: candidate.uploadedBy,
@@ -1544,7 +1574,7 @@ export function createVehicleImagePipeline({
     const today = new Date().toISOString().slice(0, 10);
     return {
       registry,
-      capabilities: { artwork: Boolean(artworkProvider), wikimedia: Boolean(photoProvider), generation: generationAvailable, publication: publicationEnabled },
+      capabilities: { artwork: Boolean(artworkProvider), wikimedia: Boolean(photoProvider), backgroundRemoval: backgroundRemovalReady, generation: generationAvailable, publication: publicationEnabled },
       requests: { canonical: canonical.length, byStatus: statuses },
       subjects: canonical.filter((request) => primaryFor(request) === request).length,
       activeScopes: db.scopes.filter((scope) => scope.status === 'active').length,
@@ -1583,6 +1613,14 @@ export function createVehicleImagePipeline({
     const reason = decision === 'reject' ? validateReason(options.reason) : null;
     if (decision === 'approve' && !hasPublishableRights(candidate))
       throw Object.assign(new Error('candidate lacks verified commercial license and required provenance'), { status: 409 });
+    if (decision === 'approve' && candidate.kind === 'licensed-photo' &&
+        (candidate.quality?.backgroundRemoval !== 'pass' || candidate.quality?.resolution === 'low' ||
+         candidate.quality?.clipping !== 'edge-check-pass'))
+      throw Object.assign(new Error('licensed photo failed background removal or image quality checks'), { status: 409 });
+    if (decision === 'approve' && candidate.kind === 'licensed-photo' &&
+        (!options.imageQualityConfirmation || options.imageQualityConfirmation.confirmed !== true ||
+         typeof options.imageQualityConfirmation.reference !== 'string' || options.imageQualityConfirmation.reference.trim().length < 4))
+      throw Object.assign(new Error('image quality confirmation is required for a licensed photo'), { status: 409 });
     if (decision === 'approve' && allowedPublicationCandidates.size && !allowedPublicationCandidates.has(candidate.id))
       throw Object.assign(new Error('candidate is outside the controlled publication allowlist'), { status: 403 });
     if (decision === 'approve' && (!options.rightsConfirmation || options.rightsConfirmation.confirmed !== true ||
@@ -1612,6 +1650,9 @@ export function createVehicleImagePipeline({
     candidate.decidedBy = actor;
     if (decision === 'approve') candidate.rightsConfirmation = {
       confirmed: true, reference: options.rightsConfirmation.reference.trim(),
+    };
+    if (decision === 'approve' && candidate.kind === 'licensed-photo') candidate.imageQualityConfirmation = {
+      confirmed: true, reference: options.imageQualityConfirmation.reference.trim(),
     };
     if (decision === 'approve') {
       const prior = db.published.filter((item) => item.identityKey === request.identityKey);
@@ -1935,6 +1976,16 @@ export function createVehicleImagePipeline({
     };
   }
 
+  async function readCandidateOriginal(candidateId, authorized) {
+    requireAdmin(authorized);
+    const candidate = db.candidates.find((item) => item.id === candidateId);
+    if (!candidate?.originalAvailable) return null;
+    return {
+      bytes: await readFile(path.join(privateDir, `${candidate.id}.original`)),
+      contentType: candidate.originalContentType,
+    };
+  }
+
   async function readPublished(identityKey, version) {
     const item = db.published.find(
       (entry) => entry.identityKey === identityKey && entry.version === Number(version),
@@ -1973,13 +2024,13 @@ export function createVehicleImagePipeline({
           const live = url.pathname.endsWith('/live');
           if (live) return send(200, { status: 'live' });
           // Ready means: initialised AND serving the registry the deployment pins.
-          const ready = initialized && registryCompatible;
+          const ready = initialized && registryCompatible && (!photoProvider || backgroundRemovalReady);
           return send(ready ? 200 : 503, {
-            status: !initialized ? 'starting' : ready ? 'ready' : `registry_${registryCheck}`,
+            status: !initialized ? 'starting' : !registryCompatible ? `registry_${registryCheck}` : ready ? 'ready' : 'background_removal_unavailable',
             registry: { version: registry.version, sha256: registry.sha256, check: registryCheck },
             contract: PIPELINE_CONTRACT_VERSION,
             supportedContracts: SUPPORTED_CONTRACT_VERSIONS,
-            capabilities: { artwork: Boolean(artworkProvider), wikimedia: Boolean(photoProvider), generation: generationAvailable, publication: publicationEnabled },
+            capabilities: { artwork: Boolean(artworkProvider), wikimedia: Boolean(photoProvider), backgroundRemoval: backgroundRemovalReady, generation: generationAvailable, publication: publicationEnabled },
           });
         }
         if (req.method === 'GET' && url.pathname.startsWith('/assets/') && assetStore?.serve) {
@@ -2073,6 +2124,14 @@ export function createVehicleImagePipeline({
             ? send(200, asset.bytes, asset.contentType)
             : send(404, { error: 'candidate not found' });
         }
+        const originalMatch = /^\/admin\/candidates\/([^/]+)\/original$/.exec(url.pathname);
+        if (req.method === 'GET' && originalMatch) {
+          requireAdmin(isAdmin);
+          const asset = await readCandidateOriginal(decodeURIComponent(originalMatch[1]), true);
+          return asset
+            ? send(200, asset.bytes, asset.contentType)
+            : send(404, { error: 'candidate original not found' });
+        }
         const decisionMatch = /^\/admin\/candidates\/([^/]+)\/(approve|reject)$/.exec(url.pathname);
         if (req.method === 'POST' && decisionMatch) {
           requireAdmin(isAdmin);
@@ -2083,6 +2142,7 @@ export function createVehicleImagePipeline({
               actor: body.actor,
               identityConfirmation: body.identityConfirmation,
               rightsConfirmation: body.rightsConfirmation,
+              imageQualityConfirmation: body.imageQualityConfirmation,
               scope: body.scope,
               reason: body.reason,
             }),
@@ -2136,6 +2196,7 @@ export function createVehicleImagePipeline({
     resolve,
     rollback,
     readCandidate,
+    readCandidateOriginal,
     readPublished,
     regenerateRequest,
     retryAcquisition,
@@ -2145,7 +2206,8 @@ export function createVehicleImagePipeline({
     runQueuedJobs,
     registry,
     registryCheck,
-    health: () => ({ live: true, ready: initialized && registryCompatible, registryCheck }),
+    health: () => ({ live: true, ready: initialized && registryCompatible && (!photoProvider || backgroundRemovalReady),
+      registryCheck, backgroundRemoval: backgroundRemovalReady }),
     server,
   };
 }

@@ -9,8 +9,8 @@ import { artworkPath, hintCovers, validateCandidateHints } from './vehicle-image
  *   2. an approved publication of the same subject (reused, no job)
  *   3. repository artwork (this module): artwork already in the repository that
  *      the registry links to the vehicle, proposed as a private candidate
- *   4. licensed catalog sources / authorized third-party image APIs: none is
- *      configured; a provider object with the same contract can be added
+ *   4. Wikimedia Commons photos: commercial-compatible license and full
+ *      attribution metadata are required; results remain private for review
  *   5. paid generation (vehicle-image-provider.mjs), only when separately enabled
  *
  * Provider contract (`acquire`):

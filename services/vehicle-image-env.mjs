@@ -31,7 +31,7 @@ export async function loadVehicleImageEnv() {
       'VEHICLE_IMAGE_ALLOW_UNVERIFIED_GENERATION', 'VEHICLE_IMAGE_STORE',
       'VEHICLE_IMAGE_ENVIRONMENT', 'VEHICLE_IMAGE_CLOUDINARY_PUBLIC_ID_PREFIX',
       'VEHICLE_IMAGE_LOCAL_STORE_DIR', 'VEHICLE_IMAGE_PUBLIC_BASE_URL',
-      'VEHICLE_IMAGE_REGISTRY_SHA256'].includes(match[1])) continue;
+      'VEHICLE_IMAGE_REGISTRY_SHA256', 'VEHICLE_IMAGE_SEGMENTER_SOCKET'].includes(match[1])) continue;
     const [, key, raw] = match;
     if (process.env[key]) continue;
     let value = raw;

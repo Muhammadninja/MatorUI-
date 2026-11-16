@@ -1,0 +1,40 @@
+[Unit]
+Description=Mator vehicle image background segmentation
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mator-vehicle-images-prod
+Group=mator-vehicle-images-prod
+WorkingDirectory=/opt/mator/vehicle-image-segmenter
+Environment=VEHICLE_IMAGE_SEGMENTER_SOCKET=/run/mator-vehicle-image-segmenter/api.sock
+Environment=REMBG_HOME=/var/lib/mator-vehicle-image-segmenter
+Environment=NUMBA_CACHE_DIR=/var/lib/mator-vehicle-image-segmenter
+Environment=OMP_NUM_THREADS=1
+Environment=MKL_NUM_THREADS=1
+ExecStart=/opt/mator/vehicle-image-segmenter/venv/bin/python /opt/mator/vehicle-image-segmenter/server.py
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=300
+TimeoutStopSec=15
+MemoryMax=1536M
+MemorySwapMax=512M
+CPUQuota=150%
+TasksMax=32
+StateDirectory=mator-vehicle-image-segmenter
+StateDirectoryMode=0750
+RuntimeDirectory=mator-vehicle-image-segmenter
+RuntimeDirectoryMode=0750
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/mator-vehicle-image-segmenter /run/mator-vehicle-image-segmenter
+RestrictAddressFamilies=AF_UNIX
+LockPersonality=true
+RestrictSUIDSGID=true
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

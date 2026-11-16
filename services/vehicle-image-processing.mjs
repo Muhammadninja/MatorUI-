@@ -207,3 +207,11 @@ export async function processLicensedPhoto(bytes) {
       identity: 'unverified-manual-review-required' },
   };
 }
+
+/**
+ * A real segmentation service must provide an alpha cutout. This path validates
+ * and frames it using the same Garage contract as other transparent artwork.
+ */
+export async function processSegmentedPhoto(bytes) {
+  return processFramedArtwork(bytes);
+}

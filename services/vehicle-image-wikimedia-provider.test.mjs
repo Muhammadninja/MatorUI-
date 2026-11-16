@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createWikimediaCommonsProvider } from './vehicle-image-wikimedia-provider.mjs';
 import sharp from 'sharp';
 import { hasPublishableRights } from './vehicle-image-acquisition.mjs';
-import { processLicensedPhoto } from './vehicle-image-processing.mjs';
+import { processLicensedPhoto, processSegmentedPhoto } from './vehicle-image-processing.mjs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -21,6 +21,15 @@ const page = (licenseUrl, overrides = {}) => ({
       Artist: { value: 'Example Photographer' }, Attribution: { value: 'Example Photographer / Wikimedia Commons' },
       License: { value: 'Creative Commons Attribution 4.0' }, ...overrides } }],
 });
+
+async function transparentCutout() {
+  const subject = Buffer.alloc(800 * 450 * 4);
+  for (let i = 0; i < subject.length; i += 4) subject.set([50, 70, 90, 255], i);
+  return sharp({ create: { width: 1200, height: 800, channels: 4,
+    background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+    .composite([{ input: subject, raw: { width: 800, height: 450, channels: 4 }, left: 200, top: 320 }])
+    .png().toBuffer();
+}
 
 describe('Wikimedia Commons sourcing policy', () => {
   it('returns image bytes with structured, commercial-license provenance', async () => {
@@ -71,9 +80,13 @@ describe('Wikimedia Commons sourcing policy', () => {
     expect(metadata.hasAlpha).toBe(false);
     expect(photo.checks.framing).toBe('licensed-photo-preserved');
     expect(photo.checks.identity).toContain('manual-review-required');
+    const cutout = await processSegmentedPhoto(await transparentCutout());
+    const cutoutMetadata = await sharp(cutout.bytes).metadata();
+    expect(cutoutMetadata).toMatchObject({ format: 'webp', width: 1200, height: 600, hasAlpha: true });
+    expect(cutout.checks.framing).toBe('garage-v1');
   });
 
-  it('creates a private review candidate and only publishes after explicit rights and identity review', async () => {
+  it('creates a transparent private review candidate, keeps its original, and only publishes after review', async () => {
     const dataDir = await mkdtemp(path.join(os.tmpdir(), 'wikimedia-pipeline-'));
     try {
       const jpeg = await sharp({ create: { width: 800, height: 600, channels: 3, background: '#555' } }).jpeg().toBuffer();
@@ -83,8 +96,9 @@ describe('Wikimedia Commons sourcing policy', () => {
         author: 'Photographer', attribution: 'Photographer / Commons', licenseEvidence: 'CC BY 4.0',
         provenance: { sourcePage: 'https://commons.wikimedia.org/wiki/File:Test.jpg' } };
       const photoProvider = { id: 'wikimedia-commons', autoPublish: false, acquire: vi.fn(async () => [{ bytes: jpeg, contentType: 'image/jpeg', source: rights }]) };
+      const photoSegmenter = { ready: async () => true, removeBackground: transparentCutout };
       const assetStore = { publish: vi.fn(async () => ({ url: 'https://res.cloudinary.com/test/image/upload/v1/test.webp', key: 'mator/vehicle-images/test' })) };
-      const pipeline = createVehicleImagePipeline({ dataDir, adminToken: 'pipeline-test-admin-token', photoProvider,
+      const pipeline = createVehicleImagePipeline({ dataDir, adminToken: 'pipeline-test-admin-token', photoProvider, photoSegmenter,
         publicationEnabled: true, publicationCandidateAllowlist: ['controlled-test-candidate'], assetStore, autoRun: false });
       await pipeline.initialize();
       const identity = { makeId: 'chevrolet', modelId: 'review-fixture', modelYear: 2024, generationId: null,
@@ -92,20 +106,36 @@ describe('Wikimedia Commons sourcing policy', () => {
       await pipeline.submitCanonicalRequest({ identity, vehicle: { manufacturer: 'Chevrolet', model: 'Review Fixture' } });
       await pipeline.runQueuedJobs();
       let [candidate] = pipeline.reviewQueue(true)[0].candidates;
-      expect(candidate).toMatchObject({ status: 'pending', license: 'CC-BY-4.0', attribution: 'Photographer / Commons', identityReviewRequired: true });
-      await expect(pipeline.decideCandidate(candidate.id, 'approve', true, { rightsConfirmation: { confirmed: true, reference: 'Commons license checked' }, identityConfirmation: { confirmed: true, reference: 'Exact vehicle checked' } })).rejects.toMatchObject({ status: 403 });
+      expect(candidate).toMatchObject({ status: 'pending', license: 'CC-BY-4.0', attribution: 'Photographer / Commons', identityReviewRequired: true, originalAvailable: true });
+      const original = await pipeline.readCandidateOriginal(candidate.id, true);
+      expect(original).toEqual({ bytes: jpeg, contentType: 'image/jpeg' });
+      const processed = await pipeline.readCandidate(candidate.id, true);
+      expect((await sharp(processed.bytes).metadata()).hasAlpha).toBe(true);
+      await expect(pipeline.decideCandidate(candidate.id, 'approve', true, { rightsConfirmation: { confirmed: true, reference: 'Commons license checked' }, imageQualityConfirmation: { confirmed: true, reference: 'Cutout inspected' }, identityConfirmation: { confirmed: true, reference: 'Exact vehicle checked' } })).rejects.toMatchObject({ status: 403 });
       expect(assetStore.publish).not.toHaveBeenCalled();
       // The allowlist models the one-candidate controlled test mode; no broad publication switch is inferred.
-      const isolated = createVehicleImagePipeline({ dataDir, adminToken: 'pipeline-test-admin-token', photoProvider,
+      const isolated = createVehicleImagePipeline({ dataDir, adminToken: 'pipeline-test-admin-token', photoProvider, photoSegmenter,
         publicationEnabled: true, publicationCandidateAllowlist: [candidate.id], assetStore, autoRun: false });
       await isolated.initialize();
       candidate = isolated.reviewQueue(true)[0].candidates[0];
       await isolated.decideCandidate(candidate.id, 'approve', true, {
         rightsConfirmation: { confirmed: true, reference: 'Commons CC BY 4.0 terms checked' },
+        imageQualityConfirmation: { confirmed: true, reference: 'Cutout inspected' },
         identityConfirmation: { confirmed: true, reference: 'Exact generation and model checked' },
       });
       expect(assetStore.publish).toHaveBeenCalledWith(expect.objectContaining({ kind: 'licensed-photo', rights: expect.objectContaining({ attribution: 'Photographer / Commons' }) }));
       expect(isolated.resolveCanonicalStatus(identity, { contract: 2 }).asset.url).toContain('cloudinary.com');
+    } finally { await rm(dataDir, { recursive: true, force: true }); }
+  });
+
+  it('requires a live segmenter before reporting the Commons pipeline ready', async () => {
+    const dataDir = await mkdtemp(path.join(os.tmpdir(), 'wikimedia-segmenter-health-'));
+    try {
+      const photoProvider = { id: 'wikimedia-commons', acquire: vi.fn(async () => []) };
+      const pipeline = createVehicleImagePipeline({ dataDir, adminToken: 'pipeline-test-admin-token',
+        photoProvider, photoSegmenter: { ready: async () => false }, autoRun: false });
+      await pipeline.initialize();
+      expect(pipeline.health()).toMatchObject({ ready: false, backgroundRemoval: false });
     } finally { await rm(dataDir, { recursive: true, force: true }); }
   });
 });

@@ -251,9 +251,9 @@ describe('vehicle image pipeline', () => {
     const dataDir = await mkdtemp(path.join(os.tmpdir(), 'vehicle-image-health-'));
     dirs.push(dataDir);
     const pipeline = createVehicleImagePipeline({ dataDir, adminToken: token });
-    expect(pipeline.health()).toEqual({ live: true, ready: false, registryCheck: 'not_enforced' });
+    expect(pipeline.health()).toEqual({ live: true, ready: false, registryCheck: 'not_enforced', backgroundRemoval: false });
     await pipeline.initialize();
-    expect(pipeline.health()).toEqual({ live: true, ready: true, registryCheck: 'not_enforced' });
+    expect(pipeline.health()).toEqual({ live: true, ready: true, registryCheck: 'not_enforced', backgroundRemoval: false });
   });
 
   it('does not automatically repeat a provider call after an interrupted running job', async () => {
@@ -320,7 +320,7 @@ describe('vehicle image pipeline', () => {
     expect(request.options.body.get('signature')).toBe(createHash('sha1').update(signed).digest('hex'));
   });
 
-  it('uploads licensed opaque photos without cutout processing and signs attribution into Cloudinary context', async () => {
+  it('preserves licensed photo transparency at Cloudinary and signs attribution into context', async () => {
     let request;
     const store = createCloudinaryAssetStore({
       cloudName: 'demo', apiKey: 'server-key', apiSecret: 'server-secret',
@@ -329,17 +329,19 @@ describe('vehicle image pipeline', () => {
         return { ok: true, json: async () => ({ secure_url: 'https://res.cloudinary.com/demo/image/upload/v2/licensed.webp', public_id: options.body.get('public_id') }) };
       }),
     });
-    const jpeg = await sharp({ create: { width: 800, height: 600, channels: 3, background: '#777' } }).jpeg().toBuffer();
+    const cutout = await fixtureImage();
     const rights = { attribution: 'Photographer / Commons', author: 'Photographer', license: 'CC-BY-4.0',
       licenseUrl: 'https://creativecommons.org/licenses/by/4.0/', sourcePage: 'https://commons.wikimedia.org/wiki/File:Photo.jpg',
       sourceUrl: 'https://upload.wikimedia.org/photo.jpg' };
-    await store.publish({ bytes: jpeg, contentType: 'image/jpeg', identityKey: 'chevrolet|spark|2024', version: 1,
+    await store.publish({ bytes: cutout, contentType: 'image/png', identityKey: 'chevrolet|spark|2024', version: 1,
       candidateId: 'licensed-photo-candidate', kind: 'licensed-photo', rights });
     const context = request.body.get('context');
     expect(context).toContain('attribution=Photographer / Commons');
     const signed = `context=${context}&overwrite=true&public_id=${request.body.get('public_id')}&timestamp=${request.body.get('timestamp')}server-secret`;
     expect(request.body.get('signature')).toBe(createHash('sha1').update(signed).digest('hex'));
     expect(request.body.get('file').type).toBe('image/webp');
+    const uploaded = Buffer.from(await request.body.get('file').arrayBuffer());
+    expect((await sharp(uploaded).metadata()).hasAlpha).toBe(true);
   });
 
   it('keeps staging vehicle uploads inside the staging-only Cloudinary prefix', async () => {

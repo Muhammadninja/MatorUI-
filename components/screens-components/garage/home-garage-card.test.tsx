@@ -73,6 +73,7 @@ vi.mock('@/services/vehicle-images/vehicle-visual', () => ({
 vi.mock('@/utils/haptics', () => ({ triggerHaptic: () => {} }));
 
 const { default: HomeGarageCard } = await import('./home-garage-card');
+const { GarageHeroCard } = await import('./garage-add-hero');
 
 function render(width: number) {
   screen.width = width;
@@ -163,5 +164,25 @@ describe('Explore vehicle banner actions', () => {
   test('the button keeps its own width beside it, even on a 360pt phone', () => {
     expect(render(360).shopParts.props.fullWidth).toBe(false);
     expect(render(393).shopParts.props.fullWidth).toBe(false);
+  });
+});
+
+describe('approved Garage vehicle image surface', () => {
+  test('places approved cutouts on white and keeps the placeholder state unchanged', () => {
+    const props = {
+      testID: 'garage-test',
+      action: { testID: 'garage-action', title: 'Parts', onPress: () => {} },
+      children: <></>,
+    };
+    let imageRoot!: ReturnType<typeof create>;
+    act(() => { imageRoot = create(<GarageHeroCard {...props} visual={{ kind: 'image', source: 1 as never }} />); });
+    const backdrop = imageRoot.root.find((node) => node.props.testID === 'garage-test-vehicle-image-white-backdrop');
+    expect(backdrop.props.style.backgroundColor).toBe('#fff');
+    act(() => { imageRoot.unmount(); });
+
+    let placeholderRoot!: ReturnType<typeof create>;
+    act(() => { placeholderRoot = create(<GarageHeroCard {...props} visual={{ kind: 'placeholder' }} />); });
+    expect(placeholderRoot.root.findAll((node) => node.props.testID === 'garage-test-vehicle-image-white-backdrop')).toHaveLength(0);
+    act(() => { placeholderRoot.unmount(); });
   });
 });

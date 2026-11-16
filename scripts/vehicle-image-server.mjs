@@ -6,6 +6,7 @@ import { createCloudinaryAssetStore } from '../services/vehicle-image-cloudinary
 import { createLocalAssetStore } from '../services/vehicle-image-local-store.mjs';
 import { createRepositoryArtworkProvider } from '../services/vehicle-image-acquisition.mjs';
 import { createWikimediaCommonsProvider } from '../services/vehicle-image-wikimedia-provider.mjs';
+import { createVehicleImageSegmenter } from '../services/vehicle-image-segmenter-client.mjs';
 import {
   expectedRegistrySha256,
   isRepositoryArtworkEnabled,
@@ -39,6 +40,7 @@ const artworkProvider = isRepositoryArtworkEnabled(process.env.VEHICLE_IMAGE_REP
 const photoProvider = isWikimediaEnabled(process.env.VEHICLE_IMAGE_WIKIMEDIA_ENABLED)
   ? createWikimediaCommonsProvider({ userAgent: process.env.VEHICLE_IMAGE_WIKIMEDIA_USER_AGENT || 'MatorVehicleImagePipeline/1.0 (https://mator.uz)' })
   : null;
+const photoSegmenter = photoProvider ? createVehicleImageSegmenter() : null;
 const storeKind = vehicleImageStoreKind(process.env.VEHICLE_IMAGE_STORE);
 const assetStore = !publicationEnabled
   ? null
@@ -56,6 +58,7 @@ const pipeline = createVehicleImagePipeline({
   generationEnabled,
   artworkProvider,
   photoProvider,
+  photoSegmenter,
   allowUnverifiedGeneration: isUnverifiedGenerationAllowed(process.env.VEHICLE_IMAGE_ALLOW_UNVERIFIED_GENERATION),
   assetStore,
   publicationEnabled,
@@ -84,6 +87,7 @@ server.listen(port, '127.0.0.1', () => {
     registryCheck: pipeline.registryCheck,
     artwork: Boolean(artworkProvider),
     wikimedia: Boolean(photoProvider),
+    backgroundRemoval: await photoSegmenter?.ready() ?? false,
     generation: generationEnabled,
     publication: publicationEnabled,
     store: publicationEnabled ? storeKind : null,

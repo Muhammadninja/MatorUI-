@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { processFramedArtwork, processLicensedPhoto } from './vehicle-image-processing.mjs';
+import { processFramedArtwork, processSegmentedPhoto } from './vehicle-image-processing.mjs';
 import { vehicleImageCloudinaryPublicIdPrefix } from './vehicle-image-env.mjs';
 
 export function vehicleImageCloudinaryPublicId(prefix, identityKey, version, candidateId) {
@@ -30,7 +30,9 @@ export function createCloudinaryAssetStore({
       if (!Number.isInteger(version) || version < 1 || typeof candidateId !== 'string' || !candidateId)
         throw new Error('published image version and candidate identity are required');
       if (!Buffer.isBuffer(bytes)) throw new Error('approved cloud asset must be an image buffer');
-      const normalized = kind === 'licensed-photo' ? await processLicensedPhoto(bytes) : await processFramedArtwork(bytes);
+      // Candidate bytes are already the processed cutout. Reframing is safe and
+      // verifies alpha; resizing a licensed street photo here would undo it.
+      const normalized = kind === 'licensed-photo' ? await processSegmentedPhoto(bytes) : await processFramedArtwork(bytes);
       const publicId = vehicleImageCloudinaryPublicId(prefix, identityKey, version, candidateId);
       const timestamp = Math.floor(Date.now() / 1000).toString();
       const context = kind === 'licensed-photo' && rights ? {

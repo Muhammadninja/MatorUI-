@@ -240,14 +240,21 @@ export function GarageHeroCard({
           />
         </Pressable>
       ) : (
-        <Image
-          testID={`${testID}-vehicle-image`}
-          source={visual.source}
-          contentFit="contain"
-          style={{ position: 'absolute', top: carTop, right: carRight, width: carWidth, height: carHeight, opacity: emptyGarage ? 0.96 : 1 }}
-          accessibilityIgnoresInvertColors
-          accessible={false}
-        />
+        <>
+          {!emptyGarage && visual.kind === 'image' && <AppView
+            testID={`${testID}-vehicle-image-white-backdrop`}
+            pointerEvents="none"
+            style={{ position: 'absolute', top: carTop, right: carRight, width: carWidth, height: carHeight, backgroundColor: '#fff', borderRadius: 8 }}
+          />}
+          <Image
+            testID={`${testID}-vehicle-image`}
+            source={visual.source}
+            contentFit="contain"
+            style={{ position: 'absolute', top: carTop, right: carRight, width: carWidth, height: carHeight, opacity: emptyGarage ? 0.96 : 1 }}
+            accessibilityIgnoresInvertColors
+            accessible={false}
+          />
+        </>
       )}
 
       <AppView p="lg" gap={emptyGarage ? 'md' : 'lg'} style={stacked ? { paddingTop: carTop + carHeight + 8 } : undefined}>
