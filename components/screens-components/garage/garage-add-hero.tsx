@@ -25,8 +25,9 @@ const PADDING = 16;
 const RADIUS = 16;
 /** Explore's horizontal gutter, used until the card reports its own width. */
 const PAGE_GUTTER = 16;
-/** Space between a selected car's bumper and the card's right edge, in pt. */
-const SELECTED_CAR_EDGE_GAP = 8;
+/** Space between a selected car's bumper and the card's right edge, in pt: the
+ *  copy's left inset, so the car and the text sit symmetrically in the card. */
+const SELECTED_CAR_EDGE_GAP = PADDING;
 /** How much lower than an approved image the placeholder car sits, in pt. */
 const PLACEHOLDER_DROP = 6;
 /** Visible Corvette artwork bounds in its transparent 1200×600 source image. */
@@ -89,10 +90,11 @@ export function GarageHeroCard({
   const carWidth = Math.round(width * (stacked ? 0.66 : emptyGarage ? 0.66 : 0.42));
   const carHeight = Math.round(carWidth / CAR_ASPECT);
   // Nudge the empty-state Corvette right and up without scaling the artwork. A
-  // selected car keeps ~8pt between its bumper and the card's edge.
+  // selected car's bumper sits exactly SELECTED_CAR_EDGE_GAP from the card's
+  // edge: the image's transparent margin beside the body may overhang it.
   const carRight = emptyGarage && !stacked
     ? -Math.round(width * 0.077)
-    : -Math.round(width * 0.05) + SELECTED_CAR_EDGE_GAP;
+    : SELECTED_CAR_EDGE_GAP - Math.round((carWidth * (1 - CAR_BODY_SHARE)) / 2);
   const carTop = stacked ? PADDING / 2 : PADDING + (emptyGarage ? 3 : 4);
   const copyWidth = stacked
     ? width - PADDING * 2
