@@ -388,3 +388,35 @@ describe('persisted data and review', () => {
     } });
   });
 });
+
+describe('generation-first acquisition order', () => {
+  const sparkVehicle = { manufacturer: 'Chevrolet', model: 'Spark' };
+
+  async function sparkJob(options) {
+    const { pipeline } = await setup({ allowUnverifiedGeneration: true, generationEnabled: true, ...options });
+    await requestCall(pipeline.server(), unverified('spark', 2019), sparkVehicle);
+    await pipeline.runQueuedJobs();
+    return pipeline.reviewQueue(true).find((item) => item.identity.modelId === 'spark');
+  }
+
+  it('by default keeps repository artwork ahead of paid generation', async () => {
+    const generate = vi.fn(async () => ({ bytes: await transparentFixture(), contentType: 'image/png' }));
+    const queue = await sparkJob({ provider: { generate } });
+    expect(generate).not.toHaveBeenCalled();
+    expect(queue.candidates.map((candidate) => candidate.source)).toEqual(['repository-artwork']);
+  });
+
+  it('with generationFirst generates before repository artwork and proposes only the generated image', async () => {
+    const generate = vi.fn(async () => ({ bytes: await transparentFixture(), contentType: 'image/png' }));
+    const queue = await sparkJob({ provider: { generate }, generationFirst: true });
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(queue.candidates.map((candidate) => candidate.source)).toEqual(['generated']);
+  });
+
+  it('with generationFirst falls back to repository artwork when every generation attempt fails', async () => {
+    const generate = vi.fn(async () => { throw new Error('upstream down'); });
+    const queue = await sparkJob({ provider: { generate }, generationFirst: true, maxAttempts: 2 });
+    expect(generate).toHaveBeenCalledTimes(2);
+    expect(queue.candidates.map((candidate) => candidate.source)).toEqual(['repository-artwork']);
+  });
+});

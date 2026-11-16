@@ -745,6 +745,8 @@ describe('vehicle image pipeline', () => {
     });
     expect(prompt).toContain('Manufacturer: Genesis');
     expect(prompt).not.toContain('Generation:');
+    // Earlier generations drew model names on fake plates (DAMAS, CAPTIVA).
+    expect(prompt).toContain('License plates must be blank');
     expect(
       buildVehicleImagePrompt({
         manufacturer: 'Chevrolet',

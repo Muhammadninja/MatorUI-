@@ -11,6 +11,7 @@ import {
   expectedRegistrySha256,
   isRepositoryArtworkEnabled,
   isWikimediaEnabled,
+  isGenerationFirst,
   isUnverifiedGenerationAllowed,
   isVehicleImageGenerationEnabled,
   isVehicleImagePublicationEnabled,
@@ -60,6 +61,7 @@ const pipeline = createVehicleImagePipeline({
   photoProvider,
   photoSegmenter,
   allowUnverifiedGeneration: isUnverifiedGenerationAllowed(process.env.VEHICLE_IMAGE_ALLOW_UNVERIFIED_GENERATION),
+  generationFirst: isGenerationFirst(process.env.VEHICLE_IMAGE_GENERATION_FIRST),
   assetStore,
   publicationEnabled,
   publicationCandidateAllowlist: (process.env.VEHICLE_IMAGE_PUBLICATION_CANDIDATE_ALLOWLIST || '')
@@ -92,6 +94,7 @@ server.listen(port, '127.0.0.1', () => {
     wikimedia: Boolean(photoProvider),
     backgroundRemoval: backgroundRemovalReady,
     generation: generationEnabled,
+    generationFirst: isGenerationFirst(process.env.VEHICLE_IMAGE_GENERATION_FIRST),
     publication: publicationEnabled,
     store: publicationEnabled ? storeKind : null,
   }));
