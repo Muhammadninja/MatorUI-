@@ -76,10 +76,12 @@ export function GarageVehiclePickerSheet({
   const models = useModels(makeId ?? undefined);
 
   // Alphabetical: the catalog states no popularity yet to pin brands above it.
+  // "Coming soon" brands are offered too: the flag means parts are not shoppable
+  // yet, not that an owner can't own the car, and the backend saves any active
+  // make's model. A brand with no models yet lands on the empty model step.
   const makeChoices = useMemo<VehicleChoice[]>(
     () =>
       (makes.data ?? [])
-        .filter((m) => !m.comingSoon)
         .map((m) => ({ value: m.id, label: m.name, logoUrl: m.logoUrl }))
         .sort((a, b) => a.label.localeCompare(b.label)),
     [makes.data],
