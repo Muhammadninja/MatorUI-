@@ -53,7 +53,9 @@ async function publishManualCandidate(pipeline, requestId) {
     { contentType: 'image/png', bytes: await fixtureImage() },
     true,
   );
-  await pipeline.decideCandidate(candidate.id, 'approve', true);
+  await pipeline.decideCandidate(candidate.id, 'approve', true, {
+    rightsConfirmation: { confirmed: true, reference: 'Owner-supplied image, rights checked' },
+  });
   return candidate;
 }
 
