@@ -12,7 +12,7 @@
  *
  * Endpoints (public read, no auth):
  *   GET /v1/reference/makes                 → { items: [{ id, name, logo_url }] }
- *   GET /v1/reference/models?makeId=<id>    → { items: [{ id, make_id, name }] }
+ *   GET /v1/reference/models?makeId=<id>    → { items: [{ id, make_id, name, year_from, year_to }] }
  *   GET /v1/reference/trims?modelId=<id>    → { items: [{ id, model_id, name }] }
  *   GET /v1/reference/engines?trimId=<id>   → { items: [{ id, name, displacement_cc, fuel_type }] }
  *
@@ -52,7 +52,15 @@ export type RefMake = {
   /** Teaser brand — shown dimmed with a "Soon" badge and not tappable. */
   comingSoon: boolean;
 };
-export type RefModel = { id: string; makeId: string; name: string };
+export type RefModel = {
+  id: string;
+  makeId: string;
+  name: string;
+  /** Build years Garage accepts for the model; absent from older backends and
+   *  the bundled catalog. `yearFrom` null = no stated start. */
+  yearFrom?: number | null;
+  yearTo?: number | null;
+};
 export type RefTrim = { id: string; modelId: string; name: string };
 /**
  * A public part-category reference node (`GET /v1/reference/categories`). Used to
@@ -190,6 +198,10 @@ export async function fetchMakes(signal?: AbortSignal): Promise<RefMake[]> {
  */
 const HIDDEN_MODEL_IDS: ReadonlySet<string> = new Set(['genrta-lacetti']);
 
+/** A catalog year, or null for anything that is not a whole number. */
+const yearOf = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isInteger(value) ? value : null;
+
 export async function fetchModels(
   makeId: string,
   signal?: AbortSignal,
@@ -205,6 +217,7 @@ export async function fetchModels(
       id: str(m.id),
       makeId: str(m.make_id) || makeId,
       name: str(m.name),
+      ...('year_to' in m ? { yearFrom: yearOf(m.year_from), yearTo: yearOf(m.year_to) } : {}),
     }))
     .filter((m) => !HIDDEN_MODEL_IDS.has(m.id));
 }

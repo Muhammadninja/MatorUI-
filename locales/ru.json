@@ -702,6 +702,8 @@
     "modelPickerError": "Не удалось загрузить каталог. Проверьте соединение и попробуйте снова.",
     "quickAddSuccess": "{{vehicle}} добавлен в гараж",
     "quickAddFailed": "Не удалось добавить автомобиль. Попробуйте ещё раз.",
+    "yearUnsupported": "{{model}} выпускался с {{from}} по {{to}} год. Выберите год из этого периода.",
+    "yearUnsupportedTo": "{{model}} выпускался до {{to}} года. Выберите более ранний год.",
     "addByVinInstead": "Есть VIN? Добавьте по VIN",
     "stepMakeTitle": "Выберите марку машины",
     "stepModelTitle": "Теперь модель",

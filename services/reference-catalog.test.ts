@@ -76,6 +76,20 @@ describe('fetchModels', () => {
     expect(models).toEqual([{ id: 'kia-k5', makeId: 'kia', name: 'K5' }]);
   });
 
+  // Backend PR #150: each model carries the build years Garage accepts.
+  test('maps year_from / year_to, keeping null for an open start', async () => {
+    get.mockResolvedValueOnce({
+      items: [
+        { id: 'lacetti', make_id: 'chevrolet', name: 'Lacetti', year_from: 2002, year_to: 2024 },
+        { id: 'damas', make_id: 'chevrolet', name: 'Damas', year_from: null, year_to: 2027 },
+      ],
+    });
+    expect(await fetchModels('chevrolet')).toEqual([
+      { id: 'lacetti', makeId: 'chevrolet', name: 'Lacetti', yearFrom: 2002, yearTo: 2024 },
+      { id: 'damas', makeId: 'chevrolet', name: 'Damas', yearFrom: null, yearTo: 2027 },
+    ]);
+  });
+
   test('empty makeId short-circuits to [] without a request', async () => {
     expect(await fetchModels('')).toEqual([]);
     expect(get).not.toHaveBeenCalled();
