@@ -1,0 +1,22 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'uz.mator'
+version = '1.0.0'
+
+android {
+  namespace "uz.mator.smsuserconsent"
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+}
+
+dependencies {
+  // SMS User Consent API: no SMS permission, no app hash in the message.
+  // 18.1.0: newer releases are built with Kotlin 2.3, ahead of this project.
+  implementation "com.google.android.gms:play-services-auth-api-phone:18.1.0"
+  implementation "androidx.core:core-ktx:1.13.1"
+}

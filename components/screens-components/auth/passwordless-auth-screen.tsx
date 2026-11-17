@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAcceptLegal, useLegalDocuments } from '@/hooks/use-legal';
 import { ApiError } from '@/services/api-client';
 import { isStagingBuild } from '@/services/staging-access';
+import { useSmsUserConsent } from '@/hooks/use-sms-user-consent';
 import { fetchStagingOtpCode } from '@/services/staging-otp-inbox';
 import {
   LEGAL_ACCEPTANCE_REQUIRED,
@@ -146,6 +147,12 @@ export default function PasswordlessAuthScreen() {
   const [code, setCode] = useState('');
   const [otpLength, setOtpLength] = useState(DEFAULT_OTP_LENGTH);
   const [otpToken, setOtpToken] = useState<string | null>(null);
+
+  // Android: Play services asks to share the incoming code SMS; on Allow the
+  // code fills the field. The verify tap stays the user's (legal consent).
+  useSmsUserConsent(phase === 'otp' ? otpToken : null, (message) =>
+    setCode(normalizeOtpInput(message, otpLength)),
+  );
 
   // ── Legal consent ────────────────────────────────────────────────────
   // Consent is collected HERE and nowhere else: tapping "Agree & continue" is
