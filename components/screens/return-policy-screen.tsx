@@ -1,17 +1,16 @@
-import { Circle, CircleCheck, Clock, ShieldAlert } from 'lucide-react-native';
+import { router } from 'expo-router';
+import { ChevronRight, Circle, CircleCheck, Clock, FileText, ShieldAlert } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Linking, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { LegalDocumentBody } from '@/components/screens-components/legal/legal-document-body';
 import { AppButton } from '@/components/shared/app-button';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useThemeContext } from '@/contexts/theme.context';
-import { useLegalDocument } from '@/hooks/use-legal';
 import { useOrder } from '@/hooks/use-orders';
 import { useSupportContacts } from '@/hooks/use-support-contacts';
 import { useToast } from '@/hooks/use-toast';
@@ -35,8 +34,9 @@ export type ReturnPolicyScreenProps = {
 };
 
 /**
- * Return conditions: the Refund & Returns Policy, the return window for this
- * order, and a way to reach support with the order already identified.
+ * Return conditions: the return window for this order, a way to reach support
+ * with the order already identified, and a link to the Refund & Returns Policy
+ * (/refund-policy), which opens on its own screen.
  *
  * No return request is created here: the backend stores none, so the screen
  * never pretends to have submitted one. Support registers the request.
@@ -47,7 +47,6 @@ export default function ReturnPolicyScreen({ orderId }: ReturnPolicyScreenProps)
   const insets = useSafeAreaInsets();
   const toast = useToast();
 
-  const policy = useLegalDocument('REFUND_POLICY');
   const support = useSupportContacts();
   const { state: orderState, order, refresh: refreshOrder } = useOrder(orderId ?? null);
   const [chosenIndex, setChosenIndex] = useState(0);
@@ -205,23 +204,35 @@ export default function ReturnPolicyScreen({ orderId }: ReturnPolicyScreenProps)
           </AppText>
         </Card>
 
-        {/* The policy itself, as the backend publishes it. */}
-        <AppView testID="return-policy-document" style={{ paddingTop: 4 }}>
-          {policy.state === 'loading' ? (
-            <AppView center style={{ paddingVertical: 16 }}>
-              <WheelLoader size={26} color={tokens.text} />
-            </AppView>
-          ) : policy.state === 'success' && policy.document ? (
-            <LegalDocumentBody doc={policy.document} />
-          ) : (
-            <AppView gap={10} align="flex-start">
-              <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>
-                {policy.state === 'error' ? (policy.error ?? t('legal.loadError')) : t('legal.unavailable')}
-              </AppText>
-              <AppButton title={t('common.retry')} kind="secondary" size="sm" onPress={policy.refresh} />
-            </AppView>
-          )}
-        </AppView>
+        {/* The policy text opens on its own screen; Back returns here with the
+            order and the chosen product intact. */}
+        <AppPressableView
+          testID="return-policy-document-link"
+          androidRipple={false}
+          onPress={() => {
+            triggerHaptic('selection');
+            router.push('/refund-policy');
+          }}
+          accessibilityRole="link"
+          accessibilityLabel={t('legal.types.REFUND_POLICY')}
+          row
+          align="center"
+          gap={12}
+          style={{
+            backgroundColor: tokens.card,
+            borderWidth: 1,
+            borderColor: tokens.border,
+            borderRadius: 16,
+            paddingHorizontal: 16,
+            paddingVertical: 14,
+          }}
+        >
+          <FileText size={20} strokeWidth={2.2} color={tokens.brandText} />
+          <AppText family="accent" weight="semibold" style={{ flex: 1, fontSize: 14, color: tokens.text }}>
+            {t('legal.types.REFUND_POLICY')}
+          </AppText>
+          <ChevronRight size={18} strokeWidth={2.2} color={tokens.textMuted} />
+        </AppPressableView>
       </ScrollView>
     </AppView>
   );

@@ -45,6 +45,8 @@ vi.mock('lucide-react-native', () => ({
   CircleCheck: () => null,
   Clock: () => null,
   ShieldAlert: () => null,
+  ChevronRight: () => null,
+  FileText: () => null,
 }));
 vi.mock('@/components/shared/app-view', () => ({
   AppView: host('view'),
@@ -164,8 +166,17 @@ describe('return flow', () => {
       expect(byTestId('return-policy-received')).toHaveLength(1);
       expect(text).toContain('10 дней — для подходящих товаров надлежащего качества');
       expect(text).toContain('Дефектные товары — согласно гарантийным и законодательным срокам');
-      // The policy itself comes from the backend document.
-      expect(renderer.root.findAll((n) => (n.type as unknown) === 'policy')).toHaveLength(1);
+      // The policy text is not inlined: the screen links to it.
+      expect(renderer.root.findAll((n) => (n.type as unknown) === 'policy')).toHaveLength(0);
+    });
+
+    test('the policy opens on its own screen, so Back returns to the return screen', async () => {
+      await mount(<ReturnPolicyScreen orderId={ORDER_ID} />);
+      const link = byTestId('return-policy-document-link');
+      expect(link).toHaveLength(1);
+      expect(allText()).toContain('Политика возврата и возмещения');
+      await act(async () => link[0].props.onPress());
+      expect(push).toHaveBeenCalledWith('/refund-policy');
     });
 
     test('says plainly that no request is created in the app', async () => {
