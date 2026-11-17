@@ -145,10 +145,14 @@ describe('no hardcoded legal content', () => {
     expect(body).not.toMatch(/t\('terms\./);
   });
 
-  test('the return policy screen renders the backend document, not local text', () => {
-    const source = read('components/screens/return-policy-screen.tsx');
-    expect(source).toContain("useLegalDocument('REFUND_POLICY')");
-    expect(source).toContain('<LegalDocumentBody doc={policy.document} />');
+  test('the return policy is the backend document, opened from the return screen', () => {
+    // The return screen links to the policy instead of inlining it…
+    const screen = read('components/screens/return-policy-screen.tsx');
+    expect(screen).toContain("router.push('/refund-policy')");
+    expect(screen).not.toContain('LegalDocumentBody');
+    // …and that route renders the backend document, not local text.
+    const route = read('app/refund-policy.tsx');
+    expect(route).toContain('<LegalDocumentScreen type="REFUND_POLICY"');
   });
 });
 

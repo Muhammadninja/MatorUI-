@@ -317,6 +317,16 @@ function RootNavigation() {
               gestureDirection: 'horizontal',
             }}
           />
+          {/* The policy text, pushed from return-policy; Back returns there. */}
+          <Stack.Screen
+            name="refund-policy"
+            options={{
+              headerShown: false,
+              animation: 'slide_from_right',
+              gestureEnabled: true,
+              gestureDirection: 'horizontal',
+            }}
+          />
           {/* Shared destinations pushed from multiple tabs (Profile + Garage).
               Root-hosted so `back` returns to the origin tab, not Profile. */}
           <Stack.Screen
