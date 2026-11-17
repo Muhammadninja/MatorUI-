@@ -125,6 +125,14 @@ export type Vehicle = {
   /** The backend's `identity.status`: whether the vehicle's identity is verified.
    *  Read-only: absent from an older backend and from the mock. */
   identityStatus?: VehicleIdentityStatus;
+  /** Entered by hand because the catalog lacks the model (backend `is_custom`):
+   *  `make`/`model` are the owner's names, `modelId` is empty, and no part is
+   *  ever promised as an exact fit. */
+  isCustom?: boolean;
+  /** Owner-typed names sent on create/rename of a manual vehicle (never with
+   *  `modelId`; `customMakeName` only when `brandId` is empty). */
+  customMakeName?: string;
+  customModelName?: string;
 };
 
 export type VehicleInput = Omit<Vehicle, 'id' | 'isPrimary' | 'addedAt' | 'image' | 'generation' | 'identityStatus'> & {

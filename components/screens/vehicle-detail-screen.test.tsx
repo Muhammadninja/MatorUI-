@@ -13,6 +13,10 @@ import { describe, expect, test, vi } from 'vitest';
 
 let language: 'en' | 'ru' | 'uz' = 'en';
 let activeVehicleId = 'v-malibu';
+// Switched per test: the vehicle on screen, edit mode, and the PATCHes sent.
+let shownVehicle: Record<string, unknown> | null = null;
+let routeEdit: string | undefined;
+const patches: unknown[] = [];
 const UNIT = { en: 'km', ru: 'км', uz: 'km' } as const;
 
 const MALIBU = {
@@ -22,9 +26,12 @@ const MALIBU = {
 
 vi.mock('@/hooks/use-garage', () => ({
   default: () => ({
-    vehicles: [MALIBU],
-    primaryVehicle: MALIBU,
-    updateVehicle: async () => MALIBU,
+    vehicles: [shownVehicle ?? MALIBU],
+    primaryVehicle: shownVehicle ?? MALIBU,
+    updateVehicle: async (_id: string, patch: unknown) => {
+      patches.push(patch);
+      return shownVehicle ?? MALIBU;
+    },
     removeVehicle: async () => {},
     isMutating: false,
   }),
@@ -46,7 +53,7 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('expo-router', () => ({
   router: { back: () => {}, push: () => {} },
-  useLocalSearchParams: () => ({ id: 'v-malibu' }),
+  useLocalSearchParams: () => ({ id: (shownVehicle?.id as string) ?? 'v-malibu', edit: routeEdit }),
 }));
 vi.mock('react-native', () => ({
   ScrollView: ({ children }: { children?: React.ReactNode }) => children,
@@ -151,5 +158,57 @@ describe('vehicle detail — actions', () => {
     activeVehicleId = 'v-malibu';
     const titles = (await actions()).map((b) => b.props.title);
     expect(titles).toEqual(['vehicleDetail.editDetails']);
+  });
+});
+
+describe('vehicle detail — a car entered by hand', () => {
+  async function editing(vehicle: Record<string, unknown>) {
+    shownVehicle = vehicle;
+    routeEdit = '1';
+    patches.length = 0;
+    let r!: ReactTestRenderer;
+    await act(async () => {
+      r = create(<VehicleDetailScreen />);
+    });
+    const field = (id: string) => r.root.findAll((n) => n.props.testID === id)[0] ?? null;
+    const save = () => r.root.findAll((n) => n.type === 'button' && n.props.title === 'vehicleDetail.saveChanges')[0];
+    return { r, field, save };
+  }
+
+  test('renames the typed model and make, and only sends what changed', async () => {
+    const s = await editing({
+      id: 'v-zeekr', year: 2024, make: 'Zeekr', model: '001', color: 'white', isPrimary: false,
+      addedAt: 1, isCustom: true, brandId: '', modelId: '',
+    });
+    await act(async () => s.field('vehicle-detail-custom-model').props.onChangeText('  001  FR '));
+    await act(async () => s.save().props.onPress());
+    expect(patches).toEqual([{ customModelName: '001 FR' }]);
+  });
+
+  test('a listed make stays as picked: only the model is editable', async () => {
+    const s = await editing({
+      id: 'v-ev9', year: 2025, make: 'Kia', model: 'EV9', color: 'white', isPrimary: false,
+      addedAt: 1, isCustom: true, brandId: 'kia', modelId: '',
+    });
+    expect(s.field('vehicle-detail-custom-make')).toBeNull();
+    expect(s.field('vehicle-detail-custom-model')).not.toBeNull();
+  });
+
+  test('an empty typed model is refused with a field error, nothing is sent', async () => {
+    const s = await editing({
+      id: 'v-zeekr', year: 2024, make: 'Zeekr', model: '001', color: 'white', isPrimary: false,
+      addedAt: 1, isCustom: true, brandId: '', modelId: '',
+    });
+    await act(async () => s.field('vehicle-detail-custom-model').props.onChangeText('   '));
+    expect(s.field('vehicle-detail-custom-model').props.errorText).toBe('vehiclePicker.manualError.empty');
+    await act(async () => s.save().props.onPress());
+    expect(patches).toEqual([]);
+  });
+
+  test('a catalog car shows no typed-name fields', async () => {
+    const s = await editing({ ...MALIBU });
+    expect(s.field('vehicle-detail-custom-model')).toBeNull();
+    shownVehicle = null;
+    routeEdit = undefined;
   });
 });

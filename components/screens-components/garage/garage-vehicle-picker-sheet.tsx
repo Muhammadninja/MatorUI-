@@ -14,7 +14,8 @@ import {
 } from '@/components/screens-components/garage/vehicle-choice-list';
 import { useMakes, useModels } from '@/hooks/use-reference-catalog';
 import { modelYearChoices } from '@/services/vehicle-model-years';
-import { vehicleRequests } from '@/services/vehicle-requests';
+import { checkManualName, findListedByName, manualYearChoices, MANUAL_NAME_MAX } from '@/services/manual-vehicle';
+import VehicleManualEntry, { type ManualNameErrors } from '@/components/screens-components/garage/vehicle-manual-entry';
 import { triggerHaptic } from '@/utils/haptics';
 
 const STEPS = ['make', 'model', 'year'] as const;
@@ -22,11 +23,15 @@ type Step = (typeof STEPS)[number];
 
 /** What the caller needs to create a vehicle, straight from the backend. */
 export type PickedVehicle = {
-  makeId: string;
+  /** Catalog make, or null when the owner typed a make the catalog lacks. */
+  makeId: string | null;
   makeName: string;
-  modelId: string;
+  /** Catalog model, or null for a car entered by hand (`custom`). */
+  modelId: string | null;
   modelName: string;
   year: number;
+  /** Entered by hand: names are the owner's, no catalog model behind them. */
+  custom?: boolean;
 };
 
 export type GarageVehiclePickerSheetProps = {
@@ -69,8 +74,12 @@ export function GarageVehiclePickerSheet({
   const [makeId, setMakeId] = useState<string | null>(null);
   const [modelId, setModelId] = useState<string | null>(null);
   const [year, setYear] = useState<string | null>(null);
-  /** "Не нашли автомобиль?" is open over the current step. */
-  const [notFound, setNotFound] = useState(false);
+  /** "Нет в списке? Ввести вручную": the model is typed ('model', the make is
+   *  the picked one) or both are ('make', the catalog lacks the make). */
+  const [manual, setManual] = useState<null | 'model' | 'make'>(null);
+  const [customMake, setCustomMake] = useState('');
+  const [customModel, setCustomModel] = useState('');
+  const [manualErrors, setManualErrors] = useState<ManualNameErrors>({});
 
   const makes = useMakes();
   const models = useModels(makeId ?? undefined);
@@ -98,9 +107,12 @@ export function GarageVehiclePickerSheet({
   const pickedModel = models.data?.find((m) => m.id === modelId);
   const yearChoices = useMemo<VehicleChoice[]>(
     // Read per render, not at module load, so a session running across New
-    // Year still offers the new year.
-    () => modelYearChoices(pickedModel, new Date().getFullYear()).map((y) => ({ value: String(y), label: String(y) })),
-    [pickedModel],
+    // Year still offers the new year. A hand-entered car has no catalog
+    // range: this year back to MANUAL_YEAR_MIN, never a future year.
+    () =>
+      (manual ? manualYearChoices(new Date().getFullYear()) : modelYearChoices(pickedModel, new Date().getFullYear()))
+        .map((y) => ({ value: String(y), label: String(y) })),
+    [manual, pickedModel],
   );
 
   // Clear on the way OUT, not on submit. The parent keeps this sheet mounted
@@ -114,14 +126,58 @@ export function GarageVehiclePickerSheet({
     setMakeId(null);
     setModelId(null);
     setYear(null);
-    setNotFound(false);
+    setManual(null);
+    setCustomMake('');
+    setCustomModel('');
+    setManualErrors({});
   }, [visible]);
 
   const selectedMake = makeChoices.find((o) => o.value === makeId);
   const selectedModel = modelChoices.find((o) => o.value === modelId);
 
   /** Whether the question on screen has an answer yet. */
-  const answered = step === 'make' ? !!selectedMake : step === 'model' ? !!selectedModel : !!year;
+  const answered =
+    step === 'make'
+      ? !!selectedMake
+      : step === 'model'
+        ? manual
+          ? !!customModel.trim() && (manual === 'model' || !!customMake.trim())
+          : !!selectedModel
+        : yearChoices.some((choice) => choice.value === year);
+
+  /** Open manual entry from the make step (type both) or the model step (type the model). */
+  const enterManual = () => {
+    if (busy) return;
+    triggerHaptic('selection');
+    setManualErrors({});
+    setYear(null);
+    if (step === 'make') {
+      setManual('make');
+      setMakeId(null);
+      setModelId(null);
+      setStep('model');
+    } else {
+      setManual('model');
+      setModelId(null);
+    }
+  };
+
+  /** The typed names, cleaned as the backend will, or the field errors to show. */
+  const validateManual = (): { make: string | null; model: string } | null => {
+    const message = (error: 'empty' | 'invalid' | 'tooLong') =>
+      t(`vehiclePicker.manualError.${error}`, { max: MANUAL_NAME_MAX });
+    const errors: ManualNameErrors = {};
+    const model = checkManualName(customModel);
+    if ('error' in model) errors.model = message(model.error);
+    let make: string | null = null;
+    if (manual === 'make') {
+      const checked = checkManualName(customMake);
+      if ('error' in checked) errors.make = message(checked.error);
+      else make = checked.name;
+    }
+    setManualErrors(errors);
+    return 'name' in model && !errors.make ? { make, model: model.name } : null;
+  };
 
   // A different make invalidates the model and year: model ids are per-make.
   const pickMake = (next: string) => {
@@ -142,15 +198,19 @@ export function GarageVehiclePickerSheet({
     setStep('year');
   };
   const pickYear = (next: string) => {
-    if (busy) return;
+    // Only a year the list offers (catalog range, or this year back for a car typed in).
+    if (busy || !yearChoices.some((choice) => choice.value === next)) return;
     triggerHaptic('selection');
     setYear(next);
   };
 
   const goBack = () => {
     triggerHaptic('selection');
-    if (notFound) {
-      setNotFound(false);
+    if (step === 'model' && manual) {
+      // Back to the list the manual entry was opened from.
+      setManual(null);
+      setManualErrors({});
+      if (manual === 'make') setStep('make');
       return;
     }
     setStep(STEPS[Math.max(0, STEPS.indexOf(step) - 1)]);
@@ -159,11 +219,47 @@ export function GarageVehiclePickerSheet({
   const goNext = () => {
     if (!answered || busy) return;
     triggerHaptic('selection');
+    if (step === 'model' && manual) {
+      if (!validateManual()) return;
+      // Typed something the catalog lists: use the listed row instead, so the
+      // car keeps exact part matching (the backend would refuse it anyway).
+      if (manual === 'make') {
+        const listedMake = findListedByName(makeChoices, customMake);
+        if (listedMake) {
+          setMakeId(listedMake.value);
+          setManual('model');
+          return;
+        }
+      } else {
+        const listedModel = findListedByName(modelChoices, customModel);
+        if (listedModel) {
+          setManual(null);
+          setModelId(listedModel.value);
+          setYear(null);
+          setStep('year');
+          return;
+        }
+      }
+    }
     if (step !== 'year') {
       setStep(STEPS[STEPS.indexOf(step) + 1]);
       return;
     }
-    if (!selectedMake || !selectedModel || !year) return;
+    if (!year) return;
+    if (manual) {
+      const names = validateManual();
+      if (!names || (manual === 'model' && !selectedMake)) return;
+      onSubmit({
+        makeId: manual === 'model' ? selectedMake!.value : null,
+        makeName: manual === 'model' ? selectedMake!.label : names.make!,
+        modelId: null,
+        modelName: names.model,
+        year: Number(year),
+        custom: true,
+      });
+      return;
+    }
+    if (!selectedMake || !selectedModel) return;
     onSubmit({
       makeId: selectedMake.value,
       makeName: selectedMake.label,
@@ -175,14 +271,14 @@ export function GarageVehiclePickerSheet({
 
   /** The answers so far, shown beside the back arrow. */
   const trail = [
-    step !== 'make' ? selectedMake?.label : undefined,
-    step === 'year' ? selectedModel?.label : undefined,
+    step !== 'make' ? (manual === 'make' ? customMake.trim() : selectedMake?.label) : undefined,
+    step === 'year' ? (manual ? customModel.trim() : selectedModel?.label) : undefined,
   ]
     .filter(Boolean)
     .join(' · ');
 
-  const heading = notFound
-    ? t('vehiclePicker.notFoundTitle')
+  const heading = step === 'model' && manual
+    ? t('vehiclePicker.manualTitle')
     : step === 'make'
       ? t('garage.stepMakeTitle')
       : step === 'model'
@@ -248,7 +344,7 @@ export function GarageVehiclePickerSheet({
         {/* Back and close sit on one line ABOVE the question, so the question
          *  itself gets the full width and never shares a row with controls. */}
         <AppView row align="center" justify="space-between" style={{ height: 32 }}>
-          {step !== 'make' || notFound ? (
+          {step !== 'make' ? (
             <AppPressableView
               testID="picker-step-back"
               onPress={goBack}
@@ -264,7 +360,7 @@ export function GarageVehiclePickerSheet({
             >
               <ArrowLeft size={18} strokeWidth={2.4} color={tokens.textMuted} />
               <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.textMuted, flexShrink: 1 }}>
-                {notFound ? '' : trail}
+                {trail}
               </AppText>
             </AppPressableView>
           ) : (
@@ -294,14 +390,22 @@ export function GarageVehiclePickerSheet({
       </AppView>
 
       <AppView flex={1} px={20} style={{ minHeight: 0 }}>
-        {notFound ? (
-          // The catalog has no way to take a request yet, so this offers what
-          // works today and sends nothing it cannot.
-          <AppView testID="picker-not-found" gap={12}>
-            <AppText family="default" style={{ fontSize: 15, lineHeight: 21, color: tokens.textMuted }}>
-              {t(vehicleRequests.available ? 'vehiclePicker.notFoundBody' : 'vehiclePicker.notFoundBodyVin')}
-            </AppText>
-          </AppView>
+        {step === 'model' && manual ? (
+          <VehicleManualEntry
+            catalogMakeName={manual === 'model' ? selectedMake?.label ?? null : null}
+            makeName={customMake}
+            modelName={customModel}
+            errors={manualErrors}
+            disabled={busy}
+            onChangeMake={(v) => {
+              setCustomMake(v);
+              if (manualErrors.make) setManualErrors((e) => ({ ...e, make: undefined }));
+            }}
+            onChangeModel={(v) => {
+              setCustomModel(v);
+              if (manualErrors.model) setManualErrors((e) => ({ ...e, model: undefined }));
+            }}
+          />
         ) : step === 'make' ? (
           makeState ?? (
             <VehicleChoiceList
@@ -347,20 +451,7 @@ export function GarageVehiclePickerSheet({
 
       {/* Fixed under the list: the step's action, then the quieter ways out. */}
       <AppView px={20} pt={12} pb={8} gap={4} style={{ borderTopWidth: 1, borderTopColor: tokens.divider }}>
-        {notFound ? (
-          onUseVin ? (
-            <AppButton
-              testID="use-vin-instead"
-              title={t('garage.addByVinInstead')}
-              kind="brand"
-              size="lg"
-              fullWidth
-              disabled={busy}
-              onPress={onUseVin}
-            />
-          ) : null
-        ) : (
-          <>
+        <>
             <AppButton
               testID="picker-step-next"
               title={step === 'year' ? t('common.save') : t('common.continue')}
@@ -374,7 +465,7 @@ export function GarageVehiclePickerSheet({
             <AppView row justify="center" wrap gap={4}>
               {/* The precise route, offered at the start: a VIN resolves trim
                *  and engine, which make, model and year cannot. */}
-              {onUseVin && step === 'make' ? (
+              {onUseVin && (step === 'make' || (step === 'model' && manual)) ? (
                 <AppButton
                   testID="use-vin-instead"
                   title={t('garage.addByVinInstead')}
@@ -385,23 +476,20 @@ export function GarageVehiclePickerSheet({
                   onPress={onUseVin}
                 />
               ) : null}
-              {step !== 'year' ? (
+              {/* Not in the list: type the model (and the make when it isn't listed). */}
+              {step !== 'year' && !manual ? (
                 <AppButton
                   testID="picker-not-found-link"
-                  title={t('vehiclePicker.notFoundAction')}
+                  title={t('vehiclePicker.manualAction')}
                   kind="text"
                   variant="ghost"
                   size="sm"
                   disabled={busy}
-                  onPress={() => {
-                    triggerHaptic('selection');
-                    setNotFound(true);
-                  }}
+                  onPress={enterManual}
                 />
               ) : null}
             </AppView>
-          </>
-        )}
+        </>
       </AppView>
     </AppBottomSheet>
   );

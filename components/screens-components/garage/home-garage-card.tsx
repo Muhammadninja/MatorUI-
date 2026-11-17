@@ -30,6 +30,7 @@ import { useGarageForegroundRefresh } from '@/hooks/use-garage-foreground-refres
 import { pictureModelId } from '@/services/vehicle-images/generation';
 import VehicleGenerationChoice from '@/components/screens-components/garage/vehicle-generation-choice';
 import { triggerHaptic } from '@/utils/haptics';
+import { vehiclePartsParams } from '@/services/manual-vehicle';
 
 /** Reserved while the persisted vehicle hydrates, so nothing below the card
  *  jumps when it resolves. Matches a one-line name + year + button. */
@@ -145,12 +146,14 @@ function HomeGarageCard() {
     triggerHaptic('selection');
     router.navigate({
       pathname: '/vehicle-parts',
-      params: {
+      params: vehiclePartsParams({
         make: summary.make,
         model: summary.model,
         year: summary.year,
         label: summary.name,
-      },
+        isCustom: vehicle?.isCustom,
+        brandId: vehicle?.brandId,
+      }),
     });
   };
 
