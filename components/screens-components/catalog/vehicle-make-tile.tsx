@@ -91,7 +91,7 @@ const VehicleMakeTile = ({
         style={{
           width: 65,
           height: 65,
-          backgroundColor: scheme === 'dark' ? '#E8ECEF' : tokens.white,
+          backgroundColor: scheme === 'dark' ? tokens.card : tokens.white,
           borderWidth: scheme === 'dark' ? 1 : 0,
           borderColor: tokens.divider,
         }}
