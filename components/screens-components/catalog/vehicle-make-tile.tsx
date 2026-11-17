@@ -42,6 +42,7 @@ const BRAND_LOGO_FRAMES: Record<string, { width: number; height: number }> = {
 
 const DARK_MONOCHROME_BRANDS = new Set([
   'byd',
+  'chery',
   'daewoo',
   'genesis',
   'haval',
@@ -57,6 +58,7 @@ const DARK_MONOCHROME_BRANDS = new Set([
 const DARK_LOGO_SIZES: Record<string, number> = {
   daewoo: 59,
   haval: 58,
+  hyundai: 56,
   ssangyong: 59,
 };
 
