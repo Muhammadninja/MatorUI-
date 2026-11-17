@@ -1,0 +1,368 @@
+{
+  "backend-results-retest": {
+    "numPassedTests": 1799,
+    "numFailedTests": 0,
+    "numPassedTestSuites": 77,
+    "numFailedTestSuites": 0,
+    "suites": [
+      {
+        "path": "src/orders/webhooks/payme-fiscal.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/inventory/inventory-reservation.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/inventory/payment-availability.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/webhooks/payme-fiscal-receipt.util.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/webhooks/payme.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/webhooks/payme-service-fee.flow.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/webhooks/payme-fiscal-receipt.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/inventory/stock-conflict.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/inventory/reservation-integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/admin/orders/admin-order-pickup-points.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/payment-providers-disabled.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/orders.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/orders.controller.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/orders-service-fee.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/orders-idempotency.wiring.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/orders-delivery.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/order-repricing.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/order-integrity.p2.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/order-idempotency.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/order-checkout-race.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/order-availability.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/offline-collection.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/admin/auth/admin-auth.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/admin/dealers/admin-dealers.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/admin/auth/admin-login-protection.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/webhooks/payme.config.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/webhooks/click.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/auth/phone/otp.attempt-limits.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/auth/phone/otp-log-privacy.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/addresses/search/uzmaps-address-search.provider.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/auth/phone/staging-otp.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/admin/auth/token-isolation.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/auth/phone/otp.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/webhooks/settlement.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/offline-order.policy.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/admin/auth/admin-invite.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/admin/dealers/dto/dealer-contact.validation.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/payments.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/addresses/addresses.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/user/avatar.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/service-fee.util.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/auth/auth-env.config.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/user/favorites/favorites.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/admin/orders/admin-orders.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/addresses/address-suggestions.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/auth/phone/otp.sms-protection.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/non-part-lines.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/auth/phone/dto/request-otp.dto.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/admin/auth/dto/admin-login.dto.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/auth/phone/phone-auth.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/admin/auth/admin-token.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/dto/create-order.dto.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/auth/phone/phone-auth.enumeration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/admin/auth/strategies/admin-jwt.strategy.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/auth/tokens/token-rotation.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/addresses/search/uzmaps-reverse-geocoding.provider.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/admin/dealers/admin-dealer-api-key.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/refund-breakdown.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/payment-return-url.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/garage/vehicle-images/vehicle-image.pipeline-admin-client.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/admin/auth/guards/admin-role.guard.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/garage/vehicle-images/vehicle-image.pipeline-client.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/admin/auth/admin-auth.config.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/admin/auth/admin-audit.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/integrations/guards/api-key.guard.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/order-status.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/order-settlement.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/auth/social/social-identity.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/dealers/dealers.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/order.presenter.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/admin/orders/dto/list-admin-orders.query.dto.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/auth/password.util.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/financial-refund.ledger.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/promo-allocation.util.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/webhooks/payme-checkout.util.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/orders/order-transitions.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "src/cart/cart.presenter.spec.ts",
+        "status": "passed"
+      }
+    ]
+  },
+  "http-results": {
+    "numPassedTests": 95,
+    "numFailedTests": 0,
+    "numPassedTestSuites": 8,
+    "numFailedTestSuites": 0,
+    "suites": [
+      {
+        "path": "test/smoke/auth.e2e-spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "test/smoke/payments.e2e-spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "test/smoke/orders.e2e-spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "test/smoke/admin-throttle.e2e-spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "test/smoke/payme-webhook.e2e-spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "test/smoke/user.e2e-spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "test/smoke/cart.e2e-spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "test/smoke/account-shipping.e2e-spec.ts",
+        "status": "passed"
+      }
+    ]
+  },
+  "mobile": {
+    "passed": 39,
+    "failed": 0,
+    "files": 3
+  },
+  "admin": {
+    "passed": 28,
+    "failed": 0,
+    "suites": 7
+  }
+}
