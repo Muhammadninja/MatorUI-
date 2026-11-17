@@ -45,9 +45,9 @@ beforeEach(() => {
   currentLanguage = 'ru';
 });
 
-function makeClient() {
+function makeClient(gcTime = 0) {
   return new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    defaultOptions: { queries: { retry: false, gcTime } },
   });
 }
 
@@ -287,7 +287,9 @@ describe('useAcceptLegal', () => {
       documents: [statusDoc('PRIVACY_POLICY', 2, 2)],
     };
     accept.mockResolvedValueOnce(updated);
-    const client = makeClient();
+    // Keep this inactive cache key alive long enough to assert synchronous
+    // mutation seeding; production clients use React Query's normal GC window.
+    const client = makeClient(Infinity);
 
     const { current } = await renderHook(() => useAcceptLegal(), client);
 
