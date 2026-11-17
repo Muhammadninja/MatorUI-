@@ -26,11 +26,13 @@ export type BrandLogoProps = {
   size?: number;
   /** Color for the initial fallback. */
   color?: string;
+  /** Optional tint used only when a monochrome logo needs contrast in dark UI. */
+  tintColor?: string;
   /** Shown instead of the initial when there is no usable logo. */
   fallback?: ReactNode;
 };
 
-const BrandLogo = ({ logoUrl, name, size = 40, color, fallback }: BrandLogoProps) => {
+const BrandLogo = ({ logoUrl, name, size = 40, color, fallback, tintColor }: BrandLogoProps) => {
   const { t } = useTranslation();
   const [failed, setFailed] = useState(false);
 
@@ -38,7 +40,7 @@ const BrandLogo = ({ logoUrl, name, size = 40, color, fallback }: BrandLogoProps
     return (
       <Image
         source={{ uri: logoUrl }}
-        style={{ width: size, height: size }}
+        style={[{ width: size, height: size }, tintColor ? { tintColor } : undefined]}
         contentFit="contain"
         cachePolicy="memory-disk"
         transition={120}
@@ -53,7 +55,7 @@ const BrandLogo = ({ logoUrl, name, size = 40, color, fallback }: BrandLogoProps
     return (
       <Image
         source={bundled}
-        style={{ width: size, height: size }}
+        style={[{ width: size, height: size }, tintColor ? { tintColor } : undefined]}
         contentFit="contain"
         accessibilityLabel={t('make.brandLogo', { name })}
       />
