@@ -3,14 +3,17 @@ import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AppText } from '@/components/shared/app-text';
+import { bundledBrandLogo } from '@/components/screens-components/catalog/bundled-brand-logos';
 
 /**
  * `BrandLogo` — renders a vehicle make's logo from the backend
  * (`VehicleMake.logoUrl`, exposed as `RefMake.logoUrl`). Brands and their logos
- * are managed in the admin console; nothing is bundled in the app anymore.
+ * are managed in the admin console. A make without one yet uses the logo the
+ * app ships for it (`bundled-brand-logos.ts`), so a newly enabled brand is
+ * never a bare letter.
  *
- * Falls back to the brand's initial (in the brand color) when there's no
- * `logoUrl` yet, or if the remote image fails to load — e.g. an operator hasn't
+ * Falls back to the brand's initial (in the brand color) when there's neither
+ * a usable `logoUrl` nor a bundled logo — e.g. an operator hasn't
  * uploaded a logo, or supplied a URL React Native's <Image> can't render (it
  * handles PNG/JPG/WebP, not remote SVG). This keeps the tile from ever being a
  * blank chip.
@@ -40,6 +43,18 @@ const BrandLogo = ({ logoUrl, name, size = 40, color, fallback }: BrandLogoProps
         cachePolicy="memory-disk"
         transition={120}
         onError={() => setFailed(true)}
+        accessibilityLabel={t('make.brandLogo', { name })}
+      />
+    );
+  }
+
+  const bundled = bundledBrandLogo(name);
+  if (bundled !== null) {
+    return (
+      <Image
+        source={bundled}
+        style={{ width: size, height: size }}
+        contentFit="contain"
         accessibilityLabel={t('make.brandLogo', { name })}
       />
     );
