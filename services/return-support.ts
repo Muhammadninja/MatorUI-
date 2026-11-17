@@ -107,8 +107,3 @@ export function telegramUrl(username: string, text?: string): string {
 export function mailtoUrl(email: string, subject: string, body: string): string {
   return `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
-
-/** A call carries no context: the screen shows the order number to read out. */
-export function telUrl(phone: string): string {
-  return `tel:${phone}`;
-}

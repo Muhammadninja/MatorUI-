@@ -6,8 +6,6 @@ export type UseSupportContactsValue = {
   /** Still asking the server. */
   loading: boolean;
   contacts: SupportContacts;
-  /** At least one channel is configured. */
-  hasAny: boolean;
 };
 
 const NONE: SupportContacts = { phone: null, email: null, telegramUsername: null };
@@ -23,10 +21,8 @@ export function useSupportContacts(): UseSupportContactsValue {
     queryFn: ({ signal }) => fetchAppConfig(signal),
     staleTime: 5 * 60_000,
   });
-  const contacts = query.data?.support ?? NONE;
   return {
     loading: query.isPending,
-    contacts,
-    hasAny: !!(contacts.phone || contacts.email || contacts.telegramUsername),
+    contacts: query.data?.support ?? NONE,
   };
 }

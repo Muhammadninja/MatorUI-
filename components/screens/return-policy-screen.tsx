@@ -25,7 +25,6 @@ import {
   returnSupportMessage,
   returnWindow,
   telegramUrl,
-  telUrl,
 } from '@/services/return-support';
 import { triggerHaptic } from '@/utils/haptics';
 
@@ -84,7 +83,10 @@ export default function ReturnPolicyScreen({ orderId }: ReturnPolicyScreenProps)
     });
   };
 
-  const { phone, email, telegramUsername } = support.contacts;
+  // Returns go through Telegram or e-mail only, which carry the order context.
+  // The backend still serves a support phone; the app deliberately offers no
+  // call here.
+  const { email, telegramUsername } = support.contacts;
 
   return (
     <AppView flex={1} colorName="background" testID="return-policy-screen">
@@ -168,7 +170,7 @@ export default function ReturnPolicyScreen({ orderId }: ReturnPolicyScreenProps)
             <AppView center style={{ paddingVertical: 8 }}>
               <WheelLoader size={22} color={tokens.text} />
             </AppView>
-          ) : support.hasAny ? (
+          ) : telegramUsername || email ? (
             <AppView gap={10}>
               {telegramUsername ? (
                 <AppButton
@@ -178,17 +180,6 @@ export default function ReturnPolicyScreen({ orderId }: ReturnPolicyScreenProps)
                   size="md"
                   fullWidth
                   onPress={() => open(telegramUrl(telegramUsername, message), `@${telegramUsername}`)}
-                />
-              ) : null}
-              {phone ? (
-                <AppButton
-                  testID="return-policy-call"
-                  title={t('returnPolicy.call', { phone })}
-                  kind="secondary"
-                  variant="outline"
-                  size="md"
-                  fullWidth
-                  onPress={() => open(telUrl(phone), phone)}
                 />
               ) : null}
               {email ? (
@@ -201,11 +192,6 @@ export default function ReturnPolicyScreen({ orderId }: ReturnPolicyScreenProps)
                   fullWidth
                   onPress={() => open(mailtoUrl(email, subject, message), email)}
                 />
-              ) : null}
-              {phone && order ? (
-                <AppText family="default" style={{ fontSize: 12, color: tokens.textMuted }}>
-                  {t('returnPolicy.callHint', { orderNo })}
-                </AppText>
               ) : null}
             </AppView>
           ) : (
