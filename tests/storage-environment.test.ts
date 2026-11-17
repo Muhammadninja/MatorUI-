@@ -55,7 +55,7 @@ test('switching the API wipes tokens, Garage, favorites and cart before anything
   for (const key of ['@mator/active-vehicle/v1', 'likes:v2', 'cart:v1:usr_1', 'auth:v2:session']) {
     expect(storage.has(key)).toBe(false);
   }
-  for (const key of ['auth_v3_session', 'mator_staging_access_v1']) {
+  for (const key of ['auth_v4_session', 'auth_v3_session', 'mator_staging_access_v1']) {
     expect(await SecureStore.getItemAsync(key)).toBeNull();
   }
   expect(storage.get(STORAGE_ENVIRONMENT_KEY)).toBe('staging https://api.staging.mator.uz');
