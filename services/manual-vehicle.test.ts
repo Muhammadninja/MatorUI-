@@ -89,3 +89,12 @@ describe('garage API with manual vehicles', () => {
     expect(v).toMatchObject({ make: 'Zeekr', model: '001', brandId: '', modelId: '', isCustom: true });
   });
 });
+
+test('findListedByName matches the catalog ignoring case and spacing', async () => {
+  const { findListedByName } = await import('./manual-vehicle');
+  const list = [{ label: 'Cobalt' }, { label: 'Tiggo 7 Pro' }];
+  expect(findListedByName(list, ' cobalt ')).toEqual({ label: 'Cobalt' });
+  expect(findListedByName(list, 'tiggo  7 pro')).toEqual({ label: 'Tiggo 7 Pro' });
+  expect(findListedByName(list, 'EV9')).toBeNull();
+  expect(findListedByName(list, '  ')).toBeNull();
+});

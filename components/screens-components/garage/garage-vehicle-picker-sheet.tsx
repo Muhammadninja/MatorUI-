@@ -14,7 +14,7 @@ import {
 } from '@/components/screens-components/garage/vehicle-choice-list';
 import { useMakes, useModels } from '@/hooks/use-reference-catalog';
 import { modelYearChoices } from '@/services/vehicle-model-years';
-import { checkManualName, manualYearChoices, MANUAL_NAME_MAX } from '@/services/manual-vehicle';
+import { checkManualName, findListedByName, manualYearChoices, MANUAL_NAME_MAX } from '@/services/manual-vehicle';
 import VehicleManualEntry, { type ManualNameErrors } from '@/components/screens-components/garage/vehicle-manual-entry';
 import { triggerHaptic } from '@/utils/haptics';
 
@@ -143,7 +143,7 @@ export function GarageVehiclePickerSheet({
         ? manual
           ? !!customModel.trim() && (manual === 'model' || !!customMake.trim())
           : !!selectedModel
-        : !!year;
+        : yearChoices.some((choice) => choice.value === year);
 
   /** Open manual entry from the make step (type both) or the model step (type the model). */
   const enterManual = () => {
@@ -198,7 +198,8 @@ export function GarageVehiclePickerSheet({
     setStep('year');
   };
   const pickYear = (next: string) => {
-    if (busy) return;
+    // Only a year the list offers (catalog range, or this year back for a car typed in).
+    if (busy || !yearChoices.some((choice) => choice.value === next)) return;
     triggerHaptic('selection');
     setYear(next);
   };
@@ -218,7 +219,28 @@ export function GarageVehiclePickerSheet({
   const goNext = () => {
     if (!answered || busy) return;
     triggerHaptic('selection');
-    if (step === 'model' && manual && !validateManual()) return;
+    if (step === 'model' && manual) {
+      if (!validateManual()) return;
+      // Typed something the catalog lists: use the listed row instead, so the
+      // car keeps exact part matching (the backend would refuse it anyway).
+      if (manual === 'make') {
+        const listedMake = findListedByName(makeChoices, customMake);
+        if (listedMake) {
+          setMakeId(listedMake.value);
+          setManual('model');
+          return;
+        }
+      } else {
+        const listedModel = findListedByName(modelChoices, customModel);
+        if (listedModel) {
+          setManual(null);
+          setModelId(listedModel.value);
+          setYear(null);
+          setStep('year');
+          return;
+        }
+      }
+    }
     if (step !== 'year') {
       setStep(STEPS[STEPS.indexOf(step) + 1]);
       return;

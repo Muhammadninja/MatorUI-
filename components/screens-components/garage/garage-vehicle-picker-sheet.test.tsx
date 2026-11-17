@@ -235,6 +235,30 @@ describe('GarageVehiclePickerSheet', () => {
     });
   });
 
+  test('a typed model the catalog lists becomes the listed one, with exact fit', () => {
+    const onSubmit = vi.fn();
+    const s = mount(onSubmit);
+    s.choose('make', 'make_chevrolet');
+    s.tap(s.find('button', 'picker-not-found-link'));
+    type(s, 'model', '  cobalt ');
+    s.tap(s.next());
+    expect(s.step()).toBe('year');
+    s.choose('year', s.options('year')[0]!);
+    s.tap(s.next());
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ makeId: 'make_chevrolet', modelId: 'model_cobalt', modelName: 'Cobalt' }));
+    expect(onSubmit.mock.calls[0][0].custom).toBeUndefined();
+  });
+
+  test('a typed make the catalog lists is picked for the owner, who then types only the model', () => {
+    const s = mount();
+    s.tap(s.find('button', 'picker-not-found-link'));
+    type(s, 'make', 'KIA');
+    type(s, 'model', 'EV9');
+    s.tap(s.next());
+    expect(s.find('field', 'manual-make-field')).toBeNull();
+    expect(s.find('field', 'manual-model-field')!.props.value).toBe('EV9');
+  });
+
   test('invalid typed names show field errors and do not move on', () => {
     const s = mount();
     s.tap(s.find('button', 'picker-not-found-link'));

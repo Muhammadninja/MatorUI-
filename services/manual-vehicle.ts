@@ -73,3 +73,13 @@ export function vehiclePartsParams(v: {
   if (!v.isCustom) return { ...base, ...(v.make ? { make: v.make } : {}), ...(v.model ? { model: v.model } : {}) };
   return { ...base, ...(v.brandId && v.make ? { make: v.make } : {}), custom: '1' };
 }
+
+/** Case- and space-insensitive key, the backend's rule for "same name as the catalog". */
+export const manualNameKey = (name: string) =>
+  name.normalize('NFC').replace(/\s+/g, ' ').trim().toLocaleLowerCase('en');
+
+/** The listed choice whose name the owner typed, if any. */
+export function findListedByName<T extends { label: string }>(choices: readonly T[], typed: string): T | null {
+  const key = manualNameKey(typed);
+  return key ? (choices.find((c) => manualNameKey(c.label) === key) ?? null) : null;
+}
