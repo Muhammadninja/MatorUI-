@@ -98,6 +98,38 @@ Remaining:
 1. Backend: back up the DB on the box, then follow the runbook (`npm ci && prisma generate && npm run build`, then `pm2 restart`; no migrations in this change) → check `/health` → watch the next Telegram draft image succeed.
 2. Mobile: EAS production build, device migration check, then App Store submission.
 
+
+## Verification done without owner inputs (2026-11-17, second pass)
+
+Static review was done on backend main `34c9e701`. Production probes were read-only: GET requests, TCP connect checks, and unsigned webhook calls that the API rejects before touching any data.
+
+| Gate | Result | Evidence |
+|---|---|---|
+| 1 BOLA (static) | **No defect found** | Inventoried all 253 routes. All 28 user-scoped `:id` routes (addresses, cart, Garage, devices, notifications, orders, cancel, payments, bookings, sourcing offers, AI sessions, favorites) pass `req.user.id`. The service then either filters by `userId` in the query or loads the row and compares the owner, returning 404 on a mismatch. |
+| 2 Function authz (static) | **No defect found** | All 116 admin routes use `AdminJwtGuard` + `AdminRoleGuard`. `getAllAndOverride` (handler before class) means method-level role restrictions take effect. Customer JWTs are a different token type and are rejected by the admin guard. |
+| Anonymous access (live) | **Pass 10/10** | Private and admin endpoints answer 401/403 without a token (`Backend/scripts/qa/security-authz-check.mjs`, read-only prod mode). |
+| 6 Webhooks (live + static) | **Pass** | Payme without auth or with a wrong key → `-32504`; the comparison is constant-time and a blank key is never accepted. Click is disabled (fails closed) and verifies the MD5 sign when enabled. Both check the amount against the order. |
+| Exposure (live) | **Pass** | `/metrics` 403, `/docs` and `/admin/queues` 401, the staging OTP inbox 404, legacy email/social login is not registered (404), and CORS does not reflect foreign origins. |
+| 11 Network (live) | **Pass, partly** | From the internet, 5432, 6379, 3000, 8000 and 8080 are closed. TLS 1.0/1.1 are refused, the Let's Encrypt certificate is valid until 2026-12-26, and HTTP redirects to HTTPS. Database/Redis ACLs and the host firewall config itself are **not verified** (no SSH). |
+| 10 Secrets in history | **No real secret found** | Regex scan of the full history of all 3 repos (Telegram/Cloudinary/OpenAI/Anthropic/Google/AWS/GitHub keys, private keys, DB/Redis URLs, JWTs, generic assignments). All 21 hits are placeholders (`REPLACE_ME`, `USER:PASS@host`, `postgres` in CI). |
+| Mobile logging | **Pass** | `debugLog` is off in release builds and redacts tokens, OTP and PII. Account data in AsyncStorage is keyed by owner. Recent searches are device-wide (Low). |
+
+### New findings
+
+- **NEW-01 — High (infrastructure): SSH password login enabled.** Port 2222 (OpenSSH 9.6p1) offers `publickey,password`, and the root password was previously shared in plaintext. **Owner action:** rotate the root password, set `PasswordAuthentication no` and `PermitRootLogin prohibit-password`, and add fail2ban.
+- **NEW-02 — Medium: no per-number SMS ceiling.** The only send limit is a 60 s cooldown per number, so one number can be sent 60 SMS/hour (1440/day): SMS bombing, and every message is paid. The `captcha_token` field is accepted but ignored, and the `rateSms` key is declared but unused. This was a deliberate decision in `8a72a473` / `DEPLOYMENT.md`. A fix (5/hour, 10/day per number, 429 `OTP_SEND_LIMIT_REACHED`, 205 auth/redis tests pass) sits on the **unpushed local branch `security/otp-send-cap` (`5fae393a`)** and needs owner/backend-developer sign-off.
+- **NEW-03 — Low: Eskiz delivery webhook is unauthenticated.** This is documented. A forged report can only flip one SMS row between delivered and failed. Optional fix: a secret token in `ESKIZ_CALLBACK_URL`.
+- **NEW-04 — Info: trust-proxy setting needs checking on the box.** Throttling keys on `request.ip`, which depends on `TRUST_PROXY`. A wrong value lets clients spoof `X-Forwarded-For` (if it trusts too much) or puts every client in one bucket (if it trusts too little). Check on the box: `TRUST_PROXY` should be `1` (nginx only).
+
+### Ready to run once staging accounts exist
+
+```
+MATOR_API_BASE=https://<staging> CUSTOMER_A_TOKEN=… CUSTOMER_B_TOKEN=… ADMIN_TOKEN=… \
+  node Backend/scripts/qa/security-authz-check.mjs > authz-report.json
+```
+
+The script creates objects as customer A, attacks them as customer B (address, vehicle, favorite, cart line, order, payment), tests customer → admin function calls, then cleans up. It refuses to write against production.
+
 ## Updated recommendation: **NO-GO**
 
 - SEC-01, SEC-02, SEC-04 and the reachable SEC-03 backend packages are fixed in code and tested, but **none is in production**. SEC-01 also needs a new app binary.
