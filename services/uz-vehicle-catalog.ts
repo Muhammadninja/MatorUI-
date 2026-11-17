@@ -1,3 +1,11 @@
+import {
+  UZ_MARKET_EXTRA_BRANDS,
+  UZ_MARKET_EXTRA_MODELS,
+} from '@/services/uz-vehicle-market-extension';
+import { UZ_ENGINES } from '@/services/uz-vehicle-engine-catalog';
+
+export { UZ_ENGINES } from '@/services/uz-vehicle-engine-catalog';
+
 /**
  * Canonical Uzbekistan-market vehicle catalogue. Used by:
  *
@@ -130,7 +138,7 @@ export type VehicleFitment = {
 
 // ── Brands ───────────────────────────────────────────────────────────
 
-export const UZ_BRANDS: VehicleBrand[] = [
+const CORE_UZ_BRANDS: VehicleBrand[] = [
   { id: 'chevrolet', label: 'Chevrolet', tier: 'uz_top', manufacturer: 'UzAuto Motors' },
   { id: 'byd', label: 'BYD', tier: 'uz_top', manufacturer: 'BYD Uzbekistan' },
   { id: 'kia', label: 'Kia', tier: 'uz_top' },
@@ -141,6 +149,8 @@ export const UZ_BRANDS: VehicleBrand[] = [
   { id: 'haval', label: 'Haval', tier: 'uz_mid' },
   { id: 'nissan', label: 'Nissan', tier: 'global' },
 ];
+
+export const UZ_BRANDS: VehicleBrand[] = [...CORE_UZ_BRANDS, ...UZ_MARKET_EXTRA_BRANDS];
 
 /** Brand accent color per brand id — used for tile borders / monogram tiles
  *  on Explore's "Shop by vehicle" row and the Make screen. Theme-independent
@@ -166,7 +176,7 @@ export function brandColor(brandId: string): string {
 
 // ── Models ───────────────────────────────────────────────────────────
 
-export const UZ_MODELS: VehicleModel[] = [
+const CORE_UZ_MODELS: VehicleModel[] = [
   // Chevrolet — the UZ workhorse line-up
   { id: 'cobalt', brandId: 'chevrolet', label: 'Cobalt', bodyStyle: 'sedan', order: 1 },
   { id: 'malibu', brandId: 'chevrolet', label: 'Malibu', bodyStyle: 'sedan', order: 2 },
@@ -201,94 +211,40 @@ export const UZ_MODELS: VehicleModel[] = [
   { id: 'lada-granta', brandId: 'lada', label: 'Granta', bodyStyle: 'sedan' },
 ];
 
-// ── Engines ──────────────────────────────────────────────────────────
-
-export const UZ_ENGINES: VehicleEngine[] = [
-  // GM family used across Cobalt / Nexia / Spark / Tracker
-  {
-    id: 'b15d2-na',
-    label: '1.5L On-Turbo (B15D2)',
-    type: 'na',
-    displacement: 1.5,
-    transmissions: ['manual', 'automatic'],
-    oemCatalogScope: 'gm-uz-b15d2-na',
-  },
-  {
-    id: 'b15d2-turbo',
-    label: '1.5L Turbo (B15D2)',
-    type: 'turbo',
-    displacement: 1.5,
-    transmissions: ['cvt', 'automatic'],
-    oemCatalogScope: 'gm-uz-b15d2-turbo',
-  },
-  {
-    id: 'b12d2',
-    label: '1.2L (B12D2)',
-    type: 'na',
-    displacement: 1.2,
-    transmissions: ['manual', 'automatic'],
-    oemCatalogScope: 'gm-uz-b12d2',
-  },
-  {
-    id: 'lcv-1-3',
-    label: '1.3L LCV',
-    type: 'na',
-    displacement: 1.3,
-    transmissions: ['manual'],
-    oemCatalogScope: 'gm-uz-lcv',
-  },
-  // Malibu family
-  {
-    id: 'malibu-1-5t',
-    label: '1.5L Turbo (LFV)',
-    type: 'turbo',
-    displacement: 1.5,
-    transmissions: ['automatic'],
-    oemCatalogScope: 'gm-malibu-lfv',
-  },
-  {
-    id: 'malibu-2-0t',
-    label: '2.0L Turbo (LTG)',
-    type: 'turbo',
-    displacement: 2.0,
-    transmissions: ['automatic'],
-    oemCatalogScope: 'gm-malibu-ltg',
-  },
-  // Lacetti
-  {
-    id: 'lacetti-1-6',
-    label: '1.6L (F16D3)',
-    type: 'na',
-    displacement: 1.6,
-    transmissions: ['manual', 'automatic'],
-    oemCatalogScope: 'gm-lacetti-f16d3',
-  },
-  // BYD EV/PHEV
-  {
-    id: 'byd-blade-ev',
-    label: 'Blade Battery EV',
-    type: 'ev',
-    transmissions: ['automatic'],
-    oemCatalogScope: 'byd-blade-ev',
-  },
-  {
-    id: 'byd-dmi',
-    label: 'DM-i PHEV',
-    type: 'phev',
-    displacement: 1.5,
-    transmissions: ['cvt'],
-    oemCatalogScope: 'byd-dmi',
-  },
-];
+export const UZ_MODELS: VehicleModel[] = [...CORE_UZ_MODELS, ...UZ_MARKET_EXTRA_MODELS];
 
 // ── Generations ──────────────────────────────────────────────────────
 
 export const UZ_GENERATIONS: VehicleGeneration[] = [
   // Chevrolet Cobalt — UZ "Position" naming
-  { id: 'cobalt-p1', modelId: 'cobalt', label: 'Position 1', yearRange: [2013, 2015], active: false },
-  { id: 'cobalt-p2', modelId: 'cobalt', label: 'Position 2', yearRange: [2016, 2018], active: false },
-  { id: 'cobalt-p3', modelId: 'cobalt', label: 'Position 3', yearRange: [2019, 2021], active: false },
-  { id: 'cobalt-p4', modelId: 'cobalt', label: 'Position 4', yearRange: [2022, 2099], active: true },
+  {
+    id: 'cobalt-p1',
+    modelId: 'cobalt',
+    label: 'Position 1',
+    yearRange: [2013, 2015],
+    active: false,
+  },
+  {
+    id: 'cobalt-p2',
+    modelId: 'cobalt',
+    label: 'Position 2',
+    yearRange: [2016, 2018],
+    active: false,
+  },
+  {
+    id: 'cobalt-p3',
+    modelId: 'cobalt',
+    label: 'Position 3',
+    yearRange: [2019, 2021],
+    active: false,
+  },
+  {
+    id: 'cobalt-p4',
+    modelId: 'cobalt',
+    label: 'Position 4',
+    yearRange: [2022, 2099],
+    active: true,
+  },
 
   // Chevrolet Malibu
   { id: 'malibu-1', modelId: 'malibu', label: 'Malibu 1', yearRange: [2012, 2015], active: false },
@@ -319,14 +275,38 @@ export const UZ_GENERATIONS: VehicleGeneration[] = [
   },
 
   // Chevrolet Spark / Tracker / Captiva — single active generation each on UZ market today
-  { id: 'spark-m400', modelId: 'spark', label: 'Spark M400', yearRange: [2015, 2099], active: true },
-  { id: 'tracker-3', modelId: 'tracker', label: 'Tracker 3', yearRange: [2020, 2099], active: true },
-  { id: 'captiva-5', modelId: 'captiva', label: 'Captiva 5', yearRange: [2018, 2099], active: true },
+  {
+    id: 'spark-m400',
+    modelId: 'spark',
+    label: 'Spark M400',
+    yearRange: [2015, 2099],
+    active: true,
+  },
+  {
+    id: 'tracker-3',
+    modelId: 'tracker',
+    label: 'Tracker 3',
+    yearRange: [2020, 2099],
+    active: true,
+  },
+  {
+    id: 'captiva-5',
+    modelId: 'captiva',
+    label: 'Captiva 5',
+    yearRange: [2018, 2099],
+    active: true,
+  },
   { id: 'onix-1', modelId: 'onix', label: 'Onix', yearRange: [2020, 2099], active: true },
   { id: 'damas-2', modelId: 'damas', label: 'Damas 2', yearRange: [1996, 2099], active: true },
 
   // BYD
-  { id: 'byd-chazor-1', modelId: 'byd-chazor', label: 'Chazor', yearRange: [2022, 2099], active: true },
+  {
+    id: 'byd-chazor-1',
+    modelId: 'byd-chazor',
+    label: 'Chazor',
+    yearRange: [2022, 2099],
+    active: true,
+  },
   {
     id: 'byd-song-plus-1',
     modelId: 'byd-song-plus',
@@ -369,7 +349,12 @@ export const UZ_TRIMS: VehicleTrim[] = [
   { id: 'malibu-1-ltz', generationId: 'malibu-1', label: 'LTZ', engineIds: ['malibu-2-0t'] },
   // Malibu 2 — fully refreshed line-up
   { id: 'malibu-2-lt', generationId: 'malibu-2', label: 'LT', engineIds: ['malibu-1-5t'] },
-  { id: 'malibu-2-premier', generationId: 'malibu-2', label: 'Premier', engineIds: ['malibu-2-0t'] },
+  {
+    id: 'malibu-2-premier',
+    generationId: 'malibu-2',
+    label: 'Premier',
+    engineIds: ['malibu-2-0t'],
+  },
 
   // Nexia 2 — base / dlx
   { id: 'nexia-2-base', generationId: 'nexia-2', label: 'Base', engineIds: ['b15d2-na'] },
@@ -388,8 +373,18 @@ export const UZ_TRIMS: VehicleTrim[] = [
   // keep the schema honest (UI can hide trim selection when there's
   // only one).
   { id: 'spark-m400-ls', generationId: 'spark-m400', label: 'LS', engineIds: ['b12d2'] },
-  { id: 'tracker-3-premier', generationId: 'tracker-3', label: 'Premier', engineIds: ['b15d2-turbo'] },
-  { id: 'captiva-5-premier', generationId: 'captiva-5', label: 'Premier', engineIds: ['b15d2-turbo'] },
+  {
+    id: 'tracker-3-premier',
+    generationId: 'tracker-3',
+    label: 'Premier',
+    engineIds: ['b15d2-turbo'],
+  },
+  {
+    id: 'captiva-5-premier',
+    generationId: 'captiva-5',
+    label: 'Premier',
+    engineIds: ['b15d2-turbo'],
+  },
   { id: 'onix-1-premier', generationId: 'onix-1', label: 'Premier', engineIds: ['b15d2-turbo'] },
   { id: 'damas-2-base', generationId: 'damas-2', label: 'Base', engineIds: ['lcv-1-3'] },
 
@@ -468,7 +463,12 @@ export function resolveFitmentFromText(
 ): { brandId?: string; modelId?: string } {
   // Normalize away casing/punctuation so decoder output ("CHEVROLET",
   // "Cobalt LS") still matches catalog labels ("Chevrolet", "Cobalt").
-  const norm = (s: string) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const norm = (s: string) =>
+    s
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
   const m = norm(make);
   const md = norm(model);
   if (!m) return {};
