@@ -688,7 +688,10 @@
     "stepMakeTitle": "Pick your car's brand",
     "stepModelTitle": "Now the model",
     "stepYearTitle": "And the year",
-    "notSelected": "Not selected"
+    "notSelected": "Not selected",
+    "manualInCatalog": "{{model}} is in our list: choose it there for exact part matching.",
+    "manualFutureYear": "Choose a year up to {{year}}.",
+    "manualInvalidName": "Check the make and model: use letters or numbers."
   },
   "vehicleDetail": {
     "eyebrow": "In the garage",
@@ -1059,7 +1062,8 @@
     "fallbackTitle": "For my model",
     "emptyBody": "We don't have parts listed for your {{vehicle}} yet. Check back soon.",
     "forMyModel": "For my model",
-    "forMyModelA11y": "Filter: for my model, {{model}}"
+    "forMyModelA11y": "Filter: for my model, {{model}}",
+    "manualNote": "This car was added manually, so parts can't be matched exactly. Check each part by VIN or with the seller."
   },
   "legal": {
     "loading": "Loading document…",
@@ -1102,7 +1106,20 @@
     "notFoundAction": "Can't find your car?",
     "notFoundTitle": "Can't find your car?",
     "notFoundBodyVin": "The catalog is growing. Add your car by VIN and we will identify its make, model and year exactly.",
-    "notFoundBody": "The catalog is growing. Tell us which car to add, or add yours by VIN."
+    "notFoundBody": "The catalog is growing. Tell us which car to add, or add yours by VIN.",
+    "manualAction": "Not in the list? Enter it manually",
+    "manualTitle": "Enter your car",
+    "manualMakeLabel": "Make",
+    "manualMakePlaceholder": "For example, Zeekr",
+    "manualModelLabel": "Model",
+    "manualModelPlaceholder": "For example, 001",
+    "manualMakeListed": "Make: {{make}}",
+    "manualFitNote": "We can't match parts exactly for a car that isn't in our catalog. Check parts by VIN or ask the seller.",
+    "manualError": {
+      "empty": "Fill this in",
+      "invalid": "Use letters or numbers",
+      "tooLong": "Up to {{max}} characters"
+    }
   },
   "returnPolicy": {
     "title": "Return conditions",

@@ -43,7 +43,10 @@ export default function VehiclePartsScreen() {
     model?: string;
     year?: string;
     label?: string;
+    /** '1' for a car entered by hand: no catalog model, so no exact-fit scope. */
+    custom?: string;
   }>();
+  const custom = params.custom === '1';
 
   const make = params.make?.trim() || undefined;
   const model = params.model?.trim() || undefined;
@@ -136,9 +139,23 @@ export default function VehiclePartsScreen() {
         >
           {/* Rows run edge to edge, so the section copy carries its own inset. */}
           <AppView px={16} gap={8}>
+            {/* A hand-entered car has no catalog model: say parts can't be matched
+             *  exactly instead of claiming a "my model" scope. */}
+            {custom ? (
+              <AppView
+                testID="vehicle-parts-manual-note"
+                rounded={12}
+                colorName="backgroundSecondary"
+                style={{ paddingHorizontal: 12, paddingVertical: 10 }}
+              >
+                <AppText family="default" style={{ fontSize: 13, lineHeight: 18, color: tokens.textMuted }}>
+                  {t('vehicleParts.manualNote')}
+                </AppText>
+              </AppView>
+            ) : null}
             {/* The list is scoped to the model; each part's own badge says whether
              *  it is confirmed for this car. */}
-            {model ? (
+            {model && !custom ? (
               <AppView
                 testID="vehicle-parts-model-chip"
                 row

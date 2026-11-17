@@ -688,7 +688,10 @@
     "stepMakeTitle": "Mashinangiz markasini tanlang",
     "stepModelTitle": "Endi modelini tanlang",
     "stepYearTitle": "Va yilini tanlang",
-    "notSelected": "Tanlanmagan"
+    "notSelected": "Tanlanmagan",
+    "manualInCatalog": "{{model}} roʻyxatda bor: qismlar aniq tanlanishi uchun uni oʻsha yerdan tanlang.",
+    "manualFutureYear": "{{year}}-yildan kech boʻlmagan yilni tanlang.",
+    "manualInvalidName": "Marka va modelni tekshiring: harf yoki raqamlardan foydalaning."
   },
   "vehicleDetail": {
     "eyebrow": "Garajda",
@@ -1059,7 +1062,8 @@
     "fallbackTitle": "Mening modelim uchun",
     "emptyBody": "{{vehicle}} uchun hozircha qismlar yoʻq. Keyinroq qarang.",
     "forMyModel": "Mening modelim uchun",
-    "forMyModelA11y": "Filtr: mening modelim uchun, {{model}}"
+    "forMyModelA11y": "Filtr: mening modelim uchun, {{model}}",
+    "manualNote": "Avtomobil qoʻlda qoʻshilgan, shuning uchun aniq tanlash mavjud emas. Har bir qismni VIN orqali yoki sotuvchidan tekshiring."
   },
   "legal": {
     "loading": "Hujjat yuklanmoqda…",
@@ -1102,7 +1106,20 @@
     "notFoundAction": "Avtomobilingiz topilmadimi?",
     "notFoundTitle": "Avtomobilingiz topilmadimi?",
     "notFoundBodyVin": "Katalog toʻldirilmoqda. Avtomobilni VIN orqali qoʻshing — markasi, modeli va yilini aniq aniqlaymiz.",
-    "notFoundBody": "Katalog toʻldirilmoqda. Qaysi avtomobilni qoʻshishni bizga yozing yoki uni VIN orqali qoʻshing."
+    "notFoundBody": "Katalog toʻldirilmoqda. Qaysi avtomobilni qoʻshishni bizga yozing yoki uni VIN orqali qoʻshing.",
+    "manualAction": "Roʻyxatda yoʻqmi? Qoʻlda kiriting",
+    "manualTitle": "Avtomobilingizni kiriting",
+    "manualMakeLabel": "Marka",
+    "manualMakePlaceholder": "Masalan, Zeekr",
+    "manualModelLabel": "Model",
+    "manualModelPlaceholder": "Masalan, 001",
+    "manualMakeListed": "Marka: {{make}}",
+    "manualFitNote": "Katalogda yoʻq avtomobil uchun ehtiyot qismlarni aniq tanlab boʻlmaydi. Ularni VIN orqali yoki sotuvchidan tekshiring.",
+    "manualError": {
+      "empty": "Maydonni toʻldiring",
+      "invalid": "Harf yoki raqamlardan foydalaning",
+      "tooLong": "{{max}} belgidan oshmasin"
+    }
   },
   "returnPolicy": {
     "title": "Qaytarish shartlari",

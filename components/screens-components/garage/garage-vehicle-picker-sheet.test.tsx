@@ -44,6 +44,7 @@ vi.mock('react-native', async () => {
     Platform: { OS: 'ios' },
     ActivityIndicator: host('spinner'),
     TextInput: host('input'),
+    ScrollView: host('scroll'),
     FlatList: ({ data, renderItem, ListEmptyComponent, testID }: {
       data: unknown[];
       renderItem: (a: { item: unknown; index: number }) => React.ReactNode;
@@ -61,6 +62,7 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k: string) => k }
 vi.mock('lucide-react-native', () => ({
   ArrowLeft: host('icon'),
   Check: host('icon'),
+  Info: host('icon'),
   Search: host('icon'),
   X: host('icon'),
 }));
@@ -72,6 +74,7 @@ vi.mock('@/components/shared/app-view', () => ({
   AppPressableView: host('pressable'),
 }));
 vi.mock('@/components/shared/app-button', () => ({ AppButton: host('button') }));
+vi.mock('@/components/shared/app-text-field', () => ({ AppTextField: host('field') }));
 vi.mock('@/components/shared/app-bottom-sheet', () => ({ AppBottomSheet: host('sheet') }));
 vi.mock('@/themes', () => ({ APP_FONTS: { default: 'Inter_400Regular' } }));
 vi.mock('@/contexts/theme.context', () => ({
@@ -191,15 +194,66 @@ describe('GarageVehiclePickerSheet', () => {
     });
   });
 
-  test('"Не нашли автомобиль?" offers the VIN route and sends nothing', () => {
-    const onUseVin = vi.fn();
-    const s = mount(() => {}, onUseVin);
+  const type = (s: ReturnType<typeof mount>, field: 'make' | 'model', text: string) =>
+    act(() => s.find('field', `manual-${field}-field`)!.props.onChangeText(text));
+
+  test('"Нет в списке" on the make step: type make and model, pick a year up to this year, save typed names', () => {
+    const onSubmit = vi.fn();
+    const s = mount(onSubmit, () => {});
     s.tap(s.find('button', 'picker-not-found-link'));
-    expect(s.find('view', 'picker-not-found')).not.toBeNull();
+    expect(s.find('field', 'manual-make-field')).not.toBeNull();
+    expect(s.find('view', 'manual-fit-note')).not.toBeNull();
+    // The VIN route stays offered next to manual entry.
+    expect(s.find('button', 'use-vin-instead')).not.toBeNull();
+    expect(s.next()!.props.disabled).toBe(true);
+    type(s, 'make', '  Zeekr ');
+    type(s, 'model', '001   FR');
+    s.tap(s.next());
+    const years = s.options('year');
+    const thisYear = new Date().getFullYear();
+    expect(years[0]).toBe(String(thisYear));
+    expect(years).not.toContain(String(thisYear + 1));
+    s.choose('year', '2024');
+    s.tap(s.next());
+    expect(onSubmit).toHaveBeenCalledWith({
+      makeId: null, makeName: 'Zeekr', modelId: null, modelName: '001 FR', year: 2024, custom: true,
+    });
+  });
+
+  test('"Нет в списке" on the model step keeps the picked make and types only the model', () => {
+    const onSubmit = vi.fn();
+    const s = mount(onSubmit);
+    s.choose('make', 'make_kia');
+    s.tap(s.find('button', 'picker-not-found-link'));
+    expect(s.find('field', 'manual-make-field')).toBeNull();
+    type(s, 'model', 'EV9');
+    s.tap(s.next());
+    s.choose('year', '2025');
+    s.tap(s.next());
+    expect(onSubmit).toHaveBeenCalledWith({
+      makeId: 'make_kia', makeName: 'Kia', modelId: null, modelName: 'EV9', year: 2025, custom: true,
+    });
+  });
+
+  test('invalid typed names show field errors and do not move on', () => {
+    const s = mount();
+    s.tap(s.find('button', 'picker-not-found-link'));
+    type(s, 'make', '---');
+    type(s, 'model', 'x'.repeat(61));
+    s.tap(s.next());
+    expect(s.find('field', 'manual-make-field')!.props.errorText).toBe('vehiclePicker.manualError.invalid');
+    expect(s.find('field', 'manual-model-field')!.props.errorText).toBe('vehiclePicker.manualError.tooLong');
     expect(s.step()).toBeNull();
-    s.tap(s.find('button', 'use-vin-instead'));
-    expect(onUseVin).toHaveBeenCalledTimes(1);
-    // Back returns to the step it was opened from.
+  });
+
+  test('back from manual entry returns to the list it was opened from', () => {
+    const s = mount();
+    s.choose('make', 'make_chevrolet');
+    s.tap(s.find('button', 'picker-not-found-link'));
+    s.tap(s.back());
+    expect(s.step()).toBe('model');
+    s.tap(s.back());
+    s.tap(s.find('button', 'picker-not-found-link'));
     s.tap(s.back());
     expect(s.step()).toBe('make');
   });
