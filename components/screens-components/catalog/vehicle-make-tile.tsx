@@ -41,16 +41,12 @@ const BRAND_LOGO_FRAMES: Record<string, { width: number; height: number }> = {
 };
 
 const DARK_MONOCHROME_BRANDS = new Set([
-  'byd',
   'chery',
-  'daewoo',
   'genesis',
   'haval',
-  'hyundai',
   'kia',
   'lada',
   'nissan',
-  'skoda',
   'ssangyong',
   'toyota',
 ]);
@@ -189,7 +185,12 @@ const VehicleMakeTile = ({
         </AppView>
       </AppView>
       <AppView align="center" gap={2} style={{ alignSelf: 'stretch' }}>
-        <AppText textVariant="bodyXs" weight="medium" align="center" style={{ lineHeight: 16 }}>
+        <AppText
+          textVariant="bodyXs"
+          weight="medium"
+          align="center"
+          style={{ fontSize: 13, lineHeight: 18 }}
+        >
           {label}
         </AppText>
         {comingSoon ? (
