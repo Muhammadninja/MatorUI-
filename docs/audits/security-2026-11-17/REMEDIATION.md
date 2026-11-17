@@ -1,6 +1,6 @@
 # P0 security remediation — 2026-11-17
 
-Follow-up to [INDEX.md](INDEX.md). Code fixes are on branch `security/p0-remediation-2026-11-17` in all three repos, cut from the audited main SHAs. **Nothing is pushed, merged, built for the App Store or deployed yet.**
+Follow-up to [INDEX.md](INDEX.md). All fixes were pushed to `main` in all three repos on 2026-11-17. **Admin is deployed. Backend is pushed but not yet deployed on the API box. Mobile still needs a new App Store build.**
 
 | Repo | Base (origin/main) | Fix commit |
 |---|---|---|
@@ -20,7 +20,7 @@ Follow-up to [INDEX.md](INDEX.md). Code fixes are on branch `security/p0-remedia
 - **Tests:** 23 auth-storage tests and 3 storage-environment tests. They cover: no token in AsyncStorage after save, rotation or cold boot; keychain failure with no fallback; a write that doesn't read back counts as failed; migration from each legacy format; failed-migration retry; cleanup after an interrupted migration; corrupt legacy data; account switch; clear racing a pending save. Full mobile suite: **168 files / 2276 tests pass**; `tsc` clean.
 - **Still open:** this fix only reaches users through a new app binary. It has not been checked on a device. Still to do: install over the current App Store build, confirm the user stays signed in after migration, then inspect the app container and confirm `auth:v2:session` is gone. Rollback note: older binaries read v3/AsyncStorage, so downgrading after migration signs the user out.
 
-### SEC-02 — Critical advisory — Admin Next.js → **FIXED IN CODE, not deployed**
+### SEC-02 — Critical advisory — Admin Next.js → **FIXED AND DEPLOYED**
 
 - **Deployed version:** **15.5.21**, read from the live `https://mator.uz` client chunk (`version:"15.5.21"`). Hosting is Vercel (`server: Vercel`). The repo comment saying "next start behind nginx" is out of date.
 - **Advisories affecting 15.5.21:**
@@ -36,7 +36,10 @@ Follow-up to [INDEX.md](INDEX.md). Code fixes are on branch `security/p0-remedia
 - **Change:** `next` 15.5.21 → **15.5.29** (the 15.x backport line; no major upgrade). The lockfile also picks up sharp 0.35.5, nanoid 3.3.20 and source-map-js 1.2.2.
 - **Verification:** `tsc` clean, **217/217** admin tests pass (including session/token-store/CSRF), `next build` succeeds.
 - **Remaining audit entry:** `postcss` 8.4.31 is pinned inside Next (GHSA-qx2v-qp2m-jg93, -6g55-p6wh-862q, -fxqj-rqcc-2cmp, -r28c-9q8g-f849). Next uses postcss at build time on first-party CSS only, and no attacker-controlled CSS reaches it. **Not reachable at runtime.** The only fix is Next 16 (major); deferred.
-- **Still open:** deploy, then re-read the live chunk version.
+- **Deployed:** Vercel deployment `dpl_GWpwLn2DCJXEFvKqkBFU4Ud7wGDG` (commit `5077f5b`).
+  - The build finished, but `mator.uz` and `www.mator.uz` stayed on the old deployment `dpl_B2iuy894…`. An earlier manual promote had pinned them there, which stops pushes to main from going live.
+  - I promoted the new deployment through the Vercel API, so the old one stays available as a rollback target.
+  - **Checked on the live site:** the client chunk reports `version:"15.5.29"`; `/`, `/catalog` and `www` return 200; the admin shell redirects (308) as expected.
 
 ### SEC-03 — High dependency advisories → **Backend reachable ones FIXED IN CODE; rest triaged**
 
@@ -87,13 +90,13 @@ None of the mandatory gates in INDEX.md are evidenced yet, because they need thi
 
 Still **NOT VERIFIED:** BOLA/IDOR across orders/addresses/favorites/cart, OTP rate limits in the deployed config, session revocation, the admin/dealer authorization matrix, payment tampering and webhook replay against a real DB, DB/Redis access controls, Cloudinary permissions, and backup restoration.
 
-## Section 6 — deployment: NOT PERFORMED
+## Section 6 — deployment: PARTIAL
 
-Waiting for owner approval. Proposed order:
-1. Push the branches and open PRs.
-2. Admin: merge → Vercel auto-deploys → confirm the live chunk reports 15.5.29.
-3. Backend: back up the DB on the box, then follow the runbook (`npm ci && prisma generate && npm run build`, then `pm2 restart`; no migrations in this change) → check `/health` → watch the next Telegram draft image succeed.
-4. Mobile: EAS production build, device migration check, then App Store submission.
+Done: all three repos pushed to main; admin promoted and checked live.
+
+Remaining:
+1. Backend: back up the DB on the box, then follow the runbook (`npm ci && prisma generate && npm run build`, then `pm2 restart`; no migrations in this change) → check `/health` → watch the next Telegram draft image succeed.
+2. Mobile: EAS production build, device migration check, then App Store submission.
 
 ## Updated recommendation: **NO-GO**
 
