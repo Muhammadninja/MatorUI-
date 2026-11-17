@@ -83,13 +83,14 @@ export function GarageHeroCard({
   // At large text the copy needs the full width; the car moves above it.
   const stacked = fontScale >= 1.3 || windowWidth <= 360;
 
-  const carWidth = Math.round(width * (stacked ? 0.66 : emptyGarage ? 0.66 : 0.42));
+  const carWidth = Math.round(width * (stacked ? 0.66 : emptyGarage ? 0.6 : 0.42));
   const carHeight = Math.round(carWidth / CAR_ASPECT);
-  // Nudge the empty-state Corvette right and up without scaling the artwork. A
-  // selected car's bumper sits exactly SELECTED_CAR_EDGE_GAP from the card's
-  // edge: the image's transparent margin beside the body may overhang it.
+  // The empty-state Corvette sits whole inside the card: its visible tail stops
+  // half a padding from the right edge. A selected car's bumper sits exactly
+  // SELECTED_CAR_EDGE_GAP from the card's edge: the image's transparent margin
+  // beside the body may overhang it.
   const carRight = emptyGarage && !stacked
-    ? -Math.round(width * 0.09)
+    ? PADDING / 2 - Math.round(carWidth * (1 - ART_BOUNDS.right))
     : SELECTED_CAR_EDGE_GAP - Math.round((carWidth * (1 - CAR_BODY_SHARE)) / 2);
   const carTop = stacked ? PADDING / 2 : PADDING + (emptyGarage ? -3 : 4);
   const copyWidth = stacked
@@ -272,7 +273,9 @@ function GarageAddHero({ onPress }: { onPress: () => void }) {
       <AppText textVariant="h4" weight="bold" style={{ color: tokens.onVehicleBanner }}>
         {t('explore.addVehicleTitle')}
       </AppText>
-      <AppText textVariant="bodySm" style={{ color: tokens.vehicleBannerMuted }}>
+      {/* The title clears the Corvette's roofline; the body line sits level with
+       *  its nose, which starts ~85% across the copy column at every width. */}
+      <AppText textVariant="bodySm" style={{ color: tokens.vehicleBannerMuted, maxWidth: '85%' }}>
         {t('explore.addVehicleBody')}
       </AppText>
     </GarageHeroCard>
