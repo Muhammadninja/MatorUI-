@@ -7,7 +7,6 @@ import {
   returnSupportMessage,
   returnWindow,
   telegramUrl,
-  telUrl,
 } from '@/services/return-support';
 
 describe('returnWindow', () => {
@@ -74,10 +73,6 @@ describe('support links', () => {
     expect(mailtoUrl('a@b.uz', 'Return #A1', 'Line 1\nLine 2')).toBe(
       'mailto:a@b.uz?subject=Return%20%23A1&body=Line%201%0ALine%202',
     );
-  });
-
-  test('a call is a plain tel: link', () => {
-    expect(telUrl('+998502030318')).toBe('tel:+998502030318');
   });
 });
 
