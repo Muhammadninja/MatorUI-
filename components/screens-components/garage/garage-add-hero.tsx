@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { memo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
-import Svg, { Circle, Defs, Ellipse, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
 import { AppButton } from '@/components/shared/app-button';
 import { AppText } from '@/components/shared/app-text';
@@ -45,9 +45,6 @@ type GarageHeroCardProps = {
   visual: GarageHeroVisual;
   /** Empty-state-only artwork/layout refinements; selected-vehicle cards keep their geometry. */
   emptyGarage?: boolean;
-  /** Draw the card's soft ground shadow under the car. Off for artwork that
-   *  brings its own contact shadow. */
-  groundShadow?: boolean;
   /** Optional image action; used only by the decorative empty-state Corvette. */
   onImagePress?: () => void;
   /** Copy column: title and supporting text. */
@@ -70,7 +67,6 @@ type GarageHeroCardProps = {
 export function GarageHeroCard({
   testID,
   visual,
-  groundShadow = true,
   emptyGarage = false,
   onImagePress,
   children,
@@ -93,9 +89,9 @@ export function GarageHeroCard({
   // selected car's bumper sits exactly SELECTED_CAR_EDGE_GAP from the card's
   // edge: the image's transparent margin beside the body may overhang it.
   const carRight = emptyGarage && !stacked
-    ? -Math.round(width * 0.077)
+    ? -Math.round(width * 0.09)
     : SELECTED_CAR_EDGE_GAP - Math.round((carWidth * (1 - CAR_BODY_SHARE)) / 2);
-  const carTop = stacked ? PADDING / 2 : PADDING + (emptyGarage ? 3 : 4);
+  const carTop = stacked ? PADDING / 2 : PADDING + (emptyGarage ? -3 : 4);
   const copyWidth = stacked
     ? width - PADDING * 2
     : Math.round(width * (emptyGarage ? 0.55 : 0.64)) - PADDING;
@@ -142,17 +138,6 @@ export function GarageHeroCard({
     alignItems: 'center',
   } as const;
 
-  // Where the car's tyres meet the ground, for the soft shadow. Every approved
-  // cutout ends at its tyres (~99.7% of the frame) and spans 9.5–90.5% of its width.
-  // In the front three-quarter view only the near front tyre reaches the bottom;
-  // the rear and far tyres stand ~10% higher, so the ambient pool is centred
-  // above the contact line and tall enough to reach all four.
-  const groundX = carCenterX;
-  const groundY = carTop + carHeight * 0.975;
-  // The footprint's middle sits toward the rear: the car faces right.
-  const poolX = carCenterX - carWidth * 0.04;
-  const poolY = carTop + carHeight * 0.92;
-
   return (
     <AppView
       testID={testID}
@@ -174,22 +159,6 @@ export function GarageHeroCard({
               <Stop offset="0" stopColor={tokens.garageHeroFrom} />
               <Stop offset="1" stopColor={tokens.garageHeroTo} />
             </LinearGradient>
-            <RadialGradient id="garage-hero-ground" cx="50%" cy="50%" rx="50%" ry="50%">
-              <Stop offset="0" stopColor={tokens.garageHeroShadow} />
-              <Stop offset="1" stopColor={tokens.garageHeroShadow} stopOpacity={0} />
-            </RadialGradient>
-            {/* The ambient pool keeps most of its density out to the far tyres, then fades at the rim. */}
-            <RadialGradient id="garage-hero-pool" cx="50%" cy="50%" rx="50%" ry="50%">
-              <Stop offset="0" stopColor={tokens.garageHeroShadow} />
-              <Stop offset="0.65" stopColor={tokens.garageHeroShadow} stopOpacity={0.75} />
-              <Stop offset="1" stopColor={tokens.garageHeroShadow} stopOpacity={0} />
-            </RadialGradient>
-            {/* The tight contact shadow right under the tyres: dense core, quick falloff. */}
-            <RadialGradient id="garage-hero-contact" cx="50%" cy="50%" rx="50%" ry="50%">
-              <Stop offset="0" stopColor={tokens.garageHeroShadow} />
-              <Stop offset="0.55" stopColor={tokens.garageHeroShadow} stopOpacity={0.6} />
-              <Stop offset="1" stopColor={tokens.garageHeroShadow} stopOpacity={0} />
-            </RadialGradient>
           </Defs>
           <Rect x={0} y={0} width={width} height={height} fill="url(#garage-hero-wash)" />
           {/* Soft curves behind the car: one broad arc, one sweep rising from the bottom. */}
@@ -198,14 +167,6 @@ export function GarageHeroCard({
             d={`M ${width * 0.3} ${height} C ${width * 0.52} ${height * 0.62}, ${width * 0.78} ${height * 0.5}, ${width} ${height * 0.42} L ${width} ${height} Z`}
             fill={tokens.garageHeroShapeStrong}
           />
-          {/* A silhouette casts no shadow: it isn't a car standing in the scene. */}
-          {isPlaceholder || !groundShadow ? null : (
-            <>
-              {/* A faint ambient pool the width of the car, then the contact shadow. */}
-              <Ellipse cx={poolX} cy={poolY} rx={carWidth * 0.46} ry={carHeight * 0.12} fill="url(#garage-hero-pool)" />
-              <Ellipse cx={groundX} cy={groundY} rx={carWidth * 0.36} ry={carHeight * 0.028} fill="url(#garage-hero-contact)" />
-            </>
-          )}
         </Svg>
       ) : null}
 
@@ -304,7 +265,6 @@ function GarageAddHero({ onPress }: { onPress: () => void }) {
     <GarageHeroCard
       testID="home-garage-card"
       visual={{ kind: 'image', source: emptyGarageArt }}
-      groundShadow={false}
       emptyGarage
       onImagePress={openGarage}
       action={{ testID: 'home-garage-add-vehicle', title: t('explore.addVehicleAction'), onPress }}
