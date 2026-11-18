@@ -682,11 +682,16 @@
     "emptyOptionDetails": "Model va yil orqali",
     "quickAddSuccess": "{{vehicle}} garajga qoʻshildi",
     "quickAddFailed": "Avtomobilni qoʻshib boʻlmadi. Qayta urinib koʻring.",
+    "yearUnsupported": "{{model}} {{from}}–{{to}}-yillarda ishlab chiqarilgan. Shu oraliqdagi yilni tanlang.",
+    "yearUnsupportedTo": "{{model}} {{to}}-yilgacha ishlab chiqarilgan. Oldingi yilni tanlang.",
     "addByVinInstead": "VIN bormi? VIN orqali qoʻshing",
     "stepMakeTitle": "Mashinangiz markasini tanlang",
     "stepModelTitle": "Endi modelini tanlang",
     "stepYearTitle": "Va yilini tanlang",
-    "notSelected": "Tanlanmagan"
+    "notSelected": "Tanlanmagan",
+    "manualInCatalog": "{{model}} roʻyxatda bor: qismlar aniq tanlanishi uchun uni oʻsha yerdan tanlang.",
+    "manualFutureYear": "{{year}}-yildan kech boʻlmagan yilni tanlang.",
+    "manualInvalidName": "Marka va modelni tekshiring: harf yoki raqamlardan foydalaning."
   },
   "vehicleDetail": {
     "eyebrow": "Garajda",
@@ -1057,7 +1062,8 @@
     "fallbackTitle": "Mening modelim uchun",
     "emptyBody": "{{vehicle}} uchun hozircha qismlar yoʻq. Keyinroq qarang.",
     "forMyModel": "Mening modelim uchun",
-    "forMyModelA11y": "Filtr: mening modelim uchun, {{model}}"
+    "forMyModelA11y": "Filtr: mening modelim uchun, {{model}}",
+    "manualNote": "Avtomobil qoʻlda qoʻshilgan, shuning uchun aniq tanlash mavjud emas. Har bir qismni VIN orqali yoki sotuvchidan tekshiring."
   },
   "legal": {
     "loading": "Hujjat yuklanmoqda…",
@@ -1083,7 +1089,10 @@
   "vehicleImage": {
     "preparing": "Rasm tayyorlanmoqda",
     "awaitingReview": "Rasm tekshirilmoqda",
-    "unavailable": "Hozircha rasm yoʻq"
+    "unavailable": "Hozircha rasm yoʻq",
+    "credit": "Surat: {{attribution}} · {{license}}",
+    "source": "Rasm manbasi va litsenziyasi",
+    "modified": "Oʻlchami oʻzgartirildi va WebP formatiga aylantirildi"
   },
   "vehicleGeneration": {
     "title": "Sizdagi {{model}} qaysi avlod?",
@@ -1097,7 +1106,20 @@
     "notFoundAction": "Avtomobilingiz topilmadimi?",
     "notFoundTitle": "Avtomobilingiz topilmadimi?",
     "notFoundBodyVin": "Katalog toʻldirilmoqda. Avtomobilni VIN orqali qoʻshing — markasi, modeli va yilini aniq aniqlaymiz.",
-    "notFoundBody": "Katalog toʻldirilmoqda. Qaysi avtomobilni qoʻshishni bizga yozing yoki uni VIN orqali qoʻshing."
+    "notFoundBody": "Katalog toʻldirilmoqda. Qaysi avtomobilni qoʻshishni bizga yozing yoki uni VIN orqali qoʻshing.",
+    "manualAction": "Roʻyxatda yoʻqmi? Qoʻlda kiriting",
+    "manualTitle": "Avtomobilingizni kiriting",
+    "manualMakeLabel": "Marka",
+    "manualMakePlaceholder": "Masalan, Zeekr",
+    "manualModelLabel": "Model",
+    "manualModelPlaceholder": "Masalan, 001",
+    "manualMakeListed": "Marka: {{make}}",
+    "manualFitNote": "Katalogda yoʻq avtomobil uchun ehtiyot qismlarni aniq tanlab boʻlmaydi. Ularni VIN orqali yoki sotuvchidan tekshiring.",
+    "manualError": {
+      "empty": "Maydonni toʻldiring",
+      "invalid": "Harf yoki raqamlardan foydalaning",
+      "tooLong": "{{max}} belgidan oshmasin"
+    }
   },
   "returnPolicy": {
     "title": "Qaytarish shartlari",
@@ -1115,9 +1137,7 @@
     "supportBody": "Qaytarishni rasmiylashtirish uchun jamoamizga murojaat qiling.",
     "supportBodyOrder": "Qaytarishni rasmiylashtirish uchun jamoamizga murojaat qiling. Buyurtma raqami va tovar xabarda allaqachon koʻrsatiladi.",
     "telegram": "Telegramʼda yozish",
-    "call": "Qoʻngʻiroq qilish: {{phone}}",
     "email": "Pochtaga yozish",
-    "callHint": "Qoʻngʻiroq qilganda buyurtma raqamini ayting: {{orderNo}}.",
     "supportUnavailable": "Qoʻllab-quvvatlash kontaktlari hozircha mavjud emas. Keyinroq urinib koʻring.",
     "noRequestNote": "Ilovada ariza yaratilmaydi: qaytarishni qoʻllab-quvvatlash xizmati rasmiylashtiradi.",
     "openFailed": "Ilovani ochib boʻlmadi. Biz bilan bogʻlaning: {{contact}}",

@@ -5,9 +5,15 @@ import { createImageProvider } from '../services/vehicle-image-provider.mjs';
 import { createCloudinaryAssetStore } from '../services/vehicle-image-cloudinary-store.mjs';
 import { createLocalAssetStore } from '../services/vehicle-image-local-store.mjs';
 import { createRepositoryArtworkProvider } from '../services/vehicle-image-acquisition.mjs';
+import { createWikimediaCommonsProvider } from '../services/vehicle-image-wikimedia-provider.mjs';
+import { createVehicleImageSegmenter } from '../services/vehicle-image-segmenter-client.mjs';
 import {
   expectedRegistrySha256,
   isRepositoryArtworkEnabled,
+  isWikimediaEnabled,
+  isGenerationFirst,
+  isWikimediaReferencesEnabled,
+  loadStyleReference,
   isUnverifiedGenerationAllowed,
   isVehicleImageGenerationEnabled,
   isVehicleImagePublicationEnabled,
@@ -34,6 +40,14 @@ const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url))
 const artworkProvider = isRepositoryArtworkEnabled(process.env.VEHICLE_IMAGE_REPOSITORY_ARTWORK_ENABLED)
   ? createRepositoryArtworkProvider({ rootDir: process.env.VEHICLE_IMAGE_ARTWORK_ROOT || repositoryRoot })
   : null;
+const photoProvider = isWikimediaEnabled(process.env.VEHICLE_IMAGE_WIKIMEDIA_ENABLED)
+  ? createWikimediaCommonsProvider({ userAgent: process.env.VEHICLE_IMAGE_WIKIMEDIA_USER_AGENT || 'MatorVehicleImagePipeline/1.0 (https://mator.uz)' })
+  : null;
+const photoSegmenter = photoProvider ? createVehicleImageSegmenter() : null;
+// Commons photos that only guide generation: no segmenter, never a candidate.
+const referenceProvider = isWikimediaReferencesEnabled(process.env.VEHICLE_IMAGE_WIKIMEDIA_REFERENCES)
+  ? createWikimediaCommonsProvider({ userAgent: process.env.VEHICLE_IMAGE_WIKIMEDIA_USER_AGENT || 'MatorVehicleImagePipeline/1.0 (https://mator.uz)', maxCandidates: 2 })
+  : null;
 const storeKind = vehicleImageStoreKind(process.env.VEHICLE_IMAGE_STORE);
 const assetStore = !publicationEnabled
   ? null
@@ -50,10 +64,17 @@ const pipeline = createVehicleImagePipeline({
   provider: generationEnabled ? createImageProvider() : null,
   generationEnabled,
   artworkProvider,
+  photoProvider,
+  photoSegmenter,
   allowUnverifiedGeneration: isUnverifiedGenerationAllowed(process.env.VEHICLE_IMAGE_ALLOW_UNVERIFIED_GENERATION),
+  generationFirst: isGenerationFirst(process.env.VEHICLE_IMAGE_GENERATION_FIRST),
+  styleReference: await loadStyleReference(process.env.VEHICLE_IMAGE_STYLE_REFERENCE, repositoryRoot),
+  referenceProvider,
   assetStore,
   publicationEnabled,
-  autoRun: generationEnabled || Boolean(artworkProvider),
+  publicationCandidateAllowlist: (process.env.VEHICLE_IMAGE_PUBLICATION_CANDIDATE_ALLOWLIST || '')
+    .split(',').map((value) => value.trim()).filter(Boolean),
+  autoRun: generationEnabled || Boolean(artworkProvider) || Boolean(photoProvider),
   maxAttempts: 3,
   maxProviderCallsPerDay: vehicleImageMaxProviderCallsPerDay(
     process.env.VEHICLE_IMAGE_MAX_PROVIDER_CALLS_PER_DAY,
@@ -65,6 +86,9 @@ const pipeline = createVehicleImagePipeline({
 await pipeline.initialize();
 const port = Number(process.env.PORT ?? 8047);
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('PORT is invalid');
+const backgroundRemovalReady = photoSegmenter
+  ? await photoSegmenter.ready()
+  : false;
 const server = pipeline.server();
 server.listen(port, '127.0.0.1', () => {
   console.log(JSON.stringify({
@@ -75,7 +99,12 @@ server.listen(port, '127.0.0.1', () => {
     registrySha256: pipeline.registry.sha256,
     registryCheck: pipeline.registryCheck,
     artwork: Boolean(artworkProvider),
+    wikimedia: Boolean(photoProvider),
+    backgroundRemoval: backgroundRemovalReady,
     generation: generationEnabled,
+    generationFirst: isGenerationFirst(process.env.VEHICLE_IMAGE_GENERATION_FIRST),
+    styleReference: process.env.VEHICLE_IMAGE_STYLE_REFERENCE || null,
+    wikimediaReferences: Boolean(referenceProvider),
     publication: publicationEnabled,
     store: publicationEnabled ? storeKind : null,
   }));

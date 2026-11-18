@@ -131,7 +131,7 @@ describe('registry fingerprint handshake', () => {
 });
 
 describe('repository artwork acquisition', () => {
-  it('proposes the Nexia 2 artwork privately for a verified identity and shares one job across its years', async () => {
+  it('proposes the Nexia 2 artwork privately and shares one job across its years', async () => {
     const { pipeline } = await setup();
     const years = [2009, 2010, 2012, 2014, 2016];
     const results = await Promise.all(years.flatMap((year) => [1, 2].map(() => pipeline.submitCanonicalRequest({
@@ -152,10 +152,11 @@ describe('repository artwork acquisition', () => {
     });
     expect(entry.candidates[0].policy.reasons).toContain('provider-requires-review');
 
-    await pipeline.decideCandidate(entry.candidates[0].id, 'approve', true, { actor: admin });
+    await expect(pipeline.decideCandidate(entry.candidates[0].id, 'approve', true, { actor: admin }))
+      .rejects.toMatchObject({ status: 409 });
     for (const year of years) {
       expect(pipeline.resolveCanonicalStatus(verified('nexia-2', year, { bodyType: 'sedan' }), { contract: 2 }))
-        .toMatchObject({ status: 'approved', asset: { version: 1, identityConfirmed: true } });
+        .toMatchObject({ status: 'awaiting_approval' });
     }
     expect(pipeline.metrics(true).counters.requestsDeduplicated).toBeGreaterThan(0);
   });
@@ -205,12 +206,9 @@ describe('repository artwork acquisition', () => {
       .rejects.toMatchObject({ status: 409 });
     await expect(pipeline.decideCandidate(candidate.id, 'approve', true, { actor: admin, identityConfirmation: { confirmed: true, reference: 'x' } }))
       .rejects.toMatchObject({ status: 400 });
-    await pipeline.decideCandidate(candidate.id, 'approve', true, { actor: admin, identityConfirmation: confirmation });
-    expect(pipeline.resolveCanonicalStatus(spark, { contract: 2 })).toMatchObject({
-      status: 'approved', asset: { identityConfirmed: true },
-    });
-    const history = pipeline.requestHistory(pipeline.resolveCanonicalStatus(spark).requestId, true);
-    expect(history.decisions.at(-1)).toMatchObject({ action: 'approve', actor: admin, confirmation });
+    await expect(pipeline.decideCandidate(candidate.id, 'approve', true, { actor: admin, identityConfirmation: confirmation }))
+      .rejects.toMatchObject({ status: 409 });
+    expect(pipeline.resolveCanonicalStatus(spark, { contract: 2 }).status).toBe('awaiting_approval');
   });
 
   it('applies an approved year scope to later identities without a new job', async () => {
@@ -224,14 +222,14 @@ describe('repository artwork acquisition', () => {
     await expect(pipeline.decideCandidate(candidate.id, 'approve', true, {
       actor: admin, identityConfirmation: confirmation, scope: { yearFrom: 2022, yearTo: 2024 },
     })).rejects.toMatchObject({ status: 400 });
-    await pipeline.decideCandidate(candidate.id, 'approve', true, {
+    await expect(pipeline.decideCandidate(candidate.id, 'approve', true, {
       actor: admin, identityConfirmation: confirmation, scope: { yearFrom: 2020, yearTo: 2025 },
-    });
-    expect(pipeline.resolveCanonicalStatus(waiting, { contract: 2 }).status).toBe('approved');
+    })).rejects.toMatchObject({ status: 409 });
+    expect(pipeline.resolveCanonicalStatus(waiting, { contract: 2 }).status).toBe('awaiting_approval');
     const later = unverified('tracker', 2024);
     const result = await pipeline.submitCanonicalRequest({ identity: later, vehicle: display(later, 'Tracker') });
-    expect(result).toMatchObject({ reused: true, job: null });
-    expect(pipeline.resolveCanonicalStatus(later, { contract: 2 }).subjectKey).toMatch(/^scope:/);
+    expect(result.reused).toBe(false);
+    expect(pipeline.resolveCanonicalStatus(later, { contract: 2 }).subjectKey).toMatch(/^identity:/);
     const outside = unverified('tracker', 2026);
     const separate = await pipeline.submitCanonicalRequest({ identity: outside, vehicle: display(outside, 'Tracker') });
     expect(separate.subjectKey).toMatch(/^identity:/);
@@ -298,7 +296,7 @@ describe('approval policy', () => {
       .toEqual(['publication-disabled']);
   });
 
-  it('publishes automatically through the policy when every requirement holds, and records it', async () => {
+  it('never automatically publishes provider claims without verified provenance', async () => {
     const provider = {
       generate: vi.fn(async () => ({ bytes: await transparentPng({ width: 1400, height: 700 }), contentType: 'image/png', provider: 'licensed-test' })),
       autoPublish: true,
@@ -308,8 +306,8 @@ describe('approval policy', () => {
     const han = { makeId: 'byd', modelId: 'byd-han', modelYear: 2024, generationId: 'byd-han-gen1', faceliftId: null, bodyType: null, trimId: null, marketRegion: 'UZ' };
     await pipeline.submitCanonicalRequest({ identity: han, vehicle: { manufacturer: 'BYD', model: 'Han', generation: 'Han 1', marketRegion: 'UZ' } });
     await pipeline.runQueuedJobs();
-    expect(pipeline.resolveCanonicalStatus(han, { contract: 2 }).status).toBe('approved');
-    expect(pipeline.requestHistory(pipeline.resolveCanonicalStatus(han).requestId, true).decisions[0]).toMatchObject({ automatic: true });
+    expect(pipeline.resolveCanonicalStatus(han, { contract: 2 }).status).toBe('awaiting_approval');
+    expect(pipeline.requestHistory(pipeline.resolveCanonicalStatus(han).requestId, true).decisions).toEqual([]);
   });
 });
 
@@ -385,13 +383,9 @@ describe('local asset store', () => {
     await pipeline.submitCanonicalRequest({ identity: spark, vehicle: display(spark, 'Spark') });
     await pipeline.runQueuedJobs();
     const [candidate] = pipeline.reviewQueue(true)[0].candidates;
-    await pipeline.decideCandidate(candidate.id, 'approve', true, { actor: admin, identityConfirmation: confirmation });
-    const status = pipeline.resolveCanonicalStatus(spark, { contract: 2 });
-    expect(status.asset.thumbnailUrl).toMatch(/-600\.webp$/);
-    const relative = new URL(status.asset.url).pathname.replace(/^\/assets\//, '');
-    const served = await call(pipeline.server(), { method: 'GET', url: `/assets/${relative}` });
-    expect(served.status).toBe(200);
-    expect(served.headers['cache-control']).toContain('immutable');
+    await expect(pipeline.decideCandidate(candidate.id, 'approve', true, { actor: admin, identityConfirmation: confirmation }))
+      .rejects.toMatchObject({ status: 409 });
+    expect(await call(pipeline.server(), { method: 'GET', url: '/assets/unknown.webp' })).toMatchObject({ status: 404 });
   });
 });
 

@@ -26,6 +26,13 @@ export type VehicleImageState = {
   version: number | null;
   /** Bundled catalog key for an approved asset that does not need publication. */
   catalogAssetKey?: string | null;
+  attribution?: string;
+  author?: string;
+  license?: string;
+  licenseUrl?: string;
+  sourcePage?: string;
+  sourceTitle?: string;
+  modifications?: string;
   reason?: 'not_requested' | 'needs_review' | 'generation_failed' | 'rejected' | 'request_failed' | null;
 };
 
@@ -55,7 +62,15 @@ export function parseVehicleImage(raw: unknown): VehicleImageState | undefined {
     ? r.reason as VehicleImageState['reason']
     : null;
   if (r.status === 'approved') {
-    if (isHttpsUrl(r.url)) return { status: 'approved', url: r.url, version, ...(reason ? { reason } : {}) };
+    if (isHttpsUrl(r.url)) return { status: 'approved', url: r.url, version,
+      ...(typeof r.attribution === 'string' ? { attribution: r.attribution.slice(0, 1000) } : {}),
+      ...(typeof r.author === 'string' ? { author: r.author.slice(0, 500) } : {}),
+      ...(typeof r.license === 'string' ? { license: r.license.slice(0, 80) } : {}),
+      ...(isHttpsUrl(r.license_url) ? { licenseUrl: r.license_url } : {}),
+      ...(isHttpsUrl(r.source_page) ? { sourcePage: r.source_page } : {}),
+      ...(typeof r.source_title === 'string' ? { sourceTitle: r.source_title.slice(0, 500) } : {}),
+      ...(typeof r.modifications === 'string' ? { modifications: r.modifications.slice(0, 500) } : {}),
+      ...(reason ? { reason } : {}) };
     if (typeof r.catalog_asset_key === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(r.catalog_asset_key)) {
       return { status: 'approved', url: null, version, catalogAssetKey: r.catalog_asset_key, reason };
     }

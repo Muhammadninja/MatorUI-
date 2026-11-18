@@ -16,6 +16,7 @@ import VehicleColorPicker from '@/components/screens-components/garage/vehicle-c
 import useGarage from '@/hooks/use-garage';
 import type { VehiclePatch } from '@/services/garage-service';
 import { toastService } from '@/services/toast-service';
+import { checkManualName, MANUAL_NAME_MAX } from '@/services/manual-vehicle';
 import { formatMileage } from '@/utils/mileage';
 import { colorEnumToHex, colorHexToEnum, nearestSwatch, normalizeHex } from '@/utils/vehicle-color';
 import {
@@ -70,6 +71,9 @@ export default function VehicleDetailScreen() {
       mileage: vehicle?.mileage != null ? String(vehicle.mileage) : '',
       plate: formatUzPlate(vehicle?.plate ?? ''),
       colorHex: normalizeHex(vehicle?.colorHex ?? colorEnumToHex(vehicle?.color ?? 'midnight')),
+      // A hand-entered car can fix its typed names; a catalog make stays as picked.
+      customMake: vehicle?.isCustom && !vehicle.brandId ? vehicle.make : '',
+      customModel: vehicle?.isCustom ? vehicle.model : '',
     }),
     [vehicle],
   );
@@ -81,6 +85,13 @@ export default function VehicleDetailScreen() {
   const isActive = currentActiveVehicle?.vehicleId === vehicle?.id;
 
   const openEdit = useCallback(() => setForm(seed()), [seed]);
+  /** Why a typed make/model can't be saved, shown under its field. */
+  const manualNameError = (value: string) => {
+    const checked = checkManualName(value);
+    return 'error' in checked
+      ? t(`vehiclePicker.manualError.${checked.error}`, { max: MANUAL_NAME_MAX })
+      : undefined;
+  };
   const cancelEdit = useCallback(() => setForm(null), []);
 
   // Capture the id so the async handlers keep a stable, non-undefined ref.
@@ -101,6 +112,13 @@ export default function VehicleDetailScreen() {
     if (form.colorHex !== currentHex) {
       patch.colorHex = form.colorHex;
       patch.color = colorHexToEnum(form.colorHex);
+    }
+    if (vehicle.isCustom) {
+      const model = checkManualName(form.customModel);
+      const make = vehicle.brandId ? null : checkManualName(form.customMake);
+      if ('error' in model || (make && 'error' in make)) return; // the fields show why
+      if (model.name !== vehicle.model) patch.customModelName = model.name;
+      if (make && 'name' in make && make.name !== vehicle.make) patch.customMakeName = make.name;
     }
 
     if (Object.keys(patch).length === 0) {
@@ -227,6 +245,38 @@ export default function VehicleDetailScreen() {
         {editing ? (
           /* ── Edit form ─────────────────────────────────────────────── */
           <AppView px={20} gap={14}>
+            {vehicle.isCustom ? (
+              <>
+                {vehicle.brandId ? null : (
+                  <AppTextField
+                    testID="vehicle-detail-custom-make"
+                    label={t('vehiclePicker.manualMakeLabel')}
+                    value={form.customMake}
+                    onChangeText={(v) => setForm((f) => (f ? { ...f, customMake: v } : f))}
+                    autoCapitalize="words"
+                    autoCorrect={false}
+                    maxLength={MANUAL_NAME_MAX + 20}
+                    errorText={manualNameError(form.customMake)}
+                    containerRounded={12}
+                    containerColorName="surface"
+                    containerBorderName="controlBorder"
+                  />
+                )}
+                <AppTextField
+                  testID="vehicle-detail-custom-model"
+                  label={t('vehiclePicker.manualModelLabel')}
+                  value={form.customModel}
+                  onChangeText={(v) => setForm((f) => (f ? { ...f, customModel: v } : f))}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                  maxLength={MANUAL_NAME_MAX + 20}
+                  errorText={manualNameError(form.customModel)}
+                  containerRounded={12}
+                  containerColorName="surface"
+                  containerBorderName="controlBorder"
+                />
+              </>
+            ) : null}
             <AppTextField
               label={`${t('vehicleDetail.mileage')} (${t('vehicleDetail.mileageUnit')})`}
               placeholder={t('vehicleDetail.mileagePlaceholder')}

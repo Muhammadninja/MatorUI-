@@ -1,6 +1,7 @@
+import { CarFront } from 'lucide-react-native';
+
 import BrandLogo from '@/components/screens-components/catalog/brand-logo';
 import { AppView } from '@/components/shared/app-view';
-import { CarIcon } from '@/components/shared/mator-icons';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useMakes } from '@/hooks/use-vehicle-catalog';
 import { plainMakeId } from '@/services/vehicle-images/catalog-id';
@@ -18,8 +19,8 @@ export type GarageBrandBadgeProps = {
  * small white rounded square — white in both themes, because logos are drawn
  * for a white ground. Resolved by manufacturer id, never by a name's first
  * letter; a make with no logo, or a catalogue that hasn't loaded, gets a
- * neutral car instead of an initial. Decorative: the name beside it is what a
- * screen reader should read.
+ * front-on car instead of an initial: it implies no body type. Decorative:
+ * the name beside it is what a screen reader should read.
  */
 export function GarageBrandBadge({ makeId, make, size = 48 }: GarageBrandBadgeProps) {
   const { tokens } = useThemeContext();
@@ -44,7 +45,7 @@ export function GarageBrandBadge({ makeId, make, size = 48 }: GarageBrandBadgePr
         logoUrl={match?.logoUrl}
         name={make}
         size={logoSize}
-        fallback={<CarIcon size={logoSize} color={tokens.onPhotoMuted} />}
+        fallback={<CarFront size={Math.round(logoSize * 0.7)} strokeWidth={1.75} color={tokens.onPhotoMuted} />}
       />
     </AppView>
   );

@@ -36,7 +36,7 @@ vi.mock('react-native-svg', () => ({
 vi.mock('expo-image', () => ({ Image: host('image') }));
 vi.mock('expo-router', () => ({ router: { navigate: () => {} } }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k: string) => k }) }));
-vi.mock('lucide-react-native', () => ({ ArrowLeftRight: host('icon') }));
+vi.mock('lucide-react-native', () => ({ ArrowLeftRight: host('icon'), ImagePlus: host('icon') }));
 vi.mock('@/assets/hero/corvette-c8-red.webp', () => ({ default: 1 }));
 vi.mock('@/components/shared/app-button', () => ({ AppButton: host('button') }));
 vi.mock('@/components/shared/app-text', () => ({ AppText: host('text') }));
@@ -73,6 +73,7 @@ vi.mock('@/services/vehicle-images/vehicle-visual', () => ({
 vi.mock('@/utils/haptics', () => ({ triggerHaptic: () => {} }));
 
 const { default: HomeGarageCard } = await import('./home-garage-card');
+const { GarageHeroCard } = await import('./garage-add-hero');
 
 function render(width: number) {
   screen.width = width;
@@ -163,5 +164,28 @@ describe('Explore vehicle banner actions', () => {
   test('the button keeps its own width beside it, even on a 360pt phone', () => {
     expect(render(360).shopParts.props.fullWidth).toBe(false);
     expect(render(393).shopParts.props.fullWidth).toBe(false);
+  });
+});
+
+describe('approved Garage vehicle image surface', () => {
+  test('approved cutouts stand on the card with no white box behind them', () => {
+    const props = {
+      testID: 'garage-test',
+      action: { testID: 'garage-action', title: 'Parts', onPress: () => {} },
+      children: <></>,
+    };
+    let imageRoot!: ReturnType<typeof create>;
+    act(() => { imageRoot = create(<GarageHeroCard {...props} visual={{ kind: 'image', source: 1 as never }} />); });
+    expect(imageRoot.root.findAll((node) => node.props.style?.backgroundColor === '#fff')).toHaveLength(0);
+    act(() => { imageRoot.unmount(); });
+  });
+
+  test('no approved image: the placeholder car, with the status in the copy column', () => {
+    const { tree: root } = render(393);
+    expect(root.findAll((node) => String(node.type) === 'car')).toHaveLength(1);
+    const status = root.find((node) => node.props.testID === 'home-garage-image-status');
+    expect(status.findByType('text' as never).props.children).toBe('vehicleImage.unavailable');
+    // Not inside the car slot: no absolute positioning on the status row.
+    expect(status.props.style).toBeUndefined();
   });
 });

@@ -13,6 +13,7 @@ import {
 import { createRepositoryArtworkProvider } from './vehicle-image-acquisition.mjs';
 import { expectedRegistrySha256 } from './vehicle-image-env.mjs';
 import { loadRegistryFile } from './vehicle-image-registry.mjs';
+import sharp from 'sharp';
 
 /**
  * Contract 2 as the Mator backend speaks it
@@ -34,6 +35,14 @@ const BACKEND_STATUSES = [
 const confirmation = { confirmed: true, reference: 'Compared with chevrolet.uz model page' };
 const admin = { id: 'adm_1', email: 'owner@example.test', name: 'Owner' };
 const dirs = [];
+async function transparentFixture() {
+  const subject = Buffer.alloc(800 * 450 * 4);
+  for (let i = 0; i < subject.length; i += 4) subject.set([220, 40, 20, 255], i);
+  return sharp({ create: { width: 1200, height: 800, channels: 4,
+    background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+    .composite([{ input: subject, raw: { width: 800, height: 450, channels: 4 }, left: 200, top: 320 }])
+    .png().toBuffer();
+}
 
 const unverified = (modelId, modelYear, extra = {}) => ({
   makeId: 'chevrolet', modelId, modelYear, generationId: null, faceliftId: null,
@@ -52,17 +61,36 @@ async function tempDir() {
 
 async function setup(options = {}) {
   const dataDir = options.dataDir ?? await tempDir();
+  const photoSegmenter = options.photoSegmenter ?? (options.photoProvider ? {
+    ready: async () => true,
+    removeBackground: transparentFixture,
+  } : null);
   const pipeline = createVehicleImagePipeline({
     dataDir, adminToken, requestToken, autoRun: false, retryDelayMs: 0,
     artworkProvider: createRepositoryArtworkProvider({ rootDir: repoRoot }),
     publicationEnabled: true,
     assetStore: { publish: vi.fn(async ({ version, candidateId }) => ({ url: `https://cdn.example.test/${candidateId}/v${version}.webp`, key: candidateId })) },
     expectedRegistrySha256: REGISTRY_SHA,
+    photoSegmenter,
     ...options,
   });
   await pipeline.initialize();
   return { pipeline, dataDir };
 }
+
+function commonsFixture(bytes) {
+  const source = {
+    provider: 'wikimedia-commons', license: 'CC-BY-4.0', licenseName: 'CC BY 4.0',
+    licenseUrl: 'https://creativecommons.org/licenses/by/4.0/', licenseEvidence: 'CC BY 4.0',
+    sourcePage: 'https://commons.wikimedia.org/wiki/File:Chevrolet_Spark.jpg',
+    sourceUrl: 'https://upload.wikimedia.org/test/chevrolet-spark.jpg',
+    author: 'Test photographer', attribution: 'Test photographer / Commons',
+  };
+  return { id: 'wikimedia-commons', autoPublish: false,
+    acquire: async () => [{ bytes, contentType: 'image/jpeg', source }] };
+}
+const rightsConfirmation = { confirmed: true, reference: 'Commons CC BY 4.0 license and attribution checked' };
+const imageQualityConfirmation = { confirmed: true, reference: 'Cutout edges and car parts checked' };
 
 function call(server, { method, url, token, body, headers = {} }) {
   return new Promise((resolve) => {
@@ -126,7 +154,7 @@ describe('readiness and the registry fingerprint', () => {
       registry: expect.objectContaining({ sha256: REGISTRY_SHA, check: 'ok' }),
       contract: 2,
       supportedContracts: [2],
-      capabilities: { artwork: true, generation: false, publication: true },
+      capabilities: { artwork: true, wikimedia: false, backgroundRemoval: false, generation: false, publication: true },
     });
   });
 
@@ -256,7 +284,8 @@ describe('identity key', () => {
 
 describe('unverified identities', () => {
   async function sparkWithCandidate() {
-    const { pipeline, dataDir } = await setup();
+    const bytes = await sharp({ create: { width: 800, height: 600, channels: 3, background: '#777' } }).jpeg().toBuffer();
+    const { pipeline, dataDir } = await setup({ artworkProvider: null, photoProvider: commonsFixture(bytes) });
     const spark = unverified('spark', 2019);
     const accepted = await requestCall(pipeline.server(), spark, { manufacturer: 'Chevrolet', model: 'Spark' });
     await pipeline.runQueuedJobs();
@@ -285,7 +314,7 @@ describe('unverified identities', () => {
 
   it('does not return an unconfirmed published image (legacy or shared data) as approved', async () => {
     const { pipeline, dataDir, spark, candidate } = await sparkWithCandidate();
-    await pipeline.decideCandidate(candidate.id, 'approve', true, { actor: admin, identityConfirmation: confirmation });
+    await pipeline.decideCandidate(candidate.id, 'approve', true, { actor: admin, identityConfirmation: confirmation, rightsConfirmation, imageQualityConfirmation });
     // Simulate a published record without a confirmation, as only older or
     // hand-edited data could hold, and restart from disk.
     const { readFile, writeFile } = await import('node:fs/promises');
@@ -302,7 +331,7 @@ describe('unverified identities', () => {
 
   it('answers approved with identityConfirmed true once a person confirmed the identity', async () => {
     const { pipeline, spark, candidate } = await sparkWithCandidate();
-    await pipeline.decideCandidate(candidate.id, 'approve', true, { actor: admin, identityConfirmation: confirmation });
+    await pipeline.decideCandidate(candidate.id, 'approve', true, { actor: admin, identityConfirmation: confirmation, rightsConfirmation, imageQualityConfirmation });
     const status = await resolveCall(pipeline.server(), spark);
     expectBackendAccepts(status.body, spark);
     expect(status.body).toMatchObject({
@@ -339,7 +368,8 @@ describe('persisted data and review', () => {
   });
 
   it('keeps approval and publication working through the admin routes', async () => {
-    const { pipeline } = await setup();
+    const bytes = await sharp({ create: { width: 800, height: 600, channels: 3, background: '#777' } }).jpeg().toBuffer();
+    const { pipeline } = await setup({ artworkProvider: null, photoProvider: commonsFixture(bytes) });
     const server = pipeline.server();
     const spark = unverified('spark', 2019);
     await requestCall(server, spark, { manufacturer: 'Chevrolet', model: 'Spark' });
@@ -348,9 +378,45 @@ describe('persisted data and review', () => {
     const url = `/admin/candidates/${candidate.id}/approve`;
     expect((await call(server, { method: 'POST', url, token: requestToken, body: { identityConfirmation: confirmation } })).status).toBe(403);
     expect((await call(server, { method: 'POST', url, token: adminToken, body: {} })).status).toBe(409);
-    const approved = await call(server, { method: 'POST', url, token: adminToken, body: { identityConfirmation: confirmation, actor: admin } });
+    const approved = await call(server, { method: 'POST', url, token: adminToken, body: {
+      identityConfirmation: confirmation, rightsConfirmation, imageQualityConfirmation, actor: admin,
+    } });
     expect(approved.status, JSON.stringify(approved.body)).toBe(200);
     const status = await resolveCall(server, spark);
-    expect(status.body).toMatchObject({ status: 'approved', asset: { identityConfirmed: true } });
+    expect(status.body).toMatchObject({ status: 'approved', asset: {
+      identityConfirmed: true, license: 'CC-BY-4.0', attribution: 'Test photographer / Commons',
+    } });
+  });
+});
+
+describe('generation-first acquisition order', () => {
+  const sparkVehicle = { manufacturer: 'Chevrolet', model: 'Spark' };
+
+  async function sparkJob(options) {
+    const { pipeline } = await setup({ allowUnverifiedGeneration: true, generationEnabled: true, ...options });
+    await requestCall(pipeline.server(), unverified('spark', 2019), sparkVehicle);
+    await pipeline.runQueuedJobs();
+    return pipeline.reviewQueue(true).find((item) => item.identity.modelId === 'spark');
+  }
+
+  it('by default keeps repository artwork ahead of paid generation', async () => {
+    const generate = vi.fn(async () => ({ bytes: await transparentFixture(), contentType: 'image/png' }));
+    const queue = await sparkJob({ provider: { generate } });
+    expect(generate).not.toHaveBeenCalled();
+    expect(queue.candidates.map((candidate) => candidate.source)).toEqual(['repository-artwork']);
+  });
+
+  it('with generationFirst generates before repository artwork and proposes only the generated image', async () => {
+    const generate = vi.fn(async () => ({ bytes: await transparentFixture(), contentType: 'image/png' }));
+    const queue = await sparkJob({ provider: { generate }, generationFirst: true });
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(queue.candidates.map((candidate) => candidate.source)).toEqual(['generated']);
+  });
+
+  it('with generationFirst falls back to repository artwork when every generation attempt fails', async () => {
+    const generate = vi.fn(async () => { throw new Error('upstream down'); });
+    const queue = await sparkJob({ provider: { generate }, generationFirst: true, maxAttempts: 2 });
+    expect(generate).toHaveBeenCalledTimes(2);
+    expect(queue.candidates.map((candidate) => candidate.source)).toEqual(['repository-artwork']);
   });
 });

@@ -20,16 +20,18 @@ export async function loadVehicleImageEnv() {
   for (const line of contents.split(/\r?\n/)) {
     const match = line.match(/^\s*(?:export\s+)?([A-Z][A-Z0-9_]*)\s*=\s*(.*?)\s*$/);
     if (!match || !['OPENAI_API_KEY', 'VEHICLE_IMAGE_MODEL', 'VEHICLE_IMAGE_PROVIDER',
-      'VEHICLE_IMAGE_GENERATION_ENABLED',
+      'VEHICLE_IMAGE_GENERATION_ENABLED', 'VEHICLE_IMAGE_GENERATION_FIRST', 'VEHICLE_IMAGE_STYLE_REFERENCE', 'VEHICLE_IMAGE_WIKIMEDIA_REFERENCES',
       'VEHICLE_IMAGE_PUBLICATION_ENABLED',
       'VEHICLE_IMAGE_MAX_PROVIDER_CALLS_PER_DAY',
       'VEHICLE_IMAGE_ADMIN_TOKEN', 'VEHICLE_IMAGE_REQUEST_TOKEN', 'VEHICLE_IMAGE_DATA_DIR', 'PORT', 'CLOUDINARY_CLOUD_NAME',
       'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET',
       'VEHICLE_IMAGE_REPOSITORY_ARTWORK_ENABLED', 'VEHICLE_IMAGE_ARTWORK_ROOT',
+      'VEHICLE_IMAGE_WIKIMEDIA_ENABLED', 'VEHICLE_IMAGE_WIKIMEDIA_USER_AGENT',
+      'VEHICLE_IMAGE_PUBLICATION_CANDIDATE_ALLOWLIST',
       'VEHICLE_IMAGE_ALLOW_UNVERIFIED_GENERATION', 'VEHICLE_IMAGE_STORE',
       'VEHICLE_IMAGE_ENVIRONMENT', 'VEHICLE_IMAGE_CLOUDINARY_PUBLIC_ID_PREFIX',
       'VEHICLE_IMAGE_LOCAL_STORE_DIR', 'VEHICLE_IMAGE_PUBLIC_BASE_URL',
-      'VEHICLE_IMAGE_REGISTRY_SHA256'].includes(match[1])) continue;
+      'VEHICLE_IMAGE_REGISTRY_SHA256', 'VEHICLE_IMAGE_SEGMENTER_SOCKET'].includes(match[1])) continue;
     const [, key, raw] = match;
     if (process.env[key]) continue;
     let value = raw;
@@ -57,8 +59,21 @@ export function isRepositoryArtworkEnabled(value) {
   return value !== 'false';
 }
 
+/** Wikimedia stays opt-in until deployed with explicit owner review policy. */
+export function isWikimediaEnabled(value) { return value === 'true'; }
+
 /** Paid generation for unverified identities: only the exact opt-in 'true'. */
 export function isUnverifiedGenerationAllowed(value) {
+  return value === 'true';
+}
+
+/** Commons photos as generation references only (never candidates): only an explicit `true`. */
+export function isWikimediaReferencesEnabled(value) {
+  return value === 'true';
+}
+
+/** Generation before repository artwork and Commons photos: only an explicit `true`. */
+export function isGenerationFirst(value) {
   return value === 'true';
 }
 
@@ -111,4 +126,20 @@ export function vehicleImageMaxProviderCallsPerDay(value) {
   if (!Number.isInteger(parsed) || parsed < 1 || parsed > 10_000)
     throw new Error('VEHICLE_IMAGE_MAX_PROVIDER_CALLS_PER_DAY must be an integer from 1 to 10000');
   return parsed;
+}
+
+const STYLE_REFERENCE_TYPES = { '.png': 'image/png', '.webp': 'image/webp' };
+
+/**
+ * VEHICLE_IMAGE_STYLE_REFERENCE: an approved transparent PNG/WebP whose angle,
+ * framing and light every generation copies (relative paths resolve against the
+ * checkout). Unset → null, and generation runs without one. A set value that is
+ * not a readable PNG/WebP fails at startup instead of silently changing the look.
+ */
+export async function loadStyleReference(value, rootDir) {
+  if (value === undefined || value === '') return null;
+  const file = path.resolve(rootDir, value);
+  const contentType = STYLE_REFERENCE_TYPES[path.extname(file).toLowerCase()];
+  if (!contentType) throw new Error('VEHICLE_IMAGE_STYLE_REFERENCE must be a .png or .webp file');
+  return { bytes: await readFile(file), contentType };
 }

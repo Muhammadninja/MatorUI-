@@ -48,8 +48,10 @@ type ServerVehicle = {
   user_id?: string;
   is_primary: boolean;
   nickname?: string | null;
-  make: { id: string; name: string; logo_url?: string | null };
-  model: { id: string; name: string };
+  // `id` is null for a manual vehicle (`is_custom`): the owner's typed names.
+  make: { id: string | null; name: string; logo_url?: string | null } | null;
+  model: { id: string | null; name: string } | null;
+  is_custom?: boolean;
   year: number;
   trim?: { id: string; name: string } | null;
   engine?: {
@@ -90,6 +92,9 @@ type ServerVehicleCreatePayload = {
   // UZ-market VINs (resolved client-side) and picker-based adds.
   make_id?: string;
   model_id?: string;
+  /** Manual vehicle: typed names when the catalog lacks the make/model. */
+  custom_make_name?: string;
+  custom_model_name?: string;
   year: number;
   trim_id?: string;
   engine_id?: string;
@@ -148,6 +153,7 @@ export function toClientVehicle(raw: ServerVehicle): Vehicle {
     registrationRegionCode: raw.registration_region_code ?? undefined,
     model3d: raw.model_3d ? mapModel3d(raw.model_3d) : undefined,
     image: parseVehicleImage(raw.vehicle_image),
+    isCustom: raw.is_custom === true || undefined,
     generation: parseVehicleGeneration(raw.generation),
     identityStatus: parseIdentityStatus(raw.identity),
   };
@@ -200,6 +206,8 @@ export function toServerVehicleCreatePayload(
     // as "decode from VIN" rather than rejecting an empty id as mismatched.
     make_id: input.brandId || undefined,
     model_id: input.modelId || undefined,
+    custom_make_name: input.customMakeName || undefined,
+    custom_model_name: input.customModelName || undefined,
     year: input.year,
     trim_id: input.trimId,
     engine_id: input.engineId,
@@ -239,6 +247,8 @@ export function toServerVehiclePatchPayload(
   if (patch.nickname !== undefined) out.nickname = patch.nickname;
   if (patch.fuelType !== undefined) out.fuel_type = patch.fuelType;
   if (patch.variantModelId !== undefined) out.variant_model_id = patch.variantModelId;
+  if (patch.customMakeName !== undefined) out.custom_make_name = patch.customMakeName;
+  if (patch.customModelName !== undefined) out.custom_model_name = patch.customModelName;
   return out;
 }
 

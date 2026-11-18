@@ -40,6 +40,15 @@ if (Platform.OS === 'android') {
 // future stray emission from RNScreens.
 LogBox.ignoreLogs([/UIViewControllerBasedStatusBarAppearance/]);
 
+// expo-notifications reads its persisted push registration from the keychain on
+// import (DevicePushTokenAutoRegistration.fx). The iOS simulator denies that
+// keychain access (ERR_NOTIFICATIONS_KEYCHAIN_ACCESS), so every dev launch on a
+// simulator raised a red LogBox. Devices are unaffected and nothing depends on
+// the result; only this exact library message is silenced.
+if (Platform.OS === 'ios') {
+  LogBox.ignoreLogs([/\[expo-notifications\] Error reading persisted server registration info/]);
+}
+
 import { QueryClientProvider } from '@tanstack/react-query';
 
 import { queryClient } from '@/services/query-client';
@@ -310,6 +319,16 @@ function RootNavigation() {
           />
           <Stack.Screen
             name="return-policy"
+            options={{
+              headerShown: false,
+              animation: 'slide_from_right',
+              gestureEnabled: true,
+              gestureDirection: 'horizontal',
+            }}
+          />
+          {/* The policy text, pushed from return-policy; Back returns there. */}
+          <Stack.Screen
+            name="refund-policy"
             options={{
               headerShown: false,
               animation: 'slide_from_right',

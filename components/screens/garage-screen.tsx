@@ -26,6 +26,8 @@ import { useUserContext } from '@/contexts/user.context';
 import { useToast } from '@/hooks/use-toast';
 import useGarage from '@/hooks/use-garage';
 import type { Vehicle } from '@/services/garage-service';
+import { unsupportedYearRange } from '@/services/vehicle-model-years';
+import { manualVehicleRejection, vehiclePartsParams } from '@/services/manual-vehicle';
 import { formatMileage } from '@/utils/mileage';
 import { DEFAULT_VEHICLE_COLOR_HEX, colorHexToEnum } from '@/utils/vehicle-color';
 
@@ -143,8 +145,15 @@ export default function GarageScreen() {
         make: picked.makeName,
         model: picked.modelName,
         year,
-        brandId: picked.makeId,
-        modelId: picked.modelId,
+        brandId: picked.makeId ?? undefined,
+        modelId: picked.modelId ?? undefined,
+        // Entered by hand: the typed names, never a made-up catalog id.
+        ...(picked.custom
+          ? {
+              customModelName: picked.modelName,
+              ...(picked.makeId ? {} : { customMakeName: picked.makeName }),
+            }
+          : {}),
         color: colorHexToEnum(DEFAULT_VEHICLE_COLOR_HEX),
         colorHex: DEFAULT_VEHICLE_COLOR_HEX,
         // First car in an empty garage is the one being shopped for.
@@ -152,8 +161,25 @@ export default function GarageScreen() {
       });
       setPickingVehicle(false);
       toast.success(t('garage.quickAddSuccess', { vehicle: label }));
-    } catch {
-      toast.danger(t('garage.quickAddFailed'));
+    } catch (error) {
+      // The backend rejects a year the model was not built in; say which years
+      // it was, instead of a generic "try again" that would fail the same way.
+      const range = unsupportedYearRange(error);
+      const manual = manualVehicleRejection(error);
+      const model = `${picked.makeName} ${picked.modelName}`.trim();
+      toast.danger(
+        manual?.kind === 'inCatalog'
+          ? t('garage.manualInCatalog', { model })
+          : manual?.kind === 'futureYear'
+            ? t('garage.manualFutureYear', { year: manual.yearTo })
+            : manual?.kind === 'invalidName'
+              ? t('garage.manualInvalidName')
+              : range === null
+                ? t('garage.quickAddFailed')
+                : range.yearFrom === null
+                  ? t('garage.yearUnsupportedTo', { model, to: range.yearTo })
+                  : t('garage.yearUnsupported', { model, from: range.yearFrom, to: range.yearTo }),
+      );
     } finally {
       setQuickAdding(false);
     }
@@ -197,12 +223,14 @@ export default function GarageScreen() {
     }
     router.navigate({
       pathname: '/vehicle-parts',
-      params: {
+      params: vehiclePartsParams({
         make: primaryVehicle.make,
         model: primaryVehicle.model,
-        year: String(primaryVehicle.year),
+        year: primaryVehicle.year,
         label: `${primaryVehicle.make} ${primaryVehicle.model}`,
-      },
+        isCustom: primaryVehicle.isCustom,
+        brandId: primaryVehicle.brandId,
+      }),
     });
   };
 

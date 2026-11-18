@@ -20,7 +20,6 @@ const { host, openURL, push, state } = vi.hoisted(() => ({
     order: null as null | Record<string, unknown>,
     support: {
       loading: false,
-      hasAny: true,
       contacts: {
         phone: '+998502030318' as string | null,
         email: 'matorinnovations@gmail.com' as string | null,
@@ -46,6 +45,8 @@ vi.mock('lucide-react-native', () => ({
   CircleCheck: () => null,
   Clock: () => null,
   ShieldAlert: () => null,
+  ChevronRight: () => null,
+  FileText: () => null,
 }));
 vi.mock('@/components/shared/app-view', () => ({
   AppView: host('view'),
@@ -134,7 +135,6 @@ describe('return flow', () => {
     state.order = order();
     state.support = {
       loading: false,
-      hasAny: true,
       contacts: { phone: '+998502030318', email: 'matorinnovations@gmail.com', telegramUsername: 'Mator_AutoParts' },
     };
   });
@@ -166,8 +166,17 @@ describe('return flow', () => {
       expect(byTestId('return-policy-received')).toHaveLength(1);
       expect(text).toContain('10 дней — для подходящих товаров надлежащего качества');
       expect(text).toContain('Дефектные товары — согласно гарантийным и законодательным срокам');
-      // The policy itself comes from the backend document.
-      expect(renderer.root.findAll((n) => (n.type as unknown) === 'policy')).toHaveLength(1);
+      // The policy text is not inlined: the screen links to it.
+      expect(renderer.root.findAll((n) => (n.type as unknown) === 'policy')).toHaveLength(0);
+    });
+
+    test('the policy opens on its own screen, so Back returns to the return screen', async () => {
+      await mount(<ReturnPolicyScreen orderId={ORDER_ID} />);
+      const link = byTestId('return-policy-document-link');
+      expect(link).toHaveLength(1);
+      expect(allText()).toContain('Политика возврата и возмещения');
+      await act(async () => link[0].props.onPress());
+      expect(push).toHaveBeenCalledWith('/refund-policy');
     });
 
     test('says plainly that no request is created in the app', async () => {
@@ -186,16 +195,21 @@ describe('return flow', () => {
       expect(text).toContain('part_1');
     });
 
-    test('e-mail carries the same context; a call shows the number to read out', async () => {
+    test('e-mail carries the same context', async () => {
       await mount(<ReturnPolicyScreen orderId={ORDER_ID} />);
       await act(async () => byTestId('return-policy-email')[0].props.onPress());
       const mail = openURL.mock.calls[0][0] as string;
       expect(mail.startsWith('mailto:matorinnovations@gmail.com?subject=')).toBe(true);
       expect(decodeURIComponent(mail)).toContain(ORDER_ID);
+    });
 
-      await act(async () => byTestId('return-policy-call')[0].props.onPress());
-      expect(openURL).toHaveBeenLastCalledWith('tel:+998502030318');
-      expect(allText()).toContain('При звонке назовите номер заказа');
+    test('never offers a call, even when the backend serves a phone', async () => {
+      await mount(<ReturnPolicyScreen orderId={ORDER_ID} />);
+      expect(byTestId('return-policy-telegram')).toHaveLength(1);
+      expect(byTestId('return-policy-email')).toHaveLength(1);
+      expect(byTestId('return-policy-call')).toHaveLength(0);
+      expect(allText()).not.toContain('+998502030318');
+      expect(allText()).not.toContain('Позвонить');
     });
 
     test('with several products, the chosen one goes into the message', async () => {
@@ -216,7 +230,6 @@ describe('return flow', () => {
     test('only configured channels are offered', async () => {
       state.support = {
         loading: false,
-        hasAny: true,
         contacts: { phone: null, email: null, telegramUsername: 'Mator_AutoParts' },
       };
       await mount(<ReturnPolicyScreen orderId={ORDER_ID} />);
@@ -228,11 +241,20 @@ describe('return flow', () => {
     test('with no channel configured it says support is unavailable', async () => {
       state.support = {
         loading: false,
-        hasAny: false,
         contacts: { phone: null, email: null, telegramUsername: null },
       };
       await mount(<ReturnPolicyScreen orderId={ORDER_ID} />);
       expect(byTestId('return-policy-support-unavailable')).toHaveLength(1);
+    });
+
+    test('a phone alone is not a channel: support reads as unavailable', async () => {
+      state.support = {
+        loading: false,
+        contacts: { phone: '+998502030318', email: null, telegramUsername: null },
+      };
+      await mount(<ReturnPolicyScreen orderId={ORDER_ID} />);
+      expect(byTestId('return-policy-support-unavailable')).toHaveLength(1);
+      expect(byTestId('return-policy-call')).toHaveLength(0);
     });
 
     test('without an order (checkout, Settings) it shows the policy and support only', async () => {

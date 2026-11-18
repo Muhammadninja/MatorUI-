@@ -1,5 +1,6 @@
 import { Image } from 'expo-image';
 import { memo } from 'react';
+import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { useTranslation } from 'react-i18next';
 
 import BrandLogo from '@/components/screens-components/catalog/brand-logo';
@@ -39,6 +40,28 @@ const BRAND_LOGO_FRAMES: Record<string, { width: number; height: number }> = {
   vw: { width: 44, height: 44 },
 };
 
+const DARK_MONOCHROME_BRANDS = new Set([
+  'chery',
+  'genesis',
+  'haval',
+  'kia',
+  'lada',
+  'nissan',
+  'ssangyong',
+  'toyota',
+]);
+
+const DARK_LOGO_SIZES: Record<string, number> = {
+  daewoo: 59,
+  haval: 58,
+  hyundai: 56,
+  ssangyong: 59,
+};
+
+const DARK_TILE_TOP = '#17383B';
+const DARK_TILE_BOTTOM = '#09191D';
+const DARK_TILE_GLOW = '#7D9698';
+
 export type VehicleMakeTileProps = {
   /** Brand id used for navigation. */
   brandId: string;
@@ -67,6 +90,16 @@ const VehicleMakeTile = ({
   const { t } = useTranslation();
   const { tokens, scheme } = useThemeContext();
   const brandKey = brandId.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const brandNameKey = label
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/gi, '')
+    .toLowerCase();
+  const tintDarkLogo =
+    scheme === 'dark' &&
+    (DARK_MONOCHROME_BRANDS.has(brandNameKey) ||
+      DARK_MONOCHROME_BRANDS.has(brandKey.replace(/^make/, '')));
+  const logoSize = scheme === 'dark' ? (DARK_LOGO_SIZES[brandNameKey] ?? 50) : 50;
   const bundledLogo = BUNDLED_BRAND_LOGOS[brandKey as keyof typeof BUNDLED_BRAND_LOGOS];
   const logoSource = bundledLogo?.[scheme === 'dark' ? 'dark' : 'light'];
   const logoFrame = BRAND_LOGO_FRAMES[brandKey] ?? { width: 50, height: 50 };
@@ -83,34 +116,81 @@ const VehicleMakeTile = ({
       gap={8}
       style={{ width: 84 }}
     >
-      {/* Preserve the white chips in light mode; dark mode uses a raised card
-       *  surface with a quiet outline. Availability dims the mark only. */}
+      {/* Keep the approved white chips in light mode. Dark tiles use a quiet
+       *  teal gradient and outline; availability dims the mark only. */}
       <AppView
         center
         rounded={20}
         style={{
           width: 65,
           height: 65,
-          backgroundColor: scheme === 'dark' ? tokens.card : tokens.white,
+          backgroundColor: scheme === 'dark' ? DARK_TILE_BOTTOM : tokens.white,
           borderWidth: scheme === 'dark' ? 1 : 0,
-          borderColor: tokens.divider,
+          borderColor: scheme === 'dark' ? 'rgba(39, 102, 106, 0.38)' : tokens.divider,
+          overflow: 'hidden',
         }}
       >
-        <AppView style={{ opacity: comingSoon ? 0.55 : 1 }}>
+        {scheme === 'dark' ? (
+          <Svg
+            width={65}
+            height={65}
+            pointerEvents="none"
+            style={{ position: 'absolute', top: 0, left: 0 }}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            <Defs>
+              <LinearGradient id={`brand-tile-gradient-${brandKey}`} x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor={DARK_TILE_TOP} />
+                <Stop offset="1" stopColor={DARK_TILE_BOTTOM} />
+              </LinearGradient>
+              <RadialGradient
+                id={`brand-tile-glow-${brandKey}`}
+                cx="50%"
+                cy="46%"
+                rx="58%"
+                ry="54%"
+              >
+                <Stop offset="0" stopColor={DARK_TILE_GLOW} stopOpacity={0.16} />
+                <Stop offset="1" stopColor={DARK_TILE_GLOW} stopOpacity={0} />
+              </RadialGradient>
+            </Defs>
+            <Rect width={65} height={65} rx={20} fill={`url(#brand-tile-gradient-${brandKey})`} />
+            <Rect width={65} height={65} rx={20} fill={`url(#brand-tile-glow-${brandKey})`} />
+          </Svg>
+        ) : null}
+        <AppView style={{ opacity: scheme === 'dark' ? 1 : comingSoon ? 0.55 : 1 }}>
           {logoSource ? (
             <Image
               source={logoSource}
-              style={logoFrame}
+              style={[
+                {
+                  width: brandNameKey === 'haval' ? 58 : logoFrame.width,
+                  height: brandNameKey === 'haval' ? 58 : logoFrame.height,
+                },
+                tintDarkLogo ? { tintColor: '#E5EFF0' } : undefined,
+              ]}
               contentFit="contain"
               accessibilityLabel={t('make.brandLogo', { name: label })}
             />
           ) : (
-            <BrandLogo logoUrl={logoUrl} name={label} size={50} color={brandColor(brandId)} />
+            <BrandLogo
+              logoUrl={logoUrl}
+              name={label}
+              size={logoSize}
+              color={brandColor(brandId)}
+              tintColor={tintDarkLogo ? '#E5EFF0' : undefined}
+            />
           )}
         </AppView>
       </AppView>
       <AppView align="center" gap={2} style={{ alignSelf: 'stretch' }}>
-        <AppText textVariant="bodyXs" weight="medium" align="center" style={{ lineHeight: 16 }}>
+        <AppText
+          textVariant="bodyXs"
+          weight="medium"
+          align="center"
+          style={{ fontSize: 13, lineHeight: 18 }}
+        >
           {label}
         </AppText>
         {comingSoon ? (

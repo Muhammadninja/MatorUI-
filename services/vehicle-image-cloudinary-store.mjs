@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { processFramedArtwork } from './vehicle-image-processing.mjs';
+import { processFramedArtwork, processSegmentedPhoto } from './vehicle-image-processing.mjs';
 import { vehicleImageCloudinaryPublicIdPrefix } from './vehicle-image-env.mjs';
 
 export function vehicleImageCloudinaryPublicId(prefix, identityKey, version, candidateId) {
@@ -26,14 +26,22 @@ export function createCloudinaryAssetStore({
     throw new Error('Cloudinary credentials are required');
 
   return {
-    async publish({ bytes, contentType, identityKey, version, candidateId }) {
+    async publish({ bytes, contentType, identityKey, version, candidateId, kind, rights }) {
       if (!Number.isInteger(version) || version < 1 || typeof candidateId !== 'string' || !candidateId)
         throw new Error('published image version and candidate identity are required');
       if (!Buffer.isBuffer(bytes)) throw new Error('approved cloud asset must be an image buffer');
-      const normalized = await processFramedArtwork(bytes);
+      // Candidate bytes are already the processed cutout. Reframing is safe and
+      // verifies alpha; resizing a licensed street photo here would undo it.
+      const normalized = kind === 'licensed-photo' ? await processSegmentedPhoto(bytes) : await processFramedArtwork(bytes);
       const publicId = vehicleImageCloudinaryPublicId(prefix, identityKey, version, candidateId);
       const timestamp = Math.floor(Date.now() / 1000).toString();
-      const signed = { overwrite, public_id: publicId, timestamp };
+      const context = kind === 'licensed-photo' && rights ? {
+        attribution: rights.attribution, author: rights.author, license: rights.license,
+        license_url: rights.licenseUrl, source_page: rights.sourcePage, source_url: rights.sourceUrl,
+        source_title: rights.sourceTitle, modifications: rights.modifications,
+      } : null;
+      const contextValue = context ? Object.entries(context).map(([key, value]) => `${key}=${String(value).replace(/[|=]/g, ' ')}`).join('|') : null;
+      const signed = { overwrite, public_id: publicId, timestamp, ...(contextValue ? { context: contextValue } : {}) };
       const signaturePayload = Object.keys(signed)
         .sort()
         .map((key) => `${key}=${signed[key]}`)
@@ -45,6 +53,7 @@ export function createCloudinaryAssetStore({
       body.append('timestamp', timestamp);
       body.append('public_id', publicId);
       body.append('overwrite', overwrite);
+      if (contextValue) body.append('context', contextValue);
       body.append('signature', signature);
       let response;
       try {
@@ -80,6 +89,7 @@ export function createCloudinaryAssetStore({
         url: result.secure_url,
         key: publicId,
         sha256: createHash('sha256').update(normalized.bytes).digest('hex'),
+        format: 'webp',
         ...(thumbnailUrl ? { thumbnailUrl } : {}),
       };
     },

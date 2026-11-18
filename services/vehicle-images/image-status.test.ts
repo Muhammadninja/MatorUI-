@@ -22,6 +22,19 @@ describe('parseVehicleImage (backend vehicle_image)', () => {
     });
   });
 
+  test('keeps license credit and source links on an approved Commons image', () => {
+    expect(parseVehicleImage({ status: 'approved', url: URL_V2, version: 2,
+      attribution: 'Photographer / Commons', author: 'Photographer', license: 'CC-BY-4.0',
+      license_url: 'https://creativecommons.org/licenses/by/4.0/',
+      source_page: 'https://commons.wikimedia.org/wiki/File:Car.jpg',
+      source_title: 'File:Car.jpg', modifications: 'Resized and converted to WebP' })).toMatchObject({
+      attribution: 'Photographer / Commons', author: 'Photographer', license: 'CC-BY-4.0',
+      licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
+      sourcePage: 'https://commons.wikimedia.org/wiki/File:Car.jpg',
+      sourceTitle: 'File:Car.jpg', modifications: 'Resized and converted to WebP',
+    });
+  });
+
   test('pending and unavailable never carry a url', () => {
     expect(parseVehicleImage({ status: 'pending', url: URL_V2, version: 1, reason: null })).toEqual({
       status: 'pending',

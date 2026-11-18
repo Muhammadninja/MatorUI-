@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
-import { ArrowLeftRight } from 'lucide-react-native';
+import { ArrowLeftRight, ImagePlus } from 'lucide-react-native';
 import { memo } from 'react';
+import { Linking } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import GarageAddHero, {
@@ -23,12 +24,13 @@ import type { Vehicle } from '@/services/garage-service';
 import { nearestSwatch } from '@/utils/vehicle-color';
 import { resolveVehicleImage } from '@/services/vehicle-images/resolver';
 import { chooseVehicleVisual } from '@/services/vehicle-images/vehicle-visual';
-import type { VehicleImageState } from '@/services/vehicle-images/image-status';
+import { placeholderMessageKey, type VehicleImageState } from '@/services/vehicle-images/image-status';
 import { useVehicleImage } from '@/hooks/use-vehicle-image';
 import { useGarageForegroundRefresh } from '@/hooks/use-garage-foreground-refresh';
 import { pictureModelId } from '@/services/vehicle-images/generation';
 import VehicleGenerationChoice from '@/components/screens-components/garage/vehicle-generation-choice';
 import { triggerHaptic } from '@/utils/haptics';
+import { vehiclePartsParams } from '@/services/manual-vehicle';
 
 /** Reserved while the persisted vehicle hydrates, so nothing below the card
  *  jumps when it resolves. Matches a one-line name + year + button. */
@@ -83,8 +85,8 @@ function summarize(
 /**
  * The selected vehicle's picture: the backend's approved, published image when it
  * has one; else an approved bundled image of exactly this model and generation;
- * else the universal placeholder, saying "preparing" or "no image yet" from the
- * backend's `vehicle_image` status. Never the empty state's decorative car, and
+ * else the universal placeholder, with "preparing" or "no image yet" from the
+ * backend's `vehicle_image` status as text in the copy column. Never the empty state's decorative car, and
  * never a stand-in model. Reads the garage row when loaded, else the persisted
  * fitment ids. A generic model is pictured as the generation the backend resolved
  * it to; until then it stays the placeholder.
@@ -144,12 +146,14 @@ function HomeGarageCard() {
     triggerHaptic('selection');
     router.navigate({
       pathname: '/vehicle-parts',
-      params: {
+      params: vehiclePartsParams({
         make: summary.make,
         model: summary.model,
         year: summary.year,
         label: summary.name,
-      },
+        isCustom: vehicle?.isCustom,
+        brandId: vehicle?.brandId,
+      }),
     });
   };
 
@@ -227,15 +231,50 @@ function HomeGarageCard() {
           {spec}
         </AppText>
       ) : null}
+      {visual.kind === 'placeholder' ? (
+        // In the copy column, so it never covers the car slot or the actions.
+        <AppView testID="home-garage-image-status" row align="center" gap={4}>
+          <ImagePlus size={13} strokeWidth={2} color={`${tokens.onVehicleBanner}B3`} />
+          <AppText textVariant="bodyXs" style={{ flexShrink: 1, color: `${tokens.onVehicleBanner}B3` }}>
+            {t(placeholderMessageKey(visual.status, visual.stage))}
+          </AppText>
+        </AppView>
+      ) : null}
     </GarageHeroCard>
   );
+
+  const attribution = image?.status === 'approved' && image.attribution && image.license
+    ? (
+      <AppView gap="xs" style={{ paddingHorizontal: 4 }}>
+        <AppText textVariant="bodyXs" colorName="textMuted">
+          {t('vehicleImage.credit', { attribution: image.attribution, license: image.license })}
+        </AppText>
+        {image.modifications ? <AppText textVariant="bodyXs" colorName="textMuted">{image.modifications}</AppText> : null}
+        {image.sourcePage ? (
+          <AppPressableView
+            testID="vehicle-image-attribution-source"
+            onPress={() => { void Linking.openURL(image.sourcePage!).catch(() => undefined); }}
+            accessibilityRole="link"
+            accessibilityLabel={t('vehicleImage.source')}
+            pressedOpacity={0.7}
+          >
+            <AppText textVariant="bodyXs" style={{ color: tokens.brandText, textDecorationLine: 'underline' }}>
+              {t('vehicleImage.source')}
+            </AppText>
+          </AppPressableView>
+        ) : null}
+      </AppView>
+    ) : null;
 
   // A year two generations share: the backend's options, under the card.
   return vehicle?.generation?.status === 'choice_required' ? (
     <AppView gap="sm">
       {card}
+      {attribution}
       <VehicleGenerationChoice vehicle={vehicle} />
     </AppView>
+  ) : attribution ? (
+    <AppView gap="xs">{card}{attribution}</AppView>
   ) : (
     card
   );

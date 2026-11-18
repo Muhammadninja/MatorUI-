@@ -1,12 +1,3 @@
-/**
- * Regression tests for the auth-session persistence that caused "re-login on
- * every launch". Locks in all three failure modes that were fixed:
- *   1. SecureStore keys must be legal (a ':' threw "Invalid key" → silent write
- *      failure). The test shim now enforces the real rule, and the
- *      "SecureStore alone persists" case fails if an illegal key is reintroduced.
- *   2. AsyncStorage is a reliable fallback when the keychain drops the value.
- *   3. save → load round-trips; clear wipes both stores.
- */
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -22,9 +13,7 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
     setItem: vi.fn(async (k: string, v: string) => {
       asyncMem.set(k, v);
     }),
-    removeItem: async (k: string) => {
-      asyncMem.delete(k);
-    },
+    removeItem: vi.fn(async (k: string) => { asyncMem.delete(k); }),
   },
 }));
 
@@ -63,17 +52,17 @@ describe('auth-storage persistence (re-login regression)', () => {
     expect(await loadAuthSession()).toEqual(SESSION);
   });
 
-  test('AsyncStorage is the fallback when the keychain loses the value', async () => {
+  test('keychain loss never restores credentials from a new plaintext copy', async () => {
     await saveAuthSession(SESSION);
-    __resetSecureStore(); // the real iOS-release failure mode
-    expect(await loadAuthSession()).toEqual(SESSION);
+    __resetSecureStore();
+    expect(await loadAuthSession()).toBeNull();
   });
 
   test('clear() removes the session from both stores', async () => {
     await saveAuthSession(SESSION);
     await clearAuthSession();
     expect(await loadAuthSession()).toBeNull();
-    expect(asyncMem.size).toBe(0);
+    expect(asyncMem.has('auth:v2:session')).toBe(false);
   });
 
   test('no persisted session → null', async () => {
@@ -84,18 +73,12 @@ describe('auth-storage persistence (re-login regression)', () => {
 // Unit failure injection only: synthetic sessions, no real credentials or API.
 const ROTATED: AuthSession = { accessToken: 'synthetic-new-access', refreshToken: 'synthetic-new-refresh', expiresAt: 1785276060 };
 
-test('failed encrypted update restores the newer complete fallback session', async () => {
+test('failed encrypted rotation clears stale credentials and rejects', async () => {
   await saveAuthSession(SESSION);
   vi.spyOn(SecureStore, 'setItemAsync').mockRejectedValueOnce(new Error('keychain unavailable'));
-  await saveAuthSession(ROTATED);
-  expect(await loadAuthSession()).toEqual(ROTATED);
-});
-
-test('failed fallback update restores the newer atomic encrypted session', async () => {
-  await saveAuthSession(SESSION);
-  vi.mocked(AsyncStorage.setItem).mockRejectedValueOnce(new Error('storage unavailable'));
-  await saveAuthSession(ROTATED);
-  expect(await loadAuthSession()).toEqual(ROTATED);
+  await expect(saveAuthSession(ROTATED)).rejects.toThrow('securely');
+  expect(await loadAuthSession()).toBeNull();
+  expect(asyncMem.has('auth:v2:session')).toBe(false);
 });
 
 test('legacy fallback beats split keys that may contain tokens from different rotations', async () => {
@@ -124,7 +107,7 @@ test('clear removes both atomic and legacy encrypted keys', async () => {
   for (const key of ['auth_v2_access', 'auth_v2_refresh', 'auth_v2_meta']) await SecureStore.setItemAsync(key, 'synthetic-legacy');
   await clearAuthSession();
   for (const key of ['auth_v3_session', 'auth_v2_access', 'auth_v2_refresh', 'auth_v2_meta']) expect(await SecureStore.getItemAsync(key)).toBeNull();
-  expect(asyncMem.size).toBe(0);
+  expect(asyncMem.has('auth:v2:session')).toBe(false);
   expect(await loadAuthSession()).toBeNull();
 });
 
@@ -144,7 +127,7 @@ test('clear waits for a pending save so its late encrypted write cannot resurrec
   release();
   await Promise.all([save, clear]);
   expect(await loadAuthSession()).toBeNull();
-  expect(asyncMem.size).toBe(0);
+  expect(asyncMem.has('auth:v2:session')).toBe(false);
 });
 
 test('overlapping saves keep the final complete pair in both stores', async () => {
@@ -187,13 +170,36 @@ test('valid writtenAt recovers an envelope with invalid revision metadata', asyn
   expect(await loadAuthSession()).toEqual(ROTATED);
 });
 
-test('new saves emit equal revision and writtenAt fields newer than stored metadata', async () => {
-  const prior = Date.now() + 60_000;
-  await SecureStore.setItemAsync('auth_v3_session', JSON.stringify({ v: 1, ...SESSION, writtenAt: prior }));
+test('new saves never persist bearer credentials outside SecureStore', async () => {
   await saveAuthSession(ROTATED);
-  const raw = await SecureStore.getItemAsync('auth_v3_session');
-  const metadata = JSON.parse(raw!) as { revision: number; writtenAt: number };
-  expect(metadata.revision).toBeGreaterThan(prior);
-  expect(metadata.writtenAt).toBe(metadata.revision);
-  expect(asyncMem.get('auth:v2:session')).toBe(raw);
+  expect(await loadAuthSession()).toEqual(ROTATED);
+  expect([...asyncMem.values()].some((v) => v.includes(ROTATED.accessToken) || v.includes(ROTATED.refreshToken))).toBe(false);
+  expect(SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY).toBeDefined();
+});
+
+test('failed migration erases plaintext and refuses restoration', async () => {
+  asyncMem.set('auth:v2:session', JSON.stringify({ v: 1, ...SESSION }));
+  vi.spyOn(SecureStore, 'setItemAsync').mockRejectedValueOnce(new Error('locked'));
+  expect(await loadAuthSession()).toBeNull();
+  expect(asyncMem.has('auth:v2:session')).toBe(false);
+});
+
+test('successful migration persists in Keychain before returning and removes plaintext', async () => {
+  asyncMem.set('auth:v2:session', JSON.stringify({ v: 1, ...SESSION }));
+  expect(await loadAuthSession()).toEqual(SESSION);
+  expect(asyncMem.has('auth:v2:session')).toBe(false);
+  expect(await loadAuthSession()).toEqual(SESSION);
+});
+
+test('logout tombstone prevents restart restoration when Keychain deletion fails', async () => {
+  await saveAuthSession(SESSION);
+  vi.spyOn(SecureStore, 'deleteItemAsync').mockRejectedValue(new Error('locked'));
+  await clearAuthSession();
+  expect(await loadAuthSession()).toBeNull();
+});
+
+test('plaintext deletion failure prevents migrated session activation', async () => {
+  asyncMem.set('auth:v2:session', JSON.stringify({ v: 1, ...SESSION }));
+  vi.mocked(AsyncStorage.removeItem).mockRejectedValueOnce(new Error('disk unavailable'));
+  expect(await loadAuthSession()).toBeNull();
 });

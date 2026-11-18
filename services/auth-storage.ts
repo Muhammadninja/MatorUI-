@@ -1,8 +1,5 @@
-/** Session persistence uses atomic envelopes in encrypted and fallback storage.
- * Revisions choose the newest complete copy if one store fails during rotation.
- * Legacy split SecureStore keys remain readable for migration only.
- * The existing AsyncStorage fallback remains plaintext in the app sandbox.
- */
+/** Credentials persist only in SecureStore. Plaintext copies from older releases
+ * are consumed once during migration and deleted before a session is restored. */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
@@ -18,9 +15,11 @@ const KEY_REFRESH = 'auth_v2_refresh';
 const KEY_META = 'auth_v2_meta';
 const KEY_SESSION = 'auth_v3_session';
 
-// AsyncStorage keys allow any string (colons are fine here) — the reliable copy.
+// Read/delete only: an older release stored credentials at this key.
 const ASYNC_KEY = 'auth:v2:session';
 
+const INVALIDATED_KEY = 'auth:v4:invalidated';
+const SECURE_OPTIONS = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY };
 const SCHEMA = 1;
 
 export type AuthSession = {
@@ -63,17 +62,6 @@ function parseEnvelope(raw: string | null): Envelope | null {
   } catch { return null; }
 }
 
-async function readCopies(): Promise<{ secure: Envelope | null; fallback: Envelope | null }> {
-  const [secureRaw, fallbackRaw] = await Promise.all([
-    SecureStore.getItemAsync(KEY_SESSION).catch(() => null),
-    AsyncStorage.getItem(ASYNC_KEY).catch(() => null),
-  ]);
-  const secure = parseEnvelope(secureRaw);
-  const fallback = parseEnvelope(fallbackRaw);
-  lastRevision = Math.max(lastRevision, secure?.revision ?? 0, fallback?.revision ?? 0);
-  return { secure, fallback };
-}
-
 function sessionFrom(envelope: Envelope): AuthSession {
   return {
     accessToken: envelope.accessToken,
@@ -82,67 +70,94 @@ function sessionFrom(envelope: Envelope): AuthSession {
   };
 }
 
+// A non-secret tombstone prevents failed Keychain deletion from resurrecting a
+// signed-out session on restart. A successful new secure save removes it last.
+async function eraseCredentials(): Promise<void> {
+  const marked = await AsyncStorage.setItem(INVALIDATED_KEY, '1').then(() => true, () => false);
+  const results = await Promise.allSettled([
+    AsyncStorage.removeItem(ASYNC_KEY),
+    ...[KEY_SESSION, KEY_ACCESS, KEY_REFRESH, KEY_META].map((key) => SecureStore.deleteItemAsync(key)),
+  ]);
+  if (results.some((r) => r.status === 'rejected') && !marked) {
+    throw new Error('Could not clear saved credentials');
+  }
+}
+
+async function writeSecure(session: AuthSession): Promise<void> {
+  lastRevision = Math.max(lastRevision + 1, Date.now());
+  const envelope = JSON.stringify({ ...session, v: SCHEMA, revision: lastRevision });
+  await SecureStore.setItemAsync(KEY_SESSION, envelope, SECURE_OPTIONS);
+  // Verify persistence before accepting an account switch or migrated session.
+  if (await SecureStore.getItemAsync(KEY_SESSION) !== envelope) {
+    throw new Error('Could not persist credentials securely');
+  }
+  await AsyncStorage.removeItem(ASYNC_KEY);
+  await Promise.all([KEY_ACCESS, KEY_REFRESH, KEY_META].map((key) => SecureStore.deleteItemAsync(key)));
+  await AsyncStorage.removeItem(INVALIDATED_KEY);
+}
+
 export function loadAuthSession(): Promise<AuthSession | null> {
   return serialized(async () => {
-    const { secure, fallback } = await readCopies();
-    // Prefer encrypted storage only when its revision is at least as recent.
-    // A legacy fallback has revision zero and wins over potentially mixed split keys.
-    const newest = secure && (!fallback || (secure.revision ?? 0) >= (fallback.revision ?? 0))
-      ? secure : fallback;
-    if (newest) return sessionFrom(newest);
     try {
+      if (await AsyncStorage.getItem(INVALIDATED_KEY)) {
+        await eraseCredentials();
+        return null;
+      }
+      // A Keychain read error must not silently substitute a plaintext token.
+      const secure = parseEnvelope(await SecureStore.getItemAsync(KEY_SESSION));
+      const legacyRaw = await AsyncStorage.getItem(ASYNC_KEY);
+      const legacy = parseEnvelope(legacyRaw);
+      const newest = secure && (!legacy || (secure.revision ?? 0) >= (legacy.revision ?? 0))
+        ? secure : legacy;
+      lastRevision = Math.max(lastRevision, newest?.revision ?? 0);
+      if (newest) {
+        if (legacyRaw !== null) {
+          // Commit and verify the encrypted copy before deleting the only usable
+          // legacy copy. Any migration error falls through to fail-closed cleanup.
+          await writeSecure(sessionFrom(newest));
+        }
+        return sessionFrom(newest);
+      }
+      await AsyncStorage.removeItem(ASYNC_KEY);
       const [accessToken, refreshToken, metaRaw] = await Promise.all([
         SecureStore.getItemAsync(KEY_ACCESS), SecureStore.getItemAsync(KEY_REFRESH), SecureStore.getItemAsync(KEY_META),
       ]);
       if (!accessToken || !refreshToken) return null;
       let expiresAt: number | undefined;
-      if (metaRaw) {
-        try {
-          const meta = JSON.parse(metaRaw) as { v?: number; expiresAt?: number };
-          if (meta.v === SCHEMA) expiresAt = meta.expiresAt;
-        } catch { /* Tokens remain usable if only legacy metadata is corrupt. */ }
-      }
-      return { accessToken, refreshToken, ...(expiresAt !== undefined ? { expiresAt } : {}) };
+      try {
+        const meta = JSON.parse(metaRaw ?? '{}') as { v?: number; expiresAt?: number };
+        if (meta.v === SCHEMA && typeof meta.expiresAt === 'number') expiresAt = meta.expiresAt;
+      } catch { /* Metadata is optional; the server validates the credential. */ }
+      const session = { accessToken, refreshToken, ...(expiresAt !== undefined ? { expiresAt } : {}) };
+      await writeSecure(session);
+      return session;
     } catch {
-      debugLog('auth', 'loadAuthSession failed');
+      cachedSession = null;
+      await eraseCredentials().catch(() => undefined);
+      debugLog('auth', 'Secure credential restoration failed');
       return null;
     }
   });
 }
 
 export function saveAuthSession(session: AuthSession): Promise<void> {
-  // Snapshot caller-owned data before waiting behind an earlier storage operation.
   const snapshot = { ...session };
   return serialized(async () => {
-    await readCopies();
-    lastRevision = Math.max(lastRevision + 1, Date.now());
-    // Keep writtenAt in new copies for compatible rollback to eea9b09.
-    const envelope = JSON.stringify({ ...snapshot, v: SCHEMA, revision: lastRevision, writtenAt: lastRevision });
-    let saved = false;
     try {
-      await AsyncStorage.setItem(ASYNC_KEY, envelope);
-      saved = true;
-    } catch { debugLog('auth', 'saveAuthSession fallback write failed'); }
-    try {
-      // One encrypted write prevents access/refresh tokens from different rotations.
-      await SecureStore.setItemAsync(KEY_SESSION, envelope);
-      saved = true;
-    } catch { debugLog('auth', 'saveAuthSession encrypted write failed'); }
-    if (saved) {
-      await Promise.all([KEY_ACCESS, KEY_REFRESH, KEY_META].map((key) =>
-        SecureStore.deleteItemAsync(key).catch(() => undefined)));
+      // Invalidate first: a crash or failed account switch cannot restore an old user.
+      await AsyncStorage.setItem(INVALIDATED_KEY, '1');
+      await writeSecure(snapshot);
+    } catch {
+      cachedSession = null;
+      await eraseCredentials().catch(() => undefined);
+      throw new Error('Could not persist credentials securely');
     }
   });
 }
 
 export function clearAuthSession(): Promise<void> {
-  return serialized(async () => {
-    await Promise.all([
-      ...[KEY_SESSION, KEY_ACCESS, KEY_REFRESH, KEY_META].map((key) =>
-        SecureStore.deleteItemAsync(key).catch(() => undefined)),
-      AsyncStorage.removeItem(ASYNC_KEY).catch(() => undefined),
-    ]);
-  });
+  cachedSession = null;
+  return serialized(eraseCredentials);
 }
 
 // ── In-memory cache ────────────────────────────────────────────────────

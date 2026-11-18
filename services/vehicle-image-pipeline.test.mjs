@@ -251,9 +251,9 @@ describe('vehicle image pipeline', () => {
     const dataDir = await mkdtemp(path.join(os.tmpdir(), 'vehicle-image-health-'));
     dirs.push(dataDir);
     const pipeline = createVehicleImagePipeline({ dataDir, adminToken: token });
-    expect(pipeline.health()).toEqual({ live: true, ready: false, registryCheck: 'not_enforced' });
+    expect(pipeline.health()).toEqual({ live: true, ready: false, registryCheck: 'not_enforced', backgroundRemoval: false });
     await pipeline.initialize();
-    expect(pipeline.health()).toEqual({ live: true, ready: true, registryCheck: 'not_enforced' });
+    expect(pipeline.health()).toEqual({ live: true, ready: true, registryCheck: 'not_enforced', backgroundRemoval: false });
   });
 
   it('does not automatically repeat a provider call after an interrupted running job', async () => {
@@ -275,7 +275,7 @@ describe('vehicle image pipeline', () => {
     expect(restarted.listPending(true)[0].job.status).toBe('failed');
   });
 
-  it('publishes approved WebP through the storage adapter and resolves its stable URL', async () => {
+  it('publishes owner supplied artwork only after a person confirms its rights', async () => {
     const publish = vi.fn(async () => ({
       url: 'https://res.cloudinary.com/demo/image/upload/v123/mator/vehicle-images/hash/v1.webp',
       key: 'mator/vehicle-images/hash/v1',
@@ -286,9 +286,18 @@ describe('vehicle image pipeline', () => {
     const candidate = await pipeline.uploadCandidate(result.request.id,
       { contentType: 'image/png', bytes }, true);
     expect(publish).not.toHaveBeenCalled();
-    await pipeline.decideCandidate(candidate.id, 'approve', true);
-    expect(publish).toHaveBeenCalledOnce();
-    expect(pipeline.resolve(result.request.identityKey).url).toContain('https://res.cloudinary.com/');
+    await expect(pipeline.decideCandidate(candidate.id, 'approve', true))
+      .rejects.toMatchObject({ status: 409 });
+    await expect(pipeline.decideCandidate(candidate.id, 'approve', true, {
+      rightsConfirmation: { confirmed: true, reference: '' },
+    })).rejects.toMatchObject({ status: 409 });
+    expect(publish).not.toHaveBeenCalled();
+    expect(pipeline.resolve(result.request.identityKey)).toBeNull();
+    await pipeline.decideCandidate(candidate.id, 'approve', true, {
+      rightsConfirmation: { confirmed: true, reference: 'Owner-supplied image, rights checked' },
+    });
+    expect(publish).toHaveBeenCalledWith(expect.objectContaining({ rights: undefined }));
+    expect(pipeline.resolve(result.request.identityKey)).not.toBeNull();
   });
 
   it('uploads approved WebP with signed server credentials and validates the provider URL', async () => {
@@ -317,6 +326,30 @@ describe('vehicle image pipeline', () => {
     ));
     const signed = `overwrite=true&public_id=${request.options.body.get('public_id')}&timestamp=${request.options.body.get('timestamp')}server-secret`;
     expect(request.options.body.get('signature')).toBe(createHash('sha1').update(signed).digest('hex'));
+  });
+
+  it('preserves licensed photo transparency at Cloudinary and signs attribution into context', async () => {
+    let request;
+    const store = createCloudinaryAssetStore({
+      cloudName: 'demo', apiKey: 'server-key', apiSecret: 'server-secret',
+      fetchImpl: vi.fn(async (_url, options) => {
+        request = options;
+        return { ok: true, json: async () => ({ secure_url: 'https://res.cloudinary.com/demo/image/upload/v2/licensed.webp', public_id: options.body.get('public_id') }) };
+      }),
+    });
+    const cutout = await fixtureImage();
+    const rights = { attribution: 'Photographer / Commons', author: 'Photographer', license: 'CC-BY-4.0',
+      licenseUrl: 'https://creativecommons.org/licenses/by/4.0/', sourcePage: 'https://commons.wikimedia.org/wiki/File:Photo.jpg',
+      sourceUrl: 'https://upload.wikimedia.org/photo.jpg' };
+    await store.publish({ bytes: cutout, contentType: 'image/png', identityKey: 'chevrolet|spark|2024', version: 1,
+      candidateId: 'licensed-photo-candidate', kind: 'licensed-photo', rights });
+    const context = request.body.get('context');
+    expect(context).toContain('attribution=Photographer / Commons');
+    const signed = `context=${context}&overwrite=true&public_id=${request.body.get('public_id')}&timestamp=${request.body.get('timestamp')}server-secret`;
+    expect(request.body.get('signature')).toBe(createHash('sha1').update(signed).digest('hex'));
+    expect(request.body.get('file').type).toBe('image/webp');
+    const uploaded = Buffer.from(await request.body.get('file').arrayBuffer());
+    expect((await sharp(uploaded).metadata()).hasAlpha).toBe(true);
   });
 
   it('keeps staging vehicle uploads inside the staging-only Cloudinary prefix', async () => {
@@ -425,7 +458,7 @@ describe('vehicle image pipeline', () => {
     );
   });
 
-  it('reuses an approved asset without scheduling a generation job', async () => {
+  it('does not reuse unlicensed owner supplied artwork as an approved asset', async () => {
     const generate = vi.fn();
     const { pipeline } = await setup({ provider: { generate } });
     const vehicle = { make: 'Lexus', model: 'TX', year: 2024 };
@@ -436,12 +469,13 @@ describe('vehicle image pipeline', () => {
       { contentType: 'image/png', bytes: image },
       true,
     );
-    await pipeline.decideCandidate(candidate.id, 'approve', true);
+    await expect(pipeline.decideCandidate(candidate.id, 'approve', true))
+      .rejects.toMatchObject({ status: 409 });
     const duplicate = await pipeline.submitRequest(vehicle);
-    expect(duplicate.reused).toBe(true);
-    expect(duplicate.asset.version).toBe(1);
+    expect(duplicate.reused).toBe(false);
+    expect(duplicate.asset).toBeNull();
     expect(duplicate.job).toBeNull();
-    await expect(pipeline.regenerateRequest(request.id, true)).rejects.toMatchObject({ status: 409 });
+    expect(duplicate.activeJob.status).toBe('queued');
     expect(generate).not.toHaveBeenCalled();
   });
 
@@ -471,8 +505,9 @@ describe('vehicle image pipeline', () => {
     const preview = await pipeline.readCandidate(candidate.id, true);
     const meta = await sharp(preview.bytes).metadata();
     expect(meta).toMatchObject({ format: 'webp', width: 1200, height: 600, hasAlpha: true });
-    await pipeline.decideCandidate(candidate.id, 'approve', true);
-    expect(pipeline.resolve(result.request.identityKey).version).toBe(1);
+    await expect(pipeline.decideCandidate(candidate.id, 'approve', true))
+      .rejects.toMatchObject({ status: 409 });
+    expect(pipeline.resolve(result.request.identityKey)).toBeNull();
   });
 
   it('coalesces concurrent equivalent requests into one generation job', async () => {
@@ -669,12 +704,13 @@ describe('vehicle image pipeline', () => {
     const replacement = pipeline
       .listPending(true)[0]
       .candidates.find((item) => item.status === 'pending');
-    await pipeline.decideCandidate(replacement.id, 'approve', true);
-    expect(pipeline.resolve(request.identityKey).version).toBe(1);
+    await expect(pipeline.decideCandidate(replacement.id, 'approve', true))
+      .rejects.toMatchObject({ status: 409 });
+    expect(pipeline.resolve(request.identityKey)).toBeNull();
     expect(generate).toHaveBeenCalledTimes(2);
   });
 
-  it('supports rollback and leaves an unrelated vehicle pending', async () => {
+  it('keeps unlicensed candidates private and unrelated requests pending', async () => {
     const { pipeline } = await setup();
     const genesis = await pipeline.submitRequest({ make: 'Genesis', model: 'GV80', year: 2025 });
     const lexus = await pipeline.submitRequest({ make: 'Lexus', model: 'TX', year: 2024 });
@@ -684,15 +720,16 @@ describe('vehicle image pipeline', () => {
       { contentType: 'image/png', bytes: firstImage },
       true,
     );
-    await pipeline.decideCandidate(first.id, 'approve', true);
+    await expect(pipeline.decideCandidate(first.id, 'approve', true))
+      .rejects.toMatchObject({ status: 409 });
     const second = await pipeline.uploadCandidate(
       genesis.request.id,
       { contentType: 'image/png', bytes: firstImage },
       true,
     );
-    await pipeline.decideCandidate(second.id, 'approve', true);
-    await pipeline.rollback(genesis.request.identityKey, 1, true);
-    expect(pipeline.resolve(genesis.request.identityKey).version).toBe(1);
+    await expect(pipeline.decideCandidate(second.id, 'approve', true))
+      .rejects.toMatchObject({ status: 409 });
+    expect(pipeline.resolve(genesis.request.identityKey)).toBeNull();
     expect(pipeline.listPending(true).some((item) => item.id === lexus.request.id)).toBe(true);
   });
 
@@ -708,6 +745,12 @@ describe('vehicle image pipeline', () => {
     });
     expect(prompt).toContain('Manufacturer: Genesis');
     expect(prompt).not.toContain('Generation:');
+    // Earlier generations drew model names on fake plates (DAMAS, CAPTIVA).
+    expect(prompt).toContain('License plates must be blank');
+    // No stated colour: white, matching the approved Cobalt / Gentra / Nexia set.
+    expect(prompt).toContain('Exterior color: solid white, non-metallic');
+    // Same direction as the approved Cobalt / Gentra / Nexia set: front to the right.
+    expect(prompt).toContain('front of the car points toward the RIGHT side of the image');
     expect(
       buildVehicleImagePrompt({
         manufacturer: 'Chevrolet',
@@ -771,5 +814,107 @@ describe('vehicle image pipeline', () => {
       }),
     );
     expect(request.referenceAssets[0]).not.toHaveProperty('bytes');
+  });
+
+  it('sends the style reference first and tells the model it is another car', async () => {
+    const calls = [];
+    const provider = new OpenAIImageProvider({
+      apiKey: 'test-key-not-a-secret',
+      fetchImpl: async (url, options) => {
+        calls.push({ url, options });
+        return new Response(JSON.stringify({ data: [{ b64_json: Buffer.from('fake').toString('base64') }] }), { status: 200 });
+      },
+    });
+    const style = { bytes: await fixtureImage(), contentType: 'image/png' };
+    const identity = { bytes: await fixtureImage(), contentType: 'image/png' };
+    await provider.generate({
+      vehicle: { manufacturer: 'Chevrolet', model: 'Damas', year: 2019 },
+      referenceImages: [identity],
+      styleReference: style,
+    });
+    expect(calls[0].url).toContain('/edits');
+    const images = calls[0].options.body.getAll('image[]');
+    expect(images).toHaveLength(2);
+    expect(Buffer.from(await images[0].arrayBuffer()).equals(style.bytes)).toBe(true);
+    const prompt = calls[0].options.body.get('prompt');
+    expect(prompt.startsWith('Image 1 is a STYLE REFERENCE showing a different car.')).toBe(true);
+    expect(prompt).toContain('Do NOT copy its make, model, body shape');
+    expect(prompt).toContain('Model: Damas');
+  });
+
+  it('without a style reference the prompt and endpoint are unchanged', async () => {
+    expect(buildVehicleImagePrompt({ manufacturer: 'Chevrolet', model: 'Damas', year: 2019 }))
+      .not.toContain('STYLE REFERENCE');
+    const calls = [];
+    const provider = new OpenAIImageProvider({
+      apiKey: 'test-key-not-a-secret',
+      fetchImpl: async (url, options) => {
+        calls.push({ url, options });
+        return new Response(JSON.stringify({ data: [{ b64_json: Buffer.from('fake').toString('base64') }] }), { status: 200 });
+      },
+    });
+    await provider.generate({ vehicle: { manufacturer: 'Chevrolet', model: 'Damas', year: 2019 } });
+    expect(calls[0].url).toContain('/generations');
+  });
+
+  it('names the vehicle photos after the style image in the prompt and sends them in that order', async () => {
+    const calls = [];
+    const provider = new OpenAIImageProvider({
+      apiKey: 'test-key-not-a-secret',
+      fetchImpl: async (url, options) => {
+        calls.push({ url, options });
+        return new Response(JSON.stringify({ data: [{ b64_json: Buffer.from('fake').toString('base64') }] }), { status: 200 });
+      },
+    });
+    const style = { bytes: await fixtureImage(), contentType: 'image/png' };
+    const photoA = { bytes: Buffer.from(await fixtureImage()), contentType: 'image/png' };
+    const photoB = { bytes: Buffer.from(await fixtureImage()), contentType: 'image/png' };
+    await provider.generate({
+      vehicle: { manufacturer: 'KGM', model: 'Torres', year: 2026 },
+      referenceImages: [photoA, photoB],
+      styleReference: style,
+    });
+    const prompt = calls[0].options.body.get('prompt');
+    expect(prompt).toContain('Images 2-3 are PHOTOS OF THIS EXACT VEHICLE');
+    expect(prompt).toContain('Ignore their colour, background, people, other cars, plates');
+    expect(calls[0].options.body.getAll('image[]')).toHaveLength(3);
+    expect(buildVehicleImagePrompt({ manufacturer: 'KGM', model: 'Torres', year: 2026 }, { vehiclePhotos: 1 }))
+      .toContain('Image 1 is a PHOTO OF THIS EXACT VEHICLE');
+  });
+
+  it('uses Commons photos only as generation references and records them on the candidate', async () => {
+    const captured = vi.fn(async () => ({ bytes: await fixtureImage(), provider: 'test' }));
+    const photo = await fixtureImage();
+    const source = { provider: 'wikimedia-commons', sourcePage: 'https://commons.wikimedia.org/wiki/File:Torres.jpg',
+      title: 'File:Torres.jpg', license: 'CC-BY-SA-4.0', author: 'Photographer' };
+    const referenceProvider = { acquire: vi.fn(async () => [{ bytes: photo, contentType: 'image/jpeg', source }]) };
+    const { pipeline } = await setup({ provider: { generate: captured }, referenceProvider });
+    await pipeline.submitRequest({ make: 'KGM', model: 'Torres', year: 2026 });
+    await pipeline.runQueuedJobs();
+    expect(captured).toHaveBeenCalledWith(expect.objectContaining({
+      referenceImages: [expect.objectContaining({ bytes: photo, contentType: 'image/jpeg' })],
+    }));
+    const candidates = pipeline.listPending(true).flatMap((item) => item.candidates ?? []);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].source).toBe('generated');
+    expect(candidates[0].identityReferences).toEqual([expect.objectContaining({ sourcePage: source.sourcePage, license: 'CC-BY-SA-4.0' })]);
+  });
+
+  it('still generates when the photo search fails', async () => {
+    const captured = vi.fn(async () => ({ bytes: await fixtureImage(), provider: 'test' }));
+    const referenceProvider = { acquire: vi.fn(async () => { throw new Error('commons down'); }) };
+    const { pipeline } = await setup({ provider: { generate: captured }, referenceProvider });
+    await pipeline.submitRequest({ make: 'KGM', model: 'Torres', year: 2026 });
+    await pipeline.runQueuedJobs();
+    expect(captured).toHaveBeenCalledWith(expect.objectContaining({ referenceImages: [] }));
+  });
+
+  it('passes the configured style reference to every generation', async () => {
+    const captured = vi.fn(async () => ({ bytes: await fixtureImage(), provider: 'test' }));
+    const styleReference = { bytes: await fixtureImage(), contentType: 'image/png' };
+    const { pipeline } = await setup({ provider: { generate: captured }, styleReference });
+    await pipeline.submitRequest({ make: 'Chevrolet', model: 'Damas', year: 2019 });
+    await pipeline.runQueuedJobs();
+    expect(captured).toHaveBeenCalledWith(expect.objectContaining({ styleReference }));
   });
 });
