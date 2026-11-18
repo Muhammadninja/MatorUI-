@@ -2,6 +2,17 @@
 
 Status: **implemented in code, not verified on a device with a real SMS.**
 
+## Current release gate (2026-11-18)
+
+- Eskiz approval of the new domain-bound OTP template is pending. Keep the current
+  production SMS body until approval; do not use repeated production OTP requests
+  as a substitute for this verification.
+- After approval, complete the domain, app entitlement, and shipped-build steps
+  below in that order, then run the real-iPhone checklist at the end of this file.
+- An iOS Simulator cannot receive production SMS or verify the QuickType
+  suggestion. Use an iPhone with a SIM for the AutoFill result; keep the simulator
+  for manual code-entry and non-SMS flows.
+
 ## What the app does
 
 Both code fields — the sign-in sheet

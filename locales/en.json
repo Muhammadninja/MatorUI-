@@ -380,6 +380,10 @@
     "titleWithCount_one": "Cart · {{count}} item",
     "titleWithCount_other": "Cart · {{count}} items",
     "loadErrorTitle": "Couldn't load your cart",
+    "updateErrorTitle": "Couldn't update your cart",
+    "updateErrorBody": "Your cart was restored. Please try again.",
+    "refreshErrorTitle": "Couldn't refresh your cart",
+    "refreshErrorBody": "Check your connection and try again.",
     "emptyTitle": "Your cart is empty for now",
     "emptySubtitle": "Find the parts you need and add them here",
     "emptyCardSubtitle": "Find parts that fit your build and add them here to check out in one tap.",
@@ -933,6 +937,8 @@
   },
   "liked": {
     "title": "Favorites",
+    "loadErrorTitle": "Couldn't load your saved parts",
+    "loadErrorBody": "Check your connection and try again.",
     "emptyTitle": "No favorite parts yet",
     "emptyBody": "Tap the heart on any part to save it here.",
     "addedToCart": "Added to cart"

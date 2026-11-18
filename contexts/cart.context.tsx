@@ -24,6 +24,7 @@ import {
   type PromoResult,
 } from '@/services/cart-math';
 import { clearStoredCart, loadCart, saveCart } from '@/services/cart-storage';
+import i18n from '@/services/i18n';
 import { toastService } from '@/services/toast-service';
 import { useUserContext } from '@/contexts/user.context';
 import { CartMutationQueue } from '@/services/cart-mutation-queue';
@@ -187,7 +188,7 @@ function CartSessionProvider({ ownerId, hydrating, publish }: { ownerId: string 
       pendingId: string,
       optimistic: () => void,
       apiCall: () => Promise<T>,
-      operationName: string,
+      _operationName: string,
       reconcile?: (result: T) => void,
     ): Promise<T | null> => {
       const snapshot = snapshotRef.current;
@@ -206,7 +207,7 @@ function CartSessionProvider({ ownerId, hydrating, publish }: { ownerId: string 
           setError(null);
         }
         return result ?? null;
-      } catch (err) {
+      } catch {
         if (!mutations.isLatest(ticket)) return null;
         // Keep optimistic changes to other items when this request fails.
         if (pendingId === 'cart') {
@@ -228,11 +229,9 @@ function CartSessionProvider({ ownerId, hydrating, publish }: { ownerId: string 
             return remaining;
           });
         }
-        const message = err instanceof Error ? err.message : `${operationName} failed`;
+        const message = i18n.t('cart.updateErrorBody');
         setError(message);
-        toastService.danger(message, {
-          description: 'Cart was rolled back. Try again.',
-        });
+        toastService.danger(i18n.t('cart.updateErrorTitle'), { description: message });
         // Earlier same-item responses may have been superseded. Read the
         // canonical cart after queued writes, without replacing newer intent.
         const version = mutations.readVersion();
@@ -409,11 +408,11 @@ function CartSessionProvider({ ownerId, hydrating, publish }: { ownerId: string 
       setAppliedPromo(promo ?? null);
       syncCharges();
       setError(null);
-    } catch (err) {
+    } catch {
       if (version !== mutations.readVersion()) return;
-      const message = err instanceof Error ? err.message : 'Refresh failed';
+      const message = i18n.t('cart.refreshErrorBody');
       setError(message);
-      toastService.danger('Could not refresh cart', { description: message });
+      toastService.danger(i18n.t('cart.refreshErrorTitle'), { description: message });
     }
   }, [mutations, setItems, setAppliedPromo, syncCharges]);
 

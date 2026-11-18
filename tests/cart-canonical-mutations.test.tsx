@@ -8,11 +8,13 @@ const state = vi.hoisted(() => ({
   authenticated: true,
   owner: 'user-a',
   fetch: vi.fn(), addItem: vi.fn(), updateQuantity: vi.fn(), removeItem: vi.fn(), clear: vi.fn(),
+  danger: vi.fn(),
 }));
 vi.mock('@/contexts/user.context', () => ({ useUserContext: () => ({ isAuthenticated: state.authenticated, profile: state.authenticated ? { id: state.owner } : null }) }));
 vi.mock('@/services/cart-api', () => ({ cartTransport: state }));
 vi.mock('@/services/cart-storage', () => ({ loadCart: async () => null, saveCart: vi.fn(), clearStoredCart: vi.fn() }));
-vi.mock('@/services/toast-service', () => ({ toastService: { danger: vi.fn() } }));
+vi.mock('@/services/toast-service', () => ({ toastService: { danger: state.danger } }));
+vi.mock('@/services/i18n', () => ({ default: { t: (key: string) => key } }));
 import { CartProvider, useCartContext } from '@/contexts/cart.context';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -33,6 +35,7 @@ beforeEach(() => {
   state.updateQuantity.mockReset();
   state.removeItem.mockReset().mockResolvedValue(undefined);
   state.clear.mockReset().mockResolvedValue(undefined);
+  state.danger.mockReset();
 });
 
 async function renderCart() {
@@ -126,6 +129,24 @@ test('guest mutations stay local without requiring a canonical server line', asy
   await act(async () => { await cart.get().refresh(); });
   expect(state.fetch).not.toHaveBeenCalled();
   expect(cart.get().pendingIds.size).toBe(0);
+  await cart.unmount();
+});
+
+test('cart mutation and refresh failures use localized copy instead of backend English', async () => {
+  const cart = await renderCart();
+  state.updateQuantity.mockRejectedValueOnce(new Error('server response in English'));
+  await act(async () => { cart.get().incrementItem(line.id); });
+  expect(state.danger).toHaveBeenCalledWith('cart.updateErrorTitle', {
+    description: 'cart.updateErrorBody',
+  });
+  expect(cart.get().error).toBe('cart.updateErrorBody');
+
+  state.fetch.mockRejectedValueOnce(new Error('another English backend response'));
+  await act(async () => { await cart.get().refresh(); });
+  expect(state.danger).toHaveBeenLastCalledWith('cart.refreshErrorTitle', {
+    description: 'cart.refreshErrorBody',
+  });
+  expect(cart.get().error).toBe('cart.refreshErrorBody');
   await cart.unmount();
 });
 

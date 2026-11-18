@@ -25,7 +25,7 @@ export function useLikedProducts() {
     enabled: ids.length > 0,
     queryFn: async ({ signal }) => {
       const results = await Promise.all(
-        ids.map((id) => fetchCatalogDetail(id, signal).catch(() => null)),
+        ids.map((id) => fetchCatalogDetail(id, signal)),
       );
       return results
         .filter((r): r is NonNullable<typeof r> => r != null)

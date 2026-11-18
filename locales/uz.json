@@ -380,6 +380,10 @@
     "titleWithCount_one": "Savat · {{count}} ta mahsulot",
     "titleWithCount_other": "Savat · {{count}} ta mahsulot",
     "loadErrorTitle": "Savatni yuklab boʻlmadi",
+    "updateErrorTitle": "Savatni yangilab boʻlmadi",
+    "updateErrorBody": "Savat avvalgi holatiga qaytarildi. Qayta urinib koʻring.",
+    "refreshErrorTitle": "Savatni yangilab boʻlmadi",
+    "refreshErrorBody": "Internetga ulanishni tekshirib, qayta urinib koʻring.",
     "emptyTitle": "Savatda hozircha hech narsa yoʻq",
     "emptySubtitle": "Kerakli ehtiyot qismlarni toping va shu yerga qoʻshing",
     "emptyCardSubtitle": "Mos ehtiyot qismlarni topib, bu yerga qoʻshing va bir tegishda buyurtma bering.",
@@ -933,6 +937,8 @@
   },
   "liked": {
     "title": "Saqlanganlar",
+    "loadErrorTitle": "Saqlangan ehtiyot qismlarni yuklab boʻlmadi",
+    "loadErrorBody": "Internetga ulanishni tekshirib, qayta urinib koʻring.",
     "emptyTitle": "Saqlanganlarda hali ehtiyot qismlar yoʻq",
     "emptyBody": "Uni bu yerda saqlash uchun istalgan ehtiyot qismdagi yurakchani bosing.",
     "addedToCart": "Savatga qoʻshildi"
