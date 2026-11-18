@@ -182,14 +182,8 @@ export default function ItemDetailScreen() {
 
   const shareCurrentItem = async () => {
     triggerHaptic('selection');
-    const result = await shareItem({
-      id: item.id,
-      title: item.title,
-      price: item.price,
-      imageUrl: image,
-    });
-    if (result === 'unavailable') toast.info(t('itemDetail.shareUnavailable'));
-    else if (result === 'error') toast.danger(t('itemDetail.shareFailed'));
+    const result = await shareItem({ id: item.id, title: item.title, price: item.price });
+    if (result === 'error') toast.danger(t('itemDetail.shareFailed'));
   };
 
   // Actually add the real catalog item `qty` times (one unit per `addItem`)
