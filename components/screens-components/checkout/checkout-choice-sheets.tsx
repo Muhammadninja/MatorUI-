@@ -107,7 +107,9 @@ export function reviewSummaries({
         ? first.dealerName ?? first.address ?? t('checkout.reviewPickupPoint')
         : pickup.state === 'error'
           ? t('checkout.pickupPointsError')
-          : t('checkout.pickupPointsLoading'),
+          : pickup.state === 'success'
+            ? t('checkout.pickupPointNotSpecified')
+            : t('checkout.pickupPointsLoading'),
       detail: ready ? [first.dealerName ? first.address : null, more].filter(Boolean).join(' · ') || null : null,
       error: pickup.state === 'error',
       // Where to collect has a sheet of its own; the delivery picker stays a picker.

@@ -165,11 +165,13 @@ export default function CheckoutScreen() {
         errorCode: shipping.errorCode,
       })
     : null;
-  // Where each dealer's goods are collected: asked only while the buyer collects the order,
-  // for the cart as the server has it, so it waits for cart changes still on their way.
+  // Where each dealer's goods are collected: asked while the order would be collected, which
+  // includes before any way is chosen, so the warehouse shows from the start. Not while the
+  // saved addresses load: one of them may make it the courier's. For the cart as the server
+  // has it, so it waits for cart changes still on their way.
   const pickup = usePickupPoints(
     delivery.method === 'pickup' &&
-      (addr || addressSkipped) &&
+      addresses.state !== 'loading' &&
       items.length > 0 &&
       pendingIds.size === 0 &&
       !payment.pending

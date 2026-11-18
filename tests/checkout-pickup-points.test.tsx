@@ -396,6 +396,16 @@ describe('Checkout: where to collect the order', () => {
     ]);
   });
 
+  test('before an address is chosen or skipped, the warehouse already shows', async () => {
+    await mount();
+
+    expect(transport.getPickupPoints).toHaveBeenCalledTimes(1);
+    expect(within('checkout-review-address')).toContain('Driver’s Village');
+    expect(within('checkout-review-address')).not.toContain('Загружаем адрес самовывоза…');
+    expect(within('checkout-sheet-pickup')).toContain('Toshkent, Bunyodkor shoh ko‘chasi 12');
+    expect(cards()).toHaveLength(1);
+  });
+
   test('while it loads it says so; a failure says so and can be retried', async () => {
     transport.getPickupPoints.mockReturnValueOnce(new Promise(() => undefined));
     await mount();
