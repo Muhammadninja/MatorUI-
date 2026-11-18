@@ -205,10 +205,50 @@
         "policyHash": "sha256:00b63b2f746eb8b9095bbd5e1dbae4ddd74fd92a6740b72f59f4069fbfda4737"
       },
       "hash": "sha256:b2a74df65681aceb612448e9e3287f63cb3e4bbda4a56efcc8999a0016ed6f3e"
+    },
+    {
+      "payload": {
+        "receiptId": "sha256:7eb7f376d91fa595867edd067ec29ff97438175ea3e70ee41418bf945dabadec",
+        "previousReceiptHash": "sha256:b2a74df65681aceb612448e9e3287f63cb3e4bbda4a56efcc8999a0016ed6f3e",
+        "sequence": 5,
+        "issuedAt": 1794996597254,
+        "request": {
+          "identity": {
+            "id": "legacy-cli",
+            "type": "legacy"
+          },
+          "action": {
+            "type": "mcp.tool.call",
+            "resource": "hooks_intelligence_verified-ingest",
+            "tool": "hooks_intelligence_verified-ingest",
+            "server": "ruflo",
+            "network": false,
+            "destructive": false
+          },
+          "context": {
+            "metadata": {
+              "inputDigest": "sha256:b72ed13cb525af2592de7b88e763277fa14592edc468666510c59a8cf02dd505"
+            },
+            "now": 1794996597254
+          },
+          "requestId": "7bb652a7-f7f1-47a8-8f96-ed794f0dbb1c"
+        },
+        "decision": {
+          "requestId": "7bb652a7-f7f1-47a8-8f96-ed794f0dbb1c",
+          "outcome": "allowed",
+          "enforcedOutcome": "allowed",
+          "mode": "legacy",
+          "reason": "legacy-default-allow",
+          "matchedRules": [],
+          "obligations": []
+        },
+        "policyHash": "sha256:00b63b2f746eb8b9095bbd5e1dbae4ddd74fd92a6740b72f59f4069fbfda4737"
+      },
+      "hash": "sha256:ba802fdcd48d1aee6430004320587d67b808d6953b917e387ec3fef37fb5f9ce"
     }
   ],
   "migratedAt": 1793699164835,
   "migratedFrom": "pre-ADR-324; capabilities=.swarm/memory.db",
-  "ledgerLength": 5,
-  "ledgerHead": "sha256:b2a74df65681aceb612448e9e3287f63cb3e4bbda4a56efcc8999a0016ed6f3e"
+  "ledgerLength": 6,
+  "ledgerHead": "sha256:ba802fdcd48d1aee6430004320587d67b808d6953b917e387ec3fef37fb5f9ce"
 }
