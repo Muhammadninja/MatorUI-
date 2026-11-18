@@ -160,7 +160,16 @@ export function UserProvider({ children }: PropsWithChildren) {
       else await clearAuthSession();
     });
     persistenceRef.current = work.catch(() => undefined);
-    await work;
+    try {
+      await work;
+    } catch (error) {
+      if (generation === lifecycleRef.current) {
+        setCurrentSession(null);
+        invalidateAuthRequests();
+        applyProfile(null);
+      }
+      throw error;
+    }
     return generation === lifecycleRef.current;
   }, []);
 
@@ -174,11 +183,14 @@ export function UserProvider({ children }: PropsWithChildren) {
     setIsLoading(false);
     setError(null);
     applyProfile(null);
-    await persistSession(null);
-    // Best-effort revocation — don't block the sign-out UX on it.
-    if (existing) {
-      authTransport.signOut(existing.refreshToken, undefined, existing.accessToken).catch(() => undefined);
+    try {
+      await persistSession(null);
+      await profilePersistenceRef.current;
+    } finally {
+      // Revoke even when local storage cleanup fails.
+      if (existing) authTransport.signOut(existing.refreshToken, undefined, existing.accessToken).catch(() => undefined);
     }
+
   }, [persistSession]);
 
   const accountId = profile?.id ?? null;
@@ -302,6 +314,7 @@ export function UserProvider({ children }: PropsWithChildren) {
       const [session, cachedProfile] = await Promise.all([loadAuthSession(), loadProfileCache()]);
       if (cancelled || generation !== lifecycleRef.current) return;
       setCurrentSession(session);
+      if (!session) applyProfile(null);
       if (session) {
         // Render the returning user as logged-in IMMEDIATELY from the cached
         // profile. The `/me` refresh below is best-effort — it must never be
@@ -367,13 +380,6 @@ export function UserProvider({ children }: PropsWithChildren) {
         }
         if (generation !== lifecycleRef.current) return false;
         if (!result) {
-          if (bootingRef.current) {
-            // Never wipe the session mid-cold-boot — a definitive 401 during
-            // hydration still keeps the cached profile; the next in-app 401 after
-            // boot will sign out cleanly. (Matches the hydration contract above.)
-            debugLog('auth', 'refresh rejected during boot — deferring sign-out');
-            return false;
-          }
           debugLog('auth', 'refresh rejected — signing out and routing to /sign-in');
           const logout = signOut();
           const signedOutGeneration = lifecycleRef.current;
