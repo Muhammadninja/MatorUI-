@@ -25,11 +25,19 @@
         "NSFaceIDUsageDescription": "Mator uses Face ID to securely sign you in to your account."
       },
       "appleTeamId": "DXP9AG6TPN",
-      "associatedDomains": ["webcredentials:mator.uz"]
+      "associatedDomains": ["applinks:mator.uz", "webcredentials:mator.uz"]
     },
     "android": {
       "predictiveBackGestureEnabled": false,
       "package": "com.mator.myapp",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [{ "scheme": "https", "host": "mator.uz", "pathPrefix": "/p/" }],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/MATOR-app-icons/expo/adaptive-icon.png",
         "monochromeImage": "./assets/MATOR-app-icons/expo/adaptive-icon.png",

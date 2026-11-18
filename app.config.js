@@ -5,6 +5,8 @@ const { environmentFrom } = require('./config/environment-policy.cjs');
 const STAGING_ICON = './assets/MATOR-app-icons/staging/icon.png';
 
 const withoutProductionDomains = ({ associatedDomains, ...ios } = {}) => ios;
+// Same on Android: mator.uz's assetlinks.json names only the production package.
+const withoutProductionLinks = ({ intentFilters, ...android } = {}) => android;
 
 module.exports = ({ config }) => {
   const profile = process.env.EAS_BUILD_PROFILE || '';
@@ -40,7 +42,7 @@ module.exports = ({ config }) => {
     ],
     ...(e2e ? {
       name: 'Mator E2E', scheme: 'mator-e2e',
-      android: { ...config.android, package: 'com.mator.e2e' },
+      android: { ...withoutProductionLinks(config.android), package: 'com.mator.e2e' },
       ios: { ...withoutProductionDomains(config.ios), bundleIdentifier: 'com.mator.e2e' },
       updates: { enabled: false },
     } : {}),
@@ -48,7 +50,7 @@ module.exports = ({ config }) => {
       name: 'Mator Staging', scheme: 'mator-staging',
       // A banded icon, so the two apps can't be confused on the home screen.
       icon: STAGING_ICON,
-      android: { ...config.android, package: 'com.mator.myapp.staging' },
+      android: { ...withoutProductionLinks(config.android), package: 'com.mator.myapp.staging' },
       ios: { ...withoutProductionDomains(config.ios), bundleIdentifier: 'com.fotih12.mator.staging',
         icon: STAGING_ICON },
       updates: { enabled: false },

@@ -107,7 +107,8 @@ describe('dedicated E2E app boundary', () => {
         EXPO_PUBLIC_API_BASE_URL: 'http://127.0.0.1:8080',
       }, overrides);
       return appConfig({ config: {
-        android: { package: 'com.mator.myapp' }, scheme: 'mator',
+        android: { package: 'com.mator.myapp', intentFilters: require('../app.json').expo.android.intentFilters },
+        scheme: 'mator',
         ios: { bundleIdentifier: 'com.fotih12.mator', associatedDomains: ['webcredentials:mator.uz'] },
       } });
     } finally {
@@ -129,6 +130,7 @@ describe('dedicated E2E app boundary', () => {
     const config = resolve();
     expect(config.ios.bundleIdentifier).toBe('com.mator.e2e');
     expect(config.ios.associatedDomains).toBeUndefined();
+    expect(config.android.intentFilters).toBeUndefined();
   });
   test.each(['production', 'internal', 'preview', 'development'])('rejects test switch in %s', (profile) => {
     expect(() => resolve({ EAS_BUILD_PROFILE: profile })).toThrow();
@@ -184,8 +186,11 @@ describe('staging app identity', () => {
 
   test('a staging build does not claim mator.uz, which names only the production app', () => {
     expect(resolve(stagingProfile).ios.associatedDomains).toBeUndefined();
+    expect(resolve(stagingProfile).android.intentFilters).toBeUndefined();
     expect(resolve({ ...production, EAS_BUILD_PROFILE: 'production' }).ios.associatedDomains)
       .toEqual(['webcredentials:mator.uz']);
+    expect(resolve({ ...production, EAS_BUILD_PROFILE: 'production' }).android.intentFilters)
+      .toEqual(base.android.intentFilters);
   });
 
   test('the production identity is untouched', () => {
