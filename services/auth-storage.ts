@@ -27,6 +27,7 @@ const SECURE_OPTIONS: SecureStore.SecureStoreOptions = {
 const LEGACY_SECURE_SESSION = 'auth_v3_session';
 const LEGACY_SPLIT_KEYS = ['auth_v2_access', 'auth_v2_refresh', 'auth_v2_meta'] as const;
 const LEGACY_ASYNC_KEY = 'auth:v2:session';
+const INVALIDATED_KEY = 'auth:v4:invalidated';
 
 const SCHEMA = 1;
 
@@ -120,8 +121,11 @@ async function deleteLegacy(): Promise<void> {
   await Promise.all([
     ...[LEGACY_SECURE_SESSION, ...LEGACY_SPLIT_KEYS].map((key) =>
       SecureStore.deleteItemAsync(key).catch(() => undefined)),
-    AsyncStorage.removeItem(LEGACY_ASYNC_KEY).catch(() => undefined),
+    AsyncStorage.removeItem(LEGACY_ASYNC_KEY),
   ]);
+  if (await AsyncStorage.getItem(LEGACY_ASYNC_KEY) !== null) {
+    throw new Error('Could not remove legacy credentials');
+  }
 }
 
 /** Writes the keychain envelope and confirms it reads back intact. */
@@ -131,7 +135,10 @@ async function writeSecure(session: AuthSession): Promise<boolean> {
   try {
     // One write keeps the access and refresh tokens from the same rotation.
     await SecureStore.setItemAsync(KEY_SESSION, envelope, SECURE_OPTIONS);
-    return (await readSecure(KEY_SESSION)) === envelope;
+    if ((await readSecure(KEY_SESSION)) !== envelope) return false;
+    await deleteLegacy();
+    await AsyncStorage.removeItem(INVALIDATED_KEY);
+    return true;
   } catch {
     return false;
   }
@@ -139,6 +146,14 @@ async function writeSecure(session: AuthSession): Promise<boolean> {
 
 export function loadAuthSession(): Promise<AuthSession | null> {
   return serialized(async () => {
+    if (await AsyncStorage.getItem(INVALIDATED_KEY).catch(() => null)) {
+      cachedSession = null;
+      await Promise.all([
+        SecureStore.deleteItemAsync(KEY_SESSION, SECURE_OPTIONS).catch(() => undefined),
+        deleteLegacy().catch(() => undefined),
+      ]);
+      return null;
+    }
     const current = parseEnvelope(await readSecure(KEY_SESSION));
     if (current) {
       lastRevision = Math.max(lastRevision, current.revision ?? 0);
@@ -149,12 +164,14 @@ export function loadAuthSession(): Promise<AuthSession | null> {
     const legacy = await readLegacy();
     if (!legacy) return null;
     if (await writeSecure(legacy)) {
-      await deleteLegacy();
       debugLog('auth', 'legacy session migrated to keychain');
     } else {
-      // Keep the pre-existing copy so the next launch can retry; nothing new
-      // is written in plaintext. The session still works for this run.
-      debugLog('auth', 'legacy session migration failed — will retry');
+      // Do not activate or keep a plaintext legacy credential when Keychain
+      // migration fails. A non-secret marker prevents restart resurrection.
+      cachedSession = null;
+      await invalidateCredentials();
+      debugLog('auth', 'legacy session migration failed; credentials cleared');
+      return null;
     }
     return legacy;
   });
@@ -164,22 +181,27 @@ export function saveAuthSession(session: AuthSession): Promise<void> {
   // Snapshot caller-owned data before waiting behind an earlier storage operation.
   const snapshot = { ...session };
   return serialized(async () => {
+    await AsyncStorage.setItem(INVALIDATED_KEY, '1');
     const saved = await writeSecure(snapshot);
-    // Legacy copies hold an older rotation either way. When the keychain is
-    // unavailable the session lives in memory only and the next cold boot
-    // asks the user to sign in — never a plaintext fallback.
-    await deleteLegacy();
-    if (!saved) debugLog('auth', 'saveAuthSession keychain write failed — session kept in memory only');
+    if (!saved) {
+      cachedSession = null;
+      await invalidateCredentials();
+      throw new Error('Could not persist credentials securely');
+    }
   });
 }
 
+async function invalidateCredentials(): Promise<void> {
+  await AsyncStorage.setItem(INVALIDATED_KEY, '1').catch(() => undefined);
+  await Promise.all([
+    SecureStore.deleteItemAsync(KEY_SESSION, SECURE_OPTIONS).catch(() => undefined),
+    deleteLegacy().catch(() => undefined),
+  ]);
+}
+
 export function clearAuthSession(): Promise<void> {
-  return serialized(async () => {
-    await Promise.all([
-      SecureStore.deleteItemAsync(KEY_SESSION, SECURE_OPTIONS).catch(() => undefined),
-      deleteLegacy(),
-    ]);
-  });
+  cachedSession = null;
+  return serialized(invalidateCredentials);
 }
 
 // ── In-memory cache ────────────────────────────────────────────────────

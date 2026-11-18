@@ -67,7 +67,7 @@ describe('auth-storage persistence', () => {
 
   test('save writes the keychain only — AsyncStorage never receives tokens', async () => {
     await saveAuthSession(SESSION);
-    expect(AsyncStorage.setItem).not.toHaveBeenCalled();
+    expect(asyncMem.get('auth:v4:invalidated')).toBeUndefined();
     expectNoPlaintextTokens(SESSION);
     expect(await SecureStore.getItemAsync('auth_v4_session')).toContain(SESSION.refreshToken);
   });
@@ -88,8 +88,8 @@ describe('auth-storage persistence', () => {
 
   test('unavailable keychain never creates a plaintext fallback', async () => {
     vi.spyOn(SecureStore, 'setItemAsync').mockRejectedValue(new Error('keychain unavailable'));
-    await expect(saveAuthSession(SESSION)).resolves.toBeUndefined();
-    expect(AsyncStorage.setItem).not.toHaveBeenCalled();
+    await expect(saveAuthSession(SESSION)).rejects.toThrow('securely');
+    expect(asyncMem.get('auth:v4:invalidated')).toBe('1');
     expectNoPlaintextTokens(SESSION);
     expect(await loadAuthSession()).toBeNull();
   });
@@ -97,16 +97,16 @@ describe('auth-storage persistence', () => {
   test('a failed rotation write deletes the stale plaintext legacy copy', async () => {
     asyncMem.set('auth:v2:session', JSON.stringify({ v: 1, ...SESSION }));
     vi.spyOn(SecureStore, 'setItemAsync').mockRejectedValue(new Error('keychain unavailable'));
-    await saveAuthSession(ROTATED);
-    expect(asyncMem.size).toBe(0);
+    await expect(saveAuthSession(ROTATED)).rejects.toThrow('securely');
+    expect(asyncMem.get('auth:v4:invalidated')).toBe('1');
+    expect(asyncMem.has('auth:v2:session')).toBe(false);
   });
 
   test('a keychain write that does not read back is treated as failed', async () => {
     vi.spyOn(SecureStore, 'getItemAsync').mockResolvedValue(null);
     asyncMem.set('auth:v2:session', JSON.stringify({ v: 1, ...SESSION }));
-    expect(await loadAuthSession()).toEqual(SESSION);
-    // Migration not confirmed → the pre-existing copy is kept for a retry.
-    expect(asyncMem.has('auth:v2:session')).toBe(true);
+    expect(await loadAuthSession()).toBeNull();
+    expect(asyncMem.has('auth:v2:session')).toBe(false);
   });
 
   test('clear() removes current and legacy copies from every store', async () => {
@@ -115,7 +115,7 @@ describe('auth-storage persistence', () => {
     asyncMem.set('auth:v2:session', JSON.stringify({ v: 1, ...ROTATED }));
     await clearAuthSession();
     for (const key of ['auth_v4_session', ...LEGACY_SECURE_KEYS]) expect(await SecureStore.getItemAsync(key)).toBeNull();
-    expect(asyncMem.size).toBe(0);
+    expect([...asyncMem.keys()]).toEqual(['auth:v4:invalidated']);
     expect(await loadAuthSession()).toBeNull();
   });
 
@@ -180,13 +180,22 @@ describe('legacy migration', () => {
     expect(await loadAuthSession()).toEqual(ROTATED);
   });
 
-  test('failed migration keeps the user signed in for this run and retries next launch', async () => {
+  test('failed migration clears legacy plaintext and refuses restoration', async () => {
     asyncMem.set('auth:v2:session', JSON.stringify({ v: 1, ...SESSION }));
     vi.spyOn(SecureStore, 'setItemAsync').mockRejectedValueOnce(new Error('keychain unavailable'));
-    expect(await loadAuthSession()).toEqual(SESSION);
-    expect(AsyncStorage.setItem).not.toHaveBeenCalled();
-    expect(await loadAuthSession()).toEqual(SESSION);
+    expect(await loadAuthSession()).toBeNull();
+    expect(asyncMem.has('auth:v2:session')).toBe(false);
+    expect(asyncMem.get('auth:v4:invalidated')).toBe('1');
+    expect(await loadAuthSession()).toBeNull();
     expectNoPlaintextTokens(SESSION);
+  });
+
+  test('logout tombstone prevents restart restoration when keychain deletion fails', async () => {
+    await saveAuthSession(SESSION);
+    vi.spyOn(SecureStore, 'deleteItemAsync').mockRejectedValue(new Error('keychain locked'));
+    await clearAuthSession();
+    expect(await loadAuthSession()).toBeNull();
+    expect(asyncMem.get('auth:v4:invalidated')).toBe('1');
   });
 
   test('a current keychain session wins and purges leftovers of an interrupted migration', async () => {
