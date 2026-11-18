@@ -86,7 +86,7 @@ describe('fetchModels', () => {
     });
     expect(await fetchModels('chevrolet')).toEqual([
       { id: 'lacetti', makeId: 'chevrolet', name: 'Lacetti', yearFrom: 2002, yearTo: 2024 },
-      { id: 'damas', makeId: 'chevrolet', name: 'Damas', yearFrom: null, yearTo: 2027 },
+      { id: 'damas', makeId: 'chevrolet', name: 'Damas', yearFrom: 1996, yearTo: 2027 },
     ]);
   });
 
@@ -99,6 +99,15 @@ describe('fetchModels', () => {
     get.mockResolvedValueOnce({ items: [{ id: 'genesis-g90', make_id: 'genesis', name: 'G90' }] });
     expect(await fetchModels('genesis')).toEqual([
       { id: 'genesis-g90', makeId: 'genesis', name: 'G90', yearFrom: 2016, yearTo: 2099 },
+    ]);
+  });
+
+  test('fills a missing start year from the gathered range for any matching model', async () => {
+    get.mockResolvedValueOnce({
+      items: [{ id: 'g90', make_id: 'genesis', name: 'G90', year_from: null, year_to: 2026 }],
+    });
+    expect(await fetchModels('genesis')).toEqual([
+      { id: 'g90', makeId: 'genesis', name: 'G90', yearFrom: 2016, yearTo: 2026 },
     ]);
   });
 
