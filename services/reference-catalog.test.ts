@@ -73,7 +73,9 @@ describe('fetchModels', () => {
     });
     const models = await fetchModels('kia');
     expect(get).toHaveBeenCalledWith('/v1/reference/models?makeId=kia', expect.anything());
-    expect(models).toEqual([{ id: 'kia-k5', makeId: 'kia', name: 'K5' }]);
+    expect(models).toEqual([
+      { id: 'kia-k5', makeId: 'kia', name: 'K5', yearFrom: 2010, yearTo: null },
+    ]);
   });
 
   // Backend PR #150: each model carries the build years Garage accepts.
@@ -108,6 +110,33 @@ describe('fetchModels', () => {
     });
     expect(await fetchModels('genesis')).toEqual([
       { id: 'g90', makeId: 'genesis', name: 'G90', yearFrom: 2016, yearTo: 2026 },
+    ]);
+  });
+
+  test('uses the curated range for backend models outside the bundled generation tree', async () => {
+    get.mockResolvedValueOnce({
+      items: [
+        { id: 'kia-k5', make_id: 'kia', name: 'K5', year_from: null, year_to: 2027 },
+        { id: 'kia-rio', make_id: 'kia', name: 'Rio', year_from: null, year_to: 2027 },
+      ],
+    });
+    expect(await fetchModels('kia')).toEqual([
+      { id: 'kia-k5', makeId: 'kia', name: 'K5', yearFrom: 2010, yearTo: 2027 },
+      { id: 'kia-rio', makeId: 'kia', name: 'Rio', yearFrom: 1999, yearTo: 2027 },
+    ]);
+  });
+
+  test('caps a discontinued make/model whose backend range is still open', async () => {
+    get.mockResolvedValueOnce({
+      items: [{ id: 'r4-cobalt', make_id: 'ravon', name: 'R4 (Cobalt)', year_from: null, year_to: 2027 }],
+    }).mockResolvedValueOnce({
+      items: [{ id: 'tico', make_id: 'daewoo', name: 'Tico', year_from: null, year_to: 2027 }],
+    });
+    expect(await fetchModels('ravon')).toEqual([
+      { id: 'r4-cobalt', makeId: 'ravon', name: 'R4 (Cobalt)', yearFrom: 2016, yearTo: 2020 },
+    ]);
+    expect(await fetchModels('daewoo')).toEqual([
+      { id: 'tico', makeId: 'daewoo', name: 'Tico', yearFrom: 1991, yearTo: 2001 },
     ]);
   });
 

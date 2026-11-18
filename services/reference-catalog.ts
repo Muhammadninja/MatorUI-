@@ -29,6 +29,10 @@ import {
   getGenerationsForModel,
   getModelsForBrand,
 } from '@/services/uz-vehicle-catalog';
+import {
+  referenceModelYearEnd,
+  referenceModelYearStart,
+} from '@/services/vehicle-model-years';
 
 const BASE = '/v1/reference';
 
@@ -247,17 +251,18 @@ export async function fetchModels(
       const bundledRange = bundledRangeForModel(makeId, name, id);
       const apiYearFrom = yearOf(m.year_from);
       const apiYearTo = yearOf(m.year_to);
-      const hasYearRange = 'year_to' in m || bundledRange.yearFrom != null || bundledRange.yearTo != null;
+      const yearFrom = apiYearFrom ?? bundledRange.yearFrom ?? referenceModelYearStart(makeId, id) ?? null;
+      const knownEnd = referenceModelYearEnd(makeId, id);
+      const listedYearTo = apiYearTo ?? bundledRange.yearTo;
+      const yearTo = knownEnd == null
+        ? listedYearTo ?? null
+        : Math.min(listedYearTo ?? knownEnd, knownEnd);
+      const hasYearRange = 'year_to' in m || yearFrom !== null || yearTo !== null;
       return {
         id,
         makeId: str(m.make_id) || makeId,
         name,
-        ...(hasYearRange
-          ? {
-              yearFrom: apiYearFrom ?? bundledRange.yearFrom ?? null,
-              yearTo: apiYearTo ?? bundledRange.yearTo ?? null,
-            }
-          : {}),
+        ...(hasYearRange ? { yearFrom, yearTo } : {}),
       };
     })
     .filter((m) => !HIDDEN_MODEL_IDS.has(m.id));
