@@ -315,6 +315,9 @@ export const UZ_GENERATIONS: VehicleGeneration[] = [
     active: true,
   },
   { id: 'byd-han-1', modelId: 'byd-han', label: 'Han EV', yearRange: [2021, 2099], active: true },
+
+  // Genesis G90 entered production for the 2016 model year.
+  { id: 'genesis-g90-1', modelId: 'g90', label: 'G90', yearRange: [2016, 2099], active: true },
 ];
 
 // ── Trims ────────────────────────────────────────────────────────────
