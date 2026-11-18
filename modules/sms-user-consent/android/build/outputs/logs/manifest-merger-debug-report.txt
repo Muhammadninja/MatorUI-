@@ -1,0 +1,16 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /private/tmp/claude-501/-Users-muhammadfotihabdullaev-Desktop-matorui/6bb104af-e90a-49af-a54b-96bdba591034/scratchpad/wt/mobile/modules/sms-user-consent/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest13619694561956118429.xml:2:13-83
+INJECTED from /private/tmp/claude-501/-Users-muhammadfotihabdullaev-Desktop-matorui/6bb104af-e90a-49af-a54b-96bdba591034/scratchpad/wt/mobile/modules/sms-user-consent/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest13619694561956118429.xml:2:13-83
+	package
+		INJECTED from /private/tmp/claude-501/-Users-muhammadfotihabdullaev-Desktop-matorui/6bb104af-e90a-49af-a54b-96bdba591034/scratchpad/wt/mobile/modules/sms-user-consent/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest13619694561956118429.xml
+	xmlns:android
+		ADDED from /private/tmp/claude-501/-Users-muhammadfotihabdullaev-Desktop-matorui/6bb104af-e90a-49af-a54b-96bdba591034/scratchpad/wt/mobile/modules/sms-user-consent/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest13619694561956118429.xml:2:23-81
+uses-sdk
+INJECTED from /private/tmp/claude-501/-Users-muhammadfotihabdullaev-Desktop-matorui/6bb104af-e90a-49af-a54b-96bdba591034/scratchpad/wt/mobile/modules/sms-user-consent/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest13619694561956118429.xml reason: use-sdk injection requested
+INJECTED from /private/tmp/claude-501/-Users-muhammadfotihabdullaev-Desktop-matorui/6bb104af-e90a-49af-a54b-96bdba591034/scratchpad/wt/mobile/modules/sms-user-consent/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest13619694561956118429.xml
+INJECTED from /private/tmp/claude-501/-Users-muhammadfotihabdullaev-Desktop-matorui/6bb104af-e90a-49af-a54b-96bdba591034/scratchpad/wt/mobile/modules/sms-user-consent/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest13619694561956118429.xml
+	android:targetSdkVersion
+		INJECTED from /private/tmp/claude-501/-Users-muhammadfotihabdullaev-Desktop-matorui/6bb104af-e90a-49af-a54b-96bdba591034/scratchpad/wt/mobile/modules/sms-user-consent/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest13619694561956118429.xml
+	android:minSdkVersion
+		INJECTED from /private/tmp/claude-501/-Users-muhammadfotihabdullaev-Desktop-matorui/6bb104af-e90a-49af-a54b-96bdba591034/scratchpad/wt/mobile/modules/sms-user-consent/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest13619694561956118429.xml

@@ -53,6 +53,7 @@ vi.mock('expo-router', () => ({
   },
   useNavigation: () => ({ isFocused: () => mocks.focused }),
 }));
+vi.mock('@/modules/sms-user-consent', () => ({ SmsUserConsent: null }));
 vi.mock('react-native', () => ({
   Animated: {
     Value: class {

@@ -8,6 +8,7 @@ import { AppButton } from '@/components/shared/app-button';
 import AppTextField from '@/components/shared/app-text-field';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
+import { useSmsUserConsent } from '@/hooks/use-sms-user-consent';
 import { useToast } from '@/hooks/use-toast';
 import { useUserContext } from '@/contexts/user.context';
 import {
@@ -50,6 +51,16 @@ export function PhoneChangeSheet({
   const [currentMasked, setCurrentMasked] = useState('');
   const [otpLength, setOtpLength] = useState(DEFAULT_OTP_LENGTH);
   const [busy, setBusy] = useState(false);
+  // Bumped per sent code, so a resend restarts Android's SMS consent window.
+  const [sendCount, setSendCount] = useState(0);
+
+  // Android SMS User Consent fills the one code this device can receive. With
+  // a second code to the current number the message cannot be told apart, so
+  // both fields stay manual.
+  useSmsUserConsent(
+    visible && step === 'otp' && !currentRequired ? `phone-change-${sendCount}` : null,
+    (message) => setCode(normalizeOtpInput(message, otpLength)),
+  );
 
   // Reset each time the sheet (re)opens.
   useEffect(() => {
@@ -79,6 +90,7 @@ export function PhoneChangeSheet({
       setCurrentRequired(request.currentPhoneOtpRequired);
       setCurrentMasked(request.currentPhoneMasked ?? '');
       setStep('otp');
+      setSendCount((n) => n + 1);
       toast.info(t('account.codeSent', { phone }));
     } catch (err) {
       toast.danger(t('account.codeSendFailed'), {

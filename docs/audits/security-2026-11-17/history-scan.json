@@ -1,0 +1,17 @@
+{
+  "mobile": {
+    "exitCode": 0,
+    "matchingCommitOrPathLines": 0,
+    "scope": "limited known-pattern history scan; no credential values retained"
+  },
+  "backend": {
+    "exitCode": 0,
+    "matchingCommitOrPathLines": 2,
+    "scope": "limited known-pattern history scan; no credential values retained"
+  },
+  "admin": {
+    "exitCode": 0,
+    "matchingCommitOrPathLines": 0,
+    "scope": "limited known-pattern history scan; no credential values retained"
+  }
+}
