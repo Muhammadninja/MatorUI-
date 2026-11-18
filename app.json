@@ -10,7 +10,7 @@
     "userInterfaceStyle": "automatic",
     "buildCacheProvider": "eas",
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.fotih12.mator",
       "icon": {
         "light": "./assets/MATOR-app-icons/expo/icon-light.png",
