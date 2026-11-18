@@ -189,10 +189,14 @@ function normalizeModelName(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
-function bundledRangeForModel(makeId: string, name: string) {
+function bundledRangeForModel(
+  makeId: string,
+  name: string,
+  modelId: string,
+): Partial<Pick<RefModel, 'yearFrom' | 'yearTo'>> {
   const normalized = normalizeModelName(name);
   const model = getModelsForBrand(makeId).find(
-    (candidate) => normalizeModelName(candidate.label) === normalized,
+    (candidate) => candidate.id === modelId || normalizeModelName(candidate.label) === normalized,
   );
   return model ? bundledYearRange(model.id) : {};
 }
@@ -239,13 +243,21 @@ export async function fetchModels(
   return asItems(res)
     .map((m) => {
       const name = str(m.name);
+      const id = str(m.id);
+      const bundledRange = bundledRangeForModel(makeId, name, id);
+      const apiYearFrom = yearOf(m.year_from);
+      const apiYearTo = yearOf(m.year_to);
+      const hasYearRange = 'year_to' in m || bundledRange.yearFrom != null || bundledRange.yearTo != null;
       return {
-        id: str(m.id),
+        id,
         makeId: str(m.make_id) || makeId,
         name,
-        ...('year_to' in m
-          ? { yearFrom: yearOf(m.year_from), yearTo: yearOf(m.year_to) }
-          : bundledRangeForModel(makeId, name)),
+        ...(hasYearRange
+          ? {
+              yearFrom: apiYearFrom ?? bundledRange.yearFrom ?? null,
+              yearTo: apiYearTo ?? bundledRange.yearTo ?? null,
+            }
+          : {}),
       };
     })
     .filter((m) => !HIDDEN_MODEL_IDS.has(m.id));
