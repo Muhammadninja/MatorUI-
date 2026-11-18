@@ -95,6 +95,13 @@ describe('fetchModels', () => {
     expect(get).not.toHaveBeenCalled();
   });
 
+  test('uses the gathered generation range when the API omits model years', async () => {
+    get.mockResolvedValueOnce({ items: [{ id: 'genesis-g90', make_id: 'genesis', name: 'G90' }] });
+    expect(await fetchModels('genesis')).toEqual([
+      { id: 'genesis-g90', makeId: 'genesis', name: 'G90', yearFrom: 2016, yearTo: 2099 },
+    ]);
+  });
+
   // Live Chevrolet list (2026-11-14): the misspelled legacy "Genrta" row sorted
   // beside the real Gentra, so the add-vehicle picker showed Gentra twice.
   test('drops the misspelled legacy Genrta row and keeps the real Gentra', async () => {

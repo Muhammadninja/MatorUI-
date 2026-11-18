@@ -26,6 +26,7 @@ import { shouldUseHttpTransport } from '@/config/api';
 import { apiClient } from '@/services/api-client';
 import {
   UZ_BRANDS,
+  getGenerationsForModel,
   getModelsForBrand,
 } from '@/services/uz-vehicle-catalog';
 
@@ -170,7 +171,30 @@ function localModels(makeId: string): RefModel[] {
     id: m.id,
     makeId,
     name: m.label,
+    ...bundledYearRange(m.id),
   }));
+}
+
+/** Use the collected generation years when a model row has no explicit range. */
+function bundledYearRange(modelId: string): Partial<Pick<RefModel, 'yearFrom' | 'yearTo'>> {
+  const generations = getGenerationsForModel(modelId);
+  if (!generations.length) return {};
+  return {
+    yearFrom: Math.min(...generations.map((generation) => generation.yearRange[0])),
+    yearTo: Math.max(...generations.map((generation) => generation.yearRange[1])),
+  };
+}
+
+function normalizeModelName(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function bundledRangeForModel(makeId: string, name: string) {
+  const normalized = normalizeModelName(name);
+  const model = getModelsForBrand(makeId).find(
+    (candidate) => normalizeModelName(candidate.label) === normalized,
+  );
+  return model ? bundledYearRange(model.id) : {};
 }
 
 // ── Public fetchers ──────────────────────────────────────────────────
@@ -213,12 +237,17 @@ export async function fetchModels(
     { signal },
   );
   return asItems(res)
-    .map((m) => ({
-      id: str(m.id),
-      makeId: str(m.make_id) || makeId,
-      name: str(m.name),
-      ...('year_to' in m ? { yearFrom: yearOf(m.year_from), yearTo: yearOf(m.year_to) } : {}),
-    }))
+    .map((m) => {
+      const name = str(m.name);
+      return {
+        id: str(m.id),
+        makeId: str(m.make_id) || makeId,
+        name,
+        ...('year_to' in m
+          ? { yearFrom: yearOf(m.year_from), yearTo: yearOf(m.year_to) }
+          : bundledRangeForModel(makeId, name)),
+      };
+    })
     .filter((m) => !HIDDEN_MODEL_IDS.has(m.id));
 }
 
