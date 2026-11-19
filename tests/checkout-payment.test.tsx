@@ -4,7 +4,8 @@
  *   • no confirmation without the backend saying the order is paid;
  *   • the cart is kept, and only ever cleared by a real payment;
  *   • a retry pays the same order, so there is one order however many attempts it takes;
- *   • coming back later finds that order rather than placing another.
+ *   • coming back later finds that order rather than placing another;
+ *   • the buyer who changed their mind cancels it, and a cart changed since is a new order.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
@@ -27,6 +28,7 @@ const { host, transport, cart, startPayment, openAuthSessionAsync, replace, push
       createAddress: vi.fn(),
       updateAddress: vi.fn(),
       getOrder: vi.fn(),
+      cancelOrder: vi.fn(),
     },
     cart: {
       items: [] as { id: string; title: string; price: string; quantity: number }[],
@@ -41,7 +43,16 @@ const { host, transport, cart, startPayment, openAuthSessionAsync, replace, push
   };
 });
 
-vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, ScrollView: host('scroll'), Image: host('image') }));
+vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+  ScrollView: host('scroll'),
+  Image: host('image'),
+  // The buyer confirms the cancel.
+  Alert: {
+    alert: (_title: string, _message: string, buttons: { style?: string; onPress?: () => void }[]) =>
+      buttons.find((b) => b.style === 'destructive')?.onPress?.(),
+  },
+}));
 // The choice sheets render their content in place, so every choice stays reachable here.
 vi.mock('@/components/shared/app-bottom-sheet', () => ({ AppBottomSheet: host('sheet') }));
 vi.mock('expo-linking', () => ({ createURL: () => 'mator://payment-return' }));
@@ -55,6 +66,7 @@ vi.mock('lucide-react-native', () => ({
   ArrowLeft: () => null,
   Banknote: () => null,
   Check: () => null,
+  CircleCheck: () => null,
   CreditCard: () => null,
   MapPin: () => null,
   Wallet: () => null,
@@ -119,6 +131,7 @@ vi.mock('@/contexts/cart.context', async () => {
 });
 
 import CheckoutScreen from '@/components/screens/checkout-screen';
+import { ApiError } from '@/services/api-client';
 import i18n from '@/services/i18n';
 import { PAYMENT_POLL } from '@/services/order-payment';
 
@@ -395,22 +408,27 @@ describe('Paying for an order at checkout', () => {
     });
   });
 
-  describe('giving up on the unpaid order', () => {
+  describe('changing their mind about the unpaid order', () => {
     beforeEach(() => {
       startPayment.mockRejectedValue(refusal('FISCAL_DATA_INCOMPLETE'));
       transport.getOrder.mockResolvedValue(order('pending_payment'));
+      transport.cancelOrder.mockResolvedValue(order('cancelled'));
     });
 
-    test('is the buyer\'s choice, and returns them to a working checkout', async () => {
+    test('cancels it on the backend, and returns them to a working checkout', async () => {
       await placeWithPayme();
 
-      await press(pressable('Оформить заказ заново'));
+      await press(pressable('Отменить заказ'));
 
+      expect(transport.cancelOrder).toHaveBeenCalledWith('ord_1');
       expect(exists('checkout-payment-failed')).toBe(false);
+      expect(exists('checkout-order-cancelled')).toBe(true);
+      expect(allText()).toContain('Заказ ord_1 отменён.');
       expect(allText()).toContain('Курьер Mator | 32 500 сум');
       expect(nbsp(String(button().props.title))).toBe('Оформить заказ');
-    expect(within('checkout-total')).toContain('232 500 сум');
+      expect(within('checkout-total')).toContain('232 500 сум');
       expect(transport.createOrder).toHaveBeenCalledTimes(1);
+      expect(cart.clearCart).not.toHaveBeenCalled();
       expect(stored.record).toBeNull();
     });
 
@@ -421,7 +439,7 @@ describe('Paying for an order at checkout', () => {
 
     test('then another payment method can be used, as a new order', async () => {
       await placeWithPayme();
-      await press(pressable('Оформить заказ заново'));
+      await press(pressable('Отменить заказ'));
       await press(pressable('Наличные'));
       transport.createOrder.mockResolvedValue({ orderId: 'ord_2', eta: '', totalLabel: '' });
 
@@ -433,6 +451,46 @@ describe('Paying for an order at checkout', () => {
       expect(replace).toHaveBeenCalledWith({
         pathname: '/order-confirmation',
         params: { orderId: 'ord_2' },
+      });
+    });
+
+    test('a refused cancel keeps the order, and says why', async () => {
+      transport.cancelOrder.mockRejectedValue(new ApiError(409, 'ORDER_NOT_CANCELLABLE', 'server words'));
+      await placeWithPayme();
+
+      await press(pressable('Отменить заказ'));
+
+      expect(exists('checkout-payment-failed')).toBe(true);
+      expect(allText()).toContain('Этот заказ уже нельзя отменить из приложения.');
+      expect(allText()).not.toContain('server words');
+      expect(stored.record).toMatchObject({ orderId: 'ord_1' });
+      await press(button());
+      expect(transport.createOrder).toHaveBeenCalledTimes(1);
+    });
+
+    test('a cancel that could not be sent can be tried again', async () => {
+      transport.cancelOrder.mockRejectedValueOnce(new ApiError(0, 'NETWORK', 'offline'));
+      await placeWithPayme();
+
+      await press(pressable('Отменить заказ'));
+      expect(allText()).toContain('Не удалось отменить заказ. Попробуйте ещё раз.');
+
+      await press(pressable('Отменить заказ'));
+      expect(transport.cancelOrder).toHaveBeenCalledTimes(2);
+      expect(exists('checkout-payment-failed')).toBe(false);
+    });
+
+    test('an order paid before the cancel reached it goes to its confirmation', async () => {
+      transport.cancelOrder.mockRejectedValue(new ApiError(409, 'ORDER_NOT_CANCELLABLE', ''));
+      await placeWithPayme();
+      transport.getOrder.mockResolvedValue(order('paid'));
+
+      await press(pressable('Отменить заказ'));
+
+      expect(cart.clearCart).toHaveBeenCalledTimes(1);
+      expect(replace).toHaveBeenCalledWith({
+        pathname: '/order-confirmation',
+        params: { orderId: 'ord_1' },
       });
     });
   });
@@ -511,16 +569,60 @@ describe('Paying for an order at checkout', () => {
       expect(button().props.disabled).toBe(false);
     });
 
-    test('paying the old order does not clear a cart since changed', async () => {
-      stored.record = { ...RECORD, cartKey: 'other_part:1' };
-      transport.getOrder.mockResolvedValue(order('pending_payment'));
-      await mount();
+    describe('with a cart changed since that order', () => {
+      const OLD = { ...RECORD, cartKey: 'other_part:1' };
+      beforeEach(() => {
+        stored.record = OLD;
+        transport.getOrder.mockImplementation(async (id: string) =>
+          id === 'ord_1' ? order('pending_payment') : { ...order('paid'), id },
+        );
+      });
 
-      transport.getOrder.mockResolvedValue(order('paid'));
-      await press(button());
+      test('the checkout is for a new order, and only mentions the old one', async () => {
+        await mount();
 
-      expect(cart.clearCart).not.toHaveBeenCalled();
-      expect(replace).toHaveBeenCalled();
+        expect(exists('checkout-payment-failed')).toBe(false);
+        expect(exists('checkout-other-unpaid')).toBe(true);
+        expect(allText()).toContain('У вас есть неоплаченный заказ');
+        expect(nbsp(String(button().props.title))).toBe('Оформить заказ');
+        expect(button().props.disabled).toBe(false);
+      });
+
+      test('placing it places a new order, and pays that one', async () => {
+        transport.createOrder.mockResolvedValue({ orderId: 'ord_2', eta: '', totalLabel: "232 500 so'm" });
+        await mount();
+
+        await press(button());
+
+        expect(transport.createOrder).toHaveBeenCalledTimes(1);
+        expect(startPayment.mock.calls[0]![0].orderId).toBe('ord_2');
+        expect(replace).toHaveBeenCalledWith({
+          pathname: '/order-confirmation',
+          params: { orderId: 'ord_2' },
+        });
+      });
+
+      test('the old order can be paid from its own screen', async () => {
+        await mount();
+
+        await press(pressable('Оплатить'));
+
+        expect(push).toHaveBeenCalledWith({ pathname: '/track-order', params: { orderId: 'ord_1' } });
+        expect(startPayment).not.toHaveBeenCalled();
+      });
+
+      test('or cancelled here, which leaves the new cart alone', async () => {
+        transport.cancelOrder.mockResolvedValue(order('cancelled'));
+        await mount();
+
+        await press(pressable('Отменить заказ'));
+
+        expect(transport.cancelOrder).toHaveBeenCalledWith('ord_1');
+        expect(exists('checkout-other-unpaid')).toBe(false);
+        expect(exists('checkout-order-cancelled')).toBe(true);
+        expect(cart.clearCart).not.toHaveBeenCalled();
+        expect(stored.record).toBeNull();
+      });
     });
 
     test('a record is written before the payment starts, so a crash cannot lead to a second order', async () => {

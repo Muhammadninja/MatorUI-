@@ -17,12 +17,16 @@ type RestoreOptions = {
 };
 
 /** Restore the server-consumed cart after an unpaid order, without crossing sessions.
- * Missing/sourced lines stay on the unpaid order; the final fetch remains authoritative. */
+ * Missing/sourced lines stay on the unpaid order; the final fetch remains authoritative.
+ * With `lines` (a cancelled order's parts), those go back instead of the local cart, and only
+ * what the cart lacks of each is added, so a line already there is never doubled. */
 export function useCartRestore({ snapshotRef, authedRef, mutations, setPendingIds,
   markPending, clearPending, setItems, setAppliedPromo, syncCharges }: RestoreOptions) {
   const authEpoch = getAuthRequestEpoch();
-  return useCallback(async (): Promise<CartItem[]> => {
-    const { items: wanted, appliedPromo: promo } = snapshotRef.current;
+  return useCallback(async (lines?: CartItem[]): Promise<CartItem[]> => {
+    const wanted = lines ?? snapshotRef.current.items;
+    // A promo belongs to the cart it was applied to, not to an order coming back into it.
+    const promo = lines ? null : snapshotRef.current.appliedPromo;
     if (!authedRef.current) return wanted;
     const ticket = mutations.begin('cart');
     const version = mutations.readVersion();

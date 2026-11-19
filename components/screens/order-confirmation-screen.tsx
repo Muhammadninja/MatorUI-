@@ -1,5 +1,6 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { AlertCircle, Check } from 'lucide-react-native';
+import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView } from 'react-native';
 
@@ -34,8 +35,10 @@ export default function OrderConfirmationScreen() {
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
 
+  const navigation = useNavigation();
   const { orderId } = useLocalSearchParams<{ orderId?: string }>();
   const { state, order, error, refresh } = useOrder(orderId ?? null);
+  const leaving = useRef(false);
 
   const goTrackOrder = () => {
     triggerHaptic('selection');
@@ -43,14 +46,23 @@ export default function OrderConfirmationScreen() {
   };
 
   const goShopping = () => {
+    if (leaving.current) return;
+    leaving.current = true;
     triggerHaptic('selection');
-    // This screen lives on the Cart tab's stack ([cart → checkout → here]).
-    // Pop the whole checkout flow back to the cart root FIRST, so returning to
-    // the Cart tab shows the (now-empty) cart, not this receipt. Then jump to
-    // Explore with `navigate` (not `push`) so we land on the existing Explore
-    // root instead of stacking a duplicate.
-    if (router.canDismiss()) router.dismissAll();
-    router.navigate('/explore');
+    // This screen lives on the Cart tab's stack ([cart → here]). The flow is popped back to
+    // the cart root so returning to the Cart tab shows the cart, not this receipt, and only
+    // then does the app switch to Explore (`navigate`, so the existing Explore root is used).
+    //
+    // The order matters. A native stack whose tab is not on screen defers every change until
+    // the tab is shown again (react-native-screens skips updates while it has no window), so
+    // a pop sent together with the tab switch ran, animated, on coming back to the cart: this
+    // receipt slid away in front of the buyer. So the pop goes first, with no animation, while
+    // the tab is still visible, and the tab switch a frame later.
+    navigation.setOptions({ animation: 'none' });
+    requestAnimationFrame(() => {
+      if (router.canDismiss()) router.dismissAll();
+      requestAnimationFrame(() => router.navigate('/explore'));
+    });
   };
 
   if (state === 'loading' || state === 'idle') {

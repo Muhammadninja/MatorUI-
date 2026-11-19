@@ -208,6 +208,8 @@ vi.mock('@/hooks/use-catalog-list', () => ({
   },
 }));
 
+// The order status card on Home is covered in order-status-card.test.tsx.
+vi.mock('@/components/screens-components/orders/order-status-card', () => ({ OrderStatusCard: () => null }));
 import CatalogPartsScreen from '@/components/screens/catalog-parts-screen';
 import CatalogSubcategoriesScreen from '@/components/screens/catalog-subcategories-screen';
 import CatalogSystemsScreen from '@/components/screens/catalog-systems-screen';

@@ -91,6 +91,10 @@ vi.mock('@/hooks/use-legal', () => ({
 vi.mock('@/hooks/use-support-contacts', () => ({ useSupportContacts: () => state.support }));
 
 import ReturnPolicyScreen from '@/components/screens/return-policy-screen';
+// Cancelling (and its parts going back to the cart) is covered in order-payment-screens.test.tsx.
+vi.mock('@/hooks/use-cancel-order', () => ({ useCancelOrderToCart: () => ({ run: vi.fn(), isPending: false }) }));
+// Where a pickup order is collected is covered in order-payment-screens.test.tsx.
+vi.mock('@/components/screens-components/checkout/pickup-points', () => ({ PickupPoints: () => null }));
 import TrackOrderScreen from '@/components/screens/track-order-screen';
 import i18n from '@/services/i18n';
 import { formatOrderNo } from '@/services/orders-service';

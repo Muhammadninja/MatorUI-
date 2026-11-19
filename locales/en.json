@@ -76,7 +76,7 @@
     "signedOutToast": "Signed out",
     "namePlaceholder": "Your Profile",
     "editProfileTitle": "Edit profile",
-    "orderHistoryTitle": "Order history",
+    "orderHistoryTitle": "My orders",
     "addressesTitle": "Shipping addresses",
     "likedTitle": "Favorites",
     "settingsTitle": "Settings"
@@ -103,7 +103,8 @@
       "inTransit": "In Transit",
       "outForDelivery": "Out for delivery",
       "delivered": "Delivered",
-      "cancelled": "Cancelled"
+      "cancelled": "Cancelled",
+      "refunded": "Refunded"
     },
     "step": {
       "placed": "Order placed",
@@ -476,7 +477,6 @@
     "paymentOrderClosed": "This order can no longer be paid. Your items are still in the cart, so you can order them again.",
     "unpaidOrderNumber": "Order {{number}}",
     "viewOrder": "View order",
-    "startNewOrder": "Place the order again",
     "unpaidOrderExpires": "An unpaid order is cancelled automatically.",
     "deliveryErrorCourierOff": "Courier delivery isn’t available yet. You can pick the order up instead.",
     "reviewAddress": "Address",
@@ -489,7 +489,12 @@
     "retryPaymentShort": "Pay for order",
     "pickupOpenMap": "Open in Maps",
     "refundPolicyPrefix": "Before you pay, see the",
-    "refundPolicyLink": "refund and returns conditions"
+    "refundPolicyLink": "refund and returns conditions",
+    "otherUnpaidTitle": "You have an unpaid order",
+    "otherUnpaidBody": "Order {{number}} ({{total}}) is waiting for payment. You can pay for it or cancel it. It doesn't affect this new order.",
+    "otherUnpaidBodyNoTotal": "Order {{number}} is waiting for payment. You can pay for it or cancel it. It doesn't affect this new order.",
+    "otherUnpaidPay": "Pay for it",
+    "unpaidOrderCancelled": "Order {{number}} is cancelled."
   },
   "orderConfirmation": {
     "loadErrorTitle": "Couldn't load your order",
@@ -507,7 +512,7 @@
     "closedSubtitle": "This order wasn’t paid and is no longer active."
   },
   "orderHistory": {
-    "title": "Order history",
+    "title": "My orders",
     "loadError": "Could not load your orders.",
     "emptyText": "You haven't placed any orders yet.",
     "startShopping": "Start shopping",
@@ -516,7 +521,12 @@
     "dateItems_other": "{{date}} · {{count}} items",
     "autoCancelIn": "Cancels in {{time}}",
     "autoCancelling": "Time is up",
-    "autoCancelA11y": "Cancels automatically in {{time}}"
+    "autoCancelA11y": "Cancels automatically in {{time}}",
+    "tabActive": "Active",
+    "tabAll": "All",
+    "tabA11y": "{{label}}: {{count}}",
+    "noActive": "No active orders right now.",
+    "showAll": "All orders"
   },
   "trackOrder": {
     "unitPrice": "Unit price",
@@ -542,7 +552,9 @@
     "autoCancelBody": "If the order isn't paid or confirmed in time, it is cancelled automatically.",
     "autoCancelExpired": "Payment time is up. The order status will update shortly.",
     "autoCancelA11y": "{{time}} left before the order is cancelled",
-    "returnConditions": "Return conditions"
+    "returnConditions": "Return conditions",
+    "cancelled": "The order is cancelled.",
+    "cancelledToCart": "The order is cancelled. Its items are back in your cart."
   },
   "explore": {
     "pricesStockUpdated": "Prices & stock updated",
@@ -1153,5 +1165,25 @@
     "messageGeneral": "Hello! I have a question about returning a product.",
     "emailSubject": "Return for order {{orderNo}}",
     "emailSubjectGeneral": "Question about a return"
+  },
+  "orderStage": {
+    "awaitingPayment": "Awaiting payment",
+    "awaitingPaymentBody": "Pay for the order before it is cancelled automatically.",
+    "awaitingConfirmation": "Awaiting confirmation",
+    "awaitingConfirmationBody": "You pay on receipt. We will confirm the order soon.",
+    "preparing": "Being prepared",
+    "preparingBody": "The order is accepted and is being prepared.",
+    "onTheWay": "On the way",
+    "onTheWayBody": "The courier is bringing your order.",
+    "onTheWayPickupBody": "The order is on its way to the pickup point.",
+    "readyForPickup": "Ready for pickup",
+    "readyForPickupBody": "Your order has arrived. You can pick it up at the pickup point.",
+    "delivered": "Delivered",
+    "deliveredBody": "Your order has been delivered.",
+    "refunded": "Refunded",
+    "refundedBody": "The money for this order has been returned.",
+    "cardA11y": "{{title}}, order {{number}}. {{body}}",
+    "moreOrders_one": "{{count}} more order",
+    "moreOrders_other": "{{count}} more orders"
   }
 }

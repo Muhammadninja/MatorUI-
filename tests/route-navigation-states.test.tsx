@@ -24,6 +24,10 @@ vi.mock('@/components/shared/app-text', () => ({ AppText: ({ children }: any) =>
 vi.mock('@/components/shared/app-button', () => ({ AppButton: (props: any) => <button {...props}>{props.title}</button> }));
 vi.mock('@/components/shared/wheel-loader', () => ({ WheelLoader: () => <span>loading</span> }));
 import VinFinderScreen from '@/app/vin-finder';
+// Cancelling (and its parts going back to the cart) is covered in order-payment-screens.test.tsx.
+vi.mock('@/hooks/use-cancel-order', () => ({ useCancelOrderToCart: () => ({ run: vi.fn(), isPending: false }) }));
+// Where a pickup order is collected is covered in order-payment-screens.test.tsx.
+vi.mock('@/components/screens-components/checkout/pickup-points', () => ({ PickupPoints: () => null }));
 import TrackOrderScreen from '@/components/screens/track-order-screen';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 beforeEach(() => { vi.clearAllMocks(); state.canBack = false; state.orderState = 'not_found'; });

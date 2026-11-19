@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { router, useFocusEffect, useNavigationContainerRef } from 'expo-router';
 import { Heart, LogOut, MapPin, ReceiptText, Shield, User } from 'lucide-react-native';
 
+import { OrderStatusCard } from '@/components/screens-components/orders/order-status-card';
 import ProfileGuestEmpty from '@/components/screens-components/profile/profile-guest-empty';
 import ScreenShell from '@/components/screens-components/screen-shell';
 import { AppIconBox } from '@/components/shared/app-icon-box';
@@ -189,6 +190,9 @@ export default function ProfileScreen() {
               <StatCell label={t('profile.statSaved')} value={String(likedIds.size)} />
             </AppView>
           </AppView>
+
+          {/* The current order, when there is one, above the menu that lists them all. */}
+          <OrderStatusCard testID="profile-order-status" px="lg" />
 
           {/* Handoff §17 rows, minus the sub-lines (see buildAccountItems). */}
           <AppView gap={10} px="lg">

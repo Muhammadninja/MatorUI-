@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { describe, expect, test } from 'vitest';
 
-import { canCancelOrder, formatCountdown, orderPaymentDeadline } from './order-cancel-window';
+import { canCancelOrder, formatCountdown, orderCartLines, orderPaymentDeadline } from './order-cancel-window';
 
 const EXPIRES = '2026-11-12T10:30:00.000Z';
 const waitingOnline = { serverStatus: 'pending_payment', paymentType: 'payme', expiresAt: EXPIRES };
@@ -43,13 +43,20 @@ describe('canCancelOrder', () => {
     expect(canCancelOrder({ serverStatus: 'pending_payment', paymentType })).toBe(true);
   });
 
-  test.each(['payme', null, undefined])('never for payment type %s (the backend refuses it)', (paymentType) => {
-    expect(canCancelOrder({ serverStatus: 'pending_payment', paymentType })).toBe(false);
+  test.each(['payme', null, undefined])('offers it on an unpaid online order too (payment type %s)', (paymentType) => {
+    expect(canCancelOrder({ serverStatus: 'pending_payment', paymentType })).toBe(true);
   });
 
-  test('never once the order has moved on', () => {
-    expect(canCancelOrder({ serverStatus: 'paid', paymentType: 'cash' })).toBe(false);
+  test('offers it while a Payme transaction is open: the backend decides', () => {
+    expect(canCancelOrder({ ...waitingOnline, expirySuspended: true })).toBe(true);
   });
+
+  test.each(['paid', 'processing', 'shipped', 'delivered', 'cancelled', 'expired', undefined])(
+    'never once the order is %s',
+    (serverStatus) => {
+      expect(canCancelOrder({ serverStatus, paymentType: 'cash' })).toBe(false);
+    },
+  );
 });
 
 describe('the countdown never cancels by itself', () => {
@@ -72,3 +79,33 @@ describe('formatCountdown', () => {
     expect(formatCountdown(ms)).toBe(text);
   });
 });
+
+describe('orderCartLines: what a cancelled order puts back in the cart', () => {
+  test('its parts, at the quantity ordered, with the unit price the order stated', () => {
+    expect(
+      orderCartLines({
+        items: [
+          { partId: 'part_1', title: 'Колодки', quantity: 2, price: "100 000 so'm" },
+          { partId: null, title: 'Установка', quantity: 1, price: "50 000 so'm" },
+          { partId: 'part_2', title: 'Фильтр', quantity: 0, price: '' },
+        ],
+        pricing: { lines: [{ unitPrice: 100_000 }, { unitPrice: 50_000 }, { unitPrice: null }] },
+      }),
+    ).toEqual([
+      {
+        id: 'part_1',
+        title: 'Колодки',
+        description: '',
+        price: '100000',
+        priceLabel: "100 000 so'm",
+        quantity: 2,
+      },
+    ]);
+  });
+
+  test('a price the order did not state is left to the server', () => {
+    const [line] = orderCartLines({ items: [{ partId: 'p', title: 'X', quantity: 1, price: '' }] });
+    expect(line!.price).toBe('0');
+  });
+});
+

@@ -1,6 +1,7 @@
 /** Live HTTP transport and public contracts. Test doubles live under tests/support. */
 import i18next from 'i18next';
 import { confirmedMoney, formatOrderMoney, getOrderPricing } from '@/services/order-pricing';
+import { parseOrderPickupPoints } from '@/services/pickup-points';
 import type {
   Address,
   AddressInput,
@@ -14,6 +15,7 @@ import type {
   OrderDetail,
   OrderListPage,
   OrderListRow,
+  OrderDeliveryMethod,
   OrderListStatus,
   OrderStatus,
   PaymentMethod,
@@ -146,6 +148,8 @@ export type RawBackendOrder = {
   expiry_suspended?: boolean;
   /** When the order was delivered; null before delivery. */
   delivered_at?: string | null;
+  /** Detail only, pickup orders only: where each dealer's goods are collected. */
+  pickup_points?: unknown;
   created_at?: string;
   updated_at?: string;
 };
@@ -194,8 +198,9 @@ export function formatDate(iso?: string): string {
 function mapListStatus(s: string): OrderListStatus {
   switch (s) {
     case 'delivered':
-    case 'refunded':
       return 'Delivered';
+    case 'refunded':
+      return 'Refunded';
     case 'shipped':
     case 'out_for_delivery':
       return 'Out for delivery';
@@ -282,7 +287,13 @@ export function mapOrderToListRow(o: RawBackendOrder): OrderListRow {
     createdAt: o.created_at,
     expiresAt: o.expires_at,
     expirySuspended: o.expiry_suspended === true,
+    deliveryMethod: asDeliveryMethod(o.delivery_method),
+    deliveredAt: o.delivered_at ?? undefined,
   };
+}
+
+function asDeliveryMethod(value: string | null | undefined): OrderDeliveryMethod | null {
+  return value === 'pickup' || value === 'courier' ? value : null;
 }
 
 function asPaymentType(value: string | null | undefined): PaymentType | null {
@@ -319,6 +330,7 @@ export function mapOrderToDetail(o: RawBackendOrder): OrderDetail {
     items: (o.items ?? []).map((it, i) => ({
       id: it.part_id ?? it.service_id ?? `item_${i}`,
       productId: it.part_id ?? it.service_id ?? null,
+      partId: it.part_id ?? null,
       title: it.title ?? 'Item',
       quantity: pricing.lines[i].quantity ?? 0,
       price: formatUzs(pricing.lines[i].unitPrice),
@@ -332,6 +344,8 @@ export function mapOrderToDetail(o: RawBackendOrder): OrderDetail {
     expiresAt: o.expires_at,
     expirySuspended: o.expiry_suspended === true,
     deliveredAt: o.delivered_at ?? undefined,
+    deliveryMethod: asDeliveryMethod(o.delivery_method),
+    pickupPoints: parseOrderPickupPoints(o.pickup_points),
   };
 }
 

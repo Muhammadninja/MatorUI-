@@ -23,8 +23,9 @@ export type CartContextValue = {
   addItem: (item: Omit<CartItem, 'quantity'>) => void;
   removeItem: (itemId: string) => void;
   clearCart: () => void;
-  /** Restores missing server lines after an unpaid order; safe to repeat. */
-  restoreCart: () => Promise<CartItem[]>;
+  /** Restores missing server lines after an unpaid order; safe to repeat. Given `lines`
+   *  (a cancelled order's parts), adds what the cart lacks of those instead. */
+  restoreCart: (lines?: CartItem[]) => Promise<CartItem[]>;
   incrementItem: (itemId: string) => void;
   decrementItem: (itemId: string) => void;
   applyPromoCode: (code: string) => PromoResult;

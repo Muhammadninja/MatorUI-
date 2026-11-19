@@ -214,6 +214,40 @@ test('tops up a line that is partly there, and leaves more than was wanted alone
   await act(async () => tree.unmount());
 });
 
+test("a cancelled order's lines go back into an empty cart, at the quantities ordered", async () => {
+  const tree = await render();
+  consumed();
+
+  let items!: typeof value.items;
+  await act(async () => {
+    items = await value.restoreCart([line('part_3', 2)]);
+  });
+
+  const server = await state.transport.fetch();
+  expect(server.items.map((i: { id: string; quantity: number }) => [i.id, i.quantity])).toEqual([
+    ['part_3', 2],
+  ]);
+  expect(items.map((i) => [i.id, i.quantity])).toEqual([['part_3', 2]]);
+  expect(value.items.map((i) => i.id)).toEqual(['part_3']);
+  await act(async () => tree.unmount());
+});
+
+test("a cancelled order's lines join what the cart holds, never doubling one already there", async () => {
+  const tree = await render();
+
+  await act(async () => {
+    await value.restoreCart([line('part_1', 2), line('part_3', 1)]);
+  });
+
+  const server = await state.transport.fetch();
+  expect(server.items.map((i: { id: string; quantity: number }) => [i.id, i.quantity])).toEqual([
+    ['part_1', 2],
+    ['part_2', 1],
+    ['part_3', 1],
+  ]);
+  await act(async () => tree.unmount());
+});
+
 test('a part no longer sold stays out, and does not stop the others', async () => {
   const tree = await render();
   consumed();

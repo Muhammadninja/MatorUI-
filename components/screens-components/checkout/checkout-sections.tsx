@@ -11,16 +11,13 @@ import type { PaymentOption } from '@/constants/payment-options';
 import { useThemeContext } from '@/contexts/theme.context';
 import {
   formatAddressLine,
-  paymentFailureKey,
-  paymentFailureTitleKey,
   quoteErrorAction,
   quoteErrorKey,
   type CheckoutDelivery,
   type CourierOffer,
   type DeliveryMethod,
-  type PaymentFailureReason,
 } from '@/services/checkout-presentation';
-import { formatOrderNo, type Address } from '@/services/orders-service';
+import type { Address } from '@/services/orders-service';
 
 type Tokens = ReturnType<typeof useThemeContext>['tokens'];
 
@@ -444,50 +441,6 @@ export function DeliveryOptionsCard({
       ) : null}
       {/* In a sheet both choices come first; where to collect follows them. */}
       {pickupChosen && bare ? pickupDetails : null}
-    </AppView>
-  );
-}
-
-// ── Unpaid order ───────────────────────────────────────────────────────
-// Takes the place of the address, payment and delivery choices: those were made when the
-// order was placed, and this pays that order. Choosing differently means a new order.
-
-export function PaymentRetryCard({
-  tokens,
-  orderId,
-  failure,
-  onViewOrder,
-  onStartOver,
-}: {
-  tokens: Tokens;
-  orderId: string;
-  failure: PaymentFailureReason | null;
-  onViewOrder: () => void;
-  onStartOver: () => void;
-}) {
-  const { t } = useTranslation();
-  const reason = failure ?? 'unpaid';
-  return (
-    <AppView testID="checkout-payment-failed" rounded={16} p={16} colorName="card" borderWidth={1} borderName="border" gap={10}>
-      <AppView row align="center" gap={8}>
-        <AlertCircle size={18} strokeWidth={2} color={tokens.error} />
-        <AppText family="heading" weight="bold" style={{ fontSize: 16, color: tokens.text, flex: 1 }}>
-          {t(paymentFailureTitleKey(reason))}
-        </AppText>
-      </AppView>
-      <AppText family="default" style={{ fontSize: 13.5, color: tokens.text }}>
-        {t(paymentFailureKey(reason))}
-      </AppText>
-      <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>
-        {t('checkout.unpaidOrderNumber', { number: formatOrderNo(orderId) })}
-      </AppText>
-      <AppView row gap={18} style={{ marginTop: 2 }}>
-        <LinkAction label={t('checkout.viewOrder')} onPress={onViewOrder} color={tokens.text} />
-        <LinkAction label={t('checkout.startNewOrder')} onPress={onStartOver} color={tokens.text} />
-      </AppView>
-      <AppText family="default" style={{ fontSize: 12, color: tokens.textMuted }}>
-        {t('checkout.unpaidOrderExpires')}
-      </AppText>
     </AppView>
   );
 }

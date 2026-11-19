@@ -5,7 +5,7 @@
  * never replaced by another. Nothing here adds a dealer, an address or a point the backend
  * did not state.
  */
-import type { DeliveryPoint, PickupPoint } from '@/services/orders-service';
+import type { DeliveryPoint, OrderPickupPoint, PickupPoint } from '@/services/orders-service';
 
 type RawPickupItem = {
   cart_item_id?: unknown;
@@ -60,6 +60,41 @@ export function parsePickupPoints(raw: unknown): PickupPoint[] {
     if (!isObject(entry)) return [];
     const point = entry as RawPickupPoint;
     const items = Array.isArray(point.items) ? point.items.flatMap(parseItem) : [];
+    if (items.length === 0) return [];
+    return [
+      {
+        dealerId: text(point.dealer_id),
+        dealerName: text(point.dealer_name),
+        address: text(point.address),
+        landmark: text(point.landmark),
+        location: parsePickupLocation(point.location),
+        items,
+      },
+    ];
+  });
+}
+
+function parseOrderItem(raw: unknown): OrderPickupPoint['items'] {
+  if (!isObject(raw)) return [];
+  const id = text(raw.order_item_id);
+  const title = text(raw.title);
+  const quantity = raw.quantity;
+  if (!id || !title) return [];
+  if (typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity < 1) return [];
+  return [{ id, partId: text(raw.part_id), title, quantity }];
+}
+
+/**
+ * A placed pickup order's `pickup_points` (`GET /v1/orders/:id`): the same rules as the
+ * cart's, keyed by order line. Null when the backend sent no list at all, so a backend
+ * that does not state them yet reads as "not known" rather than "nowhere".
+ */
+export function parseOrderPickupPoints(raw: unknown): OrderPickupPoint[] | null {
+  if (!Array.isArray(raw)) return null;
+  return raw.flatMap((entry): OrderPickupPoint[] => {
+    if (!isObject(entry)) return [];
+    const point = entry as RawPickupPoint;
+    const items = Array.isArray(point.items) ? point.items.flatMap(parseOrderItem) : [];
     if (items.length === 0) return [];
     return [
       {

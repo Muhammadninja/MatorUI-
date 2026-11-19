@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { useCancelOrder, useRefreshOrders } from '@/hooks/use-orders';
+import { useRefreshOrders } from '@/hooks/use-orders';
 import {
   canCancelOrder,
   orderPaymentDeadline,
@@ -12,10 +12,9 @@ export type OrderCancelWindow = {
   remainingMs: number | null;
   /** The deadline has passed. Display only: the order is unchanged until the backend says. */
   expired: boolean;
-  /** Whether the manual cancel button applies (cash or terminal order, still waiting). */
+  /** Whether the manual cancel button applies: the order still waits in pending_payment.
+   *  The cancel itself is `useCancelOrderToCart`, pressed by the buyer, never on a timer. */
   canCancel: boolean;
-  /** Manual cancel, for the detail screen's button. Never called on a timer. */
-  cancel: ReturnType<typeof useCancelOrder>;
 };
 
 /**
@@ -24,11 +23,9 @@ export type OrderCancelWindow = {
  * It never cancels and never changes the order itself.
  */
 export function useOrderCancelWindow(
-  orderId: string | null | undefined,
   order: CancelWindowSource | null | undefined,
 ): OrderCancelWindow {
   const deadline = order ? orderPaymentDeadline(order) : null;
-  const cancel = useCancelOrder(orderId);
   const refreshOrders = useRefreshOrders();
   const [now, setNow] = useState(() => Date.now());
 
@@ -52,5 +49,5 @@ export function useOrderCancelWindow(
     refreshOrders();
   }, [expired, refreshOrders]);
 
-  return { remainingMs, expired, canCancel: order ? canCancelOrder(order) : false, cancel };
+  return { remainingMs, expired, canCancel: order ? canCancelOrder(order) : false };
 }

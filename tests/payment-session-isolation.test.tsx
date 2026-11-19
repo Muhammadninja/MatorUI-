@@ -28,7 +28,10 @@ vi.mock('@/contexts/cart.context', () => ({
   }),
 }));
 vi.mock('@/services/api-client', () => ({ getAuthRequestEpoch: () => mock.epoch }));
-vi.mock('@/hooks/use-orders', () => ({ useOrder: () => ({ order: null }) }));
+vi.mock('@/hooks/use-orders', () => ({
+  useOrder: () => ({ order: null }),
+  useRefreshOrders: () => () => undefined,
+}));
 vi.mock('@/services/pending-payment-storage', () => ({
   loadPendingPayment: mock.load,
   savePendingPayment: mock.save,

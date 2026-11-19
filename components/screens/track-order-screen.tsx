@@ -8,15 +8,19 @@ import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { OrderLinePrice, OrderPriceBreakdown } from '@/components/screens-components/orders/order-price-breakdown';
+import { OrderTimeline } from '@/components/screens-components/orders/order-timeline';
 import { OrderChargeRows } from '@/components/screens-components/checkout/checkout-sections';
+import { PickupPoints } from '@/components/screens-components/checkout/pickup-points';
 import { AppButton } from '@/components/shared/app-button';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
+import { useCancelOrderToCart } from '@/hooks/use-cancel-order';
 import { useRecoverPayment } from '@/hooks/use-order-payment';
 import { useOrderCancelWindow } from '@/hooks/use-order-cancel-window';
 import { useOrder } from '@/hooks/use-orders';
+import { useToast } from '@/hooks/use-toast';
 import { ApiError } from '@/services/api-client';
 import { formatCurrency } from '@/services/cart-math';
 import {
@@ -27,8 +31,16 @@ import {
   formatOrderNo,
   ORDER_STATUS_LABEL_I18N,
   ORDER_STEP_I18N,
+  type OrderDetail,
+  type PickupPoint,
 } from '@/services/orders-service';
 import { formatCountdown } from '@/services/order-cancel-window';
+import {
+  isClosedOrder,
+  ORDER_STAGE_I18N,
+  orderStage,
+  orderStageBodyKey,
+} from '@/services/order-groups';
 import { triggerHaptic } from '@/utils/haptics';
 
 /**
@@ -53,7 +65,9 @@ export default function TrackOrderScreen() {
   const { orderId } = useLocalSearchParams<{ orderId?: string }>();
   const { state, order, refresh } = useOrder(orderId ?? null);
   const recover = useRecoverPayment(orderId, refresh);
-  const { remainingMs, expired, canCancel, cancel } = useOrderCancelWindow(orderId, order);
+  const { remainingMs, expired, canCancel } = useOrderCancelWindow(order);
+  const cancel = useCancelOrderToCart(order);
+  const toast = useToast();
   const [cancelFailure, setCancelFailure] = useState<string | null>(null);
 
   const askToCancel = () => {
@@ -64,12 +78,18 @@ export default function TrackOrderScreen() {
         style: 'destructive',
         onPress: () => {
           setCancelFailure(null);
-          cancel.mutate(undefined, {
-            onSuccess: () => {
-              triggerHaptic('success');
+          // Its parts go back into the cart, so calling the order off loses nothing chosen.
+          cancel.run().then(
+            ({ cancelled, restoredToCart }) => {
+              if (cancelled) {
+                triggerHaptic('success');
+                toast.success(
+                  t(restoredToCart ? 'trackOrder.cancelledToCart' : 'trackOrder.cancelled'),
+                );
+              }
               refresh();
             },
-            onError: (err) => {
+            (err: unknown) => {
               setCancelFailure(
                 t(
                   err instanceof ApiError && err.status === 409
@@ -79,7 +99,7 @@ export default function TrackOrderScreen() {
               );
               refresh();
             },
-          });
+          );
         },
       },
     ]);
@@ -98,6 +118,10 @@ export default function TrackOrderScreen() {
       refreshRef.current();
     }, []),
   );
+
+  const stage = order ? orderStage(stageSource(order)) : null;
+  const stageBody = stage && order ? t(orderStageBodyKey(stage, order.deliveryMethod)) : null;
+  const pickupPoints = order ? orderPickupPoints(order) : null;
 
   const goShopping = () => {
     triggerHaptic('selection');
@@ -167,11 +191,22 @@ export default function TrackOrderScreen() {
                 minimumFontScale={0.7}
                 style={{ fontSize: 20, color: tokens.onBrand }}
               >
-                {localizeStatus(order.etaWindow) ||
-                  t(ORDER_STEP_I18N[order.status], {
-                    defaultValue: localizeStatus(order.statusLabel),
-                  })}
+                {stage
+                  ? t(ORDER_STAGE_I18N[stage].title)
+                  : localizeStatus(order.etaWindow) ||
+                    t(ORDER_STEP_I18N[order.status], {
+                      defaultValue: localizeStatus(order.statusLabel),
+                    })}
               </AppText>
+              {stageBody ? (
+                <AppText
+                  testID="track-order-stage-body"
+                  family="default"
+                  style={{ fontSize: 12.5, lineHeight: 17, color: `${tokens.onBrand}D9`, marginTop: 2 }}
+                >
+                  {stageBody}
+                </AppText>
+              ) : null}
             </AppView>
             <AppView style={{ alignItems: 'flex-end', flexShrink: 0 }}>
               <AppText
@@ -266,8 +301,8 @@ export default function TrackOrderScreen() {
             </AppView>
           ) : null}
 
-          {/* A cash or terminal order still waiting for an operator can be called off.
-              No timer: the backend decides, and refuses with 409 once it cannot. */}
+          {/* An order still waiting (for online payment, or for an operator) can be called
+              off. No timer: the backend decides, and refuses with 409 once it cannot. */}
           {canCancel ? (
             <AppView gap={8} testID="track-order-cancel">
               <AppButton
@@ -288,6 +323,23 @@ export default function TrackOrderScreen() {
               <AppText family="default" style={{ fontSize: 12.5, color: tokens.error, flex: 1 }}>
                 {cancelFailure}
               </AppText>
+            </AppView>
+          ) : null}
+
+          {/* A pickup order: where each dealer's goods are collected, as the backend
+              recorded them for this order. */}
+          {pickupPoints && pickupPoints.length > 0 ? (
+            <AppView
+              testID="track-order-pickup"
+              style={{
+                backgroundColor: tokens.card,
+                borderWidth: 1,
+                borderColor: tokens.border,
+                borderRadius: 16,
+                padding: 16,
+              }}
+            >
+              <PickupPoints tokens={tokens} state="success" points={pickupPoints} onRetry={refresh} />
             </AppView>
           ) : null}
 
@@ -371,79 +423,7 @@ export default function TrackOrderScreen() {
             />
           ) : null}
 
-          {/* Timeline */}
-          <AppView style={{ paddingLeft: 4 }}>
-            {order.steps.map((step, i) => {
-              const isLast = i === order.steps.length - 1;
-              const done = i <= order.currentStepIndex;
-              const active = i === order.currentStepIndex;
-              return (
-                <AppView
-                  key={step.key}
-                  row
-                  style={{ gap: 14, minHeight: isLast ? 30 : 62 }}
-                >
-                  {/* Dot + connector column */}
-                  <AppView style={{ alignItems: 'center' }}>
-                    <AppView
-                      center
-                      style={{
-                        width: 20,
-                        height: 20,
-                        borderRadius: 999,
-                        backgroundColor: done ? tokens.brandBg : 'transparent',
-                        borderWidth: done ? 0 : 2,
-                        borderColor: done ? tokens.brandBg : tokens.border,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {done ? (
-                        <AppText
-                          style={{
-                            fontSize: 11,
-                            fontWeight: '700',
-                            color: tokens.onBrand,
-                          }}
-                        >
-                          ✓
-                        </AppText>
-                      ) : null}
-                    </AppView>
-                    {!isLast ? (
-                      <AppView
-                        style={{
-                          flex: 1,
-                          width: 2,
-                          backgroundColor: done ? tokens.brandBg : tokens.border,
-                          marginTop: 2,
-                        }}
-                      />
-                    ) : null}
-                  </AppView>
-
-                  {/* Label + sub */}
-                  <AppView style={{ paddingBottom: 8 }}>
-                    <AppText
-                      family="accent"
-                      weight={active ? 'bold' : 'semibold'}
-                      style={{
-                        fontSize: 15,
-                        color: done ? tokens.text : tokens.textMuted,
-                      }}
-                    >
-                      {t(ORDER_STEP_I18N[step.key], { defaultValue: step.label })}
-                    </AppText>
-                    <AppText
-                      family="default"
-                      style={{ fontSize: 12, color: tokens.textMuted, marginTop: 2 }}
-                    >
-                      {step.caption}
-                    </AppText>
-                  </AppView>
-                </AppView>
-              );
-            })}
-          </AppView>
+          <OrderTimeline order={order} />
 
           {/* Ghost CTA */}
           <AppButton
@@ -458,4 +438,29 @@ export default function TrackOrderScreen() {
       )}
     </AppView>
   );
+}
+
+/** A pickup order's points, in the shape the checkout's pickup card reads. None once closed. */
+function orderPickupPoints(order: OrderDetail): PickupPoint[] | null {
+  if (order.deliveryMethod !== 'pickup' || !order.pickupPoints) return null;
+  if (isClosedOrder(stageSource(order))) return null;
+  return order.pickupPoints.map((point) => ({
+    ...point,
+    items: point.items.map((item) => ({
+      cartItemId: item.id,
+      partId: item.partId,
+      title: item.title,
+      quantity: item.quantity,
+    })),
+  }));
+}
+
+/** The detail, as the stage rules read it. Its timeline status is not a list pill. */
+function stageSource(order: OrderDetail) {
+  return {
+    serverStatus: order.serverStatus,
+    paymentType: order.paymentType,
+    deliveryMethod: order.deliveryMethod,
+    status: order.status === 'cancelled' ? ('Cancelled' as const) : undefined,
+  };
 }
