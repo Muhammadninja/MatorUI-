@@ -33,6 +33,7 @@ export type OrderListStatus =
   | 'In Transit'
   | 'Out for delivery'
   | 'Delivered'
+  | 'Refunded'
   | 'Cancelled';
 
 /**
@@ -47,6 +48,7 @@ export const ORDER_LIST_STATUS_I18N: Record<OrderListStatus, string> = {
   'In Transit': 'orderStatus.list.inTransit',
   'Out for delivery': 'orderStatus.list.outForDelivery',
   Delivered: 'orderStatus.list.delivered',
+  Refunded: 'orderStatus.list.refunded',
   Cancelled: 'orderStatus.list.cancelled',
 };
 
@@ -107,6 +109,8 @@ export type OrderItem = {
   id: string;
   /** The catalog part (or service) the line is for; null when the backend names none. */
   productId?: string | null;
+  /** The catalog part alone: null for a service or a sourced offer, which no cart can hold. */
+  partId?: string | null;
   title: string;
   quantity: number;
   /** Formatted server unit price; confirmed row totals live in OrderDetail.pricing. */
@@ -169,6 +173,18 @@ export type OrderListRow = {
   expiresAt?: string;
   /** The server has suspended expiry (an open Payme transaction): no countdown. */
   expirySuspended?: boolean;
+  /** How the buyer gets it, when the backend says: a pickup order is collected. */
+  deliveryMethod?: OrderDeliveryMethod | null;
+  /** ISO time the order was delivered, as the server sent it; absent before delivery. */
+  deliveredAt?: string;
+};
+
+/** `courier` brings it; `pickup` means the buyer collects it from the dealer. */
+export type OrderDeliveryMethod = 'courier' | 'pickup';
+
+/** Where the buyer collects a placed pickup order: one dealer, and its share of the lines. */
+export type OrderPickupPoint = Omit<PickupPoint, 'items'> & {
+  items: { id: string; partId: string | null; title: string; quantity: number }[];
 };
 
 export type OrderListPage = {
@@ -232,6 +248,11 @@ export type OrderDetail = {
   expirySuspended?: boolean;
   /** ISO time the order was delivered, as the server sent it; absent before delivery. */
   deliveredAt?: string;
+  /** How the buyer gets it, when the backend says. */
+  deliveryMethod?: OrderDeliveryMethod | null;
+  /** Where a pickup order is collected, dealer by dealer. Null when the backend states none
+   *  (a courier order, or a backend that does not send them yet). */
+  pickupPoints?: OrderPickupPoint[] | null;
 };
 
 export type PaymentMethod = {

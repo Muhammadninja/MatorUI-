@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { router } from 'expo-router';
 import { AlertCircle, PackageOpen, Timer } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
@@ -11,10 +11,18 @@ import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppPrice } from '@/components/shared/app-price';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
+import { stageColors } from '@/components/screens-components/orders/order-status-card';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useOrderCancelWindow } from '@/hooks/use-order-cancel-window';
 import { useOrders } from '@/hooks/use-orders';
 import { formatCountdown } from '@/services/order-cancel-window';
+import {
+  ORDER_STAGE_I18N,
+  orderStage,
+  orderStageTone,
+  ordersForTab,
+  type OrdersTab,
+} from '@/services/order-groups';
 import {
   formatOrderNo,
   ORDER_LIST_STATUS_I18N,
@@ -24,14 +32,22 @@ import {
 import { triggerHaptic } from '@/utils/haptics';
 
 /**
- * Order History — faithful rebuild of the prototype's order list, now on the
- * real orders layer (`useOrders`) with its loading / empty / error / success
- * state machine. Each row taps through to Track Order carrying its `orderId`.
+ * My orders — the buyer's orders on the real orders layer (`useOrders`) with its loading /
+ * empty / error / success states, in two tabs: what is still under way, and everything.
+ * A cancelled or expired order is never listed (see order-groups). It opens on "Active"
+ * when something is under way, on "All" otherwise. Each row taps through to Track Order
+ * carrying its `orderId`.
  */
 export default function OrderHistoryScreen() {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const { state, page, refresh } = useOrders();
+  const [chosenTab, setChosenTab] = useState<OrdersTab | null>(null);
+
+  const active = useMemo(() => ordersForTab(page?.items ?? [], 'active'), [page]);
+  const all = useMemo(() => ordersForTab(page?.items ?? [], 'all'), [page]);
+  const tab: OrdersTab = chosenTab ?? (active.length > 0 ? 'active' : 'all');
+  const shown = tab === 'active' ? active : all;
 
   return (
     <AppView flex={1} colorName="background" testID="order-history-screen">
@@ -49,8 +65,8 @@ export default function OrderHistoryScreen() {
           </AppText>
           <AppButton title={t('common.retry')} kind="secondary" size="sm" onPress={refresh} />
         </AppView>
-      ) : state === 'empty' ? (
-        <AppView flex={1} center px="xl" gap={12}>
+      ) : state === 'empty' || all.length === 0 ? (
+        <AppView flex={1} center px="xl" gap={12} testID="order-history-empty">
           <PackageOpen size={30} strokeWidth={2} color={tokens.textMuted} />
           <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted, textAlign: 'center' }}>
             {t('orderHistory.emptyText')}
@@ -65,11 +81,98 @@ export default function OrderHistoryScreen() {
             <RefreshControl refreshing={false} onRefresh={refresh} tintColor={tokens.textMuted} colors={[tokens.brandBg]} />
           }
         >
-          {(page?.items ?? []).map((order) => (
-            <OrderCard key={order.id} order={order} />
-          ))}
+          <OrdersTabs
+            tab={tab}
+            onChange={setChosenTab}
+            counts={{ active: active.length, all: all.length }}
+          />
+          {shown.length === 0 ? (
+            <AppView center gap={12} testID="order-history-active-empty" style={{ paddingVertical: 48 }}>
+              <PackageOpen size={30} strokeWidth={2} color={tokens.textMuted} />
+              <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted, textAlign: 'center' }}>
+                {t('orderHistory.noActive')}
+              </AppText>
+              <AppButton title={t('orderHistory.showAll')} kind="secondary" size="sm" onPress={() => setChosenTab('all')} />
+            </AppView>
+          ) : (
+            shown.map((order) => <OrderCard key={order.id} order={order} />)
+          )}
         </ScrollView>
       )}
+    </AppView>
+  );
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+
+function OrdersTabs({
+  tab,
+  onChange,
+  counts,
+}: {
+  tab: OrdersTab;
+  onChange: (tab: OrdersTab) => void;
+  counts: Record<OrdersTab, number>;
+}) {
+  const { t } = useTranslation();
+  const { tokens } = useThemeContext();
+  const tabs: { key: OrdersTab; label: string }[] = [
+    { key: 'active', label: t('orderHistory.tabActive') },
+    { key: 'all', label: t('orderHistory.tabAll') },
+  ];
+  return (
+    <AppView
+      testID="order-history-tabs"
+      row
+      accessibilityRole="tablist"
+      style={{ backgroundColor: tokens.backgroundSecondary, borderRadius: 12, padding: 3 }}
+    >
+      {tabs.map(({ key, label }) => {
+        const selected = key === tab;
+        return (
+          <AppPressableView
+            key={key}
+            testID={`order-history-tab-${key}`}
+            onPress={() => {
+              if (selected) return;
+              triggerHaptic('selection');
+              onChange(key);
+            }}
+            accessibilityRole="tab"
+            accessibilityState={{ selected }}
+            accessibilityLabel={t('orderHistory.tabA11y', { label, count: counts[key] })}
+            androidRipple={false}
+            flex={1}
+            row
+            center
+            gap={6}
+            style={{
+              minHeight: 38,
+              borderRadius: 10,
+              paddingHorizontal: 8,
+              backgroundColor: selected ? tokens.card : 'transparent',
+              borderWidth: selected ? 1 : 0,
+              borderColor: tokens.border,
+            }}
+          >
+            <AppText
+              family="accent"
+              weight={selected ? 'bold' : 'semibold'}
+              numberOfLines={1}
+              style={{ fontSize: 14, color: selected ? tokens.text : tokens.textMuted, flexShrink: 1 }}
+            >
+              {label}
+            </AppText>
+            <AppText
+              family="accent"
+              weight="bold"
+              style={{ fontSize: 12, color: tokens.textMuted, fontVariant: ['tabular-nums'] }}
+            >
+              {counts[key]}
+            </AppText>
+          </AppPressableView>
+        );
+      })}
     </AppView>
   );
 }
@@ -78,6 +181,7 @@ export default function OrderHistoryScreen() {
 
 const statusToneMap: Record<OrderListStatus, 'success' | 'warning' | 'error'> = {
   Delivered: 'success',
+  Refunded: 'success',
   'In Transit': 'warning',
   'Out for delivery': 'warning',
   Processing: 'warning',
@@ -88,11 +192,20 @@ const OrderCard = React.memo(function OrderCard({ order }: { order: OrderListRow
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
 
+  // The stage's own words and colour (Awaiting payment, On the way, Ready for pickup…),
+  // or the list pill's for a status the app has no stage for.
+  const stage = orderStage(order);
   const tone = statusToneMap[order.status] ?? 'warning';
-  const statusColor = tone === 'success' ? tokens.success : tone === 'error' ? tokens.error : tokens.warning;
-  // Localized display label, derived from the stable status value. Falls back
-  // to the raw server string if it's a status we don't have a key for.
-  const statusText = t(ORDER_LIST_STATUS_I18N[order.status] ?? '', { defaultValue: order.status });
+  const statusColor = stage
+    ? stageColors(tokens, orderStageTone(stage)).fg
+    : tone === 'success'
+      ? tokens.success
+      : tone === 'error'
+        ? tokens.error
+        : tokens.warning;
+  const statusText = stage
+    ? t(ORDER_STAGE_I18N[stage].title)
+    : t(ORDER_LIST_STATUS_I18N[order.status] ?? '', { defaultValue: order.status });
 
   const handlePress = () => {
     triggerHaptic('selection');
@@ -183,7 +296,7 @@ const OrderCard = React.memo(function OrderCard({ order }: { order: OrderListRow
 function OrderCountdownChip({ order }: { order: OrderListRow }) {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
-  const { remainingMs, expired } = useOrderCancelWindow(order.id, order);
+  const { remainingMs, expired } = useOrderCancelWindow(order);
   if (remainingMs === null) return null;
 
   const time = formatCountdown(remainingMs);

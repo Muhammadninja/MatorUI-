@@ -76,7 +76,7 @@
     "signedOutToast": "Hisobdan chiqdingiz",
     "namePlaceholder": "Profilingiz",
     "editProfileTitle": "Profilni tahrirlash",
-    "orderHistoryTitle": "Buyurtmalar tarixi",
+    "orderHistoryTitle": "Buyurtmalarim",
     "addressesTitle": "Yetkazib berish manzillari",
     "likedTitle": "Saqlanganlar",
     "settingsTitle": "Sozlamalar"
@@ -103,7 +103,8 @@
       "inTransit": "Yoʻlda",
       "outForDelivery": "Kuryer yoʻlda",
       "delivered": "Yetkazildi",
-      "cancelled": "Bekor qilindi"
+      "cancelled": "Bekor qilindi",
+      "refunded": "Pul qaytarildi"
     },
     "step": {
       "placed": "Buyurtma rasmiylashtirildi",
@@ -476,7 +477,6 @@
     "paymentOrderClosed": "Bu buyurtmani endi toʻlab boʻlmaydi. Mahsulotlar savatda qoldi, buyurtmani qayta rasmiylashtirish mumkin.",
     "unpaidOrderNumber": "Buyurtma {{number}}",
     "viewOrder": "Buyurtmani koʻrish",
-    "startNewOrder": "Qayta rasmiylashtirish",
     "unpaidOrderExpires": "Toʻlanmagan buyurtma avtomatik bekor qilinadi.",
     "deliveryErrorCourierOff": "Kuryer orqali yetkazib berish hozircha mavjud emas. Buyurtmani oʻzingiz olib ketishingiz mumkin.",
     "reviewAddress": "Manzil",
@@ -489,7 +489,12 @@
     "retryPaymentShort": "Buyurtmani toʻlash",
     "pickupOpenMap": "Xaritada ochish",
     "refundPolicyPrefix": "Toʻlovdan oldin tanishib chiqing:",
-    "refundPolicyLink": "qaytarish va pulni qaytarish shartlari"
+    "refundPolicyLink": "qaytarish va pulni qaytarish shartlari",
+    "otherUnpaidTitle": "Sizda toʻlanmagan buyurtma bor",
+    "otherUnpaidBody": "Buyurtma {{number}} ({{total}}) toʻlovni kutmoqda. Uni toʻlashingiz yoki bekor qilishingiz mumkin — bu yangi buyurtmaga taʼsir qilmaydi.",
+    "otherUnpaidBodyNoTotal": "Buyurtma {{number}} toʻlovni kutmoqda. Uni toʻlashingiz yoki bekor qilishingiz mumkin — bu yangi buyurtmaga taʼsir qilmaydi.",
+    "otherUnpaidPay": "Toʻlash",
+    "unpaidOrderCancelled": "Buyurtma {{number}} bekor qilindi."
   },
   "orderConfirmation": {
     "loadErrorTitle": "Buyurtmani yuklab boʻlmadi",
@@ -507,7 +512,7 @@
     "closedSubtitle": "Bu buyurtma toʻlanmagan va endi amal qilmaydi."
   },
   "orderHistory": {
-    "title": "Buyurtmalar tarixi",
+    "title": "Buyurtmalarim",
     "loadError": "Buyurtmalarni yuklab boʻlmadi.",
     "emptyText": "Siz hali buyurtma bermagansiz.",
     "startShopping": "Xaridni boshlash",
@@ -516,7 +521,12 @@
     "dateItems_other": "{{date}} · {{count}} ta mahsulot",
     "autoCancelIn": "Bekor qilinishiga {{time}}",
     "autoCancelling": "Vaqt tugadi",
-    "autoCancelA11y": "{{time}} dan soʻng avtomatik bekor qilinadi"
+    "autoCancelA11y": "{{time}} dan soʻng avtomatik bekor qilinadi",
+    "tabActive": "Faol",
+    "tabAll": "Barchasi",
+    "tabA11y": "{{label}}: {{count}}",
+    "noActive": "Hozircha faol buyurtmalar yoʻq.",
+    "showAll": "Barcha buyurtmalar"
   },
   "trackOrder": {
     "unitPrice": "Bir dona narxi",
@@ -542,7 +552,9 @@
     "autoCancelBody": "Buyurtma oʻz vaqtida toʻlanmasa yoki tasdiqlanmasa, avtomatik bekor qilinadi.",
     "autoCancelExpired": "Toʻlov vaqti tugadi. Buyurtma holati tez orada yangilanadi.",
     "autoCancelA11y": "Buyurtma bekor qilinishiga {{time}} qoldi",
-    "returnConditions": "Qaytarish shartlari"
+    "returnConditions": "Qaytarish shartlari",
+    "cancelled": "Buyurtma bekor qilindi.",
+    "cancelledToCart": "Buyurtma bekor qilindi. Mahsulotlar savatga qaytdi."
   },
   "explore": {
     "pricesStockUpdated": "Narx va mavjudlik yangilandi",
@@ -1153,5 +1165,25 @@
     "messageGeneral": "Assalomu alaykum! Tovarni qaytarish boʻyicha savolim bor.",
     "emailSubject": "{{orderNo}} buyurtma boʻyicha qaytarish",
     "emailSubjectGeneral": "Tovarni qaytarish boʻyicha savol"
+  },
+  "orderStage": {
+    "awaitingPayment": "Toʻlov kutilmoqda",
+    "awaitingPaymentBody": "Buyurtma avtomatik bekor qilinmasidan oldin uni toʻlang.",
+    "awaitingConfirmation": "Tasdiqlash kutilmoqda",
+    "awaitingConfirmationBody": "Toʻlov qabul qilib olishda. Buyurtmani tez orada tasdiqlaymiz.",
+    "preparing": "Buyurtma yigʻilmoqda",
+    "preparingBody": "Buyurtma qabul qilindi va joʻnatishga tayyorlanmoqda.",
+    "onTheWay": "Yetkazilmoqda",
+    "onTheWayBody": "Kuryer buyurtmangizni olib kelmoqda.",
+    "onTheWayPickupBody": "Buyurtma olib ketish punktiga yoʻlda.",
+    "readyForPickup": "Olib ketish mumkin",
+    "readyForPickupBody": "Buyurtma yetkazildi. Uni olib ketish punktidan olishingiz mumkin.",
+    "delivered": "Yetkazildi",
+    "deliveredBody": "Buyurtma yetkazib berildi.",
+    "refunded": "Pul qaytarildi",
+    "refundedBody": "Buyurtma uchun pul qaytarildi.",
+    "cardA11y": "{{title}}, buyurtma {{number}}. {{body}}",
+    "moreOrders_one": "Yana {{count}} ta buyurtma",
+    "moreOrders_other": "Yana {{count}} ta buyurtma"
   }
 }

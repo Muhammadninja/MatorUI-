@@ -76,7 +76,7 @@
     "signedOutToast": "Вы вышли из аккаунта",
     "namePlaceholder": "Ваш профиль",
     "editProfileTitle": "Изменить профиль",
-    "orderHistoryTitle": "История заказов",
+    "orderHistoryTitle": "Мои заказы",
     "addressesTitle": "Адреса доставки",
     "likedTitle": "Избранное",
     "settingsTitle": "Настройки"
@@ -103,7 +103,8 @@
       "inTransit": "В пути",
       "outForDelivery": "Передан в доставку",
       "delivered": "Доставлен",
-      "cancelled": "Отменён"
+      "cancelled": "Отменён",
+      "refunded": "Возврат средств"
     },
     "step": {
       "placed": "Заказ оформлен",
@@ -484,7 +485,6 @@
     "paymentOrderClosed": "Этот заказ больше нельзя оплатить. Товары остались в корзине, можно оформить заказ заново.",
     "unpaidOrderNumber": "Заказ {{number}}",
     "viewOrder": "Посмотреть заказ",
-    "startNewOrder": "Оформить заказ заново",
     "unpaidOrderExpires": "Неоплаченный заказ отменится автоматически.",
     "deliveryErrorCourierOff": "Доставка курьером пока недоступна. Можно забрать заказ самовывозом.",
     "reviewAddress": "Адрес",
@@ -499,7 +499,12 @@
     "retryPaymentShort": "Оплатить заказ",
     "pickupOpenMap": "Открыть на карте",
     "refundPolicyPrefix": "Перед оплатой можно ознакомиться:",
-    "refundPolicyLink": "условия возврата и возмещения"
+    "refundPolicyLink": "условия возврата и возмещения",
+    "otherUnpaidTitle": "У вас есть неоплаченный заказ",
+    "otherUnpaidBody": "Заказ {{number}} на {{total}} ждёт оплаты. Его можно оплатить или отменить — новый заказ это не затронет.",
+    "otherUnpaidBodyNoTotal": "Заказ {{number}} ждёт оплаты. Его можно оплатить или отменить — новый заказ это не затронет.",
+    "otherUnpaidPay": "Оплатить",
+    "unpaidOrderCancelled": "Заказ {{number}} отменён."
   },
   "orderConfirmation": {
     "loadErrorTitle": "Не удалось загрузить заказ",
@@ -517,7 +522,7 @@
     "closedSubtitle": "Этот заказ не был оплачен и больше не действует."
   },
   "orderHistory": {
-    "title": "История заказов",
+    "title": "Мои заказы",
     "loadError": "Не удалось загрузить ваши заказы.",
     "emptyText": "Вы ещё не оформляли заказы.",
     "startShopping": "Начать покупки",
@@ -528,7 +533,12 @@
     "dateItems_other": "{{date}} · {{count}} товаров",
     "autoCancelIn": "Отмена через {{time}}",
     "autoCancelling": "Время вышло",
-    "autoCancelA11y": "Автоматическая отмена через {{time}}"
+    "autoCancelA11y": "Автоматическая отмена через {{time}}",
+    "tabActive": "Активные",
+    "tabAll": "Все",
+    "tabA11y": "{{label}}: {{count}}",
+    "noActive": "Сейчас нет активных заказов.",
+    "showAll": "Все заказы"
   },
   "trackOrder": {
     "unitPrice": "Цена за единицу",
@@ -554,7 +564,9 @@
     "autoCancelBody": "Если заказ не оплатить или не подтвердить вовремя, он отменится автоматически.",
     "autoCancelExpired": "Время на оплату вышло. Статус заказа скоро обновится.",
     "autoCancelA11y": "До отмены заказа осталось {{time}}",
-    "returnConditions": "Условия возврата"
+    "returnConditions": "Условия возврата",
+    "cancelled": "Заказ отменён.",
+    "cancelledToCart": "Заказ отменён. Товары снова в корзине."
   },
   "explore": {
     "pricesStockUpdated": "Цены и наличие обновлены",
@@ -1175,5 +1187,27 @@
     "messageGeneral": "Здравствуйте! У меня вопрос о возврате товара.",
     "emailSubject": "Возврат по заказу {{orderNo}}",
     "emailSubjectGeneral": "Вопрос о возврате товара"
+  },
+  "orderStage": {
+    "awaitingPayment": "Ожидает оплаты",
+    "awaitingPaymentBody": "Оплатите заказ, пока он не отменился автоматически.",
+    "awaitingConfirmation": "Ожидает подтверждения",
+    "awaitingConfirmationBody": "Оплата при получении. Скоро подтвердим заказ.",
+    "preparing": "Собираем заказ",
+    "preparingBody": "Заказ принят и готовится к отправке.",
+    "onTheWay": "Доставляется",
+    "onTheWayBody": "Курьер везёт ваш заказ.",
+    "onTheWayPickupBody": "Заказ едет в пункт выдачи.",
+    "readyForPickup": "Можно забирать",
+    "readyForPickupBody": "Заказ доставлен. Можете забрать его в пункте выдачи.",
+    "delivered": "Доставлен",
+    "deliveredBody": "Заказ доставлен.",
+    "refunded": "Возврат средств",
+    "refundedBody": "Деньги за заказ возвращены.",
+    "cardA11y": "{{title}}, заказ {{number}}. {{body}}",
+    "moreOrders_one": "Ещё {{count}} заказ",
+    "moreOrders_few": "Ещё {{count}} заказа",
+    "moreOrders_many": "Ещё {{count}} заказов",
+    "moreOrders_other": "Ещё {{count}} заказа"
   }
 }

@@ -19,6 +19,7 @@ import CategoryGridSkeleton, {
 import CategoryTile from '@/components/screens-components/catalog/category-tile';
 import VehicleMakeTile from '@/components/screens-components/catalog/vehicle-make-tile';
 import HomeGarageCard from '@/components/screens-components/garage/home-garage-card';
+import { OrderStatusCard } from '@/components/screens-components/orders/order-status-card';
 import { AppButton } from '@/components/shared/app-button';
 import { AppLogo } from '@/components/shared/app-logo';
 import { AppText } from '@/components/shared/app-text';
@@ -337,6 +338,8 @@ export default function ExploreScreen() {
           gap: 12,
         }}
       >
+        {/* The buyer's current order, when there is one: what it waits for, or where it is. */}
+        <OrderStatusCard testID="home-order-status" />
         <HomeGarageCard />
 
         {/* ── Shop by vehicle ── */}

@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { AlertCircle, ArrowLeft } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, ScrollView } from 'react-native';
+import { Alert, Platform, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AddressFormSheet, {
@@ -13,9 +13,13 @@ import {
   NO_PRICE_YET,
   OrderChargeRows,
   PaymentOptionMark,
-  PaymentRetryCard,
   SummaryRow,
 } from '@/components/screens-components/checkout/checkout-sections';
+import {
+  CancelledOrderNote,
+  PaymentRetryCard,
+  UnpaidOrderNotice,
+} from '@/components/screens-components/checkout/unpaid-order-cards';
 import { ReviewRow } from '@/components/screens-components/checkout/checkout-review';
 import {
   CheckoutChoiceSheets,
@@ -84,8 +88,11 @@ import { checkoutFooterBottom } from '@/utils/sticky-footer';
  *
  * Payme is paid after the order exists. A payment that does not go through leaves that order
  * unpaid and this screen open on it, with the cart intact: the button then pays that same
- * order again, and nothing here can place a second one by accident. The confirmation screen
- * is reached only once the backend says the order is paid. See `useCheckoutPayment`.
+ * order again, and nothing here can place a second one by accident. The buyer who changed
+ * their mind cancels it here, and is back at a working checkout with the same cart. A cart
+ * changed since that order is another purchase: the checkout is open for it, and the old
+ * order is only mentioned, to pay or cancel. The confirmation screen is reached only once
+ * the backend says the order is paid. See `useCheckoutPayment`.
  */
 export default function CheckoutScreen() {
   const { t } = useTranslation();
@@ -302,10 +309,26 @@ export default function CheckoutScreen() {
     goToConfirmation(result.orderId);
   };
 
-  const startOver = async () => {
-    await payment.startOver();
-    create.reset();
+  // Cancelling is for good, so the buyer confirms it first. Then the checkout is a new
+  // order's, with the same cart.
+  const cancelUnpaid = () => {
+    Alert.alert(t('trackOrder.cancelConfirmTitle'), t('trackOrder.cancelConfirmBody'), [
+      { text: t('trackOrder.cancelKeep'), style: 'cancel' },
+      {
+        text: t('trackOrder.cancelConfirm'),
+        style: 'destructive',
+        onPress: () => {
+          void payment.cancelUnpaid().then((cancelled) => {
+            if (!cancelled) return;
+            triggerHaptic('success');
+            create.reset();
+          });
+        },
+      },
+    ]);
   };
+  const viewOrder = (orderId: string) =>
+    router.push({ pathname: '/track-order', params: { orderId } });
 
   const { deliveryReview, addressReview } = reviewSummaries({
     t,
@@ -352,18 +375,33 @@ export default function CheckoutScreen() {
             </AppView>
           ) : null}
 
+          {payment.cancelledOrderId ? (
+            <CancelledOrderNote tokens={tokens} orderId={payment.cancelledOrderId} />
+          ) : null}
+
           {payment.pending ? (
             <PaymentRetryCard
               tokens={tokens}
               orderId={payment.pending.orderId}
               failure={payment.failure}
-              onViewOrder={() =>
-                router.push({ pathname: '/track-order', params: { orderId: payment.pending!.orderId } })
-              }
-              onStartOver={startOver}
+              onViewOrder={() => viewOrder(payment.pending!.orderId)}
+              onCancel={cancelUnpaid}
+              cancelling={payment.phase === 'cancelling'}
+              cancelFailure={payment.cancelFailure}
             />
           ) : (
             <>
+              {payment.otherUnpaid ? (
+                <UnpaidOrderNotice
+                  tokens={tokens}
+                  orderId={payment.otherUnpaid.orderId}
+                  totalLabel={payment.order?.totalLabel ?? payment.otherUnpaid.totalLabel}
+                  onPay={() => viewOrder(payment.otherUnpaid!.orderId)}
+                  onCancel={cancelUnpaid}
+                  cancelling={payment.phase === 'cancelling'}
+                  cancelFailure={payment.cancelFailure}
+                />
+              ) : null}
               {/* The review: one compact row per choice, each opening its own sheet. */}
               <AppView testID="checkout-review" rounded={16} colorName="card" borderWidth={1} borderName="border" style={{ paddingHorizontal: 16 }}>
                 <ReviewRow

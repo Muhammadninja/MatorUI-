@@ -9,23 +9,45 @@ import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vi
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const { host, getOrder, startPayment, openAuthSessionAsync, clearCart, stored, cart } = vi.hoisted(() => ({
+const { host, getOrder, cancelOrder, startPayment, openAuthSessionAsync, clearCart, restoreCart, nav, stored, cart } = vi.hoisted(() => ({
   host:
     (type: string) =>
     ({ children, ...p }: Record<string, unknown> & { children?: React.ReactNode }) =>
       React.createElement(type, p, children),
   getOrder: vi.fn(),
+  cancelOrder: vi.fn(),
   startPayment: vi.fn(),
   openAuthSessionAsync: vi.fn(),
   clearCart: vi.fn(),
+  restoreCart: vi.fn(),
+  /** Each navigation call, in order, to tell a pop sent before the tab switch from one after. */
+  nav: { calls: [] as string[], canDismiss: false },
   stored: { record: null as null | Record<string, string> },
   cart: { items: [] as { id: string; quantity: number }[] },
 }));
 
-vi.mock('react-native', () => ({ ScrollView: host('scroll') }));
+vi.mock('react-native', () => ({
+  ScrollView: host('scroll'),
+  Platform: { OS: 'ios' },
+  Linking: { openURL: vi.fn() },
+  // The buyer confirms the cancel.
+  Alert: {
+    alert: (_title: string, _message: string, buttons: { style?: string; onPress?: () => void }[]) =>
+      buttons.find((b) => b.style === 'destructive')?.onPress?.(),
+  },
+}));
+vi.mock('@/components/shared/app-map', () => ({ default: host('map') }));
 vi.mock('expo-linking', () => ({ createURL: () => 'mator://payment-return' }));
 vi.mock('expo-router', () => ({
-  router: { push: vi.fn(), navigate: vi.fn(), canDismiss: () => false },
+  router: {
+    push: vi.fn(),
+    navigate: (href: string) => nav.calls.push(`navigate ${href}`),
+    canDismiss: () => nav.canDismiss,
+    dismissAll: () => nav.calls.push('dismissAll'),
+  },
+  useNavigation: () => ({
+    setOptions: (options: { animation?: string }) => nav.calls.push(`animation ${options.animation}`),
+  }),
   useLocalSearchParams: () => ({ orderId: 'ord_1' }),
   useFocusEffect: vi.fn(),
 }));
@@ -33,7 +55,7 @@ vi.mock('expo-web-browser', () => ({ openAuthSessionAsync }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
-vi.mock('lucide-react-native', () => ({ AlertCircle: () => null, Check: () => null }));
+vi.mock('lucide-react-native', () => ({ AlertCircle: () => null, Check: () => null, MapPin: () => null }));
 vi.mock('@/components/shared/app-view', () => ({
   AppView: host('view'),
   AppPressableView: host('pressable'),
@@ -50,10 +72,10 @@ vi.mock('@/contexts/user.context', () => ({ useUserContext: () => ({
   profile: { id: 'user_a' }, isAuthenticated: true, isHydrating: false,
 }) }));
 vi.mock('@/contexts/cart.context', () => ({
-  useCartContext: () => ({ items: cart.items, clearCart, restoreCart: vi.fn() }),
+  useCartContext: () => ({ items: cart.items, clearCart, restoreCart }),
 }));
 vi.mock('@/services/payments-service', () => ({ paymentsTransport: { startPayment } }));
-vi.mock('@/services/orders-api', () => ({ ordersTransport: { getOrder } }));
+vi.mock('@/services/orders-api', () => ({ ordersTransport: { getOrder, cancelOrder } }));
 vi.mock('@/utils/haptics', () => ({ triggerHaptic: vi.fn() }));
 vi.mock('@/services/pending-payment-storage', () => ({
   loadPendingPayment: vi.fn(async () => stored.record),
@@ -65,6 +87,7 @@ vi.mock('@/services/pending-payment-storage', () => ({
 
 import OrderConfirmationScreen from '@/components/screens/order-confirmation-screen';
 import TrackOrderScreen from '@/components/screens/track-order-screen';
+import { ApiError } from '@/services/api-client';
 import i18n from '@/services/i18n';
 import { PAYMENT_POLL } from '@/services/order-payment';
 import type { OrderDetail } from '@/services/orders-service';
@@ -117,6 +140,11 @@ describe('Screens showing an order', () => {
     vi.clearAllMocks();
     stored.record = null;
     cart.items = [{ id: 'part_1', quantity: 2 }];
+    nav.calls = [];
+    nav.canDismiss = false;
+    restoreCart.mockImplementation(async () => cart.items);
+    // React Native has it; the test runtime does not.
+    globalThis.requestAnimationFrame = ((cb: () => void) => setTimeout(cb, 0)) as never;
   });
   afterEach(() => act(() => renderer.unmount()));
 
@@ -130,6 +158,25 @@ describe('Screens showing an order', () => {
       await mount(<OrderConfirmationScreen />);
 
       expect(allText()).toContain('Заказ оформлен');
+    });
+
+    test('continuing to shop pops the receipt before leaving the cart tab, with no animation', async () => {
+      // A pop sent while its tab is hidden waits for the tab and then animates: the receipt
+      // flashed on coming back to the cart.
+      getOrder.mockResolvedValue(order({ paymentType: 'cash' }));
+      nav.canDismiss = true;
+      await mount(<OrderConfirmationScreen />);
+
+      const shop = renderer.root.find(
+        (node) => node.type === 'button' && node.props.title === 'Продолжить покупки',
+      );
+      await act(async () => {
+        shop.props.onPress();
+        shop.props.onPress();
+      });
+      await settle();
+
+      expect(nav.calls).toEqual(['animation none', 'dismissAll', 'navigate /explore']);
     });
 
     test('an order waiting for online payment is not called a success', async () => {
@@ -257,6 +304,117 @@ describe('Screens showing an order', () => {
 
       expect(clearCart).toHaveBeenCalledTimes(1);
       expect(stored.record).toBeNull();
+    });
+
+    test('an unpaid online order can be cancelled from here too', async () => {
+      getOrder.mockResolvedValue(order());
+      await mount(<TrackOrderScreen />);
+
+      const cancel = renderer.root.findAll(
+        (node) => node.props.testID === 'track-order-cancel-btn' && node.type === 'button',
+      );
+      expect(cancel).toHaveLength(1);
+      expect(allText()).toContain('Ожидает оплаты');
+    });
+
+    describe('cancelling', () => {
+      const cash = () =>
+        order({
+          paymentType: 'cash',
+          items: [
+            { id: 'part_1', productId: 'part_1', partId: 'part_1', title: 'Колодки', quantity: 2, price: "100 000 so'm" },
+            { id: 'svc_1', productId: 'svc_1', partId: null, title: 'Установка', quantity: 1, price: "50 000 so'm" },
+          ],
+        });
+      const pressCancel = async () => {
+        const button = renderer.root.find(
+          (node) => node.props.testID === 'track-order-cancel-btn' && node.type === 'button',
+        );
+        await act(async () => {
+          button.props.onPress();
+        });
+        await settle();
+      };
+
+      test('a cash order cancelled here puts its parts back in the cart', async () => {
+        // Placing it emptied the cart, so without this the buyer lost what they had chosen.
+        cart.items = [];
+        getOrder.mockResolvedValue(cash());
+        cancelOrder.mockResolvedValue(order({ serverStatus: 'cancelled', paymentType: 'cash' }));
+        restoreCart.mockImplementation(async (lines: { id: string; quantity: number }[]) => lines);
+        await mount(<TrackOrderScreen />);
+
+        await pressCancel();
+
+        expect(cancelOrder).toHaveBeenCalledWith('ord_1');
+        expect(restoreCart).toHaveBeenCalledTimes(1);
+        // The part, at the quantity ordered. The service has no part a cart can hold.
+        expect(restoreCart.mock.calls[0]![0]).toEqual([
+          expect.objectContaining({ id: 'part_1', title: 'Колодки', quantity: 2 }),
+        ]);
+      });
+
+      test('a refused cancel puts nothing back, and says why', async () => {
+        getOrder.mockResolvedValue(cash());
+        cancelOrder.mockRejectedValue(new ApiError(409, 'ORDER_NOT_CANCELLABLE', 'server words'));
+        await mount(<TrackOrderScreen />);
+
+        await pressCancel();
+
+        expect(restoreCart).not.toHaveBeenCalled();
+        expect(allText()).toContain('Этот заказ уже нельзя отменить из приложения.');
+        expect(allText()).not.toContain('server words');
+      });
+    });
+
+    test.each([['paid'], ['shipped'], ['cancelled']])('a %s order cannot be cancelled', async (serverStatus) => {
+      getOrder.mockResolvedValue(order({ serverStatus }));
+      await mount(<TrackOrderScreen />);
+
+      expect(
+        renderer.root.findAll((node) => node.props.testID === 'track-order-cancel-btn'),
+      ).toHaveLength(0);
+    });
+
+    const PICKUP = {
+      dealerId: 'seller_7',
+      dealerName: 'Avto Ehtiyot',
+      address: 'Sergeli avtobozori, 3-qator 25',
+      landmark: null,
+      location: { lat: 41.2263, lng: 69.219 },
+      items: [{ id: 'oi_1', partId: 'part_1', title: 'Колодки', quantity: 2 }],
+    };
+
+    test('a delivered pickup order says it can be collected, and where', async () => {
+      getOrder.mockResolvedValue(
+        order({
+          status: 'delivered',
+          serverStatus: 'delivered',
+          deliveryMethod: 'pickup',
+          deliveredAt: '2026-11-18T10:00:00.000Z',
+          pickupPoints: [PICKUP],
+        }),
+      );
+      await mount(<TrackOrderScreen />);
+
+      expect(allText()).toContain('Можно забирать');
+      expect(allText()).toContain('Можете забрать его в пункте выдачи');
+      expect(allText()).toContain('Где забрать заказ');
+      expect(allText()).toContain('Avto Ehtiyot');
+      expect(allText()).toContain('Sergeli avtobozori, 3-qator 25');
+    });
+
+    test('a courier order, or a backend that states no points, shows no pickup place', async () => {
+      getOrder.mockResolvedValue(order({ serverStatus: 'shipped', deliveryMethod: 'courier', pickupPoints: [PICKUP] }));
+      await mount(<TrackOrderScreen />);
+      expect(renderer.root.findAll((node) => node.props.testID === 'track-order-pickup')).toHaveLength(0);
+      expect(allText()).toContain('Доставляется');
+
+      act(() => renderer.unmount());
+      getOrder.mockResolvedValue(order({ serverStatus: 'shipped', deliveryMethod: 'pickup', pickupPoints: null }));
+      await mount(<TrackOrderScreen />);
+      expect(renderer.root.findAll((node) => node.props.testID === 'track-order-pickup')).toHaveLength(0);
+      expect(allText()).toContain('Заказ едет в пункт выдачи.');
     });
 
     test('paying another order leaves the cart alone', async () => {

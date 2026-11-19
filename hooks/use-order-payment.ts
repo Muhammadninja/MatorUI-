@@ -8,11 +8,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useCartContext } from '@/contexts/cart.context';
 import { useUserContext } from '@/contexts/user.context';
-import { useOrder } from '@/hooks/use-orders';
-import { orderPaymentState, type PaymentFailureReason } from '@/services/checkout-presentation';
+import { useOrder, useRefreshOrders } from '@/hooks/use-orders';
+import {
+  orderPaymentState,
+  type OrderPaymentState,
+  type PaymentFailureReason,
+} from '@/services/checkout-presentation';
 import { payOrder, readOrderPaymentState } from '@/services/order-payment';
+import { ordersTransport } from '@/services/orders-api';
 import type { OrderDetail } from '@/services/orders-service';
-import { getAuthRequestEpoch } from '@/services/api-client';
+import { ApiError, getAuthRequestEpoch } from '@/services/api-client';
 import {
   clearPendingPayment,
   loadPendingPayment,
@@ -28,7 +33,10 @@ export function cartKeyOf(items: readonly { id: string; quantity: number }[]): s
     .join(',');
 }
 
-export type PaymentPhase = 'checking' | 'idle' | 'paying';
+export type PaymentPhase = 'checking' | 'idle' | 'paying' | 'cancelling';
+
+/** Why a cancel did not go through: the server refused it (409), or it could not be asked. */
+export type CancelFailure = 'refused' | 'failed';
 
 /** A retained action belongs to this mounted owner and auth generation only. */
 function usePaymentSession(ownerId: string | null): () => boolean {
@@ -55,9 +63,13 @@ function usePaymentSession(ownerId: string | null): () => boolean {
 export type UseCheckoutPaymentValue = {
   /** 'checking': looking for an unpaid order from before, so nothing may be placed yet. */
   phase: PaymentPhase;
-  /** The unpaid order the buyer can pay or give up on. While set, no new order is placed. */
+  /** The unpaid order from this same cart, which the buyer can pay or cancel. While set, no
+   *  new order is placed: the cart on screen is the one that order was placed with. */
   pending: PendingPayment | null;
-  /** That order, as the backend has it, when it has been read. */
+  /** An unpaid order from another cart. The buyer is here to buy something else, so the
+   *  checkout stays open for that: this order is only offered, to pay or to cancel. */
+  otherUnpaid: PendingPayment | null;
+  /** The unpaid order (either of the above), as the backend has it, when it has been read. */
   order: OrderDetail | null;
   failure: PaymentFailureReason | null;
   /** The last order expired or was cancelled unpaid, so it is a new order from here. */
@@ -66,8 +78,12 @@ export type UseCheckoutPaymentValue = {
   collect: (record: PendingPayment) => Promise<void>;
   /** Pays the pending order again. Never creates one. */
   retry: () => Promise<void>;
-  /** Leaves the pending order to expire, and goes back to placing a new one. */
-  startOver: () => Promise<void>;
+  /** Cancels the unpaid order on the backend, then goes back to placing a new one. True
+   *  when the backend cancelled it. */
+  cancelUnpaid: () => Promise<boolean>;
+  cancelFailure: CancelFailure | null;
+  /** The order the buyer just cancelled here, so the screen can say so. */
+  cancelledOrderId: string | null;
 };
 
 export function useCheckoutPayment(onPaid: (orderId: string) => void): UseCheckoutPaymentValue {
@@ -82,7 +98,12 @@ export function useCheckoutPayment(onPaid: (orderId: string) => void): UseChecko
   const [pending, setPending] = useState<PendingPayment | null>(null);
   const [failure, setFailure] = useState<PaymentFailureReason | null>(null);
   const [orderClosed, setOrderClosed] = useState(false);
+  const [cancelFailure, setCancelFailure] = useState<CancelFailure | null>(null);
+  const [cancelledOrderId, setCancelledOrderId] = useState<string | null>(null);
+  const refreshOrders = useRefreshOrders();
   const visiblePending = stateSession.current === isCurrent ? pending : null;
+  // Only the cart that order was placed with is held to it. A changed cart is another purchase.
+  const blocking = !!visiblePending && visiblePending.cartKey === cartKeyOf(items);
   const { order } = useOrder(visiblePending?.orderId ?? null);
 
   const itemsRef = useRef(items);
@@ -113,6 +134,15 @@ export function useCheckoutPayment(onPaid: (orderId: string) => void): UseChecko
     setOrderClosed(true);
   }, [ownerId, isCurrent]);
 
+  /** The other cart's order moved on by itself (paid, or closed): nothing to offer any more. */
+  const forget = useCallback(async () => {
+    if (!isCurrent()) return;
+    await clearPendingPayment(ownerId);
+    if (!isCurrent()) return;
+    setPending(null);
+    setFailure(null);
+  }, [ownerId, isCurrent]);
+
   const collect = useCallback(
     async (record: PendingPayment) => {
       if (!isCurrent() || inFlight.current?.()) return;
@@ -121,6 +151,8 @@ export function useCheckoutPayment(onPaid: (orderId: string) => void): UseChecko
       setPhase('paying');
       setFailure(null);
       setOrderClosed(false);
+      setCancelFailure(null);
+      setCancelledOrderId(null);
       try {
         // Before anything else, so a crash mid-payment cannot lead to a second order.
         await savePendingPayment(ownerId, record);
@@ -158,13 +190,56 @@ export function useCheckoutPayment(onPaid: (orderId: string) => void): UseChecko
     if (visiblePending) await collect(visiblePending);
   }, [visiblePending, collect]);
 
-  const startOver = useCallback(async () => {
-    if (!isCurrent() || inFlight.current?.()) return;
-    await clearPendingPayment(ownerId);
-    if (!isCurrent()) return;
-    setPending(null);
-    setFailure(null);
-  }, [ownerId, isCurrent]);
+  const cancelUnpaid = useCallback(async (): Promise<boolean> => {
+    const record = visiblePending;
+    if (!record || !isCurrent() || inFlight.current?.()) return false;
+    const attempt = () => isCurrent();
+    inFlight.current = attempt;
+    setPhase('cancelling');
+    setCancelFailure(null);
+    setCancelledOrderId(null);
+    try {
+      let state: OrderPaymentState;
+      try {
+        const cancelled = await ordersTransport.cancelOrder(record.orderId);
+        state = orderPaymentState(cancelled.serverStatus);
+      } catch (error) {
+        if (!isCurrent()) return false;
+        // A refusal can mean the order moved on (paid meanwhile, taken up by an operator):
+        // its own status says which before this is called a failure.
+        state = await readOrderPaymentState(record.orderId, isCurrent);
+        if (!isCurrent()) return false;
+        if (state !== 'settled' && state !== 'closed') {
+          setCancelFailure(error instanceof ApiError && error.status === 409 ? 'refused' : 'failed');
+          return false;
+        }
+      }
+      if (!isCurrent()) return false;
+      if (state === 'closed') {
+        await clearPendingPayment(ownerId);
+        if (!isCurrent()) return false;
+        setPending(null);
+        setFailure(null);
+        setOrderClosed(false);
+        setCancelledOrderId(record.orderId);
+        return true;
+      } else if (state === 'settled') {
+        // Paid before the cancel reached it: the order stands, like any other payment.
+        if (record.cartKey === cartKeyOf(itemsRef.current)) await finish(record);
+        else await forget();
+      } else {
+        setCancelFailure('failed');
+      }
+      return false;
+    } finally {
+      // Every list and card reads the order's new status.
+      refreshOrders();
+      if (inFlight.current === attempt) {
+        inFlight.current = null;
+        if (isCurrent()) setPhase('idle');
+      }
+    }
+  }, [visiblePending, ownerId, finish, forget, isCurrent, refreshOrders]);
 
   // Coming back to the checkout: an order left unpaid is offered before a new one can be
   // placed, and one paid in the meantime is finished with.
@@ -174,6 +249,8 @@ export function useCheckoutPayment(onPaid: (orderId: string) => void): UseChecko
     setPending(null);
     setFailure(null);
     setOrderClosed(false);
+    setCancelFailure(null);
+    setCancelledOrderId(null);
     setPhase('checking');
     const current = () => !cancelled && isCurrent() && !inFlight.current?.();
     void (async () => {
@@ -203,24 +280,29 @@ export function useCheckoutPayment(onPaid: (orderId: string) => void): UseChecko
   }, [ownerId, isCurrent]);
 
   // The order is polled while it is on screen, so a webhook arriving late moves the buyer on
-  // without them doing anything.
+  // without them doing anything. Another cart's order is only let go of: the buyer is busy
+  // with this one, and is never taken to that order's confirmation.
   const polled = orderPaymentState(order?.serverStatus);
   useEffect(() => {
     if (!visiblePending || phase !== 'idle' || !isCurrent() || inFlight.current?.()) return;
-    if (polled === 'settled') void finish(visiblePending);
-    if (polled === 'closed') void close();
+    if (polled === 'settled') void (blocking ? finish(visiblePending) : forget());
+    if (polled === 'closed') void (blocking ? close() : forget());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [polled, visiblePending, phase, isCurrent]);
+  }, [polled, visiblePending, phase, isCurrent, blocking]);
 
+  const current = stateSession.current === isCurrent;
   return {
-    phase: stateSession.current === isCurrent ? phase : 'checking',
-    pending: visiblePending,
+    phase: current ? phase : 'checking',
+    pending: blocking ? visiblePending : null,
+    otherUnpaid: blocking ? null : visiblePending,
     order: visiblePending ? order : null,
-    failure: stateSession.current === isCurrent ? failure : null,
-    orderClosed: stateSession.current === isCurrent && orderClosed,
+    failure: current && blocking ? failure : null,
+    orderClosed: current && orderClosed,
     collect,
     retry,
-    startOver,
+    cancelUnpaid,
+    cancelFailure: current ? cancelFailure : null,
+    cancelledOrderId: current ? cancelledOrderId : null,
   };
 }
 

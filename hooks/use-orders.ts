@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient, type MutateOptions } from '@tans
 import { useUserContext } from '@/contexts/user.context';
 import { getAuthRequestEpoch } from '@/services/api-client';
 import { clearPendingOrderAttempt, loadPendingOrderAttempt, savePendingOrderAttempt, type PendingOrderAttempt } from '@/services/order-attempt-storage';
+import { isActiveOrder } from '@/services/order-groups';
 
 import {
   ordersTransport,
@@ -93,12 +94,19 @@ export type UseOrdersValue = {
 
 const DEFAULT_LIST_REQUEST: OrderListRequest = { page: 1, pageSize: 20 };
 
+/** How often the list is read again while an order is under way, so the status card on
+ *  Home and Profile follows operator and payment changes. Foreground only. */
+const ACTIVE_LIST_POLL_MS = 60_000;
+
 export function useOrders(request: OrderListRequest = DEFAULT_LIST_REQUEST): UseOrdersValue {
   const { ownerId, canRead } = useAccountScope();
   const query = useQuery({
     queryKey: [...ordersQueryKeys.list(request), ownerId],
     enabled: ownerId !== null,
     queryFn: ({ signal }) => ordersTransport.listOrders(request, signal),
+    refetchInterval: (q) =>
+      q.state.data?.items.some((row) => isActiveOrder(row)) ? ACTIVE_LIST_POLL_MS : false,
+    refetchIntervalInBackground: false,
   });
 
   return useMemo<UseOrdersValue>(() => {
