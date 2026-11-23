@@ -10,6 +10,11 @@ import * as Sentry from '@sentry/react-native';
  * No-op when the DSN is missing — local dev runs without it.
  */
 
+/** Records each route change as a breadcrumb + navigation span, so an issue
+ *  shows the screens the user went through. The root layout registers the
+ *  navigation container with it. */
+export const navigationIntegration = Sentry.reactNavigationIntegration();
+
 type ExpoExtra = {
   sentry?: {
     dsn?: string;
@@ -38,6 +43,7 @@ export function initSentry(): void {
     environment: process.env.EXPO_PUBLIC_SENTRY_ENV ?? extra.sentry?.environment ?? 'production',
     release: extra.sentry?.release,
     tracesSampleRate: 0.2,
+    integrations: [navigationIntegration],
     enableAutoSessionTracking: true,
     // App-specific tags: helpful for filtering on the dashboard.
     initialScope: {

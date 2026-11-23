@@ -8,7 +8,7 @@ import {
 import { Raleway_800ExtraBold } from '@expo-google-fonts/raleway';
 import { useFonts } from 'expo-font';
 import { requireNativeModule } from 'expo-modules-core';
-import { ThemeProvider as NavigationThemeProvider, Stack } from 'expo-router';
+import { ThemeProvider as NavigationThemeProvider, Stack, useNavigationContainerRef } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import * as SystemUI from 'expo-system-ui';
 import { useEffect, useState } from 'react';
@@ -52,7 +52,7 @@ if (Platform.OS === 'ios') {
 import { QueryClientProvider } from '@tanstack/react-query';
 
 import { queryClient } from '@/services/query-client';
-import { initSentry } from '@/services/sentry';
+import { initSentry, navigationIntegration, Sentry } from '@/services/sentry';
 
 // Fire Sentry init at module-eval, before any component renders, so the
 // first JS-thrown error of the session is captured. No-op when DSN is
@@ -97,7 +97,7 @@ export const unstable_settings = {
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
+function RootLayout() {
   const [loaded, error] = useFonts({
     // Inter — the app's typeface, every role, with Cyrillic and Uzbek Latin
     // coverage. Every weight the type scale names is loaded here, so no surface
@@ -178,6 +178,11 @@ function RootLayoutNav() {
 
 function RootNavigation() {
   useE2EStartupMount('root-navigation');
+  // Route changes → Sentry breadcrumbs, so an issue shows how the user got there.
+  const navigationRef = useNavigationContainerRef();
+  useEffect(() => {
+    navigationIntegration.registerNavigationContainer(navigationRef);
+  }, [navigationRef]);
   const colorScheme = useColorScheme();
   const { scheme, tokens } = useThemeContext();
   const resolvedScheme = scheme ?? (colorScheme === 'dark' ? 'dark' : 'light');
@@ -364,3 +369,6 @@ function RootNavigation() {
     </AppView>
   );
 }
+
+// Touch breadcrumbs + the root error handler; a no-op when Sentry is not initialised.
+export default Sentry.wrap(RootLayout);

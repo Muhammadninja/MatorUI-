@@ -1,1 +1,1 @@
-export { initSentry, Sentry } from './init-sentry';
+export { initSentry, navigationIntegration, Sentry } from './init-sentry';

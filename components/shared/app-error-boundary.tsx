@@ -6,6 +6,7 @@ import { AppButton } from '@/components/shared/app-button';
 import { AppText } from '@/components/shared/app-text';
 import { AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
+import { Sentry } from '@/services/sentry';
 
 export type AppErrorBoundaryProps = {
   children: ReactNode;
@@ -16,7 +17,7 @@ export type AppErrorBoundaryProps = {
    *  variant that fills the safe area). Receives a `retry` callback that
    *  resets the boundary's internal state so the children can re-render. */
   fallback?: (state: { error: Error; retry: () => void; label: string }) => ReactNode;
-  /** Side-channel reporter — wire to Sentry.captureException in prod. */
+  /** Extra side-channel on top of the Sentry report every boundary sends. */
   onError?: (error: Error, info: ErrorInfo) => void;
 };
 
@@ -40,6 +41,11 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
+    // The fallback swallows the crash, so without this it never reached Sentry.
+    Sentry.captureException(error, {
+      contexts: { react: { componentStack: info.componentStack ?? '' } },
+      tags: { boundary: this.props.label ?? 'this screen' },
+    });
     this.props.onError?.(error, info);
   }
 
