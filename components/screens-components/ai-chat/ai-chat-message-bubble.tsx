@@ -13,9 +13,8 @@ type AiChatMessageBubbleProps = {
   body: string;
   caption?: string;
   title?: string;
-  /** Fires when the avatar is tapped. For assistant bubbles the parent
-   *  typically opens an "About the assistant" affordance; for user
-   *  bubbles, a route to edit-profile. */
+  /** Fires when the avatar is tapped (assistant bubbles: "About the
+   *  assistant"). Omit it and the avatar is not a button. */
   onAvatarPress?: () => void;
   /** Tool invocations the agent made while producing this message.
    *  Rendered as a stack of cards above the text body. */

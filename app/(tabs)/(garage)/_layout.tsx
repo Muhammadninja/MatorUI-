@@ -36,6 +36,16 @@ export default function GarageStackLayout() {
           gestureEnabled: true,
         }}
       />
+      {/* Garage's own copies of the parts list and product screen, so back
+          from them returns to Garage (see garage-parts.tsx). */}
+      <Stack.Screen
+        name="garage-parts"
+        options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }}
+      />
+      <Stack.Screen
+        name="garage-item/[id]"
+        options={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true }}
+      />
     </Stack>
   );
 }

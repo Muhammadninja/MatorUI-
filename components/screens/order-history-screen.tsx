@@ -30,6 +30,7 @@ import {
   type OrderListStatus,
 } from '@/services/orders-service';
 import { triggerHaptic } from '@/utils/haptics';
+import { useGoToTab } from '@/hooks/use-app-navigation';
 
 /**
  * My orders — the buyer's orders on the real orders layer (`useOrders`) with its loading /
@@ -39,6 +40,7 @@ import { triggerHaptic } from '@/utils/haptics';
  * carrying its `orderId`.
  */
 export default function OrderHistoryScreen() {
+  const goToTab = useGoToTab();
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const { state, page, refresh } = useOrders();
@@ -71,7 +73,7 @@ export default function OrderHistoryScreen() {
           <AppText family="default" style={{ fontSize: 14, color: tokens.textMuted, textAlign: 'center' }}>
             {t('orderHistory.emptyText')}
           </AppText>
-          <AppButton title={t('orderHistory.startShopping')} kind="brand" size="sm" onPress={() => router.navigate('/explore')} />
+          <AppButton title={t('orderHistory.startShopping')} kind="brand" size="sm" onPress={() => goToTab('/explore')} />
         </AppView>
       ) : (
         <ScrollView

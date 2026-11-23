@@ -214,15 +214,15 @@ export default function GarageScreen() {
   };
 
   // "Shop parts that fit" → the bestsellers list scoped to the active vehicle
-  // (searched by make/model). Falls back to the Explore tab when, somehow,
-  // there's no primary vehicle to scope by.
+  // (searched by make/model), in Garage's own stack so back returns here.
+  // Falls back to the Explore tab when, somehow, there's no primary vehicle.
   const shopPartsThatFit = () => {
     if (!primaryVehicle) {
       router.navigate('/explore');
       return;
     }
-    router.navigate({
-      pathname: '/vehicle-parts',
+    router.push({
+      pathname: '/garage-parts',
       params: vehiclePartsParams({
         make: primaryVehicle.make,
         model: primaryVehicle.model,

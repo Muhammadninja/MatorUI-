@@ -8,7 +8,7 @@ import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useCatalogList } from '@/hooks/use-catalog-list';
 import type { CatalogItem } from '@/services/catalog-service';
-import { openItemDetail } from '@/utils/nav';
+import { useOpenItemDetail } from '@/utils/nav';
 
 const CARD_WIDTH = 150;
 const MAX_CARDS = 8;
@@ -74,10 +74,11 @@ function SimilarCard({ item }: { item: CatalogItem }) {
   const { tokens } = useThemeContext();
   const brand = (item.brand ?? item.description?.split('·')[0])?.trim();
   const amount = splitPrice(item.price).amount || item.price;
+  const openItem = useOpenItemDetail();
 
   return (
     <AppPressableView
-      onPress={() => openItemDetail(item.id)}
+      onPress={() => openItem(item.id)}
       androidRipple={false}
       pressedOpacity={0.9}
       accessibilityRole="button"

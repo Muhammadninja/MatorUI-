@@ -17,7 +17,7 @@ export default function NotFoundScreen() {
         <AppText textVariant="body" colorName="gray400">
           {t('nav.notFoundBody')}
         </AppText>
-        <AppButton title={t('nav.backToExplore')} kind="brand" onPress={() => router.replace('/explore')} />
+        <AppButton title={t('nav.backToExplore')} kind="brand" onPress={() => router.dismissTo('/explore')} />
       </AppView>
     </>
   );

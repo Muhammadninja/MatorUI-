@@ -30,7 +30,7 @@ const { host, openURL, push, state } = vi.hoisted(() => ({
 }));
 
 vi.mock('react-native', () => ({ ScrollView: host('scroll'), Linking: { openURL }, Alert: { alert: vi.fn() } }));
-vi.mock('expo-router', () => ({
+vi.mock('expo-router', () => ({ useNavigation: () => ({ isFocused: () => true }), useSegments: () => [],
   router: { push, navigate: vi.fn() },
   useLocalSearchParams: () => ({ orderId: 'ord_1' }),
   useFocusEffect: vi.fn(),

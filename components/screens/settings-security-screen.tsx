@@ -8,6 +8,7 @@ import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useLanguageContext } from '@/contexts/language.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useUserContext } from '@/contexts/user.context';
+import { useResetToExplore } from '@/hooks/use-app-navigation';
 import { useToast } from '@/hooks/use-toast';
 import { modalService } from '@/services/global-modal-service/global-modal.service';
 import { triggerHaptic } from '@/utils/haptics';
@@ -47,6 +48,7 @@ export default function SettingsSecurityScreen() {
   const { languageLabel } = useLanguageContext();
   const { deleteAccount, isAuthenticated } = useUserContext();
   const toast = useToast();
+  const resetToExplore = useResetToExplore();
 
   const confirmDeleteAccount = () => {
     triggerHaptic('warning');
@@ -59,7 +61,9 @@ export default function SettingsSecurityScreen() {
         try {
           await deleteAccount();
           toast.success(t('settings.accountDeletedToast'));
-          router.replace('/explore');
+          // Same fresh start as sign-out: `replace` only switched tabs and
+          // left this Settings screen on the Profile tab.
+          resetToExplore();
         } catch {
           // Deletion failed server-side — the user stays signed in.
           toast.danger(t('settings.accountDeleteFailedToast'));

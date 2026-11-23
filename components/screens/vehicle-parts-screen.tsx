@@ -21,7 +21,7 @@ import { useCatalogList } from '@/hooks/use-catalog-list';
 import { useToast } from '@/hooks/use-toast';
 import type { CatalogItem } from '@/services/catalog-service';
 import { triggerHaptic } from '@/utils/haptics';
-import { openItemDetail } from '@/utils/nav';
+import { useOpenItemDetail } from '@/utils/nav';
 
 /**
  * Vehicle parts / bestsellers — the "Shop parts that fit" destination from the
@@ -76,6 +76,7 @@ export default function VehiclePartsScreen() {
   const { isAuthenticated } = useUserContext();
   const toast = useToast();
 
+  const openItemDetail = useOpenItemDetail();
   const openItem = (it: CatalogItem) => openItemDetail(it.id);
 
   // Guest-first purchase gate, mirroring Item Detail / Category.

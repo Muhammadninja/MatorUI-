@@ -1,6 +1,6 @@
 import 'expo-dev-client';
-import { Redirect } from 'expo-router';
-import { useEffect } from 'react';
+import { Redirect, router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect } from 'react';
 
 import { useLanguageContext } from '@/contexts/language.context';
 import { traceStartup } from '@/services/e2e-startup-trace';
@@ -21,7 +21,17 @@ export default function RootIndex() {
     traceStartup('index-gate', { hydrated: isHydrated, chosen: hasChosen });
   }, [isHydrated, hasChosen]);
 
-  if (!isHydrated) return null;
+  // Returning users go back DOWN to the `(tabs)` the root stack already holds
+  // (its initialRouteName). A `<Redirect>` replaced this route with a second
+  // `(tabs)` on top: two tab navigators, so `canGoBack()` was always true and
+  // a back past a tab's root landed on the hidden copy.
+  useFocusEffect(
+    useCallback(() => {
+      if (isHydrated && hasChosen) router.dismissTo('/explore');
+    }, [isHydrated, hasChosen]),
+  );
 
-  return <Redirect href={hasChosen ? '/explore' : '/select-language?mode=onboarding'} />;
+  if (!isHydrated || hasChosen) return null;
+
+  return <Redirect href="/select-language?mode=onboarding" />;
 }

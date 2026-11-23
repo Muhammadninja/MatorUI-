@@ -50,7 +50,7 @@ vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, ScrollView: host('scro
 // The choice sheets render their content in place, so every choice stays reachable here.
 vi.mock('@/components/shared/app-bottom-sheet', () => ({ AppBottomSheet: host('sheet') }));
 vi.mock('expo-linking', () => ({ createURL: () => 'mator://payment-return' }));
-vi.mock('expo-router', () => ({ router: { back: vi.fn(), push: vi.fn(), replace } }));
+vi.mock('expo-router', () => ({ useNavigation: () => ({ isFocused: () => true }), useSegments: () => [], router: { back: vi.fn(), push: vi.fn(), replace } }));
 vi.mock('expo-web-browser', () => ({ openAuthSessionAsync: vi.fn() }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),

@@ -2,7 +2,7 @@ import React from 'react';
 import { Image } from 'react-native';
 
 import { useTranslation } from 'react-i18next';
-import { router, useFocusEffect, useNavigationContainerRef } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Heart, LogOut, MapPin, ReceiptText, Shield, User } from 'lucide-react-native';
 
 import { OrderStatusCard } from '@/components/screens-components/orders/order-status-card';
@@ -16,6 +16,7 @@ import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useLikesContext } from '@/contexts/likes.context';
 import { debugLog } from '@/services/debug-log';
+import { useResetToExplore } from '@/hooks/use-app-navigation';
 import { useToast } from '@/hooks/use-toast';
 import useGarage from '@/hooks/use-garage';
 import { useOrders } from '@/hooks/use-orders';
@@ -103,7 +104,7 @@ export default function ProfileScreen() {
   const { tokens } = useThemeContext();
   const toast = useToast();
   const { profile, isAuthenticated, isHydrating, signOut, refreshProfile } = useUserContext();
-  const rootNavigation = useNavigationContainerRef();
+  const resetToExplore = useResetToExplore();
   const accountItems = React.useMemo(() => buildAccountItems(t), [t]);
 
   // Re-fetch GET /v1/me every time the tab gains focus so freshly-saved fields
@@ -132,13 +133,8 @@ export default function ProfileScreen() {
     toast.info(t('profile.signedOutToast'));
     // Start navigation over: `router.replace('/explore')` only switched tabs,
     // so the next person landed on the previous account's last Explore page,
-    // and stale nested params outlived any pop. `__root` is Expo Router's slot
-    // above app/_layout; its `(tabs)` opens on Explore.
-    if (rootNavigation.getRootState()?.routeNames?.includes('__root')) {
-      rootNavigation.reset({ index: 0, routes: [{ name: '__root', state: { index: 0, routes: [{ name: '(tabs)' }] } }] });
-    } else {
-      router.replace('/explore');
-    }
+    // and stale nested params outlived any pop.
+    resetToExplore();
   };
 
   // Brief cold-boot hydrate — avoid flashing the guest state before we know

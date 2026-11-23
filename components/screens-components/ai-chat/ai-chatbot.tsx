@@ -52,7 +52,7 @@ import type {
   AiChatVehicleContext,
 } from '@/types/ai-chat';
 import { triggerHaptic } from '@/utils/haptics';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 
 /** Handoff §16 suggestion chips — tap fills the composer. Built via a
  *  factory so the labels re-resolve when the language changes. */
@@ -606,11 +606,6 @@ export default function AiChatbot() {
     });
   }, [t]);
 
-  const handleUserAvatarPress = useCallback(() => {
-    triggerHaptic('selection');
-    router.push('/edit-profile');
-  }, []);
-
   const submitFeedback = useCallback(
     async (message: AiChatMessage, kind: 'up' | 'down') => {
       triggerHaptic('selection');
@@ -995,10 +990,11 @@ export default function AiChatbot() {
                         body={message.body}
                         caption={message.caption}
                         toolCalls={message.toolCalls}
+                        // Only the assistant's avatar is tappable. The user's
+                        // used to open Edit Profile in the Profile tab, which
+                        // left that tab without its root and sent back to Explore.
                         onAvatarPress={
-                          message.role === 'assistant'
-                            ? handleAssistantAvatarPress
-                            : handleUserAvatarPress
+                          message.role === 'assistant' ? handleAssistantAvatarPress : undefined
                         }
                       />
                       {message.partGroups?.length ? (

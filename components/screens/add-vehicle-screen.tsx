@@ -13,6 +13,7 @@ import { WheelLoader } from '@/components/shared/wheel-loader';
 import { useActiveVehicle } from '@/contexts/active-vehicle.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import useGarage from '@/hooks/use-garage';
+import { useGoBack } from '@/hooks/use-app-navigation';
 import { resolveCatalogIds } from '@/services/reference-catalog';
 import { toastService } from '@/services/toast-service';
 import { VinDecoderService, type DecodedVehicle } from '@/services/vin-decoder-service';
@@ -28,6 +29,7 @@ import VehicleColorPicker from '@/components/screens-components/garage/vehicle-c
  * camera / scanner.
  */
 export default function AddVehicleScreen() {
+  const goBack = useGoBack('/garage');
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
@@ -212,7 +214,7 @@ export default function AddVehicleScreen() {
           borderName="border"
           colorName="surface"
           androidRipple={false}
-          onPress={() => router.back()}
+          onPress={goBack}
           accessibilityRole="button"
           accessibilityLabel={t('addVehicle.goBack')}
           style={{ width: 36, height: 36 }}

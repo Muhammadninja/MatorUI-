@@ -20,7 +20,7 @@ const { host } = vi.hoisted(() => ({
       React.createElement(type, p, children),
 }));
 
-vi.mock('expo-router', () => ({ router: { canGoBack: () => true, back: vi.fn(), replace: vi.fn() } }));
+vi.mock('expo-router', () => ({ useNavigation: () => ({ isFocused: () => true }), useSegments: () => [], router: { canGoBack: () => true, back: vi.fn(), replace: vi.fn() } }));
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 59, bottom: 34 }) }));
 vi.mock('react-native', () => ({ ScrollView: host('rn-scroll') }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k: string) => k }) }));

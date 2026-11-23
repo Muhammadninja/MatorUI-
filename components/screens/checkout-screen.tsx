@@ -52,6 +52,7 @@ import {
   useUpdateAddress,
 } from '@/hooks/use-orders';
 import { usePickupPoints } from '@/hooks/use-pickup-points';
+import { useGoBack } from '@/hooks/use-app-navigation';
 import {
   checkoutTotal,
   courierOffer,
@@ -95,6 +96,7 @@ import { checkoutFooterBottom } from '@/utils/sticky-footer';
  * the backend says the order is paid. See `useCheckoutPayment`.
  */
 export default function CheckoutScreen() {
+  const goBack = useGoBack('/cart');
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
@@ -359,7 +361,7 @@ export default function CheckoutScreen() {
       >
         {/* Header */}
         <AppView row align="center" gap={12} px="lg" style={{ paddingBottom: 14 }}>
-          <AppPressableView onPress={() => router.back()} center rounded={999} borderWidth={1} borderName="border" colorName="surface" accessibilityRole="button" accessibilityLabel={t('checkout.back')} style={{ width: 36, height: 36 }}>
+          <AppPressableView onPress={goBack} center rounded={999} borderWidth={1} borderName="border" colorName="surface" accessibilityRole="button" accessibilityLabel={t('checkout.back')} style={{ width: 36, height: 36 }}>
             <ArrowLeft size={18} strokeWidth={2.2} color={tokens.text} />
           </AppPressableView>
           <AppText family="heading" weight="bold" style={{ fontSize: 20, color: tokens.text }}>{t('checkout.title')}</AppText>

@@ -57,7 +57,9 @@ export default function SelectLanguageScreen() {
     triggerHaptic('success');
     await setLanguage(pick);
     if (isOnboarding) {
-      router.replace('/explore');
+      // Pop to the root stack's `(tabs)` rather than replacing this screen
+      // with a second tab navigator (see app/index.tsx).
+      router.dismissTo('/explore');
     } else if (router.canGoBack()) {
       router.back();
     } else {

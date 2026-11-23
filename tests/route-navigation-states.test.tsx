@@ -5,7 +5,7 @@ import { beforeEach, expect, test, vi } from 'vitest';
 const state = vi.hoisted(() => ({ canBack: false, back: vi.fn(), replace: vi.fn(), post: vi.fn(), cancelOrder: vi.fn(), orderState: 'not_found' }));
 vi.mock('react-native', () => ({ TextInput: (props: any) => <input {...props} />, ScrollView: ({ children }: any) => <section>{children}</section> }));
 vi.mock('@/utils/haptics', () => ({ triggerHaptic: vi.fn() }));
-vi.mock('expo-router', () => ({ router: { canGoBack: () => state.canBack, back: state.back, replace: state.replace }, useLocalSearchParams: () => ({}), useFocusEffect: () => {} }));
+vi.mock('expo-router', () => ({ useNavigation: () => ({ isFocused: () => true }), useSegments: () => [], router: { canGoBack: () => state.canBack, back: state.back, replace: state.replace }, useLocalSearchParams: () => ({}), useFocusEffect: () => {} }));
 vi.mock('lucide-react-native', () => ({ ArrowLeft: () => null, AlertCircle: () => null, Timer: () => null }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) }));

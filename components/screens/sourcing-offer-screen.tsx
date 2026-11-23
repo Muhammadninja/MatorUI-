@@ -15,6 +15,7 @@ import { useCartContext } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import { toastService } from '@/services/toast-service';
 import { formatSomAmount } from '@/utils/format-price';
+import { useGoToTab } from '@/hooks/use-app-navigation';
 import {
   acceptSourcingOffer,
   fetchSourcingOffer,
@@ -178,6 +179,7 @@ type LoadState = 'loading' | 'ready' | 'error';
  * tonal placeholder instead of an empty photo box.
  */
 export default function SourcingOfferScreen() {
+  const goToTab = useGoToTab();
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const { refresh: refreshCart } = useCartContext();
@@ -222,7 +224,7 @@ export default function SourcingOfferScreen() {
       await refreshCart();
       setStatus('ACCEPTED');
       toastService.success(t('sourcing.addedToCart'));
-      router.navigate('/cart');
+      goToTab('/cart');
     } catch (err) {
       const conflict = (err as { status?: number })?.status === 409;
       if (conflict) setStatus('EXPIRED');
@@ -390,7 +392,7 @@ export default function SourcingOfferScreen() {
                     {t('sourcing.addedToCart')}
                   </AppText>
                 </AppView>
-                <BuyButton priceText={null} busy={false} disabled={false} onPress={() => router.navigate('/cart')} tokens={tokens} />
+                <BuyButton priceText={null} busy={false} disabled={false} onPress={() => goToTab('/cart')} tokens={tokens} />
               </>
             ) : status === 'DECLINED' ? (
               <AppText

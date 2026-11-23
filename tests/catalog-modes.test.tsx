@@ -25,7 +25,7 @@ import { ROOT_PRODUCTS_COUNT, referenceCategories } from './fixtures/part-catego
 
 const push = vi.fn();
 let params: Record<string, string | undefined> = {};
-vi.mock('expo-router', () => ({
+vi.mock('expo-router', () => ({ useNavigation: () => ({ isFocused: () => true }), useSegments: () => [],
   router: { push: (...a: unknown[]) => push(...a), navigate: () => {}, replace: () => {} },
   useLocalSearchParams: () => params,
 }));

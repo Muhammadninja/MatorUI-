@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Search, X } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,6 +11,7 @@ import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
 import { DEFAULT_FILTERS, hasActiveFilters, useSearch } from '@/hooks/use-search';
+import { useGoBack } from '@/hooks/use-app-navigation';
 import { APP_FONTS } from '@/themes';
 
 /**
@@ -26,6 +27,7 @@ import { APP_FONTS } from '@/themes';
  * service.
  */
 export default function MatorSearchScreen() {
+  const goBack = useGoBack('/explore');
   const { t } = useTranslation();
   const { tokens, scheme } = useThemeContext();
   const insets = useSafeAreaInsets();
@@ -79,7 +81,7 @@ export default function MatorSearchScreen() {
         {/* Header: back + search field */}
         <AppView row align="center" gap={10} px="lg" style={{ paddingBottom: 12 }}>
           <AppPressableView
-            onPress={() => router.back()}
+            onPress={goBack}
             center
             rounded={999}
             borderWidth={1}

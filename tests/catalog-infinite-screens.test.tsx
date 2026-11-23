@@ -18,7 +18,7 @@ import { brandCatalogue, brandId, FakeCatalog, partsIn } from './fixtures/catalo
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 let params: Record<string, string | undefined> = {};
-vi.mock('expo-router', () => ({
+vi.mock('expo-router', () => ({ useNavigation: () => ({ isFocused: () => true }), useSegments: () => [],
   router: { push: () => {}, back: () => {} },
   useLocalSearchParams: () => params,
   useFocusEffect: () => {},

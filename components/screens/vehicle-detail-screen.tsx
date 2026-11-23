@@ -14,6 +14,7 @@ import { useLanguageContext } from '@/contexts/language.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import VehicleColorPicker from '@/components/screens-components/garage/vehicle-color-picker';
 import useGarage from '@/hooks/use-garage';
+import { useGoBack } from '@/hooks/use-app-navigation';
 import type { VehiclePatch } from '@/services/garage-service';
 import { toastService } from '@/services/toast-service';
 import { checkManualName, MANUAL_NAME_MAX } from '@/services/manual-vehicle';
@@ -53,6 +54,7 @@ function parseMileage(raw: string): number | undefined {
  * `useGarage().removeVehicle`, triggered by the trash icon.
  */
 export default function VehicleDetailScreen() {
+  const goBack = useGoBack('/garage');
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
@@ -183,7 +185,7 @@ export default function VehicleDetailScreen() {
           title={t('vehicleDetail.backToGarage')}
           kind="secondary"
           size="sm"
-          onPress={() => router.back()}
+          onPress={goBack}
         />
       </AppView>
     );
@@ -436,7 +438,7 @@ export default function VehicleDetailScreen() {
       >
         <AppPressableView
           androidRipple={false}
-          onPress={() => (editing ? cancelEdit() : router.back())}
+          onPress={() => (editing ? cancelEdit() : goBack())}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           accessibilityRole="button"
           accessibilityLabel={editing ? t('common.cancel') : t('vehicleDetail.goBack')}

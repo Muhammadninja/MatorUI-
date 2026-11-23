@@ -42,6 +42,7 @@ import {
   orderStageBodyKey,
 } from '@/services/order-groups';
 import { triggerHaptic } from '@/utils/haptics';
+import { useGoToTab } from '@/hooks/use-app-navigation';
 
 /**
  * Track Order — faithful rebuild of the prototype's `scTrackOrder`, now
@@ -52,6 +53,7 @@ import { triggerHaptic } from '@/utils/haptics';
  * server's `etaWindow` / `statusLabel`.
  */
 export default function TrackOrderScreen() {
+  const goToTab = useGoToTab();
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
@@ -125,7 +127,7 @@ export default function TrackOrderScreen() {
 
   const goShopping = () => {
     triggerHaptic('selection');
-    router.navigate('/explore');
+    goToTab('/explore');
   };
 
   return (

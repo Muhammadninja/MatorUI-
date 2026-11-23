@@ -12,7 +12,8 @@ export type ItemFitBadgeProps = {
   result: CompatibilityResult;
   /** The active garage vehicle this verdict is about. */
   subtitle: string | null;
-  onShowAlternatives: () => void;
+  /** Omitted where the search screen is in another tab; the CTA is hidden. */
+  onShowAlternatives?: () => void;
 };
 
 /**
@@ -53,7 +54,7 @@ export function ItemFitBadge({ result, subtitle, onShowAlternatives }: ItemFitBa
             </AppText>
           ) : null}
         </AppView>
-        {result.status === 'NOT_COMPATIBLE' ? (
+        {result.status === 'NOT_COMPATIBLE' && onShowAlternatives ? (
           <AppButton
             title={t('itemDetail.showAlternatives')}
             kind="secondary"

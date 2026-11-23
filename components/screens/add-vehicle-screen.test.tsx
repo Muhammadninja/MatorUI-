@@ -115,7 +115,7 @@ vi.mock('@/services/reference-catalog', () => ({
 
 const back = vi.fn();
 const dangerToast = vi.fn();
-vi.mock('expo-router', () => ({ router: { back: () => back() } }));
+vi.mock('expo-router', () => ({ useNavigation: () => ({ isFocused: () => true }), useSegments: () => [], router: { back: () => back() } }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k: string) => k }) }));
 vi.mock('react-native', () => ({
   KeyboardAvoidingView: ({ children }: { children?: React.ReactNode }) => children,

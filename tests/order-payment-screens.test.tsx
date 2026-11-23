@@ -45,7 +45,9 @@ vi.mock('expo-router', () => ({
     canDismiss: () => nav.canDismiss,
     dismissAll: () => nav.calls.push('dismissAll'),
   },
+  useSegments: () => [],
   useNavigation: () => ({
+    isFocused: () => true,
     setOptions: (options: { animation?: string }) => nav.calls.push(`animation ${options.animation}`),
   }),
   useLocalSearchParams: () => ({ orderId: 'ord_1' }),

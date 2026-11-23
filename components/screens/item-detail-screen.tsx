@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useSegments } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, ScrollView, useWindowDimensions } from 'react-native';
@@ -41,6 +41,7 @@ import { useCatalogDetail } from '@/hooks/use-catalog-detail';
 import { useCompatibility } from '@/hooks/use-compatibility';
 import { useActiveSales } from '@/hooks/use-sales';
 import { useToast } from '@/hooks/use-toast';
+import { useGoBack } from '@/hooks/use-app-navigation';
 import { parsePrice } from '@/services/cart-math';
 import type { CatalogItem, CatalogItemSpec } from '@/services/catalog-service';
 import { resolveItemPricing } from '@/services/sales-service';
@@ -67,6 +68,8 @@ import { commercialBrandName } from '@/utils/commercial-brand';
  * confirm.
  */
 export default function ItemDetailScreen() {
+  const goBack = useGoBack('/explore');
+  const inExploreStack = (useSegments() as string[])[1] === '(explore)';
   const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { tokens } = useThemeContext();
@@ -147,7 +150,7 @@ export default function ItemDetailScreen() {
             title={t('itemDetail.goBack')}
             kind="secondary"
             size="sm"
-            onPress={() => router.back()}
+            onPress={goBack}
           />
           {state === 'error' ? (
             <AppButton title={t('common.retry')} kind="brand" size="sm" onPress={refresh} />
@@ -328,7 +331,9 @@ export default function ItemDetailScreen() {
                       ? `${activeVehicle.year} ${activeVehicle.make} ${activeVehicle.model} ${activeVehicle.trim ?? ''}`.trim()
                       : null
                   }
-                  onShowAlternatives={() => router.push('/search')}
+                  // Search lives in Explore's stack; from the Assistant or
+                  // Garage copy of this screen it would switch tabs.
+                  onShowAlternatives={inExploreStack ? () => router.push('/search') : undefined}
                 />
               ) : null}
               {!compat ? (
@@ -405,7 +410,7 @@ export default function ItemDetailScreen() {
 
       <ItemDetailHeader
         topInset={insets.top}
-        onBack={() => router.back()}
+        onBack={goBack}
         onLayout={(e) => setMeasuredHeaderHeight(e.nativeEvent.layout.height)}
       />
 

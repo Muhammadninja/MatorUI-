@@ -24,7 +24,7 @@ const { host, transport, push } = vi.hoisted(() => ({
 }));
 
 vi.mock('react-native', () => ({ ScrollView: host('scroll'), RefreshControl: () => null }));
-vi.mock('expo-router', () => ({
+vi.mock('expo-router', () => ({ useNavigation: () => ({ isFocused: () => true }), useSegments: () => [],
   router: { push, navigate: vi.fn() },
   useFocusEffect: vi.fn(),
 }));

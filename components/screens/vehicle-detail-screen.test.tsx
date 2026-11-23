@@ -51,7 +51,7 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-vi.mock('expo-router', () => ({
+vi.mock('expo-router', () => ({ useNavigation: () => ({ isFocused: () => true }), useSegments: () => [],
   router: { back: () => {}, push: () => {} },
   useLocalSearchParams: () => ({ id: (shownVehicle?.id as string) ?? 'v-malibu', edit: routeEdit }),
 }));

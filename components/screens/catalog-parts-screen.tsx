@@ -20,6 +20,7 @@ import { useThemeContext } from '@/contexts/theme.context';
 import { useUserContext } from '@/contexts/user.context';
 import { CATALOG_PAGE_SIZE, useCatalogInfiniteList } from '@/hooks/use-catalog-list';
 import { useToast } from '@/hooks/use-toast';
+import { useGoBack } from '@/hooks/use-app-navigation';
 import type { CatalogItem } from '@/services/catalog-service';
 import type { CatalogSortBy, FilterState } from '@/types/catalog-nav';
 import { triggerHaptic } from '@/utils/haptics';
@@ -51,6 +52,7 @@ const LIST_COLUMNS = 1;
  * shopper nears its end.
  */
 export default function CatalogPartsScreen() {
+  const goBack = useGoBack('/explore');
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
   const insets = useSafeAreaInsets();
@@ -306,7 +308,7 @@ export default function CatalogPartsScreen() {
       <AppView style={{ paddingTop: insets.top + 6 }} px="lg" colorName="background">
         <AppView row align="center" gap={10}>
           <AppPressableView
-            onPress={() => router.back()}
+            onPress={goBack}
             center
             rounded={12}
             borderWidth={1}

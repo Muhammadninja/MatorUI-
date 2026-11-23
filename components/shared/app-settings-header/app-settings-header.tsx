@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -7,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
+import { useGoBack } from '@/hooks/use-app-navigation';
 import { triggerHaptic } from '@/utils/haptics';
 
 /** Visible (post-safe-area) height of the header. Kept exported for any
@@ -54,19 +54,15 @@ export function AppSettingsHeader({
   const { tokens, scheme } = useThemeContext();
   const insets = useSafeAreaInsets();
 
+  const goBack = useGoBack(fallbackHref);
+
   const handleBack = () => {
     triggerHaptic('selection');
     if (onBack) {
       onBack();
       return;
     }
-    if (router.canGoBack()) {
-      router.back();
-      return;
-    }
-    if (fallbackHref) {
-      router.replace(fallbackHref as never);
-    }
+    goBack();
   };
 
   return (
