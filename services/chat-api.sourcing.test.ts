@@ -66,6 +66,16 @@ describe('what is sent', () => {
     ]);
   });
 
+  test('a photo request names its part in headers, not the body', async () => {
+    await send({ photoRequestProductId: 'part_stock_6567' });
+    expect(post.mock.calls[0]![2].headers).toEqual({
+      'Idempotency-Key': 'user-1',
+      'X-Chat-Intent': 'request_photo',
+      'X-Product-Id': 'part_stock_6567',
+    });
+    expect(Object.keys(post.mock.calls[0]![1]).sort()).toEqual(['history', 'message']);
+  });
+
   test('without a vehicle no vehicle header is sent', async () => {
     await send({});
     expect(post.mock.calls[0]![2].headers).toEqual({ 'Idempotency-Key': 'user-1' });

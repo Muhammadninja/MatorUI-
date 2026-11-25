@@ -72,6 +72,13 @@ export function openMatorAIShopping(context: MatorAIShoppingContext, language: s
   const shoppingPrompt = buildMatorAIShoppingDraft(context, language);
   router.push({
     pathname: '/(tabs)/(ai-chat)/ai-chat',
-    params: { shoppingPrompt, shoppingSource: context.source },
+    params: {
+      shoppingPrompt,
+      shoppingSource: context.source,
+      // Lets the chat send a photo request as one, instead of as a part search.
+      ...(context.intent === 'request_photo' && context.productId
+        ? { shoppingProductId: context.productId }
+        : {}),
+    },
   });
 }

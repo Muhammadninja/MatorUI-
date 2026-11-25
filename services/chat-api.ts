@@ -268,6 +268,11 @@ export class SourcingChatTransport implements ChatTransport {
             headers: {
               ...(input.requestId ? { 'Idempotency-Key': input.requestId } : {}),
               ...(vehicle?.vehicleId ? { 'X-Selected-Vehicle-Id': vehicle.vehicleId } : {}),
+              // A photo request names its part exactly; the backend answers it
+              // without the model. Headers, because the body rejects new fields.
+              ...(input.photoRequestProductId
+                ? { 'X-Chat-Intent': 'request_photo', 'X-Product-Id': input.photoRequestProductId }
+                : {}),
             },
           },
         );

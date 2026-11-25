@@ -116,7 +116,10 @@ function selectedVehicleContext(vehicle: Vehicle | null | undefined): AiChatVehi
 }
 
 export default function AiChatbot() {
-  const routeParams = useLocalSearchParams<{ shoppingPrompt?: string | string[] }>();
+  const routeParams = useLocalSearchParams<{
+    shoppingPrompt?: string | string[];
+    shoppingProductId?: string | string[];
+  }>();
   const { tokens } = useThemeContext();
   const { t } = useTranslation();
   const suggestionChips = useMemo(() => buildSuggestionChips(t), [t]);
@@ -150,6 +153,12 @@ export default function AiChatbot() {
 
   const [draft, setDraft] = useState('');
   const handledShoppingPrompt = useRef<string | null>(null);
+  // A photo-request draft from a product page, until it is sent. Its first line
+  // marks it: a message that no longer carries it is an ordinary question.
+  const photoDraftRef = useRef<{ marker: string; productId: string } | null>(null);
+  // Which sent messages were photo requests, so a retry or a send held for
+  // sign-in goes out as one too.
+  const photoByMessageRef = useRef(new Map<string, string>());
   const [messages, setMessages] = useState<AiChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [streamingReply, setStreamingReply] = useState<StreamingReply | null>(null);
@@ -166,6 +175,9 @@ export default function AiChatbot() {
   const shoppingPrompt = Array.isArray(routeParams.shoppingPrompt)
     ? routeParams.shoppingPrompt[0]
     : routeParams.shoppingPrompt;
+  const shoppingProductId = Array.isArray(routeParams.shoppingProductId)
+    ? routeParams.shoppingProductId[0]
+    : routeParams.shoppingProductId;
   useEffect(() => {
     if (
       !shoppingPrompt ||
@@ -174,6 +186,9 @@ export default function AiChatbot() {
     )
       return;
     handledShoppingPrompt.current = shoppingPrompt;
+    photoDraftRef.current = shoppingProductId
+      ? { marker: shoppingPrompt.split('\n')[0]!.trim(), productId: shoppingProductId }
+      : null;
     if (!draft.trim()) setDraft(shoppingPrompt);
     else {
       openConfirm({
@@ -185,7 +200,7 @@ export default function AiChatbot() {
           setDraft((latest) => [latest.trim(), shoppingPrompt].filter(Boolean).join('\n\n')),
       });
     }
-  }, [shoppingPrompt, hydratedOwner, chatOwner, openConfirm, t, draft]);
+  }, [shoppingPrompt, shoppingProductId, hydratedOwner, chatOwner, openConfirm, t, draft]);
   // During render, not in an effect: an effect would commit one frame showing the
   // previous account's messages to the next person.
   if (sessionOwner !== chatOwner) {
@@ -302,6 +317,12 @@ export default function AiChatbot() {
       // Doubles as the request id, so it has to stay unique and survive retries.
       const finalUserId =
         retryUserId ?? messageId ?? `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const photoDraft = photoDraftRef.current;
+      if (!retryUserId && !messageId && photoDraft && trimmed.includes(photoDraft.marker)) {
+        photoByMessageRef.current.set(finalUserId, photoDraft.productId);
+        photoDraftRef.current = null;
+      }
+      const photoRequestProductId = photoByMessageRef.current.get(finalUserId);
       if (!retryUserId) {
         setMessages((current) => [
           ...current,
@@ -377,6 +398,7 @@ export default function AiChatbot() {
             requestId: `${finalUserId}:${currentActiveVehicle?.vehicleId ?? 'none'}`,
             userMessageId: finalUserId,
             isAuthenticated,
+            photoRequestProductId,
             vehicleContext: selectedVehicleContext(currentActiveVehicle?.vehicle),
             // Snapshot the prior turns (pre-append: this fires before the ref
             // effect runs) so the endpoint remembers earlier context.

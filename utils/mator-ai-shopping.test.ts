@@ -45,6 +45,7 @@ describe('Mator AI shopping handoff', () => {
       params: { shoppingPrompt: string; shoppingSource: string };
     };
     expect(route.params.shoppingSource).toBe('product_photo_request');
+    expect((route.params as Record<string, string>).shoppingProductId).toBe('part-1');
     expect(route.params.shoppingPrompt).not.toContain('part-1');
     expect(route.params.shoppingPrompt).toContain('Bosch');
     expect(route.params.shoppingPrompt).toContain('BOS-10042');

@@ -163,6 +163,8 @@ export type AiChatSendMessageRequest = {
   requestId?: string;
   /** The message to send after sign-in, if the request is held. */
   userMessageId?: string;
+  /** Catalog part this message asks a photo of (from the product page). */
+  photoRequestProductId?: string;
   isAuthenticated?: boolean;
 };
 

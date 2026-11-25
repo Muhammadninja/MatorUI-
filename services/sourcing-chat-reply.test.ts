@@ -278,3 +278,31 @@ describe('real backend replies', () => {
     expect(reply.partGroups?.[0]?.links.map((l) => l.fit)).toEqual(['FITS', 'UNKNOWN']);
   });
 });
+
+describe('photo requests', () => {
+  const photo = { part_id: 'p1', part_title: 'Уплотнитель двери' };
+
+  test('a recorded request shows the server text and is not a part request', () => {
+    const reply = interpretSourcingReply(
+      {
+        intent: 'PHOTO_REQUESTED',
+        reply_text: 'Запрос на фото принят.',
+        photo_request: { ...photo, status: 'REQUESTED' },
+      },
+      signedIn,
+    );
+    expect(reply).toEqual({ text: 'Запрос на фото принят.' });
+  });
+
+  test('a guest is held for sign-in like a part request', () => {
+    const reply = interpretSourcingReply(
+      { intent: 'PHOTO_AUTH_REQUIRED', reply_text: 'x', photo_request: { ...photo, status: 'AUTH_REQUIRED' } },
+      guest,
+    );
+    expect(reply.sourcing).toEqual({
+      status: 'sign_in_required',
+      parts: ['Уплотнитель двери'],
+      userMessageId: 'user-1',
+    });
+  });
+});

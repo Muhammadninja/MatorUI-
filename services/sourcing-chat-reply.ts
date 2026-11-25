@@ -38,6 +38,8 @@ export type SourcingChatResponse = {
   parts?: SourcingReplyPart[];
   /** True only when `parts` or the single-part fields cover every part asked for. */
   all_parts_accounted?: boolean;
+  /** Set on a reply to a photo request (the `PHOTO_*` intents). */
+  photo_request?: { part_id: string; part_title?: string | null; status: string } | null;
 };
 
 export type InterpretedSourcingReply = {
@@ -81,6 +83,14 @@ export function interpretSourcingReply(
   res: SourcingChatResponse,
   { isAuthenticated, userMessageId }: { isAuthenticated: boolean; userMessageId?: string },
 ): InterpretedSourcingReply {
+  // A photo request: a guest is held for sign-in exactly like a part request,
+  // so the same button signs them in and sends the message again.
+  if (res.intent === 'PHOTO_AUTH_REQUIRED') {
+    const name = res.photo_request?.part_title?.trim();
+    return { text: '', sourcing: { status: 'sign_in_required', parts: name ? [name] : [], userMessageId } };
+  }
+  if (res.intent?.startsWith('PHOTO_')) return { text: res.reply_text ?? '' };
+
   const partGroups: AiChatPartGroup[] = [];
   const received: string[] = [];
   const held: string[] = [];
