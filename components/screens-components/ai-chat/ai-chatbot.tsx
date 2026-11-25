@@ -255,7 +255,17 @@ export default function AiChatbot() {
       const stored = await loadChat(chatOwner);
       if (cancelled) return;
       if (stored && stored.messages.length > 0) {
-        setMessages((current) => [...stored.messages, ...current]);
+        // By id: hydration can run again over messages already on screen (a
+        // dev Fast Refresh re-runs effects with state kept), and an earlier
+        // duplicate may already be saved. Two rows with one id break the list.
+        setMessages((current) => {
+          const seen = new Set<string>();
+          return [...stored.messages, ...current].filter((m) => {
+            if (seen.has(m.id)) return false;
+            seen.add(m.id);
+            return true;
+          });
+        });
         if (stored.conversationId) setConversationId(stored.conversationId);
       }
       setHydratedOwner(chatOwner);

@@ -260,6 +260,16 @@ describe('stored data', () => {
     expect(m.disk.has('ai-chat:v1')).toBe(false);
   });
 
+  test('a message saved twice is shown once', async () => {
+    const message = { id: 'u1', role: 'user', body: 'photo please', createdAt: '2026-11-25T10:00:00Z' };
+    m.disk.set(
+      'ai-chat:v2:guest',
+      JSON.stringify({ v: 1, conversationId: null, messages: [message, message] }),
+    );
+    await launch();
+    expect(visible()).toEqual(['photo please']);
+  });
+
   test('nothing loads until auth settles, so nobody sees the wrong chat at boot', async () => {
     m.disk.set(
       'ai-chat:v2:guest',
