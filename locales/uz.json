@@ -258,7 +258,7 @@
     "requestedParts": "Soʻrov: {{parts}}",
     "requestsUnavailable": "Hozir bu ehtiyot qismga soʻrov qabul qila olmaymiz.",
     "temporarilyUnavailable": "Chat vaqtincha ishlamayapti. Xabar yuborilmadi.",
-    "photoNotYetAvailable": "Bu mahsulotning surati hali yoʻq — butun katalogga suratlarni asta-sekin qoʻshyapmiz. Qismni sahifasidagi OEM raqami boʻyicha tekshirishingiz mumkin, savolingiz boʻlsa shu yerga yozing.",
+    "photoRequestReceived": "Surat soʻrovi qabul qilindi. Surat paydo boʻlganda xabar yuboramiz.",
     "fitsSelectedVehicle": "Tanlangan avtomobilga mos keladi",
     "fitNotConfirmed": "Mosligi tasdiqlanmagan",
     "confirmAllParts": "Biz faqat buni tushundik: {{parts}}. Boshqa ehtiyot qismlar ham kerak boʻlsa, qaysilari ekanini yozing.",

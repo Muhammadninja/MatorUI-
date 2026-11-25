@@ -475,7 +475,7 @@ export default function AiChatbot() {
           body: chatUnavailable
             ? t('aiChat.temporarilyUnavailable')
             : photoRequestPending
-              ? t('aiChat.photoNotYetAvailable')
+              ? t('aiChat.photoRequestReceived')
               : composeSourcingBody({ text: body, sourcing, partsClarification }, t),
           caption: t('aiChat.captionNow'),
           createdAt,

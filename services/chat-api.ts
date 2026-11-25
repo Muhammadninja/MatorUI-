@@ -256,7 +256,8 @@ export class SourcingChatTransport implements ChatTransport {
         }
 
         // An older backend would treat a photo request as a part search and list
-        // the very product the customer is looking at, so answer it here.
+        // the very product the customer is looking at, so the app acknowledges it
+        // itself (owner's decision, 2026-11-25), in the backend's own words.
         if (input.photoRequestProductId && !(await photoRequestsSupported(signal))) {
           yield {
             type: 'done',
