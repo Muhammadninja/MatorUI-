@@ -1,6 +1,8 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef } from 'react';
 
+import { getCurrentSession } from '@/services/auth-storage';
+
 /**
  * Holds a sourcing request while a guest signs in, then sends it once. The request
  * travels in here because signing in clears the guest's conversation: this is the
@@ -26,10 +28,12 @@ export function useSourcingSignInGate<THeld>({
     submit(held);
   }, [isAuthenticated, ready, submit]);
 
-  // Back on this screen still signed out means the sheet was dismissed.
+  // Back on this screen still signed out means the sheet was dismissed. The
+  // sheet closes right after the code is verified, before this screen has
+  // re-rendered as signed in, so the session itself decides, not the prop.
   useFocusEffect(
     useCallback(() => {
-      if (!isAuthenticated) waiting.current = null;
+      if (!isAuthenticated && !getCurrentSession()) waiting.current = null;
     }, [isAuthenticated]),
   );
 

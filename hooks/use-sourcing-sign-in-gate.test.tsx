@@ -7,7 +7,9 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
   focus: null as null | (() => void),
+  session: null as null | object,
 }));
+vi.mock('@/services/auth-storage', () => ({ getCurrentSession: () => mocks.session }));
 vi.mock('expo-router', () => ({
   router: { push: mocks.push },
   useFocusEffect: (run: () => void) => {
@@ -39,6 +41,7 @@ function mount(isAuthenticated: boolean) {
 beforeEach(() => {
   submit.mockReset();
   mocks.push.mockReset();
+  mocks.session = null;
 });
 
 describe('sourcing sign-in gate', () => {
@@ -73,6 +76,17 @@ describe('sourcing sign-in gate', () => {
     act(() => mocks.focus?.());
     setAuth(true);
     expect(submit).not.toHaveBeenCalled();
+  });
+
+  test('the sheet closing before the screen knows about the sign-in keeps the request', () => {
+    const setAuth = mount(false);
+    act(() => request('a1'));
+    // The code is verified and the sheet closes; this screen is focused again
+    // while it still renders as signed out.
+    mocks.session = { accessToken: 't' };
+    act(() => mocks.focus?.());
+    setAuth(true);
+    expect(submit).toHaveBeenCalledWith('a1');
   });
 
   test('signing in without asking sends nothing', () => {
