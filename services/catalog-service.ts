@@ -34,6 +34,8 @@ export type CatalogItem = {
   priceUzs?: number;
   priceLabel: string;
   images: string[];
+  /** Explicit operations flag: photography is planned, but no usable image is published yet. */
+  photoPlanned?: boolean;
   specs: CatalogItemSpec[];
   features: string[];
   category: string;
@@ -48,6 +50,10 @@ export type CatalogItem = {
    *  screen so shoppers can cross-reference against existing parts.
    *  Optional — items without a number simply omit the pill. */
   oem?: string;
+  /** Manufacturer-assigned part number, never inferred from OEM/GM references. */
+  manufacturerPartNumber?: string;
+  /** Original-equipment references, kept distinct from the seller's number. */
+  oemNumbers?: string[];
   /** GM (General Motors) cross-reference number, when the part carries
    *  one. Shown alongside the OEM number on the product row. */
   gm?: string;
@@ -144,6 +150,8 @@ export type CatalogItem = {
 export type CatalogItemSpec = {
   label: string;
   value: string;
+  /** Detail-only affordance for identifiers customers may want to copy. */
+  copyable?: boolean;
 };
 
 export type CatalogListRequest = {
@@ -315,6 +323,8 @@ type ApiCatalogPart = {
   }[];
   /** Denormalized brand label the backend attaches to the part. */
   part_brand_name?: string | null;
+  /** Seller's own part number; distinct from cross-reference/OEM numbers. */
+  manufacturer_part_number?: string | null;
   oem_numbers?: string[];
   gm_numbers?: string[];
   /** How the part number is classified ("OEM" | "GM" | "UNKNOWN"). */
@@ -344,6 +354,8 @@ type ApiCatalogPart = {
   /** Seller/ops-flagged bestseller, mirrored from the operator panel. */
   is_bestseller?: boolean;
   images?: string[];
+  /** Optional, backward-compatible field. Only true enables the friendly photo-coming-soon copy. */
+  photo_planned?: boolean;
   specs?: { label: string; value: string }[];
   features?: string[];
   /** Estimated delivery window in days (either can be null). */
@@ -444,10 +456,12 @@ function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
       // formatted from the amount the order will actually charge.
       typeof p.price_uzs === 'number' && !Number.isInteger(p.price_uzs)
         ? `UZS ${formatSomAmount(p.price_uzs)}`
-        : p.price_label ?? (p.price_uzs != null ? `UZS ${p.price_uzs.toLocaleString('ru-RU')}` : ''),
+        : (p.price_label ??
+          (p.price_uzs != null ? `UZS ${p.price_uzs.toLocaleString('ru-RU')}` : '')),
     priceUzs: p.price_uzs ?? undefined,
     priceLabel: '',
     images: p.images ?? [],
+    photoPlanned: p.photo_planned === true,
     // The detail screen only reads the oil/antifreeze rows off `motorOil` /
     // `antifreeze` now — brand/category/origin/OEM/GM live in the OEM pill
     // and the title instead. Kept passthrough-only for whatever the backend
@@ -456,6 +470,8 @@ function mapPartToCatalogItem(p: ApiCatalogPart): CatalogItem {
     features: p.features ?? [],
     category: categoryLabel ?? '',
     brand: partBrand,
+    manufacturerPartNumber: p.manufacturer_part_number ?? undefined,
+    oemNumbers: p.oem_numbers ?? [],
     // Exactly one of these is ever set — a part is GM xor OEM (see resolvePartNumber).
     oem: partNumber.oem,
     gm: partNumber.gm,

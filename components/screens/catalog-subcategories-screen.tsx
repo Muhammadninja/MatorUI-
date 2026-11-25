@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CategoryRowsSkeleton } from '@/components/screens-components/catalog/category-grid-skeleton';
+import MatorAIDiscoveryCard from '@/components/screens-components/catalog/mator-ai-discovery-card';
 import FitmentNote from '@/components/screens-components/catalog/fitment-note';
 import { AppButton } from '@/components/shared/app-button';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
@@ -136,17 +137,20 @@ export default function CatalogSubcategoriesScreen() {
           />
         </AppView>
       ) : state === 'loaded' && items.length === 0 ? (
-        <AppView flex={1} center px="xl" gap={12}>
-          <AppText family="heading" weight="bold" style={{ fontSize: 17, color: tokens.text }}>
-            {t('catalog.noSubcategories')}
-          </AppText>
+        <AppView flex={1} justify="center" px="lg" gap={12}>
+          <MatorAIDiscoveryCard
+            source="subcategory_empty"
+            categoryId={parentId}
+            categoryLabel={parentLabel}
+          />
           <AppButton
             title={
               parentLabel
                 ? t('catalog.viewAllLabelParts', { label: parentLabel })
                 : t('catalog.viewAllParts')
             }
-            kind="brand"
+            kind="secondary"
+            variant="outline"
             size="md"
             onPress={viewAllParts}
           />

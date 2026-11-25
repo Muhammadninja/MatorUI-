@@ -102,7 +102,7 @@ function SearchResultRow({ result, query, onPress }: SearchResultRowProps) {
       }}
     >
       <AppView row>
-        <Thumbnail alt={result.title} uri={image} width={imageWidth} />
+        <Thumbnail alt={result.title} uri={image} width={imageWidth} categoryId={result.categoryId} />
 
         <AppView flex={1} style={{ minWidth: 0, padding: 12 }}>
           <AppView style={{ paddingRight: HEART_CLEARANCE }}>

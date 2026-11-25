@@ -8,10 +8,11 @@ import ProductRow, {
   productCellStyle,
   useProductGridColumns,
 } from '@/components/screens-components/catalog/product-row';
+import MatorAIDiscoveryCard from '@/components/screens-components/catalog/mator-ai-discovery-card';
 import { RADIUS_PILL } from '@/components/screens-components/search/radii';
 import { AppSettingsHeader } from '@/components/shared/app-settings-header';
 import { AppText } from '@/components/shared/app-text';
-import { AppView } from '@/components/shared/app-view';
+import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { ListLoadingOverlay } from '@/components/shared/wheel-loader';
 import { useCartContext } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
@@ -56,7 +57,7 @@ export default function VehiclePartsScreen() {
     [make, model].filter(Boolean).join(' ') ||
     t('vehicleParts.fallbackTitle');
 
-  const { state, items, total } = useCatalogList({
+  const { state, items, total, refresh } = useCatalogList({
     page: 1,
     pageSize: 24,
     make,
@@ -107,26 +108,46 @@ export default function VehiclePartsScreen() {
           gap={16}
           style={{ paddingBottom: insets.bottom + 72 }}
         >
-          <AppView
-            center
-            rounded={RADIUS_PILL}
-            colorName="backgroundSecondary"
-            borderName="border"
-            borderWidth={1}
-            style={{ width: 72, height: 72 }}
-          >
-            <PackageOpen size={28} strokeWidth={2} color={tokens.text} />
-          </AppView>
-          <AppText textVariant="title" family="heading" colorName="text" align="center">
-            {t('catalog.noPartsFound')}
-          </AppText>
-          <AppText
-            family="default"
-            align="center"
-            style={{ fontSize: 13, color: tokens.textMuted, maxWidth: 300 }}
-          >
-            {t('vehicleParts.emptyBody', { vehicle: vehicleName || title })}
-          </AppText>
+          {state === 'empty' ? (
+            <MatorAIDiscoveryCard source="no_compatible_products" categoryLabel={title} />
+          ) : null}
+          {state === 'error' ? (
+            <>
+              <AppView
+                center
+                rounded={RADIUS_PILL}
+                colorName="backgroundSecondary"
+                borderName="border"
+                borderWidth={1}
+                style={{ width: 72, height: 72 }}
+              >
+                <PackageOpen size={28} strokeWidth={2} color={tokens.text} />
+              </AppView>
+              <AppText textVariant="title" family="heading" colorName="text" align="center">
+                {t('catalog.noPartsFound')}
+              </AppText>
+              <AppText
+                family="default"
+                align="center"
+                style={{ fontSize: 13, color: tokens.textMuted, maxWidth: 300 }}
+              >
+                {t('vehicleParts.emptyBody', { vehicle: vehicleName || title })}
+              </AppText>
+              <AppPressableView
+                onPress={refresh}
+                accessibilityRole="button"
+                rounded={999}
+                borderWidth={1}
+                borderName="border"
+                px={16}
+                py={10}
+              >
+                <AppText family="accent" weight="semibold" style={{ color: tokens.text }}>
+                  {t('common.retry')}
+                </AppText>
+              </AppPressableView>
+            </>
+          ) : null}
         </AppView>
       ) : (
         <ScrollView

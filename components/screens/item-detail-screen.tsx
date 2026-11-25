@@ -47,6 +47,7 @@ import { resolveItemPricing } from '@/services/sales-service';
 import { formatSomAmount } from '@/utils/format-price';
 import { triggerHaptic } from '@/utils/haptics';
 import { shareItem } from '@/utils/share';
+import { commercialBrandName } from '@/utils/commercial-brand';
 
 /**
  * Item Detail — backed by the REAL catalog (`useCatalogDetail`).
@@ -83,6 +84,7 @@ export default function ItemDetailScreen() {
 
   const { state, detail, error, refresh } = useCatalogDetail(id ?? null);
   const item = detail?.item ?? null;
+  const displayManufacturer = commercialBrandName(item?.brand);
   const activeVehicle = currentActiveVehicle?.vehicle ?? null;
   const sales = useActiveSales();
 
@@ -248,6 +250,12 @@ export default function ItemDetailScreen() {
             setImageIndex(i);
             setViewerOpen(true);
           }}
+          categoryId={item.categoryId}
+          productId={item.id}
+          manufacturer={displayManufacturer}
+          photoPlanned={item.photoPlanned}
+          partNumber={item.manufacturerPartNumber}
+          oemNumbers={item.oemNumbers?.length ? item.oemNumbers : item.oem ? [item.oem] : []}
         />
 
         {/* Content sheet — rides over the bottom of the gallery.
@@ -263,7 +271,7 @@ export default function ItemDetailScreen() {
           px="lg"
           gap={20}
           style={{
-            marginTop: -24,
+            marginTop: item.images?.length ? -24 : 0,
             paddingTop: 20,
             borderTopLeftRadius: 26,
             borderTopRightRadius: 26,
@@ -272,13 +280,22 @@ export default function ItemDetailScreen() {
           {/* ZONE 1 — what it is, what it costs. No containers: the type
               hierarchy alone carries it. */}
           <AppView gap={12}>
-            <ItemIdentity title={item.title} oem={item.oem} gm={item.gm} />
+            {item.images?.length && displayManufacturer ? (
+              <AppText
+                family="accent"
+                weight="semibold"
+                style={{ fontSize: 13, color: tokens.brandText }}
+              >
+                {displayManufacturer}
+              </AppText>
+            ) : null}
+            <ItemIdentity title={item.title} />
 
             {/* Real review aggregate, or nothing at all. */}
             <ItemRatingRow rating={item.rating} reviewCount={item.reviewCount} />
 
             <ItemPriceRow
-              price={item.price}
+              price={formatCurrency(unitPrice)}
               wasUzs={wasUzs}
               wasLabel={item.originalPriceLabel}
               savePct={savePct}
@@ -337,7 +354,18 @@ export default function ItemDetailScreen() {
           {specs.length > 0 ? (
             <AppView gap={11}>
               <ItemSectionTitle title={t('itemDetail.specsTitle')} />
-              <ItemSpecTable specs={specs} />
+              <ItemSpecTable
+                specs={specs}
+                onCopy={async (value) => {
+                  try {
+                    const Clipboard = await import('expo-clipboard');
+                    await Clipboard.setStringAsync(value);
+                    toast.success(t('itemDetail.identifierCopied'));
+                  } catch {
+                    toast.info(t('itemDetail.copyUnavailable'));
+                  }
+                }}
+              />
             </AppView>
           ) : null}
 
@@ -410,20 +438,36 @@ export default function ItemDetailScreen() {
   );
 }
 
-/**
- * Spec rows for the table: ONLY the KIND-specific attributes the backend
- * keeps outside the generic fields — a motor oil's viscosity/type/volume, an
- * antifreeze's net weight. The catalog's generic `specs` (brand, category,
- * origin, OEM/GM number) are deliberately left out: brand/OEM/GM already show
- * in the OEM pill and the part's fit/model already shows in the title, so
- * repeating them here was redundant.
- */
+/** Build the detail specification list only from fields actually present. */
 function buildSpecs(
   item: CatalogItem | null,
   t: (key: string, options?: Record<string, unknown>) => string,
 ): CatalogItemSpec[] {
   if (!item) return [];
-  const kindRows: CatalogItemSpec[] = [];
+  const kindRows: CatalogItemSpec[] = [...(item.specs ?? [])];
+
+  if (commercialBrandName(item.brand)) {
+    kindRows.unshift({
+      label: t('itemDetail.manufacturerLabel'),
+      value: commercialBrandName(item.brand)!,
+    });
+  }
+  if (item.category) kindRows.push({ label: t('itemDetail.categoryLabel'), value: item.category });
+  if (item.manufacturerPartNumber) {
+    kindRows.push({
+      label: t('itemDetail.manufacturerPartNumberLabel'),
+      value: item.manufacturerPartNumber,
+      copyable: true,
+    });
+  }
+  const oemRefs = Array.from(
+    new Set([...(item.oemNumbers ?? []), ...(item.oem ? [item.oem] : [])]),
+  );
+  if (oemRefs.length) {
+    kindRows.push({ label: t('itemDetail.oemLabel'), value: oemRefs.join(', '), copyable: true });
+  }
+  if (item.gm)
+    kindRows.push({ label: t('itemDetail.gmReferenceLabel'), value: item.gm, copyable: true });
 
   const oil = item.kind === 'MOTOR_OIL' ? item.motorOil : null;
   if (oil?.viscosity) kindRows.push({ label: t('itemDetail.oilViscosity'), value: oil.viscosity });
@@ -438,5 +482,11 @@ function buildSpecs(
     (coolant?.weightG != null ? t('itemDetail.weightGrams', { grams: coolant.weightG }) : null);
   if (weight) kindRows.push({ label: t('itemDetail.antifreezeWeight'), value: weight });
 
-  return kindRows;
+  const seen = new Set<string>();
+  return kindRows.filter((row) => {
+    const key = `${row.label}:${row.value}`;
+    if (!row.value.trim() || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }

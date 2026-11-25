@@ -172,6 +172,7 @@ export default function MatorSearchScreen() {
               isLoadingMore={isLoadingMore}
               onFilterPress={openFilters}
               onClearFilters={clearFilters}
+              aiFilters={filters as unknown as Record<string, unknown>}
             />
           </AppView>
         )}

@@ -21,6 +21,7 @@ let params: Record<string, string | undefined> = {};
 vi.mock('expo-router', () => ({
   router: { push: () => {}, back: () => {} },
   useLocalSearchParams: () => params,
+  useFocusEffect: () => {},
 }));
 vi.mock('@/config/api', () => ({ shouldUseHttpTransport: () => true }));
 const get = vi.fn();
@@ -59,7 +60,14 @@ const { grid, host, list } = vi.hoisted(() => ({
     ({ children, ...p }: Record<string, unknown> & { children?: React.ReactNode }) =>
       React.createElement(type, p, children),
   /** The props the list last rendered with. */
-  list: { props: {} as { numColumns?: number; onEndReached?: () => void } },
+  list: {
+    props: {} as {
+      numColumns?: number;
+      onEndReached?: () => void;
+      data?: unknown[];
+      overrideItemLayout?: (layout: { span?: number }, item: unknown, index: number) => void;
+    },
+  },
 }));
 vi.mock('react-native', () => ({
   Keyboard: { dismiss: () => {} },
@@ -73,6 +81,7 @@ vi.mock('@shopify/flash-list', () => ({
     ListHeaderComponent?: React.ReactNode;
     ListFooterComponent?: React.ReactNode;
     onEndReached?: () => void;
+    overrideItemLayout?: (layout: { span?: number }, item: unknown, index: number) => void;
   }) => {
     list.props = props;
     return React.createElement(
@@ -112,13 +121,18 @@ vi.mock('@/components/screens-components/home/image-box', () => ({}));
 vi.mock('@/components/shared/app-icon-button', () => ({}));
 vi.mock('@/components/shared/app-price', () => ({}));
 vi.mock('@/components/shared/wheel-loader/wheel-loader', () => ({}));
-vi.mock('@/contexts/active-vehicle.context', () => ({}));
+vi.mock('@/contexts/active-vehicle.context', () => ({
+  useActiveVehicle: () => ({ currentActiveVehicle: null }),
+}));
 vi.mock('@/contexts/likes.context', () => ({}));
 vi.mock('@/hooks/use-sales', () => ({}));
 vi.mock('@/services/compatibility-service', () => ({}));
 vi.mock('@/services/sales-service', () => ({}));
 vi.mock('@/components/screens-components/catalog/results-toolbar', () => ({
   default: host('toolbar'),
+}));
+vi.mock('@/components/screens-components/catalog/catalog-ai-inline-hint', () => ({
+  default: host('inline-ai-hint'),
 }));
 vi.mock('@/components/screens-components/catalog/fitment-note', () => ({ default: host('note') }));
 vi.mock('@/contexts/theme.context', () => ({ useThemeContext: () => ({ tokens: {} }) }));
@@ -239,6 +253,43 @@ describe('Category screen (a home tile)', () => {
     expect(r.root.find((n) => is(n, 'toolbar')).props.count).toBe(60);
   });
 
+  test('a successful empty response offers AI while an API error stays an error', async () => {
+    catalog = new FakeCatalog([]);
+    get.mockImplementation(catalog.get);
+    const empty = await render(<CategoryScreen />);
+    expect(
+      empty.root.findAll(
+        (node) => is(node, 'pressable') && node.props.testID === 'mator-ai-category_empty',
+      ),
+    ).toHaveLength(1);
+
+    get.mockReset().mockRejectedValue(new Error('API unavailable'));
+    const failed = await render(<CategoryScreen />);
+    expect(texts(failed)).toContain('catalog.loadPartsError');
+    expect(
+      failed.root.findAll(
+        (node) => is(node, 'pressable') && String(node.props.testID).startsWith('mator-ai-'),
+      ),
+    ).toHaveLength(0);
+  });
+
+  test('inserts one full-width AI hint after eight products and keeps product order', async () => {
+    const r = await render(<CategoryScreen />);
+    const data = list.props.data as Array<{ id: string; kind?: string }>;
+    expect(data[8]).toMatchObject({ id: 'catalog-ai-inline-hint', kind: 'ai_hint' });
+    expect(data.filter((item) => item.kind === 'ai_hint')).toHaveLength(1);
+    expect(data.filter((item) => !item.kind).map((item) => item.id)).toEqual(
+      catalog
+        .matching(catalog.calls[0])
+        .slice(0, 24)
+        .map((part) => part.id),
+    );
+    const span = {} as { span?: number };
+    list.props.overrideItemLayout?.(span, data[8], 8);
+    expect(span.span).toBe(2);
+    expect(r.root.findAll((node) => is(node, 'inline-ai-hint'))).toHaveLength(1);
+  });
+
   test('shows a spinner under the rows while the next page loads', async () => {
     const r = await render(<CategoryScreen />);
     catalog.holding = true;
@@ -324,6 +375,13 @@ describe('Parts screen (brand → model → subcategory)', () => {
     expect(rows(r)).toHaveLength(30);
     await reachEnd();
     expect(pages()).toEqual(['1', '2']);
+  });
+
+  test('inserts the inline hint once after eight parts in a long subcategory list', async () => {
+    await render(<CatalogPartsScreen />);
+    const data = list.props.data as Array<{ id: string; kind?: string }>;
+    expect(data[8]).toMatchObject({ id: 'catalog-ai-inline-hint', kind: 'ai_hint' });
+    expect(data.filter((item) => item.kind === 'ai_hint')).toHaveLength(1);
   });
 
   test('another model lists again from page 1', async () => {

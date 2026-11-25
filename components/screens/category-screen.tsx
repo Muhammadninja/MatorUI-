@@ -5,6 +5,9 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import CatalogListFooter from '@/components/screens-components/catalog/catalog-list-footer';
+import CatalogAIInlineHint from '@/components/screens-components/catalog/catalog-ai-inline-hint';
+import CatalogPhotoAnnouncement from '@/components/screens-components/catalog/catalog-photo-announcement';
+import MatorAIDiscoveryCard from '@/components/screens-components/catalog/mator-ai-discovery-card';
 import ProductRow, {
   productCellStyle,
   useProductGridColumns,
@@ -53,6 +56,9 @@ export default function CategoryScreen() {
   const label = params.label ?? vehicleCat ?? cat;
 
   const [sortBy, setSortBy] = useState<CatalogSortBy>('relevance');
+  const [dismissedPhotoCategories, setDismissedPhotoCategories] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   const {
     state,
@@ -76,7 +82,7 @@ export default function CategoryScreen() {
   // keeps it from being a dead end when the network returns.
   const showEmpty = state === 'empty' || state === 'error';
 
-  const listRef = useRef<FlashListRef<CatalogItem>>(null);
+  const listRef = useRef<FlashListRef<CatalogItem | { id: string; kind: 'ai_hint' }>>(null);
 
   // A new ordering is a new list: holding the old scroll offset would drop the
   // shopper into the middle of rows they never scrolled past.
@@ -99,6 +105,29 @@ export default function CategoryScreen() {
     [total, items.length, sortBy, changeSort],
   );
 
+  const showPhotoAnnouncement =
+    items.some((item) => item.photoPlanned === true) && !dismissedPhotoCategories.has(cat);
+  const dismissPhotoAnnouncement = useCallback(() => {
+    setDismissedPhotoCategories((current) => new Set(current).add(cat));
+  }, [cat]);
+  const listHeader = useMemo(
+    () => (
+      <AppView>
+        {toolbar}
+        {showPhotoAnnouncement ? (
+          <AppView px={16} pb={12}>
+            <CatalogPhotoAnnouncement
+              categoryId={cat}
+              categoryLabel={label}
+              onDismiss={dismissPhotoAnnouncement}
+            />
+          </AppView>
+        ) : null}
+      </AppView>
+    ),
+    [toolbar, showPhotoAnnouncement, cat, label, dismissPhotoAnnouncement],
+  );
+
   const footer = useMemo(
     () => (
       <CatalogListFooter loading={isLoadingMore} failed={loadMoreError} onRetry={retryLoadMore} />
@@ -111,6 +140,17 @@ export default function CategoryScreen() {
   const toast = useToast();
 
   const columns = useProductGridColumns();
+  // An eight-product boundary is a complete row in the two-column grid. The
+  // full-span hint is only added to long lists, well before the end card.
+  const showInlineHint = total > 16 && items.length >= 8;
+  const listItems = useMemo<(CatalogItem | { id: string; kind: 'ai_hint' })[]>(() => {
+    if (!showInlineHint) return items;
+    return [
+      ...items.slice(0, 8),
+      { id: 'catalog-ai-inline-hint', kind: 'ai_hint' },
+      ...items.slice(8),
+    ];
+  }, [items, showInlineHint]);
   const openItem = useCallback((it: CatalogItem) => openItemDetail(it.id), []);
 
   // Guest-first purchase gate, mirroring Item Detail.
@@ -135,12 +175,22 @@ export default function CategoryScreen() {
   );
 
   const renderItem = useCallback(
-    ({ item, index }: { item: CatalogItem; index: number }) => (
-      <AppView style={productCellStyle(index, columns)}>
-        <ProductRow item={item} onOpen={openItem} onAdd={addToCart} />
-      </AppView>
-    ),
-    [openItem, addToCart, columns],
+    ({ item, index }: { item: CatalogItem | { id: string; kind: 'ai_hint' }; index: number }) => {
+      if ('kind' in item && item.kind === 'ai_hint') {
+        return (
+          <AppView style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+            <CatalogAIInlineHint categoryId={cat} categoryLabel={label} />
+          </AppView>
+        );
+      }
+      const productIndex = index - (showInlineHint && index > 8 ? 1 : 0);
+      return (
+        <AppView style={productCellStyle(productIndex, columns)}>
+          <ProductRow item={item} onOpen={openItem} onAdd={addToCart} />
+        </AppView>
+      );
+    },
+    [openItem, addToCart, columns, showInlineHint, cat, label],
   );
 
   return (
@@ -160,22 +210,30 @@ export default function CategoryScreen() {
             gap={10}
             style={{ paddingBottom: insets.bottom + 72 }}
           >
-            <AppText family="heading" weight="bold" style={{ fontSize: 18, color: tokens.text }}>
-              {t('catalog.noPartsFound')}
-            </AppText>
-            <AppText
-              family="default"
-              style={{ fontSize: 13, lineHeight: 18, color: tokens.textMuted, textAlign: 'center' }}
-            >
-              {t('catalog.tryClearingFilters')}
-            </AppText>
-            <AppButton
-              title={t('common.retry')}
-              kind="secondary"
-              size="sm"
-              onPress={refresh}
-              style={{ marginTop: 4 }}
-            />
+            {state === 'empty' ? (
+              <MatorAIDiscoveryCard
+                source="category_empty"
+                categoryId={cat}
+                categoryLabel={label}
+              />
+            ) : (
+              <>
+                <AppText
+                  family="heading"
+                  weight="bold"
+                  style={{ fontSize: 18, color: tokens.text }}
+                >
+                  {t('catalog.loadPartsError')}
+                </AppText>
+                <AppButton
+                  title={t('common.retry')}
+                  kind="secondary"
+                  size="sm"
+                  onPress={refresh}
+                  style={{ marginTop: 4 }}
+                />
+              </>
+            )}
           </AppView>
         </AppView>
       ) : (
@@ -184,12 +242,30 @@ export default function CategoryScreen() {
         <AppView flex={1} style={{ opacity: isRefreshing ? 0.5 : 1 }}>
           <FlashList
             ref={listRef}
-            data={items}
+            data={listItems}
             keyExtractor={(it) => it.id}
             renderItem={renderItem}
             numColumns={columns}
-            ListHeaderComponent={state === 'loading' ? null : toolbar}
-            ListFooterComponent={footer}
+            overrideItemLayout={(layout, _item, index) => {
+              if (showInlineHint && index === 8) layout.span = columns;
+            }}
+            ListHeaderComponent={state === 'loading' ? null : listHeader}
+            ListFooterComponent={
+              <AppView gap={12} px={16}>
+                {footer}
+                {!isLoadingMore &&
+                !loadMoreError &&
+                !isRefreshing &&
+                total > 0 &&
+                items.length >= total ? (
+                  <MatorAIDiscoveryCard
+                    source="category_end"
+                    categoryId={cat}
+                    categoryLabel={label}
+                  />
+                ) : null}
+              </AppView>
+            }
             onEndReached={loadMore}
             onEndReachedThreshold={0.5}
             // FlashList v2 keeps the visible content anchored BY DEFAULT: when

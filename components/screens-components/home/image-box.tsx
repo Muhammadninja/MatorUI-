@@ -3,7 +3,7 @@ import { memo } from 'react';
 import { type DimensionValue } from 'react-native';
 
 import { AppImage } from '@/components/shared/app-image';
-import PartImagePlaceholder from '@/components/shared/part-image-placeholder';
+import ProductImagePlaceholder from '@/components/shared/product-image-placeholder';
 
 export type ImageBoxProps = {
   /** Accessibility label (product/vehicle name). */
@@ -28,6 +28,12 @@ export type ImageBoxProps = {
   /** Width in POINTS the box is drawn at, so the CDN can hand back a
    *  right-sized derivative. Only needed when `width` is a percentage. */
   targetWidth?: number;
+  /** Stable backend category id for an intentional no-photo illustration. */
+  categoryId?: string;
+  manufacturer?: string;
+  photoPlanned?: boolean;
+  onPhotoLoad?: () => void;
+  onPhotoError?: () => void;
 };
 
 /**
@@ -44,14 +50,21 @@ function ImageBox({
   contentFit = 'cover',
   backgroundColor,
   targetWidth,
+  categoryId,
+  manufacturer,
+  photoPlanned = false,
+  onPhotoLoad,
+  onPhotoError,
 }: ImageBoxProps) {
   const placeholder = (
-    <PartImagePlaceholder
+    <ProductImagePlaceholder
       label={label}
+      categoryId={categoryId}
+      manufacturer={manufacturer}
+      photoPlanned={photoPlanned}
       width={width}
       height={height}
       radius={radius}
-      backgroundColor={backgroundColor}
     />
   );
 
@@ -64,6 +77,8 @@ function ImageBox({
         rounded={radius}
         alt={label}
         fallback={placeholder}
+        onLoad={onPhotoLoad}
+        onError={onPhotoError}
         contentFit={contentFit}
         placeholderColor={backgroundColor}
         targetWidth={targetWidth}

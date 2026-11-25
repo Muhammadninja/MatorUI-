@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
+import MatorAIDiscoveryCard from '@/components/screens-components/catalog/mator-ai-discovery-card';
 
 export type ResultsEmptyProps = {
   query: string;
@@ -15,6 +16,7 @@ export type ResultsEmptyProps = {
   onClearFilters?: () => void;
   /** Called when the user taps the did-you-mean suggestion. */
   onUseSuggestion?: (suggestion: string) => void;
+  filters?: Record<string, unknown>;
 };
 
 /**
@@ -29,6 +31,7 @@ export default function ResultsEmpty({
   hasActiveFilters,
   onClearFilters,
   onUseSuggestion,
+  filters,
 }: ResultsEmptyProps) {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
@@ -63,6 +66,14 @@ export default function ResultsEmpty({
               {didYouMean}
             </AppText>
           </AppPressableView>
+        </AppView>
+        <AppView style={{ width: '100%' }}>
+          <MatorAIDiscoveryCard
+            source="search_zero_results"
+            query={query}
+            filters={filters}
+            compact
+          />
         </AppView>
       </AppView>
     );
@@ -104,6 +115,14 @@ export default function ResultsEmpty({
             </AppText>
           </AppPressableView>
         ) : null}
+        <AppView style={{ width: '100%' }}>
+          <MatorAIDiscoveryCard
+            source="filter_zero_results"
+            query={query}
+            filters={filters}
+            compact
+          />
+        </AppView>
       </AppView>
     );
   }
@@ -119,6 +138,14 @@ export default function ResultsEmpty({
         <AppText textVariant="bodySm" colorName="textMuted" style={{ textAlign: 'center' }}>
           {t('search.noMatchesBody', { query: query.trim() })}
         </AppText>
+      </AppView>
+      <AppView style={{ width: '100%' }}>
+        <MatorAIDiscoveryCard
+          source="search_zero_results"
+          query={query}
+          filters={filters}
+          compact
+        />
       </AppView>
     </AppView>
   );

@@ -31,6 +31,7 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
 }));
 vi.mock('expo-router', () => ({
   router: { push: m.push },
+  useLocalSearchParams: () => ({}),
   useFocusEffect: () => {},
 }));
 vi.mock('expo-blur', () => ({ BlurView: () => null }));
@@ -352,6 +353,21 @@ describe('a reply still on its way', () => {
     await act(async () => stream.release());
     await settle();
     expect(visible()).toEqual(['asked by B', 'reply to B']);
+  });
+
+  test('two rapid send taps create only one chat and sourcing request', async () => {
+    await launch();
+    const stream = pending();
+    await act(async () => composer().props.onChangeText('find a brake pad'));
+    await act(async () => {
+      composer().props.onSend();
+      composer().props.onSend();
+    });
+    await settle();
+    expect(m.send).toHaveBeenCalledTimes(1);
+    expect(m.send.mock.calls[0]![0]).toMatchObject({ message: 'find a brake pad' });
+    await act(async () => stream.release());
+    await settle();
   });
 
   test('a failure from the old session leaves no failed marker behind', async () => {

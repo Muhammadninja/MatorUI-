@@ -1,6 +1,12 @@
 export type ThemeTokens = {
   background: string;
   backgroundSecondary: string;
+  productPlaceholderBackground: string;
+  productPlaceholderFill: string;
+  productPlaceholderSide: string;
+  productPlaceholderHighlight: string;
+  productPlaceholderOutline: string;
+  productPlaceholderManufacturer: string;
   surface: string;
   card: string;
   onCard: string;

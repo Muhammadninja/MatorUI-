@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Copy } from 'lucide-react-native';
 
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
@@ -54,14 +55,13 @@ export function ItemTrustRow({ item }: { item: CatalogItem }) {
   const { tokens } = useThemeContext();
   const outOfStock = /out of stock/i.test(item.status ?? '');
 
-  // Nothing to say → no empty row. "In stock" deliberately has no chip: it is
-  // the default for every listing, so it would be noise on every product.
-  if (!outOfStock && !item.certified && !item.lowestPrice) return null;
-
   return (
     <AppView row wrap gap={7}>
       {outOfStock ? (
         <Chip label={t('itemDetail.outOfStock')} color={tokens.error} bg={tokens.errorSoft} />
+      ) : null}
+      {!outOfStock ? (
+        <Chip label={t('itemDetail.inStock')} color={tokens.success} bg={tokens.successSoft} />
       ) : null}
       {item.certified ? (
         <Chip label={t('catalog.matorCertified')} color={tokens.success} bg={tokens.successSoft} />
@@ -105,7 +105,14 @@ export function ItemRatingRow({ rating, reviewCount }: { rating?: number; review
 }
 
 /** Label / value spec table — the catalog's own `specs`, plus any oil rows. */
-export function ItemSpecTable({ specs }: { specs: CatalogItemSpec[] }) {
+export function ItemSpecTable({
+  specs,
+  onCopy,
+}: {
+  specs: CatalogItemSpec[];
+  onCopy?: (value: string) => void;
+}) {
+  const { t } = useTranslation();
   const { tokens } = useThemeContext();
   if (specs.length === 0) return null;
 
@@ -120,10 +127,7 @@ export function ItemSpecTable({ specs }: { specs: CatalogItemSpec[] }) {
       {specs.map((row, i) => (
         <AppView
           key={`${row.label}-${i}`}
-          row
-          align="flex-start"
-          justify="space-between"
-          gap={16}
+          gap={row.copyable ? 5 : 0}
           style={{
             paddingHorizontal: 14,
             paddingVertical: 12,
@@ -131,16 +135,68 @@ export function ItemSpecTable({ specs }: { specs: CatalogItemSpec[] }) {
             borderBottomColor: tokens.divider,
           }}
         >
-          <AppText family="default" style={{ flex: 1, fontSize: 14, lineHeight: 20, color: tokens.textMuted }}>
-            {row.label}
-          </AppText>
-          <AppText
-            family="accent"
-            weight="semibold"
-            style={{ flex: 1, fontSize: 14, lineHeight: 20, color: tokens.text, textAlign: 'right' }}
-          >
-            {row.value}
-          </AppText>
+          {row.copyable ? (
+            <>
+              <AppText
+                family="default"
+                style={{ fontSize: 14, lineHeight: 20, color: tokens.textMuted }}
+              >
+                {row.label}
+              </AppText>
+              <AppView row align="center" gap={8}>
+                <AppText
+                  family="accent"
+                  weight="semibold"
+                  style={{
+                    flex: 1,
+                    flexShrink: 1,
+                    fontSize: 14,
+                    lineHeight: 20,
+                    color: tokens.text,
+                  }}
+                >
+                  {row.value}
+                </AppText>
+                {onCopy ? (
+                  <AppPressableView
+                    onPress={() => onCopy(row.value)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('itemDetail.copyIdentifier')}
+                    style={{
+                      minWidth: 44,
+                      minHeight: 44,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Copy size={16} strokeWidth={1.8} color={tokens.brandText} />
+                  </AppPressableView>
+                ) : null}
+              </AppView>
+            </>
+          ) : (
+            <AppView row align="flex-start" justify="space-between" gap={16}>
+              <AppText
+                family="default"
+                style={{ flex: 1, fontSize: 14, lineHeight: 20, color: tokens.textMuted }}
+              >
+                {row.label}
+              </AppText>
+              <AppText
+                family="accent"
+                weight="semibold"
+                style={{
+                  flex: 1,
+                  fontSize: 14,
+                  lineHeight: 20,
+                  color: tokens.text,
+                  textAlign: 'right',
+                }}
+              >
+                {row.value}
+              </AppText>
+            </AppView>
+          )}
         </AppView>
       ))}
     </AppView>

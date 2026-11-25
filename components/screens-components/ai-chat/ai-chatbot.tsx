@@ -1,23 +1,23 @@
 import { BlurView } from 'expo-blur';
 import {
-    ChevronDown,
-    MoreVertical,
-    RefreshCw,
-    Sparkles,
-    ThumbsDown,
-    ThumbsUp,
+  ChevronDown,
+  MoreVertical,
+  RefreshCw,
+  Sparkles,
+  ThumbsDown,
+  ThumbsUp,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    ActionSheetIOS,
-    Keyboard,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    View,
-    type NativeScrollEvent,
-    type NativeSyntheticEvent,
+  ActionSheetIOS,
+  Keyboard,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from 'react-native';
 import { KeyboardStickyView } from 'react-native-keyboard-controller';
 import { useTranslation } from 'react-i18next';
@@ -52,7 +52,7 @@ import type {
   AiChatVehicleContext,
 } from '@/types/ai-chat';
 import { triggerHaptic } from '@/utils/haptics';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 
 /** Handoff §16 suggestion chips — tap fills the composer. Built via a
  *  factory so the labels re-resolve when the language changes. */
@@ -79,17 +79,12 @@ type TimelineEntry =
   | { kind: 'message'; key: string; message: AiChatMessage }
   | { kind: 'system'; key: string; label: string };
 
-function formatDateLabel(
-  iso: string,
-  t: (key: string) => string,
-  now = Date.now(),
-): string {
+function formatDateLabel(iso: string, t: (key: string) => string, now = Date.now()): string {
   const ts = Date.parse(iso);
   if (Number.isNaN(ts)) return t('aiChat.dateToday');
   const d = new Date(ts);
   const today = new Date(now);
-  const startOf = (x: Date) =>
-    new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   const diffDays = Math.floor((startOf(today) - startOf(d)) / 86_400_000);
   if (diffDays <= 0) return t('aiChat.dateToday');
   if (diffDays === 1) return t('aiChat.dateYesterday');
@@ -108,9 +103,7 @@ function dateBucket(iso: string): string {
 type HeldRequest = { assistantMessageId: string; userMessageId: string; body: string };
 
 /** What the endpoint is told about the car selected in the garage. */
-function selectedVehicleContext(
-  vehicle: Vehicle | null | undefined,
-): AiChatVehicleContext | null {
+function selectedVehicleContext(vehicle: Vehicle | null | undefined): AiChatVehicleContext | null {
   if (!vehicle) return null;
   return {
     makeId: vehicle.brandId ?? '',
@@ -123,6 +116,7 @@ function selectedVehicleContext(
 }
 
 export default function AiChatbot() {
+  const routeParams = useLocalSearchParams<{ shoppingPrompt?: string | string[] }>();
   const { tokens } = useThemeContext();
   const { t } = useTranslation();
   const suggestionChips = useMemo(() => buildSuggestionChips(t), [t]);
@@ -155,13 +149,12 @@ export default function AiChatbot() {
   }, []);
 
   const [draft, setDraft] = useState('');
+  const handledShoppingPrompt = useRef<string | null>(null);
   const [messages, setMessages] = useState<AiChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [streamingReply, setStreamingReply] = useState<StreamingReply | null>(null);
   const [lastSuggestions, setLastSuggestions] = useState<string[]>([]);
-  const [failedUserMessageIds, setFailedUserMessageIds] = useState<Set<string>>(
-    () => new Set(),
-  );
+  const [failedUserMessageIds, setFailedUserMessageIds] = useState<Set<string>>(() => new Set());
   const [systemNotes, setSystemNotes] = useState<SystemNote[]>([]);
   const [showScrollToLatest, setShowScrollToLatest] = useState(false);
 
@@ -170,6 +163,29 @@ export default function AiChatbot() {
   const sessionRef = useRef(0);
   const [sessionOwner, setSessionOwner] = useState(chatOwner);
   const [hydratedOwner, setHydratedOwner] = useState<ChatOwner | undefined>(undefined);
+  const shoppingPrompt = Array.isArray(routeParams.shoppingPrompt)
+    ? routeParams.shoppingPrompt[0]
+    : routeParams.shoppingPrompt;
+  useEffect(() => {
+    if (
+      !shoppingPrompt ||
+      handledShoppingPrompt.current === shoppingPrompt ||
+      hydratedOwner !== chatOwner
+    )
+      return;
+    handledShoppingPrompt.current = shoppingPrompt;
+    if (!draft.trim()) setDraft(shoppingPrompt);
+    else {
+      openConfirm({
+        title: t('aiChat.shoppingContextTitle'),
+        message: t('aiChat.shoppingContextBody'),
+        confirmLabel: t('aiChat.addContext'),
+        cancelLabel: t('common.cancel'),
+        onConfirm: () =>
+          setDraft((latest) => [latest.trim(), shoppingPrompt].filter(Boolean).join('\n\n')),
+      });
+    }
+  }, [shoppingPrompt, hydratedOwner, chatOwner, openConfirm, t, draft]);
   // During render, not in an effect: an effect would commit one frame showing the
   // previous account's messages to the next person.
   if (sessionOwner !== chatOwner) {
@@ -253,8 +269,7 @@ export default function AiChatbot() {
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-      const distanceFromBottom =
-        contentSize.height - contentOffset.y - layoutMeasurement.height;
+      const distanceFromBottom = contentSize.height - contentOffset.y - layoutMeasurement.height;
       const atBottom = distanceFromBottom < 48;
       isAtBottomRef.current = atBottom;
       setShowScrollToLatest(!atBottom && messages.length > 0);
@@ -286,9 +301,7 @@ export default function AiChatbot() {
 
       // Doubles as the request id, so it has to stay unique and survive retries.
       const finalUserId =
-        retryUserId ??
-        messageId ??
-        `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        retryUserId ?? messageId ?? `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       if (!retryUserId) {
         setMessages((current) => [
           ...current,
@@ -367,9 +380,7 @@ export default function AiChatbot() {
             vehicleContext: selectedVehicleContext(currentActiveVehicle?.vehicle),
             // Snapshot the prior turns (pre-append: this fires before the ref
             // effect runs) so the endpoint remembers earlier context.
-            history: messagesRef.current
-              .slice(-10)
-              .map((m) => ({ role: m.role, content: m.body })),
+            history: messagesRef.current.slice(-10).map((m) => ({ role: m.role, content: m.body })),
           },
           controller.signal,
         );
@@ -807,7 +818,8 @@ export default function AiChatbot() {
                   weight="semibold"
                   style={{ color: tokens.success, lineHeight: 14, flexShrink: 1 }}
                 >
-                  {t('aiChat.online')}{onlineLabel ? ` · ${onlineLabel}` : ''}
+                  {t('aiChat.online')}
+                  {onlineLabel ? ` · ${onlineLabel}` : ''}
                 </AppText>
               </AppView>
             </AppView>
@@ -912,11 +924,7 @@ export default function AiChatbot() {
                         backgroundColor: tokens.card,
                       }}
                     >
-                      <AppText
-                        textVariant="bodySm"
-                        weight="semibold"
-                        colorName="text"
-                      >
+                      <AppText textVariant="bodySm" weight="semibold" colorName="text">
                         {item.label}
                       </AppText>
                     </AppPressableView>
@@ -925,11 +933,7 @@ export default function AiChatbot() {
               </AppView>
 
               {/* AI disclaimer */}
-              <AppText
-                textVariant="bodyXs"
-                colorName="gray400"
-                style={{ lineHeight: 18 }}
-              >
+              <AppText textVariant="bodyXs" colorName="gray400" style={{ lineHeight: 18 }}>
                 {t('aiChat.disclaimerLong')}
               </AppText>
             </AppView>
@@ -944,8 +948,7 @@ export default function AiChatbot() {
                     return <SystemDivider key={entry.key} label={entry.label} />;
                   }
                   const message = entry.message;
-                  const failed =
-                    message.role === 'user' && failedUserMessageIds.has(message.id);
+                  const failed = message.role === 'user' && failedUserMessageIds.has(message.id);
                   const isLatestAssistant =
                     message.role === 'assistant' && message.id === latestAssistantId;
                   return (
@@ -969,7 +972,9 @@ export default function AiChatbot() {
                         <AppView style={{ paddingLeft: 40 }}>
                           <AppButton
                             testID="chat-sourcing-submit"
-                            title={t(isAuthenticated ? 'aiChat.submitRequest' : 'aiChat.signInToSubmit')}
+                            title={t(
+                              isAuthenticated ? 'aiChat.submitRequest' : 'aiChat.signInToSubmit',
+                            )}
                             kind="brand"
                             size="lg"
                             fullWidth
@@ -1001,7 +1006,11 @@ export default function AiChatbot() {
                             <AppText
                               textVariant="caption"
                               weight="semibold"
-                              style={{ color: tokens.error, lineHeight: 14, includeFontPadding: false }}
+                              style={{
+                                color: tokens.error,
+                                lineHeight: 14,
+                                includeFontPadding: false,
+                              }}
                             >
                               {t('aiChat.tapToRetry')}
                             </AppText>
@@ -1011,33 +1020,33 @@ export default function AiChatbot() {
                       {isLatestAssistant && !streamingReply ? (
                         <AppView row gap={6} style={{ paddingLeft: 40 }}>
                           {message.sourcing ? null : (
-                          <Pressable
-                            onPress={regenerateLastReply}
-                            accessibilityRole="button"
-                            accessibilityLabel={t('aiChat.regenerateResponse')}
-                            style={({ pressed }) => ({
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              gap: 6,
-                              borderRadius: 999,
-                              paddingHorizontal: 10,
-                              paddingVertical: 5,
-                              borderWidth: 1,
-                              borderColor: tokens.border,
-                              backgroundColor: tokens.card,
-                              opacity: pressed ? 0.85 : 1,
-                            })}
-                          >
-                            <RefreshCw size={12} strokeWidth={2.4} color={tokens.gray400} />
-                            <AppText
-                              textVariant="caption"
-                              weight="semibold"
-                              colorName="gray400"
-                              style={{ lineHeight: 14, includeFontPadding: false }}
+                            <Pressable
+                              onPress={regenerateLastReply}
+                              accessibilityRole="button"
+                              accessibilityLabel={t('aiChat.regenerateResponse')}
+                              style={({ pressed }) => ({
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 6,
+                                borderRadius: 999,
+                                paddingHorizontal: 10,
+                                paddingVertical: 5,
+                                borderWidth: 1,
+                                borderColor: tokens.border,
+                                backgroundColor: tokens.card,
+                                opacity: pressed ? 0.85 : 1,
+                              })}
                             >
-                              {t('aiChat.regenerate')}
-                            </AppText>
-                          </Pressable>
+                              <RefreshCw size={12} strokeWidth={2.4} color={tokens.gray400} />
+                              <AppText
+                                textVariant="caption"
+                                weight="semibold"
+                                colorName="gray400"
+                                style={{ lineHeight: 14, includeFontPadding: false }}
+                              >
+                                {t('aiChat.regenerate')}
+                              </AppText>
+                            </Pressable>
                           )}
                           <FeedbackButton
                             active={message.feedback === 'up'}
@@ -1063,9 +1072,7 @@ export default function AiChatbot() {
                       body={streamingReply.body}
                       caption={streamingReply.body ? t('aiChat.captionTyping') : undefined}
                       toolCalls={
-                        streamingReply.toolCalls.length > 0
-                          ? streamingReply.toolCalls
-                          : undefined
+                        streamingReply.toolCalls.length > 0 ? streamingReply.toolCalls : undefined
                       }
                       onAvatarPress={handleAssistantAvatarPress}
                     />
@@ -1160,11 +1167,7 @@ export default function AiChatbot() {
             {/* Persistent AI disclosure — visible across empty state AND
              *  active chat (issue #23 from UX critique). */}
             <AppView px="md" pt={2} pb={4}>
-              <AppText
-                textVariant="caption"
-                colorName="textMuted"
-                align="center"
-              >
+              <AppText textVariant="caption" colorName="textMuted" align="center">
                 {t('aiChat.disclaimerShort')}
               </AppText>
             </AppView>

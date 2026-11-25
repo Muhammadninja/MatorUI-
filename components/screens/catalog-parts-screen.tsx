@@ -1,12 +1,15 @@
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { router, useLocalSearchParams } from 'expo-router';
-import { AlertCircle, ArrowLeft, PackageOpen, Search, X } from 'lucide-react-native';
+import { AlertCircle, ArrowLeft, Search, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Keyboard, ScrollView, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import CatalogListFooter from '@/components/screens-components/catalog/catalog-list-footer';
+import CatalogAIInlineHint from '@/components/screens-components/catalog/catalog-ai-inline-hint';
+import CatalogPhotoAnnouncement from '@/components/screens-components/catalog/catalog-photo-announcement';
+import MatorAIDiscoveryCard from '@/components/screens-components/catalog/mator-ai-discovery-card';
 import ProductRow, { productCellStyle } from '@/components/screens-components/catalog/product-row';
 import FitmentNote from '@/components/screens-components/catalog/fitment-note';
 import { AppText } from '@/components/shared/app-text';
@@ -84,6 +87,9 @@ export default function CatalogPartsScreen() {
     oemOnly: certified === 'oem',
     gmOnly: certified === 'gm',
   }));
+  const [dismissedPhotoCategories, setDismissedPhotoCategories] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   // Quick-filter mutators — every chip applies immediately (no draft, no Apply).
   const toggleSort = (s: CatalogSortBy) =>
@@ -127,7 +133,7 @@ export default function CatalogPartsScreen() {
     oemOnly: filter.oemOnly || undefined,
   });
 
-  const listRef = useRef<FlashListRef<CatalogItem>>(null);
+  const listRef = useRef<FlashListRef<CatalogItem | { id: string; kind: 'ai_hint' }>>(null);
 
   // Every chip re-queries the catalog, so the rows underneath are a different
   // list. Holding the old scroll offset would land the shopper somewhere in the
@@ -224,13 +230,74 @@ export default function CatalogPartsScreen() {
     [addItem, isAuthenticated, toast, t],
   );
 
-  const renderItem = useCallback(
-    ({ item, index }: { item: CatalogItem; index: number }) => (
-      <AppView style={productCellStyle(index, LIST_COLUMNS)}>
-        <ProductRow item={item} onOpen={openItem} onAdd={addToCart} />
+  const showInlineHint = total > 16 && items.length >= 8;
+  const listItems = useMemo<(CatalogItem | { id: string; kind: 'ai_hint' })[]>(() => {
+    if (!showInlineHint) return items;
+    return [
+      ...items.slice(0, 8),
+      { id: 'catalog-ai-inline-hint', kind: 'ai_hint' },
+      ...items.slice(8),
+    ];
+  }, [items, showInlineHint]);
+  const showPhotoAnnouncement =
+    items.some((item) => item.photoPlanned === true) &&
+    !dismissedPhotoCategories.has(categoryId ?? 'all');
+  const dismissPhotoAnnouncement = useCallback(() => {
+    setDismissedPhotoCategories((current) => new Set(current).add(categoryId ?? 'all'));
+  }, [categoryId]);
+  const listHeader = useMemo(
+    () => (
+      <AppView>
+        <AppView px={16} style={{ paddingBottom: 10 }}>
+          <FitmentNote
+            lead={[categoryLabel, t('catalog.partCount', { count: total })]
+              .filter(Boolean)
+              .join(' · ')}
+          />
+        </AppView>
+        {showPhotoAnnouncement ? (
+          <AppView px={16} pb={12}>
+            <CatalogPhotoAnnouncement
+              categoryId={categoryId}
+              categoryLabel={categoryLabel}
+              onDismiss={dismissPhotoAnnouncement}
+            />
+          </AppView>
+        ) : null}
       </AppView>
     ),
-    [openItem, addToCart],
+    [categoryId, categoryLabel, dismissPhotoAnnouncement, showPhotoAnnouncement, t, total],
+  );
+
+  const renderItem = useCallback(
+    ({ item, index }: { item: CatalogItem | { id: string; kind: 'ai_hint' }; index: number }) => {
+      if ('kind' in item && item.kind === 'ai_hint') {
+        return (
+          <AppView style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+            <CatalogAIInlineHint
+              categoryId={categoryId}
+              categoryLabel={categoryLabel}
+              query={debouncedSearch}
+              filters={{
+                brands: filter.brands.map((b) => b.id),
+                regions: filter.regions,
+                gmOnly: filter.gmOnly,
+                oemOnly: filter.oemOnly,
+                sortBy: filter.sortBy,
+              }}
+            />
+          </AppView>
+        );
+      }
+      return (
+        <AppView
+          style={productCellStyle(index - (showInlineHint && index > 8 ? 1 : 0), LIST_COLUMNS)}
+        >
+          <ProductRow item={item} onOpen={openItem} onAdd={addToCart} />
+        </AppView>
+      );
+    },
+    [openItem, addToCart, showInlineHint, categoryId, categoryLabel, debouncedSearch, filter],
   );
 
   return (
@@ -355,17 +422,39 @@ export default function CatalogPartsScreen() {
           </AppPressableView>
         </AppView>
       ) : items.length === 0 ? (
-        <AppView flex={1} center px="xl" gap={10}>
-          <PackageOpen size={30} strokeWidth={2} color={tokens.textMuted} />
-          <AppText family="heading" weight="bold" style={{ fontSize: 17, color: tokens.text }}>
-            {t('catalog.noPartsFound')}
-          </AppText>
-          <AppText
-            family="default"
-            style={{ fontSize: 13, color: tokens.textMuted, textAlign: 'center', maxWidth: 280 }}
-          >
-            {t('catalog.tryClearingFilters')}
-          </AppText>
+        <AppView flex={1} center px="lg" gap={12}>
+          <MatorAIDiscoveryCard
+            source={activeFilterCount ? 'filter_zero_results' : 'category_empty'}
+            categoryId={categoryId}
+            categoryLabel={categoryLabel}
+            query={debouncedSearch}
+            filters={{
+              brands: filter.brands.map((b) => b.id),
+              regions: filter.regions,
+              gmOnly: filter.gmOnly,
+              oemOnly: filter.oemOnly,
+              sortBy: filter.sortBy,
+            }}
+          />
+          {activeFilterCount > 0 ? (
+            <AppPressableView
+              onPress={() => {
+                setFilter(DEFAULT_FILTER);
+                setSearch('');
+                resetScroll();
+              }}
+              accessibilityRole="button"
+              rounded={999}
+              borderWidth={1}
+              borderName="border"
+              px={16}
+              py={10}
+            >
+              <AppText family="accent" weight="semibold" style={{ color: tokens.text }}>
+                {t('search.clearFilters')}
+              </AppText>
+            </AppPressableView>
+          ) : null}
         </AppView>
       ) : (
         // Dimmed, not torn down, while the new query is in flight: the rows
@@ -374,29 +463,44 @@ export default function CatalogPartsScreen() {
         <AppView flex={1} style={{ opacity: isRefreshing ? 0.5 : 1 }}>
           <FlashList
             ref={listRef}
-            data={items}
+            data={listItems}
             keyExtractor={(it) => it.id}
             renderItem={renderItem}
             numColumns={LIST_COLUMNS}
+            overrideItemLayout={(layout, _item, index) => {
+              if (showInlineHint && index === 8) layout.span = LIST_COLUMNS;
+            }}
             ItemSeparatorComponent={() => (
               <AppView style={{ height: 1, backgroundColor: tokens.divider }} />
             )}
-            ListHeaderComponent={
-              <AppView px={16} style={{ paddingBottom: 10 }}>
-                {/* The vehicle lives in this line now, not in a bar above it. */}
-                <FitmentNote
-                  lead={[categoryLabel, t('catalog.partCount', { count: total })]
-                    .filter(Boolean)
-                    .join(' · ')}
-                />
-              </AppView>
-            }
+            ListHeaderComponent={listHeader}
             ListFooterComponent={
-              <CatalogListFooter
-                loading={isLoadingMore}
-                failed={loadMoreError}
-                onRetry={retryLoadMore}
-              />
+              <AppView gap={12} px={16}>
+                <CatalogListFooter
+                  loading={isLoadingMore}
+                  failed={loadMoreError}
+                  onRetry={retryLoadMore}
+                />
+                {!isLoadingMore &&
+                !loadMoreError &&
+                !isRefreshing &&
+                total > 0 &&
+                items.length >= total ? (
+                  <MatorAIDiscoveryCard
+                    source="category_end"
+                    categoryId={categoryId}
+                    categoryLabel={categoryLabel}
+                    query={debouncedSearch}
+                    filters={{
+                      brands: filter.brands.map((b) => b.id),
+                      regions: filter.regions,
+                      gmOnly: filter.gmOnly,
+                      oemOnly: filter.oemOnly,
+                      sortBy: filter.sortBy,
+                    }}
+                  />
+                ) : null}
+              </AppView>
             }
             onEndReached={loadMore}
             onEndReachedThreshold={0.5}

@@ -25,6 +25,7 @@ import {
 } from '@/services/compatibility-service';
 import { resolveItemPricing } from '@/services/sales-service';
 import { triggerHaptic } from '@/utils/haptics';
+import { commercialBrandName } from '@/utils/commercial-brand';
 
 export type ProductRowProps = {
   item: CatalogItem;
@@ -107,6 +108,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
   // ── Fit check — real, on demand ────────────────────────────────────────────
   const [fitState, setFitState] = useState<FitState>('idle');
   const [fit, setFit] = useState<CompatibilityResult | null>(null);
+  const [photoLoaded, setPhotoLoaded] = useState(false);
   const alive = useRef(true);
   useEffect(
     () => () => {
@@ -114,6 +116,12 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
     },
     [],
   );
+  useEffect(() => {
+    setPhotoLoaded(false);
+  }, [item.id, image]);
+
+  const onPhotoLoad = useCallback(() => setPhotoLoaded(true), []);
+  const onPhotoError = useCallback(() => setPhotoLoaded(false), []);
 
   // FlashList RECYCLES row components: the same instance is handed a different
   // part as you scroll, without unmounting. Without this reset the previous
@@ -152,15 +160,19 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
   const priceSize = priceFontSize(priceAmount);
   const wasLabel = wasNum > 0 ? formatSomAmount(wasNum) : null;
 
-  const brandEyebrow = (item.brand ?? item.description?.split('·')[0])?.trim();
+  const rawBrandEyebrow = (item.brand ?? item.description?.split('·')[0])?.trim();
+  // Bosch's commercial name is simply BOSCH. Long legal supplier names make
+  // the image attribution look truncated and are still available on details.
+  const brandEyebrow = commercialBrandName(rawBrandEyebrow);
   const outOfStock = /out of stock/i.test(item.status ?? '');
 
   // Oils carry no OEM/GM number; their viscosity · volume goes in that slot.
   const oil = item.kind === 'MOTOR_OIL' ? item.motorOil : null;
   const oilMeta = oil ? [oil.viscosity, oil.volumeLabel].filter(Boolean).join(' · ') : '';
-  const secondary = [item.titleDetail || oilMeta, item.oem ? `OEM ${item.oem}` : '']
-    .filter(Boolean)
-    .join(' · ');
+  const itemQualifier = item.titleDetail || oilMeta;
+  const manufacturerPartNumber = item.manufacturerPartNumber
+    ? t('catalog.manufacturerPartNumber', { number: item.manufacturerPartNumber })
+    : '';
 
   const eta =
     item.deliveryEtaMinDays != null && item.deliveryEtaMaxDays != null
@@ -229,42 +241,17 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
           <ImageBox
             label={item.title}
             uri={image}
+            categoryId={item.categoryId}
+            manufacturer={brandEyebrow}
+            photoPlanned={item.photoPlanned}
+            onPhotoLoad={onPhotoLoad}
+            onPhotoError={onPhotoError}
             height="100%"
             radius={8}
             contentFit="contain"
-            backgroundColor={tokens.white}
+            backgroundColor={image ? tokens.white : tokens.backgroundSecondary}
           />
         </AppPressableView>
-        {/* GM cross-reference, cornered on the photo. A part carries OEM xor GM
-         *  (see `resolvePartNumber`), and the GM number is THE identifier in
-         *  this market — Chevrolet / Ravon / Daewoo are the UZ fleet. */}
-        {item.gm ? (
-          <AppView
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              left: 0,
-              bottom: 0,
-              maxWidth: '100%',
-              paddingHorizontal: 5,
-              paddingVertical: 2,
-              borderTopRightRadius: 8,
-              borderBottomLeftRadius: 8,
-              backgroundColor: tokens.scrim,
-            }}
-          >
-            <AppText
-              family="mono"
-              weight="bold"
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.7}
-              style={{ fontSize: 10, letterSpacing: 0.2, color: tokens.white }}
-            >
-              {`GM ${item.gm}`}
-            </AppText>
-          </AppView>
-        ) : null}
         <AppPressableView
           testID={`part-like-${item.id}`}
           onPress={handleToggleLike}
@@ -320,16 +307,21 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
         >
           {item.title}
         </AppText>
-        {brandEyebrow ? (
+        {brandEyebrow && photoLoaded ? (
           <AppText textVariant="bodyXs" colorName="textMuted">
             {brandEyebrow}
           </AppText>
         ) : null}
         {/* Qualifiers `normalizePartTitle` lifted out of the raw title (plus an
          *  oil's viscosity · volume and the OEM number). */}
-        {secondary ? (
-          <AppText textVariant="bodyXs" colorName="textMuted">
-            {secondary}
+        {itemQualifier ? (
+          <AppText numberOfLines={2} textVariant="bodyXs" colorName="textMuted">
+            {itemQualifier}
+          </AppText>
+        ) : null}
+        {manufacturerPartNumber ? (
+          <AppText numberOfLines={1} textVariant="bodyXs" colorName="textMuted">
+            {manufacturerPartNumber}
           </AppText>
         ) : null}
       </AppPressableView>

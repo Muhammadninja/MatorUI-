@@ -1,5 +1,6 @@
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Camera } from 'lucide-react-native';
 import {
   Dimensions,
   ScrollView,
@@ -9,9 +10,12 @@ import {
 } from 'react-native';
 
 import ImageBox from '@/components/screens-components/home/image-box';
+import ProductImagePlaceholder from '@/components/shared/product-image-placeholder';
 import { AppText } from '@/components/shared/app-text';
 import { AppPressableView, AppView } from '@/components/shared/app-view';
 import { useThemeContext } from '@/contexts/theme.context';
+import { useActiveVehicle } from '@/contexts/active-vehicle.context';
+import { openMatorAIShopping } from '@/utils/mator-ai-shopping';
 
 export type ItemGalleryProps = {
   /** Real catalog photo URLs. Empty renders a single placeholder page. */
@@ -24,6 +28,12 @@ export type ItemGalleryProps = {
   index: number;
   onIndexChange: (index: number) => void;
   onPressImage: (index: number) => void;
+  categoryId?: string;
+  productId?: string;
+  manufacturer?: string;
+  partNumber?: string;
+  oemNumbers?: string[];
+  photoPlanned?: boolean;
 };
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -49,14 +59,30 @@ function ItemGallery({
   index,
   onIndexChange,
   onPressImage,
+  categoryId,
+  productId,
+  manufacturer,
+  partNumber,
+  oemNumbers,
+  photoPlanned = false,
 }: ItemGalleryProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { tokens } = useThemeContext();
+  const { currentActiveVehicle } = useActiveVehicle();
   const [width, setWidth] = useState(SCREEN_WIDTH);
+  const imageKey = JSON.stringify(images);
+  const [imageFailures, setImageFailures] = useState<{ key: string; sources: string[] }>({
+    key: imageKey,
+    sources: [],
+  });
+  const failedSources = imageFailures.key === imageKey ? imageFailures.sources : [];
+  const usableImages = images.filter((uri) => !failedSources.includes(uri));
+  const hasPhoto = usableImages.length > 0;
 
   // No photos → one placeholder page, still tappable-free (nothing to zoom).
-  const pages = images.length > 0 ? images : [undefined];
+  const pages = hasPhoto ? usableImages : [undefined];
   const total = pages.length;
+  const displayHeight = hasPhoto ? height : 254;
 
   const onLayout = (e: LayoutChangeEvent) => {
     const w = Math.round(e.nativeEvent.layout.width);
@@ -76,52 +102,138 @@ function ItemGallery({
   };
 
   return (
-    <AppView onLayout={onLayout} style={{ height, backgroundColor: tokens.white }}>
-      <ScrollView
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        // The gallery is a horizontal pager nested inside the detail screen's
-        // VERTICAL scroll view. On Android nested scrolling is off by default,
-        // so the parent swallowed the horizontal drag and the hero never paged
-        // — the full-screen viewer (a Modal, no scrolling parent) was the only
-        // place swiping worked. `directionalLockEnabled` is the iOS half of the
-        // same fix: it stops a slightly-diagonal swipe from being read as a
-        // vertical scroll of the page behind.
-        nestedScrollEnabled
-        directionalLockEnabled
-        snapToInterval={width}
-        snapToAlignment="start"
-        disableIntervalMomentum
-        decelerationRate="fast"
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        scrollEnabled={total > 1}
-      >
-        {pages.map((uri, i) => (
+    <AppView
+      onLayout={onLayout}
+      style={{
+        height: displayHeight,
+        backgroundColor: hasPhoto ? tokens.white : 'transparent',
+        marginHorizontal: hasPhoto ? 0 : 16,
+      }}
+    >
+      {!hasPhoto ? (
+        <>
+          <ProductImagePlaceholder
+            categoryId={categoryId}
+            manufacturer={manufacturer}
+            manufacturerMaxWidth="100%"
+            photoPlanned={photoPlanned}
+            showPhotoCaption
+            photoCaption={t(
+              photoPlanned ? 'itemDetail.photoPlannedDetail' : 'catalog.photoOnRequest',
+            )}
+            label={title}
+            width="100%"
+            height={204}
+            radius={18}
+          />
           <AppPressableView
-            key={uri ?? `placeholder-${i}`}
-            onPress={() => uri && onPressImage(i)}
-            androidRipple={false}
-            disabled={!uri}
-            accessibilityRole="imagebutton"
-            accessibilityLabel={t('itemDetail.viewFullScreen', { title })}
-            style={{ width, height }}
+            onPress={() =>
+              openMatorAIShopping(
+                {
+                  source: 'product_photo_request',
+                  intent: 'request_photo',
+                  productId,
+                  productName: title,
+                  manufacturer,
+                  partNumber,
+                  oemNumbers,
+                  vehicle: currentActiveVehicle?.vehicle
+                    ? [
+                        currentActiveVehicle.vehicle.year,
+                        currentActiveVehicle.vehicle.make,
+                        currentActiveVehicle.vehicle.model,
+                      ]
+                        .filter(Boolean)
+                        .join(' ')
+                    : undefined,
+                },
+                i18n.language,
+              )
+            }
+            row
+            align="center"
+            justify="center"
+            gap={7}
+            accessibilityRole="button"
+            accessibilityLabel={t('itemDetail.requestPhotoViaAI')}
+            style={{ height: 50 }}
           >
-            <ImageBox
-              label={title}
-              uri={uri}
-              width={width}
-              height={height}
-              contentFit="contain"
-              backgroundColor={tokens.white}
-            />
+            <Camera size={16} strokeWidth={1.9} color={tokens.brandText} />
+            <AppText
+              family="accent"
+              weight="semibold"
+              style={{ fontSize: 13, color: tokens.brandText }}
+            >
+              {t('itemDetail.requestPhotoViaAI')}
+            </AppText>
           </AppPressableView>
-        ))}
-      </ScrollView>
+        </>
+      ) : (
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          // The gallery is a horizontal pager nested inside the detail screen's
+          // VERTICAL scroll view. On Android nested scrolling is off by default,
+          // so the parent swallowed the horizontal drag and the hero never paged
+          // — the full-screen viewer (a Modal, no scrolling parent) was the only
+          // place swiping worked. `directionalLockEnabled` is the iOS half of the
+          // same fix: it stops a slightly-diagonal swipe from being read as a
+          // vertical scroll of the page behind.
+          nestedScrollEnabled
+          directionalLockEnabled
+          snapToInterval={width}
+          snapToAlignment="start"
+          disableIntervalMomentum
+          decelerationRate="fast"
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          scrollEnabled={total > 1}
+        >
+          {pages.map((uri, i) => (
+            <AppPressableView
+              key={uri ?? `placeholder-${i}`}
+              onPress={() => uri && onPressImage(i)}
+              androidRipple={false}
+              disabled={!uri}
+              accessibilityRole="imagebutton"
+              accessibilityLabel={t('itemDetail.viewFullScreen', { title })}
+              style={{ width, height }}
+            >
+              <ImageBox
+                label={title}
+                uri={uri}
+                manufacturer={manufacturer}
+                width={width}
+                height={height}
+                contentFit="contain"
+                backgroundColor={tokens.white}
+                onPhotoLoad={() => {
+                  if (!uri) return;
+                  setImageFailures((current) => ({
+                    key: imageKey,
+                    sources: (current.key === imageKey ? current.sources : []).filter(
+                      (failed) => failed !== uri,
+                    ),
+                  }));
+                }}
+                onPhotoError={() => {
+                  if (!uri) return;
+                  setImageFailures((current) => {
+                    const currentSources = current.key === imageKey ? current.sources : [];
+                    return currentSources.includes(uri)
+                      ? current
+                      : { key: imageKey, sources: [...currentSources, uri] };
+                  });
+                }}
+              />
+            </AppPressableView>
+          ))}
+        </ScrollView>
+      )}
 
       {/* Sale badge — same signal as the listing card, carried into detail. */}
-      {savePct > 0 ? (
+      {hasPhoto && savePct > 0 ? (
         <AppView
           rounded={8}
           px={9}

@@ -41,6 +41,7 @@ export type SearchResultsProps = {
   topInset?: number;
   /** Opens the filter sheet. Surfaced in the results header. */
   onFilterPress?: () => void;
+  aiFilters?: Record<string, unknown>;
 };
 
 /** Space under each result card, inside the item so the list measures it. */
@@ -66,6 +67,7 @@ export default function SearchResults({
   isLoadingMore,
   topInset = 0,
   onFilterPress,
+  aiFilters,
 }: SearchResultsProps) {
   const insets = useSafeAreaInsets();
 
@@ -99,6 +101,7 @@ export default function SearchResults({
             hasActiveFilters={hasActiveFilters}
             onClearFilters={onClearFilters}
             onUseSuggestion={onUseSuggestion}
+            filters={aiFilters}
           />
         ) : null}
         {state === 'error' ? <ResultsError error={error} /> : null}

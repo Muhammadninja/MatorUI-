@@ -1,6 +1,6 @@
 import AppImage from '@/components/shared/app-image';
 import { AppView } from '@/components/shared/app-view';
-import PartImagePlaceholder from '@/components/shared/part-image-placeholder';
+import ProductImagePlaceholder from '@/components/shared/product-image-placeholder';
 import { useThemeContext } from '@/contexts/theme.context';
 
 import { RADIUS_MEDIA } from '../radii';
@@ -16,12 +16,19 @@ export type ThumbnailProps = {
   uri?: string;
   /** Tile width; the tile is at least this tall and stretches with the card. */
   width: number;
+  categoryId?: string;
 };
 
-export default function Thumbnail({ alt, uri, width }: ThumbnailProps) {
+export default function Thumbnail({ alt, uri, width, categoryId }: ThumbnailProps) {
   const { tokens } = useThemeContext();
   const placeholder = (
-    <PartImagePlaceholder label={alt} width="100%" height="100%" backgroundColor="transparent" />
+    <ProductImagePlaceholder
+      label={alt}
+      categoryId={categoryId}
+      width="100%"
+      height="100%"
+      backgroundColor="transparent"
+    />
   );
 
   return (
