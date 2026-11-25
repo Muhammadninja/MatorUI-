@@ -67,6 +67,7 @@ describe('what is sent', () => {
   });
 
   test('a photo request names its part in headers, not the body', async () => {
+    get.mockResolvedValue({ contract_version: 2, ticket_submission_enabled: true, photo_requests: true });
     await send({ photoRequestProductId: 'part_stock_6567' });
     expect(post.mock.calls[0]![2].headers).toEqual({
       'Idempotency-Key': 'user-1',
@@ -74,6 +75,12 @@ describe('what is sent', () => {
       'X-Product-Id': 'part_stock_6567',
     });
     expect(Object.keys(post.mock.calls[0]![1]).sort()).toEqual(['history', 'message']);
+  });
+
+  test('a backend without photo requests is not asked, and the app answers', async () => {
+    const events = await send({ photoRequestProductId: 'part_stock_6567' });
+    expect(post).not.toHaveBeenCalled();
+    expect(done(events).photoRequestPending).toBe(true);
   });
 
   test('without a vehicle no vehicle header is sent', async () => {

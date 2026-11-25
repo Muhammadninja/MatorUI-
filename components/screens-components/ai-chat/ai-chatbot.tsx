@@ -398,6 +398,7 @@ export default function AiChatbot() {
         let sourcing: AiChatSourcingState | undefined;
         let partsClarification: AiChatPartsClarification | undefined;
         let chatUnavailable = false;
+        let photoRequestPending = false;
         const toolCallMap = new Map<string, AiChatToolCall>();
 
         const stream = chatTransport.streamMessage(
@@ -461,6 +462,7 @@ export default function AiChatbot() {
             sourcing = event.sourcing;
             partsClarification = event.partsClarification;
             chatUnavailable = event.chatUnavailable ?? false;
+            photoRequestPending = event.photoRequestPending ?? false;
           }
         }
 
@@ -472,7 +474,9 @@ export default function AiChatbot() {
           title,
           body: chatUnavailable
             ? t('aiChat.temporarilyUnavailable')
-            : composeSourcingBody({ text: body, sourcing, partsClarification }, t),
+            : photoRequestPending
+              ? t('aiChat.photoNotYetAvailable')
+              : composeSourcingBody({ text: body, sourcing, partsClarification }, t),
           caption: t('aiChat.captionNow'),
           createdAt,
           toolCalls: finalToolCalls.length > 0 ? finalToolCalls : undefined,

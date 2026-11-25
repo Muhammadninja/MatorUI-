@@ -258,6 +258,7 @@
     "requestedParts": "Requested: {{parts}}",
     "requestsUnavailable": "We can’t take requests for parts right now.",
     "temporarilyUnavailable": "Chat is temporarily unavailable. Your message wasn’t sent.",
+    "photoNotYetAvailable": "There's no photo of this part yet — we're adding photos across the whole catalog step by step. You can check the part by the OEM number on its page, or ask me anything about it here.",
     "fitsSelectedVehicle": "Fits the selected vehicle",
     "fitNotConfirmed": "Fit not confirmed",
     "confirmAllParts": "We understood only: {{parts}}. If you need other parts too, tell us which ones.",

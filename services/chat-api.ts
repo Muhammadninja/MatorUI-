@@ -48,7 +48,10 @@ export const AI_CHAT_API_BASE_PATH = '/v1/chatbot';
  * `data:` line, terminated by `event: done\ndata: {...}\n\n`.
  */
 import { getApiBaseUrl, getAuthToken, shouldUseHttpTransport } from '@/config/api';
-import { sourcingChatSupported } from '@/services/sourcing-capabilities';
+import {
+  photoRequestsSupported,
+  sourcingChatSupported,
+} from '@/services/sourcing-capabilities';
 import { interpretSourcingReply, type SourcingChatResponse } from '@/services/sourcing-chat-reply';
 import { apiClient, ApiError } from '@/services/api-client';
 import { stagingAccessHeaders } from '@/services/staging-access';
@@ -248,6 +251,21 @@ export class SourcingChatTransport implements ChatTransport {
             title: 'Mator AI',
             createdAt: new Date().toISOString(),
             chatUnavailable: true,
+          };
+          return;
+        }
+
+        // An older backend would treat a photo request as a part search and list
+        // the very product the customer is looking at, so answer it here.
+        if (input.photoRequestProductId && !(await photoRequestsSupported(signal))) {
+          yield {
+            type: 'done',
+            conversationId,
+            suggestions: [],
+            replyId,
+            title: 'Mator AI',
+            createdAt: new Date().toISOString(),
+            photoRequestPending: true,
           };
           return;
         }

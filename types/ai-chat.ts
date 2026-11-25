@@ -148,6 +148,8 @@ export type ChatStreamEvent =
       partsClarification?: AiChatPartsClarification;
       /** The backend hasn't confirmed it supports this chat, so nothing was sent. */
       chatUnavailable?: boolean;
+      /** A photo request the backend can't record yet; answered by the app. */
+      photoRequestPending?: boolean;
     };
 
 // ── Request / response ──────────────────────────────────────────────
