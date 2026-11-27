@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { fetchRootCategories, type CategoryTileData } from '@/services/categories-service';
 import { localizedCategoryLabel } from '@/utils/category-label';
@@ -52,6 +52,28 @@ export function useCategories(): UseCategoriesValue {
       refresh: () => query.refetch(),
     };
   }, [query, lang]);
+}
+
+/**
+ * Keep a home tile's count equal to the listing it opens. The tiles are cached
+ * for minutes while a category's list is fetched fresh, so while the catalog
+ * changes the two drifted apart (64 on the tile, 65 inside). The listing's
+ * total is the one number: once it has loaded, the cached tile takes it.
+ * `total` is only trusted when `ready` (the list answered).
+ */
+export function useSyncCategoryTileCount(
+  categoryId: string | undefined,
+  total: number,
+  ready: boolean,
+): void {
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (!categoryId || !ready) return;
+    queryClient.setQueryData<CategoryTileData[]>(CATEGORIES_QUERY_KEY, (rows) => {
+      if (!rows?.some((r) => r.id === categoryId && r.count !== undefined && r.count !== total)) return rows;
+      return rows.map((r) => (r.id === categoryId && r.count !== undefined ? { ...r, count: total } : r));
+    });
+  }, [categoryId, total, ready, queryClient]);
 }
 
 export default useCategories;

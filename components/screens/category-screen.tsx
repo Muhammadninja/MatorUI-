@@ -22,6 +22,7 @@ import { useCartContext } from '@/contexts/cart.context';
 import { useThemeContext } from '@/contexts/theme.context';
 import { useUserContext } from '@/contexts/user.context';
 import { CATALOG_PAGE_SIZE, useCatalogInfiniteList } from '@/hooks/use-catalog-list';
+import { useSyncCategoryTileCount } from '@/hooks/use-categories';
 import { useToast } from '@/hooks/use-toast';
 import type { CatalogItem } from '@/services/catalog-service';
 import type { CatalogSortBy } from '@/types/catalog-nav';
@@ -76,6 +77,14 @@ export default function CategoryScreen() {
     vehicleCategory: vehicleCat,
     sortBy,
   });
+
+  // The Explore tile shows this root's count too: make it this list's total.
+  // A vehicle-system bucket is a different set, so it never writes a tile.
+  useSyncCategoryTileCount(
+    cat && cat !== 'All' && !vehicleCat ? cat : undefined,
+    total,
+    state === 'success' || state === 'empty',
+  );
 
   // Any load failure (offline, timeout, or a server error) degrades to the
   // empty state — a browse screen should never show a scary error card. Retry

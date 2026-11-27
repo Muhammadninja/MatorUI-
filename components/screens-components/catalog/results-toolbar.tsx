@@ -21,6 +21,10 @@ const SORTS: { key: CatalogSortBy; labelKey: string }[] = [
 export type ResultsToolbarProps = {
   /** Server total for the query. */
   count: number;
+  /** The horizontal padding of the container this sits in. The sort row runs
+   *  edge to edge through it, so a chip that doesn't fit is cut by the SCREEN
+   *  edge — an obvious "scroll for more" — not by the padding. */
+  bleed?: number;
   sortBy: CatalogSortBy;
   onSortChange: (next: CatalogSortBy) => void;
 };
@@ -34,7 +38,7 @@ export type ResultsToolbarProps = {
  * control to add — every option is a real server param, so cheapest-first
  * re-orders the catalog rather than the twenty-four rows already on screen.
  */
-export function ResultsToolbar({ count, sortBy, onSortChange }: ResultsToolbarProps) {
+export function ResultsToolbar({ count, sortBy, onSortChange, bleed = 16 }: ResultsToolbarProps) {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
 
@@ -47,7 +51,8 @@ export function ResultsToolbar({ count, sortBy, onSortChange }: ResultsToolbarPr
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 8, paddingRight: 8 }}
+        style={{ marginHorizontal: -bleed }}
+        contentContainerStyle={{ gap: 6, paddingHorizontal: bleed }}
       >
         {SORTS.map((s) => {
           const active = sortBy === s.key;
@@ -61,10 +66,12 @@ export function ResultsToolbar({ count, sortBy, onSortChange }: ResultsToolbarPr
               androidRipple={false}
               pressedOpacity={0.85}
               rounded={8}
-              px={14}
+              // Tight enough that all four fit a 393pt-wide phone; a narrower one
+              // scrolls, with the next chip showing at the screen edge.
+              px={11}
               py={8}
               // The padding belongs to the wrapper, so the slop has to cover it.
-              hitSlop={{ top: 13, bottom: 13, left: 14, right: 14 }}
+              hitSlop={{ top: 13, bottom: 13, left: 3, right: 3 }}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
               style={{
@@ -76,7 +83,7 @@ export function ResultsToolbar({ count, sortBy, onSortChange }: ResultsToolbarPr
               <AppText
                 family="accent"
                 weight="bold"
-                style={{ fontSize: 12, color: active ? tokens.onBrand : tokens.text }}
+                style={{ fontSize: 13, color: active ? tokens.onBrand : tokens.text }}
               >
                 {t(s.labelKey)}
               </AppText>
