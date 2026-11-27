@@ -94,8 +94,15 @@ export function ItemBuyBar({
         paddingTop: 11,
         // Android: a real gap above the system navigation bar, not flush on it.
         paddingBottom: checkoutFooterBottom(insetBottom, Platform.OS),
+        // A visible edge plus a soft upward shadow, so the bar reads as a layer
+        // over the page in both themes (the divider tone vanished on dark).
         borderTopWidth: 1,
-        borderTopColor: tokens.divider,
+        borderTopColor: tokens.border,
+        shadowColor: '#000000',
+        shadowOpacity: scheme === 'dark' ? 0.45 : 0.08,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: -3 },
+        elevation: 12,
       }}
     >
       <AppView row align="center" justify="space-between" gap={12}>

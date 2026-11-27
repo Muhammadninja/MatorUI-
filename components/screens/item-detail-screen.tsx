@@ -240,7 +240,9 @@ export default function ItemDetailScreen() {
     <AppView flex={1} colorName="background" testID="item-detail-screen">
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: headerHeight + galleryTopGap, paddingBottom: 28 }}
+        // The buy bar sits below the scroll area (not over it), so the last
+        // block can always scroll clear of its edge and shadow.
+        contentContainerStyle={{ paddingTop: headerHeight + galleryTopGap, paddingBottom: 36 }}
       >
         {/* Full-bleed gallery — starts clear of the static header above it. */}
         <ItemGallery
