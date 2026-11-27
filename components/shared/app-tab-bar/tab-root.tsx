@@ -93,11 +93,9 @@ export function TabRootBar({ tab }: { tab: TabKey }) {
               // on dark's brighter teal (white there is 3.0:1).
               <Icon size={22} strokeWidth={2.2} color={tokens.onAssistantFab} />
             ) : (
-              <Icon
-                size={18}
-                strokeWidth={isActive ? 2.6 : 2.2}
-                color={isActive ? tokens.brand : tokens.textMuted}
-              />
+              // One outline style for every tab: same size and stroke; the
+              // active tab differs by colour (and the indicator bar) only.
+              <Icon size={22} strokeWidth={2} color={isActive ? tokens.brand : tokens.textMuted} />
             ),
         };
       })}

@@ -275,13 +275,13 @@ describe('root icons', () => {
     expect(iconFor('suspension-and-steering')).toEqual({ image: Susp });
     expect(iconFor('engine-system')).toEqual({ image: EngineIcon });
     expect(iconFor('heating-and-cooling')).toEqual({ image: AcCompressor });
-    expect(iconFor('other')).toHaveProperty('glyph');
+    expect(iconFor('other')).toHaveProperty('collage');
   });
 
   test('no two roots share an icon', () => {
     const icons = HOME_ROOT_ORDER.map((id) => {
       const icon = iconFor(id);
-      return 'image' in icon ? icon.image : icon.glyph;
+      return 'image' in icon ? icon.image : icon.collage.join('|');
     });
     expect(new Set(icons).size).toBe(HOME_ROOT_ORDER.length);
   });

@@ -1,8 +1,6 @@
-import { LayoutGrid, type LucideIcon } from 'lucide-react-native';
 import { Image } from 'react-native';
 
 import { AppView } from '@/components/shared/app-view';
-import { useThemeContext } from '@/contexts/theme.context';
 
 // Several file names predate their artwork; the identifiers say what each shows.
 import AirFilt from '../../../assets/3D _Icons/airfilt.png';
@@ -68,26 +66,52 @@ const PART_ICONS_BY_KEY: Record<string, any> = {
 };
 
 /**
- * Keys no part artwork can stand for — a catch-all category — drawn with the
- * app's icon set instead, on a disc the size of the artwork.
+ * Keys no single part can stand for — a catch-all category — drawn as a 2×2
+ * collage of part photos no root uses, so the tile reads as "assorted parts"
+ * in the same photographic style as its neighbours (it was a glyph on a disc).
  */
-const GLYPH_ICONS_BY_KEY: Record<string, LucideIcon> = {
-  other: LayoutGrid,
+const COLLAGE_BY_KEY: Record<string, any[]> = {
+  other: [Light, Wipe, AirFilt, Piston],
 };
+
+/**
+ * Optical size per artwork. The PNGs fill their canvas unevenly (83–99%) and
+ * in different shapes — a tall bottle or coilover looks small beside a wheel
+ * at the same box size — so each is scaled toward the same visual weight
+ * (√ of its opaque area), capped so none outgrows the box. Measured from the
+ * alpha bounds of the 1024² sources.
+ */
+const OPTICAL_SCALE = new Map<unknown, number>([
+  [AirFilt, 1.01],
+  [WheelRim, 0.9],
+  [Light, 0.97],
+  [Oil, 1.02],
+  [OilFilter, 1.03],
+  [Piston, 1.15],
+  [Wipe, 0.98],
+  [BrakeDisc, 0.93],
+  [AcCompressor, 1.05],
+  [Battery, 0.98],
+  [EngineIcon, 0.93],
+  [Susp, 1.12],
+  [Gearbox, 1.01],
+]);
+/** The artwork's base share of its box, so a scaled-up one still fits. */
+const ART_INSET = 0.92;
 
 /** Shown when neither `iconKey` nor `name` resolves — a category tile/row must
  *  never render blank, so fall back to a neutral engine glyph. */
 const DEFAULT_ICON = EngineIcon;
 
-/** What a category draws: one of the 3D PNGs, or an icon-set glyph. */
-export type PartIconSource = { image: any } | { glyph: LucideIcon };
+/** What a category draws: one of the 3D PNGs, or a collage of them. */
+export type PartIconSource = { image: any } | { collage: any[] };
 
 /** Resolve by `iconKey` first (live categories), then by display `name`
  *  (bundled tiles), then the default. */
 export function resolvePartIcon(name: string, iconKey?: string): PartIconSource {
   const key = iconKey?.toLowerCase();
-  const glyph = key ? GLYPH_ICONS_BY_KEY[key] : undefined;
-  if (glyph) return { glyph };
+  const collage = key ? COLLAGE_BY_KEY[key] : undefined;
+  if (collage) return { collage };
   return { image: (key ? PART_ICONS_BY_KEY[key] : undefined) ?? PART_ICONS[name] ?? DEFAULT_ICON };
 }
 
@@ -100,24 +124,27 @@ export type AutoPartIconProps = {
 };
 
 /**
- * `AutoPartIcon` — renders the 3D PNG illustration for a category (or, for a
- * catch-all key, an icon-set glyph on a disc of the same size). Keeps the same
+ * `AutoPartIcon` — renders the 3D PNG illustration for a category at a
+ * consistent optical size, on no backplate (the owner removed the dark-mode
+ * plate on 2026-11-12), or a 2×2 collage for a catch-all key. Keeps the same
  * size API so tiles/styles don't change.
  */
 export default function AutoPartIcon({ name, iconKey, size = 36 }: AutoPartIconProps) {
-  const { tokens } = useThemeContext();
   const icon = resolvePartIcon(name, iconKey);
-  if ('glyph' in icon) {
-    const Glyph = icon.glyph;
+  if ('collage' in icon) {
+    const cell = Math.round(size * 0.46);
     return (
-      <AppView
-        center
-        rounded={size / 2}
-        style={{ width: size, height: size, backgroundColor: tokens.backgroundSecondary }}
-      >
-        <Glyph size={Math.round(size * 0.46)} strokeWidth={1.75} color={tokens.text} />
+      <AppView row wrap center style={{ width: size, height: size, gap: Math.round(size * 0.04) }}>
+        {icon.collage.map((src, i) => (
+          <Image key={i} source={src} style={{ width: cell, height: cell }} resizeMode="contain" />
+        ))}
       </AppView>
     );
   }
-  return <Image source={icon.image} style={{ width: size, height: size }} resizeMode="contain" />;
+  const side = Math.min(size, Math.round(size * ART_INSET * (OPTICAL_SCALE.get(icon.image) ?? 1)));
+  return (
+    <AppView center style={{ width: size, height: size }}>
+      <Image source={icon.image} style={{ width: side, height: side }} resizeMode="contain" />
+    </AppView>
+  );
 }

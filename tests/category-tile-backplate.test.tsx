@@ -51,6 +51,9 @@ function artFor(rootId: string, scheme: 'dark' | 'light') {
   return {
     backgroundColor: art.props.style.backgroundColor as string | undefined,
     imageSize: art.findByType('image').props.style.width as number,
+    // The art box the image is centred in; the image itself is scaled to a
+    // common optical weight inside it (auto-part-icon OPTICAL_SCALE).
+    boxSize: art.findByType('image').parent?.parent?.props.style.width as number,
   };
 }
 
@@ -75,7 +78,10 @@ describe('category tile art', () => {
     expect(artFor(root, 'light').backgroundColor).toBeUndefined();
   });
 
-  test.each(ROOTS)('dark mode: %s uses the same 64pt art box', (root) => {
-    expect(artFor(root, 'dark').imageSize).toBe(64);
+  test.each(ROOTS)('dark mode: %s uses the same 64pt art box, art inside it', (root) => {
+    const { boxSize, imageSize } = artFor(root, 'dark');
+    expect(boxSize).toBe(64);
+    expect(imageSize).toBeGreaterThanOrEqual(52);
+    expect(imageSize).toBeLessThanOrEqual(64);
   });
 });
