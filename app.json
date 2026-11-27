@@ -3,7 +3,7 @@
     "name": "Mator",
     "slug": "Mator",
     "owner": "matoruz",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "orientation": "portrait",
     "icon": "./assets/MATOR-app-icons/expo/icon.png",
     "scheme": "mator",
