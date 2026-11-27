@@ -24,7 +24,7 @@ export default function StatusLine({ status }: { status: string }) {
         // Weight is a FACE here, not a `fontWeight`: a custom family resolves
         // one file per name on Android, where fontWeight would be ignored.
         fontFamily: low ? SEARCH_FONT.semibold : SEARCH_FONT.regular,
-        fontSize: 12,
+        fontSize: 13,
       }}
     >
       {status}

@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Text, View, type DimensionValue } from 'react-native';
 import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg';
@@ -94,6 +94,10 @@ function ProductImagePlaceholder({
 }: ProductImagePlaceholderProps) {
   const { t } = useTranslation();
   const { tokens } = useThemeContext();
+  // Caption type follows the box: ~8% of its width, 10pt on a search thumb up
+  // to 14pt on the full gallery (it was a fixed 9pt everywhere).
+  const [boxWidth, setBoxWidth] = useState(0);
+  const captionSize = boxWidth > 0 ? Math.min(14, Math.max(10, Math.round(boxWidth * 0.08))) : 11;
   const shape = resolveProductImageShape(categoryId);
   const fill = tokens.productPlaceholderFill;
   const fillSide = tokens.productPlaceholderSide;
@@ -300,6 +304,7 @@ function ProductImagePlaceholder({
       accessible
       accessibilityRole="image"
       accessibilityLabel={label}
+      onLayout={(e) => setBoxWidth(e.nativeEvent.layout.width)}
       style={{
         width,
         height,
@@ -314,12 +319,14 @@ function ProductImagePlaceholder({
       {manufacturer ? (
         <Text
           numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}
           style={{
             maxWidth: manufacturerMaxWidth,
             textAlign: 'center',
             color: tokens.productPlaceholderManufacturer,
-            fontSize: 9,
-            lineHeight: 12,
+            fontSize: captionSize,
+            lineHeight: Math.round(captionSize * 1.3),
             fontWeight: '700',
             letterSpacing: 0,
             textTransform: 'uppercase',
@@ -343,14 +350,17 @@ function ProductImagePlaceholder({
       </Svg>
       {showPhotoCaption ? (
         <Text
-          numberOfLines={1}
+          // Wraps to a second line on a narrow thumb instead of clipping.
+          numberOfLines={2}
           style={{
             color: tokens.textMuted,
-            fontSize: 9,
-            lineHeight: 12,
+            fontSize: captionSize,
+            lineHeight: Math.round(captionSize * 1.3),
             fontWeight: '500',
             letterSpacing: 0,
             marginTop: 1,
+            paddingHorizontal: 6,
+            textAlign: 'center',
           }}
         >
           {photoCaption ?? t(photoPlanned ? 'catalog.photoComingSoon' : 'catalog.photoOnRequest')}

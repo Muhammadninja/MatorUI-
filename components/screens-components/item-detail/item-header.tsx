@@ -147,7 +147,7 @@ export function ItemPriceRow({
             py={3}
             style={{ marginBottom: 4, backgroundColor: tokens.errorSoft }}
           >
-            <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.error }}>
+            <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.error }}>
               {t('itemDetail.discountPercent', { percent: savePct })}
             </AppText>
           </AppView>
@@ -161,7 +161,7 @@ export function ItemPriceRow({
       {/* Which campaign the discount comes from — the backend names it, and a
        *  named sale reads as a real offer rather than an arbitrary markdown. */}
       {saleTitle ? (
-        <AppText family="default" style={{ fontSize: 12, color: tokens.textMuted }}>
+        <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>
           {saleTitle}
         </AppText>
       ) : null}

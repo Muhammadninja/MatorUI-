@@ -7,9 +7,9 @@
  * cases where the normalizer must KEEP ITS HANDS OFF — a clean title must
  * survive byte-identical, and no rule may shorten a title into meaninglessness.
  */
-import { describe, expect, test } from 'vitest';
+import { describe, expect, it, test } from 'vitest';
 
-import { normalizePartTitle } from './part-title';
+import { cardTitleKeywords, normalizePartTitle } from './part-title';
 
 describe('normalizePartTitle — edge junk', () => {
   test.each([
@@ -177,5 +177,35 @@ describe('normalizePartTitle — refuses to over-trim', () => {
     expect(normalizePartTitle(null)).toEqual({ title: '' });
     expect(normalizePartTitle(undefined)).toEqual({ title: '' });
     expect(normalizePartTitle('   ---   ')).toEqual({ title: '' });
+  });
+});
+
+describe('cardTitleKeywords', () => {
+  it('keeps the side and model a two-line card would cut', () => {
+    expect(cardTitleKeywords('Рычаг подвески нижний в сборе передний левый Lacetti')).toBe(
+      'передний левый Lacetti',
+    );
+    // "правый" fits in the first two lines; only the trailing "лв" is at risk.
+    expect(cardTitleKeywords('Фонарь задний правый в сборе с проводкой лв')).toBe('лв');
+  });
+
+  it('says nothing for a title that fits', () => {
+    expect(cardTitleKeywords('Фара передняя левая')).toBeNull();
+    expect(cardTitleKeywords('Суппорт тормозной передний')).toBeNull();
+  });
+
+  it('skips words the detail line already shows', () => {
+    expect(
+      cardTitleKeywords('Амортизатор задней подвески газомасляный Cobalt', 'Cobalt'),
+    ).toBeNull();
+  });
+
+  it('ignores ordinary words and lowercase latin', () => {
+    expect(cardTitleKeywords('Комплект ремня генератора с роликом натяжителя и болтами')).toBeNull();
+    expect(cardTitleKeywords('Прокладка клапанной крышки двигателя rubber seal')).toBeNull();
+  });
+
+  it('keeps a model code like T300', () => {
+    expect(cardTitleKeywords('Опора переднего амортизатора с подшипником T300')).toBe('T300');
   });
 });

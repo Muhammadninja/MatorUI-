@@ -110,7 +110,7 @@ export function ItemBuyBar({
           <AppView row align="center" gap={7}>
             <AppText
               family="default"
-              style={{ fontSize: 12, lineHeight: 16, color: tokens.textMuted }}
+              style={{ fontSize: 13, lineHeight: 18, color: tokens.textMuted }}
             >
               {t('itemDetail.total')}
             </AppText>
@@ -119,7 +119,7 @@ export function ItemBuyBar({
                 <AppText
                   family="accent"
                   weight="bold"
-                  style={{ fontSize: 12, lineHeight: 16, color: tokens.success }}
+                  style={{ fontSize: 13, lineHeight: 18, color: tokens.success }}
                 >
                   {savingsLabel}
                 </AppText>

@@ -332,3 +332,32 @@ export function normalizePartTitle(
 }
 
 export default normalizePartTitle;
+
+/** Where a card title starts to risk the cut: two ~14pt lines on a grid card. */
+const CARD_TITLE_SAFE_CHARS = 28;
+const SIDE_WORD = /^(передн|задн|лев|прав|верхн|нижн|наружн|внутренн)\p{L}*$|^(лв|пр|лев|прав)\.?$/iu;
+const MODEL_WORD = /^(?=.*\p{Lu})[A-Za-z][A-Za-z0-9-]{2,}$|^[A-Z]\d{2,4}[A-Z]?$/u;
+
+/**
+ * The words a two-line card would cut off that tell parts apart: the side or
+ * position ("передний", "левый", "лв") and the car model ("Lacetti", "T300").
+ * Only words that start past what two lines safely hold are returned, and
+ * none the card's detail line already shows. Joined with spaces, or null.
+ *
+ *   cardTitleKeywords('Рычаг подвески нижний в сборе передний левый Lacetti')
+ *   → 'передний левый Lacetti'
+ */
+export function cardTitleKeywords(title: string, detail?: string | null): string | null {
+  const shown = new Set(
+    (detail ?? '').toLowerCase().split(/[^\p{L}\p{N}-]+/u).filter(Boolean),
+  );
+  const out: string[] = [];
+  for (const m of title.matchAll(/[\p{L}\p{N}][\p{L}\p{N}.-]*/gu)) {
+    if ((m.index ?? 0) < CARD_TITLE_SAFE_CHARS) continue;
+    const word = m[0].replace(/[.-]+$/, '');
+    if (!SIDE_WORD.test(word) && !MODEL_WORD.test(word)) continue;
+    if (shown.has(word.toLowerCase()) || out.includes(word)) continue;
+    out.push(word);
+  }
+  return out.length ? out.join(' ') : null;
+}

@@ -28,7 +28,7 @@ export default function PriceBlock({ priceLabel, price }: { priceLabel: string; 
       {lead ? (
         <AppText
           textVariant="bodyXs"
-          style={{ color: tokens.textMuted, fontFamily: SEARCH_FONT.regular, fontSize: 12 }}
+          style={{ color: tokens.textMuted, fontFamily: SEARCH_FONT.regular, fontSize: 13 }}
         >
           {lead}
         </AppText>

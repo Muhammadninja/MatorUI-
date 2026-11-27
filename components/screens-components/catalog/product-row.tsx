@@ -26,6 +26,7 @@ import {
 import { resolveItemPricing } from '@/services/sales-service';
 import { triggerHaptic } from '@/utils/haptics';
 import { commercialBrandName } from '@/utils/commercial-brand';
+import { cardTitleKeywords } from '@/utils/part-title';
 
 export type ProductRowProps = {
   item: CatalogItem;
@@ -169,7 +170,12 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
   // Oils carry no OEM/GM number; their viscosity · volume goes in that slot.
   const oil = item.kind === 'MOTOR_OIL' ? item.motorOil : null;
   const oilMeta = oil ? [oil.viscosity, oil.volumeLabel].filter(Boolean).join(' · ') : '';
-  const itemQualifier = item.titleDetail || oilMeta;
+  // Side and model words a two-line title would cut stay readable in the
+  // detail line under it (cardTitleKeywords).
+  const itemQualifier =
+    [cardTitleKeywords(item.title, item.titleDetail || oilMeta), item.titleDetail || oilMeta]
+      .filter(Boolean)
+      .join(' · ') || undefined;
   const manufacturerPartNumber = item.manufacturerPartNumber
     ? t('catalog.manufacturerPartNumber', { number: item.manufacturerPartNumber })
     : '';
@@ -380,8 +386,8 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
             <AppText
               weight="semibold"
               style={{
-                fontSize: 12,
-                lineHeight: 16,
+                fontSize: 13,
+                lineHeight: 18,
                 color: fitState === 'checking' ? tokens.textMuted : tokens.brandText,
               }}
             >
@@ -411,7 +417,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
                   <AppText
                     family="accent"
                     weight="bold"
-                    style={{ fontSize: 12, color: tokens.error }}
+                    style={{ fontSize: 13, color: tokens.error }}
                   >
                     {`−${savePct}%`}
                   </AppText>
@@ -448,7 +454,7 @@ function ProductRow({ item, onOpen, onAdd }: ProductRowProps) {
               <AppText
                 family="accent"
                 weight="semibold"
-                style={{ fontSize: 12, lineHeight: 16, color: tokens.error }}
+                style={{ fontSize: 13, lineHeight: 18, color: tokens.error }}
               >
                 {t('catalog.outOfStock')}
               </AppText>
@@ -507,7 +513,7 @@ function FitBadge({
       style={{ alignSelf: 'flex-start', backgroundColor: bg }}
     >
       <Icon size={14} strokeWidth={2.6} color={color} style={{ marginTop: 1 }} />
-      <AppText weight="medium" style={{ flexShrink: 1, fontSize: 12, lineHeight: 16, color }}>
+      <AppText weight="medium" style={{ flexShrink: 1, fontSize: 13, lineHeight: 18, color }}>
         {label}
       </AppText>
     </AppView>

@@ -19,13 +19,13 @@ export default function RatingRow({
       <StarBar rating={rating} />
       <AppText
         textVariant="bodyXs"
-        style={{ color: tokens.textMuted, fontFamily: SEARCH_FONT.semibold, fontSize: 12 }}
+        style={{ color: tokens.textMuted, fontFamily: SEARCH_FONT.semibold, fontSize: 13 }}
       >
         {rating.toFixed(1)}
       </AppText>
       <AppText
         textVariant="bodyXs"
-        style={{ color: tokens.textMuted, fontFamily: SEARCH_FONT.regular, fontSize: 12 }}
+        style={{ color: tokens.textMuted, fontFamily: SEARCH_FONT.regular, fontSize: 13 }}
       >
         ({formatCount(reviewCount)})
       </AppText>

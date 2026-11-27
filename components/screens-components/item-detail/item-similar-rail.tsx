@@ -102,7 +102,7 @@ function SimilarCard({ item }: { item: CatalogItem }) {
           family="accent"
           weight="bold"
           style={{
-            fontSize: 10,
+            fontSize: 12,
             letterSpacing: 0.9,
             color: tokens.textMuted,
             textTransform: 'uppercase',
@@ -114,7 +114,7 @@ function SimilarCard({ item }: { item: CatalogItem }) {
       <AppText
         family="default"
         weight="semibold"
-        style={{ fontSize: 12, lineHeight: 16, color: tokens.text }}
+        style={{ fontSize: 13, lineHeight: 18, color: tokens.text }}
       >
         {item.title}
       </AppText>
@@ -129,7 +129,7 @@ function SimilarCard({ item }: { item: CatalogItem }) {
         <AppText
           family="accent"
           weight="semibold"
-          style={{ fontSize: 10, color: tokens.textMuted }}
+          style={{ fontSize: 12, color: tokens.textMuted }}
         >
           {t('common.currency')}
         </AppText>

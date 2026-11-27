@@ -38,7 +38,7 @@ export function ItemRule() {
 function Chip({ label, color, bg }: { label: string; color: string; bg: string }) {
   return (
     <AppView rounded={8} px={8} py={4} style={{ backgroundColor: bg }}>
-      <AppText weight="medium" style={{ fontSize: 12, lineHeight: 16, color }}>
+      <AppText weight="medium" style={{ fontSize: 13, lineHeight: 18, color }}>
         {label}
       </AppText>
     </AppView>
@@ -96,7 +96,7 @@ export function ItemRatingRow({ rating, reviewCount }: { rating?: number; review
         {rating.toFixed(1)}
       </AppText>
       {reviewCount ? (
-        <AppText family="default" style={{ fontSize: 12, color: tokens.textMuted }}>
+        <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>
           {t('catalog.reviewCount', { count: reviewCount })}
         </AppText>
       ) : null}
@@ -284,7 +284,7 @@ export function ItemFitList({
           borderWidth={1}
           borderName="border"
         >
-          <AppText family="accent" weight="semibold" style={{ fontSize: 12, color: tokens.text }}>
+          <AppText family="accent" weight="semibold" style={{ fontSize: 13, color: tokens.text }}>
             {label}
           </AppText>
         </AppView>

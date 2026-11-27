@@ -88,7 +88,7 @@ export function ItemUniversalFitBadge() {
       style={{ alignSelf: 'flex-start', backgroundColor: tokens.successSoft }}
     >
       <Check size={16} strokeWidth={2.6} color={tokens.success} />
-      <AppText family="accent" weight="bold" style={{ fontSize: 12, color: tokens.success }}>
+      <AppText family="accent" weight="bold" style={{ fontSize: 13, color: tokens.success }}>
         {t('itemDetail.universalFitTitle')}
       </AppText>
     </AppView>
@@ -118,7 +118,7 @@ export function ItemVehicleCta({ checking, vehicleLabel, onPress }: ItemVehicleC
     return (
       <AppView row align="center" gap={9}>
         <WheelLoader size={14} color={tokens.textMuted} />
-        <AppText family="default" style={{ fontSize: 12, color: tokens.textMuted }}>
+        <AppText family="default" style={{ fontSize: 13, color: tokens.textMuted }}>
           {t('itemDetail.checkingFit', { vehicle: vehicleLabel })}
         </AppText>
       </AppView>
@@ -152,7 +152,7 @@ export function ItemVehicleCta({ checking, vehicleLabel, onPress }: ItemVehicleC
       <AppText family="heading" weight="bold" style={{ fontSize: 15, color: tokens.text }}>
         {t('itemDetail.confirmFitTitle')}
       </AppText>
-      <AppText family="default" style={{ fontSize: 12, lineHeight: 17, color: tokens.textMuted }}>
+      <AppText family="default" style={{ fontSize: 13, lineHeight: 19, color: tokens.textMuted }}>
         {t('itemDetail.confirmFitBody')}
       </AppText>
       <AppText

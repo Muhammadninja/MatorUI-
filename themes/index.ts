@@ -85,7 +85,7 @@ export const FONT_PACKAGES = {
 const textVariants: Record<TextVariant, TextStyle> = {
   body: { fontSize: 16, lineHeight: 24, fontFamily: 'Inter_400Regular' },
   bodySm: { fontSize: 14, lineHeight: 20, fontFamily: 'Inter_400Regular' },
-  bodyXs: { fontSize: 12, lineHeight: 16, fontFamily: 'Inter_400Regular' },
+  bodyXs: { fontSize: 13, lineHeight: 18, fontFamily: 'Inter_400Regular' },
   bodySemibold: { fontSize: 14, lineHeight: 20, fontFamily: 'Inter_600SemiBold' },
   h3: { fontSize: 24, lineHeight: 30, fontFamily: 'Inter_700Bold' },
   h4: { fontSize: 20, lineHeight: 26, fontFamily: 'Inter_700Bold' },

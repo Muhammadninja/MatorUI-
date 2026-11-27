@@ -181,6 +181,7 @@ vi.mock('@/hooks/use-categories', () => ({
     categories: homeTiles,
     refresh: async () => refreshResult,
   }),
+  useSyncCategoryTileCount: () => undefined,
 }));
 vi.mock('@/hooks/use-system-categories', () => ({
   useSystemCategories: () => ({ state: 'success', categories: systemTiles }),

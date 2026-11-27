@@ -94,7 +94,7 @@ export default function CatalogPhotoAnnouncement({ categoryId, categoryLabel, on
           <AppText
             family="accent"
             weight="semibold"
-            style={{ color: tokens.brandText, fontSize: 12 }}
+            style={{ color: tokens.brandText, fontSize: 13 }}
           >
             {t('catalog.photoAnnouncementCta')}
           </AppText>
