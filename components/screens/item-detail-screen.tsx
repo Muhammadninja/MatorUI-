@@ -45,6 +45,7 @@ import { useGoBack } from '@/hooks/use-app-navigation';
 import { parsePrice } from '@/services/cart-math';
 import type { CatalogItem, CatalogItemSpec } from '@/services/catalog-service';
 import { resolveItemPricing } from '@/services/sales-service';
+import { canCopyToClipboard, copyToClipboard } from '@/utils/clipboard';
 import { formatSomAmount } from '@/utils/format-price';
 import { triggerHaptic } from '@/utils/haptics';
 import { shareItem } from '@/utils/share';
@@ -361,15 +362,16 @@ export default function ItemDetailScreen() {
               <ItemSectionTitle title={t('itemDetail.specsTitle')} />
               <ItemSpecTable
                 specs={specs}
-                onCopy={async (value) => {
-                  try {
-                    const Clipboard = await import('expo-clipboard');
-                    await Clipboard.setStringAsync(value);
-                    toast.success(t('itemDetail.identifierCopied'));
-                  } catch {
-                    toast.info(t('itemDetail.copyUnavailable'));
-                  }
-                }}
+                // Without the native module (builds ≤1.1.0) there is no copy
+                // button; the value is selectable and long-press copies it.
+                onCopy={
+                  canCopyToClipboard
+                    ? async (value) => {
+                        if (await copyToClipboard(value)) toast.success(t('itemDetail.identifierCopied'));
+                        else toast.info(t('itemDetail.copyUnavailable'));
+                      }
+                    : undefined
+                }
               />
             </AppView>
           ) : null}

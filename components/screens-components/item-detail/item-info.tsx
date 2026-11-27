@@ -147,6 +147,7 @@ export function ItemSpecTable({
                 <AppText
                   family="accent"
                   weight="semibold"
+                  selectable
                   style={{
                     flex: 1,
                     flexShrink: 1,
